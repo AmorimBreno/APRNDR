@@ -23,12 +23,22 @@ export const EXTRA_PATH = ["/opt/local/bin", "/usr/local/bin", "/opt/homebrew/bi
 export const STAGING_ROOT = join(tmpdir(), "pi-visual-tools")
 export const FILES_DIRNAME = "viz"
 
+// [estudos-ia] Caminhos do Linux (Ubuntu no WSL) além dos do macOS. A variável
+// PI_CHROME_PATH, se existir, vence todos. Sem um Chrome encontrado o mmdc não
+// renderiza, porque o download do Chromium do puppeteer está desligado.
 export const CHROME_CANDIDATES = [
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
   "/Applications/Chromium.app/Contents/MacOS/Chromium",
+  "/usr/bin/google-chrome",
+  "/usr/bin/google-chrome-stable",
+  "/usr/bin/chromium",
+  "/usr/bin/chromium-browser",
+  "/snap/bin/chromium",
 ]
 
 export function findChrome(): string | undefined {
+  const fromEnv = process.env.PI_CHROME_PATH // [estudos-ia]
+  if (fromEnv && existsSync(fromEnv)) return fromEnv // [estudos-ia]
   for (const c of CHROME_CANDIDATES) if (existsSync(c)) return c
   return undefined
 }

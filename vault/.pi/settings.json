@@ -1,0 +1,5 @@
+{
+  "defaultProvider": "openrouter",
+  "defaultModel": "openai/gpt-6.1-sol",
+  "defaultThinkingLevel": "medium"
+}

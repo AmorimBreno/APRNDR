@@ -112,6 +112,7 @@ resultados.forEach((r, i) => {
 
 const letrasOk = Object.keys(gabarito.respostas).filter((l) => !gabarito.respostas[l].erro);
 if (letrasOk.length === 0) {
+	rmSync(pasta, { recursive: true, force: true });
 	console.error("\nNenhum modelo respondeu. Nada foi gravado.");
 	process.exit(1);
 }

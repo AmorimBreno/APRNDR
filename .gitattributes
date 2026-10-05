@@ -1,0 +1,5 @@
+# Tudo com fim de linha LF. O pi e os scripts rodam no WSL (Linux),
+# e um script .sh com CRLF quebra no bash.
+* text=auto eol=lf
+*.png binary
+*.pdf binary

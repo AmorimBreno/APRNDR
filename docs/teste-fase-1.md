@@ -38,6 +38,8 @@ No terminal do Ubuntu:
 cd /mnt/c/Users/Pichau/Desktop/DEV/projeto-estudos/vault && tmux new -A -s estudo 'pi'
 ```
 
+Se aparecer só [exited], o pi não foi encontrado: o terminal foi aberto antes de o ~/.bashrc ganhar as linhas do pi e das chaves. Rode source ~/.bashrc (ou abra um terminal novo) e tente de novo. Para conferir: type pi deve mostrar /home/breno/.pi/agent/bin/pi.
+
 Na primeira vez o pi pergunta "Trust project folder?". Escolha "Trust" (a primeira opção). Isso deixa o pi carregar a pasta vault/.pi (skills, extensões, modelos) sempre que abrir nesta pasta. Sem isso os subagentes também perguntam e travam.
 
 Confira:

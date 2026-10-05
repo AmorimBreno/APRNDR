@@ -15,7 +15,7 @@
  *   node extras/prova-cega/prova-cega.mjs
  */
 
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -67,6 +67,9 @@ async function perguntar(modelo) {
 				{ role: "system", content: sistema },
 				{ role: "user", content: pedido },
 			],
+			// Sem max_tokens o OpenRouter reserva o máximo do modelo (até 131 mil
+			// tokens) e recusa o pedido se o saldo não cobrir essa reserva.
+			max_tokens: 16000,
 			reasoning: { effort: "medium" },
 			usage: { include: true },
 		}),
@@ -108,6 +111,10 @@ resultados.forEach((r, i) => {
 });
 
 const letrasOk = Object.keys(gabarito.respostas).filter((l) => !gabarito.respostas[l].erro);
+if (letrasOk.length === 0) {
+	console.error("\nNenhum modelo respondeu. Nada foi gravado.");
+	process.exit(1);
+}
 writeFileSync(
 	join(pasta, "avaliacao.md"),
 	`# Prova cega: ${TEMA}

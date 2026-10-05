@@ -48,10 +48,17 @@ Confira:
 
 ### 2. Ligar o log no Obsidian
 
-O md-log só se liga a uma nota que já existe; ele não cria arquivos, para um erro de digitação não espalhar notas pelo vault. Então primeiro crie a nota e depois ligue o log. No pi, digite as duas linhas, uma de cada vez (o ! no começo roda o comando no bash, sem passar pela IA):
+O md-log só se liga a uma nota que já existe; ele não cria arquivos, para um erro de digitação não espalhar notas pelo vault. Então primeiro crie a nota e depois ligue o log. No pi, envie dois comandos separados, cada um com o seu Enter. Não cole os dois juntos: uma mensagem que começa com ! vai inteira para o bash, inclusive a linha do /md-log.
+
+Primeiro (o ! roda o comando no bash, sem passar pela IA):
 
 ```
 !touch aulas/2026-10-teste-r2.md
+```
+
+Depois:
+
+```
 /md-log aulas/2026-10-teste-r2.md
 ```
 

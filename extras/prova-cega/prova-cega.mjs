@@ -12,7 +12,10 @@
  * quiz é escrito como texto. O que se compara é a qualidade da explicação.
  *
  * Uso (no WSL, a partir da raiz do repositório, com OPENROUTER_API_KEY definida):
- *   node extras/prova-cega/prova-cega.mjs
+ *   node extras/prova-cega/prova-cega.mjs [pasta] [modelo ...]
+ *
+ * pasta: nome da subpasta em vault/comparacao (padrão: r2-ajustado).
+ * modelos: ids do OpenRouter (padrão: os três da primeira rodada).
  */
 
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -20,8 +23,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const TEMA = "r2-ajustado";
-const MODELOS = ["openai/gpt-6.1-sol", "z-ai/glm-5.3", "deepseek/deepseek-v4-pro-0813"];
+const TEMA = process.argv[2] ?? "r2-ajustado";
+const MODELOS = process.argv.length > 3 ? process.argv.slice(3) : ["openai/gpt-6.1-sol", "z-ai/glm-5.3", "deepseek/deepseek-v4-pro-0813"];
 
 const chave = process.env.OPENROUTER_API_KEY;
 if (!chave) {
@@ -131,9 +134,7 @@ Perguntas para guiar a leitura:
 
 ## Sua ordem (da melhor para a pior)
 
-1.
-2.
-3.
+${letrasOk.map((_, i) => `${i + 1}.`).join("\n")}
 
 ## Comentários
 

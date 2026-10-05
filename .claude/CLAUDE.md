@@ -14,9 +14,15 @@ Este arquivo é para o Claude Code, não para o pi. Ele fica em .claude/ de prop
 
 ## Etapa atual
 
-Checkpoint 1, Etapa 1: o learn funcionando igual ao original (PLANO.md seção 6, com os ajustes da seção 12).
+Checkpoint 1, Etapa 1: o learn funcionando igual ao original (PLANO.md seção 6, com os ajustes da seção 12). Instalação e teste de fumaça feitos; esperando o Breno executar docs/teste-fase-1.md e aprovar.
 
 Concluídas: Etapa 0 (repositório, .claude/CLAUDE.md, referencias/, decisões registradas no PLANO.md).
+
+Estado da Etapa 1:
+- pi 1.0.4 em ~/.pi/agent/bin (WSL), pi-interactive-subagents, web_search/web_fetch (Tavily) instalados por extras/instalar.sh.
+- Modelos (OpenRouter): professor openai/gpt-6.1-sol (vault/.pi/settings.json, escolhido por prova cega em vault/comparacao/); pesquisador z-ai/glm-5.3; desenhistas anthropic/claude-sonnet-5.5.
+- Regras de estilo do Breno em vault/.pi/APPEND_SYSTEM.md (vão para o perfil na Etapa 2).
+- Para testar o pi sem o Breno: tmux headless (tmux new-session -d) a partir de vault/, com pi -a; os subagentes pedem confiança no projeto até o Breno escolher "Trust" na primeira aula.
 
 
 ## Como trabalhar com o Breno

@@ -74,11 +74,11 @@ async function perguntar(modelo) {
 			usage: { include: true },
 		}),
 	});
-	const segundos = Math.round((Date.now() - inicio) / 1000);
 	if (!res.ok) {
 		throw new Error(`${modelo}: OpenRouter respondeu ${res.status}: ${(await res.text()).slice(0, 500)}`);
 	}
 	const dados = await res.json();
+	const segundos = Math.round((Date.now() - inicio) / 1000); // depois do corpo inteiro chegar
 	const texto = dados.choices?.[0]?.message?.content ?? "";
 	if (!texto.trim()) throw new Error(`${modelo}: resposta vazia`);
 	return { modelo, texto, segundos, uso: dados.usage ?? null, provedor: dados.provider ?? null };

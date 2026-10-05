@@ -1,3 +1,4 @@
+// [estudos-ia] Os textos que o usuário vê (no terminal e no log do Obsidian) foram traduzidos para português.
 /**
  * md-log — mirror the session to a markdown file for comfortable reading.
  *
@@ -132,10 +133,10 @@ export default function mdLog(pi: ExtensionAPI) {
 	function answerCalloutQuiz(details: any): string {
 		const status = details?.status;
 		if (status === "cancelled") {
-			return callout("warning", "Quiz — cancelled", ["(user skipped)"]);
+			return callout("warning", "Quiz — cancelado", ["(pulado)"]);
 		}
 		if (status === "unavailable") {
-			return callout("warning", "Quiz — unavailable", [details?.message || ""]);
+			return callout("warning", "Quiz — indisponível", [details?.message || ""]);
 		}
 		// "I don't know" is neither correct nor incorrect — it's a distinct signal,
 		// so it never renders as a red ✗.
@@ -143,30 +144,30 @@ export default function mdLog(pi: ExtensionAPI) {
 		const correct = details?.correct === true;
 		const type = dontKnow ? "question" : correct ? "success" : "failure";
 		const title = dontKnow
-			? "Quiz — I don't know"
+			? "Quiz — Não sei"
 			: correct
-				? "Quiz — correct ✓"
-				: "Quiz — incorrect ✗";
+				? "Quiz — certo ✓"
+				: "Quiz — errado ✗";
 		const body: string[] = [];
 
 		if (dontKnow) {
-			body.push("Your answer: I don't know");
+			body.push("Sua resposta: Não sei");
 		} else {
 			const answers: any[] = details?.answers || [];
-			const sel = answers.map((a) => `${a.index}. ${a.label}`).join(", ") || "(none)";
-			body.push(`Your answer: ${sel}`);
+			const sel = answers.map((a) => `${a.index}. ${a.label}`).join(", ") || "(nenhuma)";
+			body.push(`Sua resposta: ${sel}`);
 		}
 
 		const correctIndices: number[] = details?.correctIndices || [];
 		const correctStr = correctIndices.map((i) => `${i}`).join(", ");
-		body.push(`Correct answer: ${correctStr}`);
+		body.push(`Resposta certa: ${correctStr}`);
 
 		// Optional free-text note the user typed in the always-present note field.
 		// Only present (in details) when non-empty, so no guard for empty strings.
 		if (details?.note) {
 			body.push("");
 			const noteLines = String(details.note).split("\n");
-			body.push(`Note: ${noteLines[0]}`);
+			body.push(`Nota: ${noteLines[0]}`);
 			for (let i = 1; i < noteLines.length; i++) body.push(noteLines[i]);
 		}
 
@@ -180,19 +181,19 @@ export default function mdLog(pi: ExtensionAPI) {
 	function answerCalloutAsk(details: any): string {
 		const status = details?.status;
 		if (status === "cancelled") {
-			return callout("warning", "Question — cancelled", ["(user skipped)"]);
+			return callout("warning", "Pergunta — cancelada", ["(pulada)"]);
 		}
 		if (status === "unavailable") {
-			return callout("warning", "Question — unavailable", [details?.message || ""]);
+			return callout("warning", "Pergunta — indisponível", [details?.message || ""]);
 		}
 		const answers: any[] = details?.answers || [];
 		const body: string[] = answers.map((a) => {
-			if (a.type === "other") return `Other: ${a.label}`;
+			if (a.type === "other") return `Outra: ${a.label}`;
 			if (a.type === "text") return a.label;
 			return `${a.index}. ${a.label}`;
 		});
-		if (body.length === 0) body.push("(no answer)");
-		return callout("example", "Answer", body);
+		if (body.length === 0) body.push("(sem resposta)");
+		return callout("example", "Resposta", body);
 	}
 
 	// --- Event handlers ---
@@ -237,7 +238,7 @@ export default function mdLog(pi: ExtensionAPI) {
 		const question: string = input.question || "";
 		const context: string | undefined = input.details?.trim() || undefined;
 		const options: Array<{ label: string }> = Array.isArray(input.options) ? input.options : [];
-		const block = questionCallout("Question", question, context, options);
+		const block = questionCallout("Pergunta", question, context, options);
 		await withLock(() => appendToFile(block));
 	});
 

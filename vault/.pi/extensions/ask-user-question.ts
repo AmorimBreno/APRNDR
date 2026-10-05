@@ -1,3 +1,4 @@
+// [estudos-ia] Os textos que o usuário vê (no terminal e no log do Obsidian) foram traduzidos para português.
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import {
 	Editor,
@@ -101,7 +102,7 @@ function normalizeOptions(options: Array<{ label: string; value?: string; descri
 }
 
 function getOtherLabel(options: AskOption[]): string {
-	return options.some((option) => option.label.toLowerCase() === "other") ? "Other (custom)" : "Other";
+	return options.some((option) => option.label.toLowerCase() === "outra") ? "Outra (personalizada)" : "Outra"; // [estudos-ia] era "Other"
 }
 
 function createEditorTheme(theme: any): EditorTheme {
@@ -306,15 +307,15 @@ async function askSingleChoice(
 
 			if (editMode) {
 				lines.push("");
-				add(theme.fg("muted", " Write your custom answer:"));
+				add(theme.fg("muted", " Escreva sua resposta:"));
 				for (const line of editor.render(Math.max(1, width - 2))) {
 					add(` ${line}`);
 				}
 				lines.push("");
-				add(theme.fg("dim", " Enter to submit • Esc to go back"));
+				add(theme.fg("dim", " Enter envia • Esc volta"));
 			} else {
 				lines.push("");
-				add(theme.fg("dim", " ↑↓ navigate • Enter select • Esc cancel"));
+				add(theme.fg("dim", " ↑↓ navegar • Enter escolhe • Esc cancelar"));
 			}
 
 			add(theme.fg("accent", "─".repeat(width)));
@@ -345,7 +346,7 @@ async function askMultiChoice(
 		id: `option:${index}`,
 		index: index + 1,
 	}));
-	const submitItem: DisplayOption = { id: "submit", label: "Submit", value: "__submit__", isSubmit: true };
+	const submitItem: DisplayOption = { id: "submit", label: "Enviar", value: "__submit__", isSubmit: true };
 	const allItems: DisplayOption[] = [
 		...choiceItems,
 		{ id: "other", label: otherLabel, value: "__other__", isOther: true },
@@ -508,18 +509,18 @@ async function askMultiChoice(
 
 			if (editMode) {
 				lines.push("");
-				add(theme.fg("muted", " Write your custom answer:"));
+				add(theme.fg("muted", " Escreva sua resposta:"));
 				for (const line of editor.render(Math.max(1, width - 2))) {
 					add(` ${line}`);
 				}
 				lines.push("");
-				add(theme.fg("dim", " Enter to save • Esc to go back"));
+				add(theme.fg("dim", " Enter salva • Esc volta"));
 			} else {
 				lines.push("");
 				if (selected.size === 0) {
-					add(theme.fg("warning", " Select at least one answer before submitting."));
+					add(theme.fg("warning", " Escolha pelo menos uma resposta antes de enviar."));
 				}
-				add(theme.fg("dim", " ↑↓ navigate • Space toggle • Enter edit/submit • Esc cancel"));
+				add(theme.fg("dim", " ↑↓ navegar • Espaço marca • Enter edita/envia • Esc cancelar"));
 			}
 
 			add(theme.fg("accent", "─".repeat(width)));
@@ -576,7 +577,7 @@ export default function askUserQuestion(pi: ExtensionAPI) {
 		promptGuidelines: [
 			"Ask exactly one question per tool call.",
 			"If you need answers to multiple questions, make multiple separate ask_user_question tool calls instead of combining them into one prompt.",
-			'Users will always be able to select "Other" to provide custom text input when options are provided.',
+			'Users will always be able to select "Outra" (Other) to provide custom text input when options are provided.',
 			"Use multiSelect: true only when you need multiple answers to the same question.",
 			'If you recommend a specific option, make it the first option in the list and add "(Recommended)" at the end of the label.',
 			"Prefer this tool over guessing when requirements, preferences, or implementation choices are unclear.",
@@ -658,7 +659,7 @@ export default function askUserQuestion(pi: ExtensionAPI) {
 					case "text":
 						return `${theme.fg("success", "✓ ")}${theme.fg("accent", answer.label || "(empty response)")}`;
 					case "other":
-						return `${theme.fg("success", "✓ ")}${theme.fg("muted", "Other: ")}${theme.fg("accent", answer.label)}`;
+						return `${theme.fg("success", "✓ ")}${theme.fg("muted", "Outra: ")}${theme.fg("accent", answer.label)}`;
 					case "option":
 						return `${theme.fg("success", "✓ ")}${theme.fg("accent", `${answer.index}. ${answer.label}`)}`;
 				}

@@ -48,11 +48,14 @@ Confira:
 
 ### 2. Ligar o log no Obsidian
 
-No pi, digite:
+O md-log só se liga a uma nota que já existe; ele não cria arquivos, para um erro de digitação não espalhar notas pelo vault. Então primeiro crie a nota e depois ligue o log. No pi, digite as duas linhas, uma de cada vez (o ! no começo roda o comando no bash, sem passar pela IA):
 
 ```
+!touch aulas/2026-10-teste-r2.md
 /md-log aulas/2026-10-teste-r2.md
 ```
+
+Deve aparecer "Linked: ...". Criar a nota pelo Obsidian, dentro de aulas/, também serve.
 
 No Obsidian, abra aulas/2026-10-teste-r2.md e deixe ao lado do terminal. Tudo o que for escrito na aula aparece ali, com LaTeX renderizado.
 

@@ -308,3 +308,58 @@ Regra para todas: qualquer "refazer" ou "não entendi" passa pelo protocolo de r
 2. github.com/earendil-works/pi, documentação em packages/coding-agent/docs: quickstart.md, configuration.md, skills.md, prompt-templates.md, extensions.md, packages.md, models.md, providers.md, tmux.md, sdk.md, rpc.md e rpc-extension-ui.md.
 3. github.com/amosblomqvist/pi-interactive-subagents: README.md e pi-extension/subagents/index.ts.
 4. referencias/plano-cd.html: o artefato de referência visual da Fase 3.
+
+
+## 12. Decisões de 2026-10-05
+
+Respostas do Breno às perguntas da seção 10 e ajustes de escopo. Quando algo aqui divergir das seções anteriores, vale esta seção.
+
+### Ambiente
+
+1. A máquina é Windows 11, não Ubuntu nativo. O pi, o tmux, o Chromium e o rsvg-convert rodam no WSL (Ubuntu), porque o pi-interactive-subagents só funciona dentro do tmux.
+2. O vault fica numa pasta do Windows (projeto-estudos\vault) e o pi acessa por /mnt/c/... O motivo: o Obsidian do Windows não percebe mudanças em arquivos dentro do WSL (\wsl$), e a aula ao vivo do /md-log depende disso. A escrita do WSL em /mnt/c acontece no disco do Windows, então o Obsidian percebe.
+3. O Node do Windows (22.17) fica como está. O pi usa um Node 22.19 ou mais novo instalado no WSL.
+4. O Obsidian ainda não está instalado. Entra na lista de pré-requisitos da Etapa 1.
+5. O .gitattributes força LF em todos os arquivos, porque scripts .sh com CRLF quebram no bash do WSL.
+
+### Provedores, custo e busca
+
+1. Provedor: só OpenRouter, para todos os papéis.
+2. Orçamento: US$ 10 a 30 por mês. Antes de fixar os modelos, propor um por papel com base na lista atual do OpenRouter e medir o custo de uma aula de teste. Os desenhistas precisam de um modelo que aceite imagem.
+3. Busca do pesquisador: Tavily. As extensões web_search e web_fetch ficam em extras/, escritas de forma que trocar de serviço seja fácil.
+4. As chaves (OPENROUTER_API_KEY, TAVILY_API_KEY) o Breno coloca no ambiente do WSL. Nunca em arquivos do repositório.
+
+### Repositório
+
+Repositório privado AmorimBreno/estudos-ia no GitHub. A pasta local continua se chamando projeto-estudos.
+
+### Escopo dos checkpoints
+
+O Breno dividiu o trabalho em dois checkpoints:
+
+1. Checkpoint 1 (pi + Obsidian + terminal) junta as Fases 1 e 2 deste plano e acrescenta as notas por conceito. Etapas:
+   - Etapa 0: preparação do repositório.
+   - Etapa 1: o learn igual ao original (seção 6).
+   - Etapa 2: calibração e reexplicação (seção 7, sem mudanças).
+   - Etapa 3: notas por conceito (abaixo).
+   - Etapa 4: uma semana de estudo real de Ciência de Dados, com os materiais do curso em vault/materiais/. O roteiro de teste da Etapa 1 continua usando um tema curto (R² ajustado).
+2. Checkpoint 2 (app React + servidor) junta as Fases 3 e 4. Só começa depois do checkpoint 1 aprovado.
+
+Cada etapa é explicada e aprovada pelo Breno antes de ser executada.
+
+### Notas por conceito (Etapa 3, novo)
+
+O log da sessão (/md-log em aulas/) continua como está. Além dele, cada conceito estudado vira uma nota limpa em vault/notas/<assunto>/<conceito>.md, com links [[...]] para os conceitos de que ele depende, para a visão de grafo do Obsidian mostrar o mapa de conhecimento.
+
+As notas são geradas só no fim da aula, de uma vez, não a cada nó. Para isso existe o comando /fim-aula, que:
+
+1. gera as notas dos nós que passaram no quiz de checagem;
+2. resume o que funcionou na aula;
+3. propõe as mudanças no perfil (item 4 da seção 7.6).
+
+O comando existe porque, sem ele, o pi não tem como saber que a aula acabou.
+
+### Movido para o checkpoint 2
+
+1. Gerador de plano de estudo: o Breno escolhe quantos dias da semana e quantas horas por dia vai estudar um assunto, ou pede só um estudo rápido. Entra junto com o plano e o calendário da seção 8.
+2. Apontar um trecho da lição para ser reexplicado (clicar no trecho). No checkpoint 1 vale só o "não entendi" geral da seção 7.4.

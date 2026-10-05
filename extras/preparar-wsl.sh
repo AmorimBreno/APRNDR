@@ -25,13 +25,14 @@ node_ok() {
 if node_ok; then
   echo "Node já instalado: $(/usr/bin/node --version)"
 else
-  candidato=$(apt-cache policy nodejs | awk '/Candidate:/ {print $2; exit}')
-  maior=""
-  if echo "$candidato" | grep -qE '^([0-9]+:)?[0-9]+\.[0-9]+'; then
-    maior=$(echo "$candidato" | sed -E 's/^[0-9]+://; s/^([0-9]+)\.([0-9]+).*/\1 \2/')
+  # O awk lê a saída inteira (sem "exit" no meio). Se ele parasse cedo, o
+  # apt-cache receberia SIGPIPE e o pipefail derrubaria o script sem mensagem.
+  candidato=$(apt-cache policy nodejs | awk '/Candidate:/ && !achou {print $2; achou=1}')
+  maj=0; min=0
+  if [[ "$candidato" =~ ^([0-9]+:)?([0-9]+)\.([0-9]+) ]]; then
+    maj=${BASH_REMATCH[2]}; min=${BASH_REMATCH[3]}
   fi
-  set -- $maior
-  if [ -n "${1:-}" ] && { [ "$1" -gt 22 ] || { [ "$1" -eq 22 ] && [ "${2:-0}" -ge 19 ]; }; }; then
+  if [ "$maj" -gt 22 ] || { [ "$maj" -eq 22 ] && [ "$min" -ge 19 ]; }; then
     echo "O Ubuntu oferece o Node $candidato; instalando pelo apt."
     sudo apt-get install -y nodejs npm
   else

@@ -7,7 +7,7 @@ Cada etapa termina com um roteiro de teste em docs/ que o Breno executa. A etapa
 
 ## Estado atual
 
-Etapa 1: 1.1, 1.2 e 1.3 feitas. Teste de fumaça ok (auth do OpenRouter pronta, três modelos disponíveis, resposta em português seguindo o AGENTS.md do perfil, web_search e web_fetch com o Tavily, custo de US$ 0,06). Esperando o Breno rodar docs/teste-etapa-1.md e aprovar. Abrir o pi com o perfil: scriptspi-estudos.cmd.
+Etapa 1: 1.1, 1.2 e 1.3 feitas. Teste de fumaça ok (auth do OpenRouter pronta, três modelos disponíveis, resposta em português seguindo o AGENTS.md do perfil, web_search e web_fetch com o Tavily, custo de US$ 0,06). Esperando o Breno rodar docs/teste-etapa-1.md e aprovar. Abrir o pi com o perfil: scripts\pi-estudos.cmd.
 
 
 ## Etapa 0: preparar o repositório (feita)

@@ -7,7 +7,7 @@ Cada etapa termina com um roteiro de teste em docs/ que o Breno executa. A etapa
 
 ## Estado atual
 
-Etapa 1 em andamento.
+Etapa 1 em andamento. 1.1 e 1.2 feitas (pi 1.2.0 instalado com npm install -g --ignore-scripts; extensões de busca carregam; PNGs de teste ok). 1.3 espera o Breno gravar OPENROUTER_API_KEY e TAVILY_API_KEY nas variáveis de usuário.
 
 
 ## Etapa 0: preparar o repositório (feita)
@@ -19,9 +19,9 @@ Etapa 1 em andamento.
 
 ## Etapa 1: o pi e o ambiente nesta máquina
 
-1.1 Instalar o pi e a configuração global (Light). npm install -g @earendil-works/pi-coding-agent@1.2.0. scripts/instalar-pi-global.mjs copia pi-global/extensions/* para ~/.pi/agent/extensions e mescla pi-global/settings.json em ~/.pi/agent/settings.json sem apagar chaves existentes (openrouter, openai/gpt-6.1-sol, raciocínio medium, tema dark). Verificação: pi --version, arquivos no lugar.
+1.1 (feita) Instalar o pi e a configuração global (Light). npm install -g @earendil-works/pi-coding-agent@1.2.0. scripts/instalar-pi-global.mjs copia pi-global/extensions/* para ~/.pi/agent/extensions e mescla pi-global/settings.json em ~/.pi/agent/settings.json sem apagar chaves existentes (openrouter, openai/gpt-6.1-sol, raciocínio medium, tema dark). Verificação: pi --version, arquivos no lugar.
 
-1.2 Adaptar os recursos do perfil ao Windows (Medium). Edge (msedge.exe) como navegador do mermaid-cli, mantendo PI_CHROME_PATH. SVG desenhado com @resvg/resvg-js no lugar do rsvg-convert. agents/professor.md (agente geral, gpt-6.1-sol, skills teach e visualize). AGENTS.md do perfil com idioma e regras de estilo. ORIGEM.md atualizado. scripts/testar-render.mjs gera um PNG de mermaid e um de SVG.
+1.2 (feita) Adaptar os recursos do perfil ao Windows (Medium). Edge (msedge.exe) como navegador do mermaid-cli, mantendo PI_CHROME_PATH. SVG desenhado com @resvg/resvg-js no lugar do rsvg-convert. agents/professor.md (agente geral, gpt-6.1-sol, skills teach e visualize). AGENTS.md do perfil com idioma e regras de estilo. ORIGEM.md atualizado. scripts/testar-render.mjs gera um PNG de mermaid e um de SVG.
 
 1.3 Teste de fumaça e roteiro (Medium; depende de 1.1, 1.2 e das chaves). pi -p a partir de uma pasta fora do repositório, com as extensões, skills e o AGENTS.md do perfil: resposta em português seguindo as regras, web_search com resultados do Tavily, pi auth check do OpenRouter. Escreve docs/teste-etapa-1.md para o Breno rodar no Windows Terminal.
 

@@ -15,8 +15,8 @@ docs/teste-etapa-1.md — roteiro da Etapa 1: pi no Windows Terminal com o perfi
 docs/ponte-de-eventos.md — protocolo da ponte (interface:mostrar, pedido, resposta, acao) para quem escreve extensão de perfil
 docs/historico/ — documentos do checkpoint 1 (pi no WSL com tmux e Obsidian); só consulta
 
-packages/core/ — @estudos/core: núcleo genérico (não conhece estudos); consumido direto do src/index.ts
-packages/core/src/perfis.ts — esquema zod do profile.json e leitura da pasta profiles/ (lerPerfis, lerPerfil)
+packages/core/ — @estudos/core: núcleo genérico (não conhece estudos); consumido direto do src/index.ts; subcaminho @estudos/core/protocolo = src/protocolo.ts (sem o pi, para o front)
+packages/core/src/perfis.ts — esquema zod do profile.json e leitura da pasta profiles/ (lerPerfis, lerPerfil; lerPerfisComErros separa os inválidos)
 packages/core/src/agentes.ts — leitura dos arquivos de agente (frontmatter pelo parseFrontmatter do pi + prompt)
 packages/core/src/modelos.ts — nomes provedor/id resolvidos no registro de modelos do pi, níveis de raciocínio, modelos disponíveis
 packages/core/src/eventos.ts — tipo EventoNucleo (protocolo genérico, inclusive acao_interface e pedido_interface), tradução dos eventos da sessão do pi e do histórico
@@ -24,13 +24,22 @@ packages/core/src/sessoes.ts — opções do DefaultResourceLoader por (perfil, 
 packages/core/src/montagem.ts — criação de uma sessão do pi pelo SDK, ligação das extensões com o filtro de ferramentas e encerramento; comum à sessão principal e às filhas
 packages/core/src/ponte.ts — ponte de eventos: extensão inline que liga pi.events à janela (mostrar, pedido e resposta com cancelamento, ação da interface)
 packages/core/src/subagentes.ts — ferramenta subagent: sessão filha em <dados>/.sessoes-pi/subagentes, progresso pelo onUpdate, texto final e uso da filha
+packages/core/src/protocolo.ts — protocolo do WebSocket: mensagens do cliente (esquema zod e validarMensagemCliente), mensagens do servidor e dados de cada resposta; só zod e import type
 packages/core/src/janela-perfil.ts — JanelaPerfil: uma sessão do pi por janela (iniciar, enviar, abortar, trocar modelo e agente, histórico, recarregar, responder e acaoDaInterface da ponte)
 packages/core/src/*.test.ts — testes vitest do núcleo (sem rede; janela-perfil.test.ts usa perfil e pasta do pi temporários)
 packages/ui/ — @estudos/ui: componentes e hooks React comuns (vazio até a tarefa 2.5)
 
-apps/server/ — @estudos/server: Hono (HTTP) + ws (WebSocket) na porta 7431; dev com tsx watch
-apps/server/src/config.ts — porta do servidor e caminhos da raiz do repositório e de profiles/
-apps/server/src/index.ts — rotas /api/saude e /api/perfis e WebSocket /ws (por enquanto só ping e pong)
+apps/server/ — @estudos/server: Hono (HTTP) + ws (WebSocket) na porta 7431; dev com dev.mjs
+apps/server/dev.mjs — modo dev: roda src/index.ts com o tsx e reinicia quando apps/server/src ou packages/core/src mudam, pedindo o encerramento pelo IPC (o tsx watch mata o processo na hora no Windows)
+apps/server/src/config.ts — porta, caminhos (raiz, profiles/, %LOCALAPPDATA%\estudos-app\logs), nomes das chaves e espera do watcher
+apps/server/src/index.ts — liga tudo: chaves, janelas, rotas, WebSocket /ws, watcher, log e encerramento limpo (sinais e pedido do dev.mjs)
+apps/server/src/app.ts — rotas HTTP: /api/saude, /api/perfis (válidos e erros à parte), /api/perfis/:id/sessoes
+apps/server/src/janelas.ts — Janelas: uma JanelaPerfil por perfil, compartilhada pelas conexões; lista de perfis em cache; registro de modelos compartilhado
+apps/server/src/conexao.ts — trata cada mensagem do WebSocket (validação, chamada à janela, resposta com pedidoId) e o resumo para o log
+apps/server/src/observador.ts — watcher (fs.watch recursivo) de profiles/ e ~/.pi/agent/extensions, com filtro por data de modificação e espera de 300 ms
+apps/server/src/chaves.ts — lê OPENROUTER_API_KEY e TAVILY_API_KEY das variáveis de usuário do Windows quando faltam no processo
+apps/server/src/log.ts — log no console e em %LOCALAPPDATA%\estudos-app\logs\servidor-AAAA-MM-DD.log
+apps/server/src/servidor.test.ts — testes do servidor sem rede (rotas, mensagens com janela falsa, watcher, chaves)
 apps/web/ — @estudos/web: Vite + React na porta 7430, com proxy de /api e /ws para a 7431
 apps/web/vite.config.ts — porta e proxy do Vite
 apps/web/src/App.tsx — página mínima que mostra /api/saude e os perfis (a tela provisória é a tarefa 2.5)
@@ -64,5 +73,6 @@ scripts/instalar-pi-global.mjs — copia pi-global/ para ~/.pi/agent (mescla o s
 scripts/pi-estudos.cmd — abre o pi no terminal com o perfil de estudos, em %LOCALAPPDATA%\estudos-app\pi-teste (fora do repositório)
 scripts/testar-render.mjs — gera PNGs de teste pelo mesmo código das visual-tools (em %TEMP%/estudos-render-teste)
 scripts/testar-nucleo.ts — verificação do núcleo com chamadas reais (sessão, prompt, troca de modelo e agente, histórico, recarregar); rodar com o tsx e as chaves
+scripts/testar-servidor.ts — verificação da tarefa 2.4 pelo WebSocket do pnpm dev (perfil, pergunta, sessões, modelo, watcher; --reabrir <sessaoId> depois de reiniciar)
 scripts/testar-ponte.ts — verificação da tarefa 2.3 com chamadas reais (ponte, subagentes researcher e mermaid-maker, web_fetch fresh); rodar com o tsx e as chaves
 scripts/prova-cega/prova-cega.mjs — compara modelos de professor às cegas; grava em <dados>/comparacao

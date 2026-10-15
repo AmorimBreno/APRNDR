@@ -8,5 +8,9 @@ export * from "./modelos.ts";
 export * from "./montagem.ts";
 export * from "./perfis.ts";
 export * from "./ponte.ts";
+export * from "./protocolo.ts";
 export * from "./sessoes.ts";
 export * from "./subagentes.ts";
+
+// Do pi, para o servidor não depender do pacote direto (a versão fica fixada só aqui).
+export { getAgentDir, type ModelRuntime } from "@earendil-works/pi-coding-agent";

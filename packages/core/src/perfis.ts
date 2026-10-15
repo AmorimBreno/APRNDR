@@ -190,6 +190,46 @@ export async function lerPerfil(pasta: string): Promise<Perfil> {
 	};
 }
 
+/** Um perfil que não pôde ser lido, com a mensagem do ErroPerfil. */
+export interface PerfilInvalido {
+	/** Pasta do perfil (absoluta). */
+	pasta: string;
+	arquivo: string;
+	mensagem: string;
+}
+
+/**
+ * Como lerPerfis, mas um perfil inválido não interrompe a leitura: ele vai
+ * para `erros` e os outros continuam valendo. É o que o servidor usa, para um
+ * perfil quebrado não esconder os demais.
+ */
+export async function lerPerfisComErros(pastaPerfis: string): Promise<{ perfis: Perfil[]; erros: PerfilInvalido[] }> {
+	const raiz = resolve(pastaPerfis);
+	const itens = await readdir(raiz, { withFileTypes: true });
+	const pastas = itens
+		.filter((item) => item.isDirectory())
+		.map((item) => join(raiz, item.name))
+		.sort();
+
+	const perfis: Perfil[] = [];
+	const erros: PerfilInvalido[] = [];
+	for (const pasta of pastas) {
+		const arquivo = join(pasta, "profile.json");
+		if (!(await existe(arquivo))) continue;
+		try {
+			const perfil = await lerPerfil(pasta);
+			const repetido = perfis.find((outro) => outro.id === perfil.id);
+			if (repetido) {
+				throw new ErroPerfil(arquivo, `campo id: ${perfil.id} já é usado pelo perfil da pasta ${basename(repetido.pasta)}`);
+			}
+			perfis.push(perfil);
+		} catch (erro) {
+			erros.push({ pasta, arquivo, mensagem: erro instanceof Error ? erro.message : String(erro) });
+		}
+	}
+	return { perfis, erros };
+}
+
 /**
  * Lê todas as subpastas de `pastaPerfis` que têm profile.json, em ordem
  * alfabética. Um perfil inválido gera ErroPerfil dizendo o arquivo e o campo.

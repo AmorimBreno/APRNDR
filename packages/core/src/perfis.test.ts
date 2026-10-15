@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { ErroPerfil, lerPerfil, lerPerfis, validarProfileJson } from "./perfis.ts";
+import { ErroPerfil, lerPerfil, lerPerfis, lerPerfisComErros, validarProfileJson } from "./perfis.ts";
 
 const raizRepositorio = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const pastaPerfis = join(raizRepositorio, "profiles");
@@ -102,6 +102,25 @@ describe("profile.json inválido", () => {
 			expect((await lerPerfil(pasta)).extensoesSubagentes).toEqual([]);
 			await writeFile(join(pasta, "profile.json"), JSON.stringify({ ...valido, extensoesSubagentes: ["extensions/nao.ts"] }));
 			await expect(lerPerfil(pasta)).rejects.toThrow(/campo extensoesSubagentes\[0\]: extensions\/nao\.ts não existe/);
+		});
+
+		it("lerPerfisComErros separa os perfis inválidos sem perder os válidos", async () => {
+			pasta = await mkdtemp(join(tmpdir(), "estudos-perfis-"));
+			const bom = join(pasta, "a-bom");
+			await mkdir(join(bom, "agents"), { recursive: true });
+			await writeFile(join(bom, "AGENTS.md"), "");
+			await writeFile(join(bom, "agents", "geral.md"), "---\nname: geral\n---\n\nGeral.\n");
+			await writeFile(join(bom, "profile.json"), JSON.stringify(valido));
+			await mkdir(join(pasta, "b-quebrado"));
+			await writeFile(join(pasta, "b-quebrado", "profile.json"), "{ isto não é json");
+			await mkdir(join(pasta, "c-sem-profile"));
+
+			const { perfis, erros } = await lerPerfisComErros(pasta);
+			expect(perfis.map((perfil) => perfil.id)).toEqual(["teste"]);
+			expect(erros).toHaveLength(1);
+			expect(erros[0]?.arquivo).toBe(join(pasta, "b-quebrado", "profile.json"));
+			expect(erros[0]?.mensagem).toMatch(/não foi possível ler o JSON/);
+			await expect(lerPerfis(pasta)).rejects.toThrow(ErroPerfil);
 		});
 
 		it("acusa arquivo de agente que não existe", async () => {

@@ -1,9 +1,9 @@
 /**
  * web-search: ferramenta web_search para o pesquisador (agents/researcher.md).
  *
- * Fica em ~/.pi/agent/extensions/web-search/index.ts porque é ali que o
- * pi-interactive-subagents procura a ferramenta (getToolExtensionPath em
- * pi-extension/subagents/index.ts). Instale com extras/instalar.sh.
+ * Fica em ~/.pi/agent/extensions/web-search/index.ts, as extensões globais do pi,
+ * para valer no pi do terminal e nas sessões do app (principal e subagentes).
+ * A fonte é pi-global/; instale com node scripts/instalar-pi-global.mjs.
  *
  * Serviço: Tavily (POST https://api.tavily.com/search), chave em TAVILY_API_KEY.
  * Para trocar de serviço, reescreva só a função buscar() abaixo, mantendo o

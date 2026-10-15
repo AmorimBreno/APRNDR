@@ -21,6 +21,7 @@
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent"
 import { Type } from "@sinclair/typebox"
+import { randomUUID } from "node:crypto" // [estudos-ia]
 import { fileURLToPath } from "node:url"
 import {
   applyEdit,
@@ -51,9 +52,12 @@ const RENDER_TIMEOUT_MS = 120_000
 
 type RenderDetails = { ok: boolean; path: string; filename?: string }
 
-let session: Session | null = null
 
 export default function mermaidToolsExtension(pi: ExtensionAPI) {
+  // [estudos-ia] Estado por sessão, não por módulo: no app as sessões filhas rodam no mesmo processo (o pi guarda o módulo em cache)
+  // e podem rodar ao mesmo tempo; cada uma tem o seu arquivo-fonte numa pasta própria.
+  let session: Session | null = null // [estudos-ia]
+  const sessionGroup = `${GROUP}-${randomUUID().slice(0, 8)}` // [estudos-ia]
   // ── write_mermaid ──────────────────────────────────────────────────────────
   pi.registerTool({
     name: "write_mermaid",
@@ -74,7 +78,7 @@ export default function mermaidToolsExtension(pi: ExtensionAPI) {
     async execute(_id, params) {
       const source = (params.source ?? "").trim()
       if (!source) throw new Error("`write_mermaid` requires a non-empty `source`.")
-      session = writeBody(GROUP, BODY_FILE, source)
+      session = writeBody(sessionGroup, BODY_FILE, source)
       const lines = source.split("\n").length
       return {
         content: [
@@ -141,7 +145,7 @@ export default function mermaidToolsExtension(pi: ExtensionAPI) {
         }),
       ),
     }),
-    async execute(_id, params) {
+    async execute(_id, params, _signal, _onUpdate, ctx) { // [estudos-ia] ctx
       if (!session || !existsSync(session.bodyPath)) {
         throw new Error("render_mermaid: no source yet — call write_mermaid first.")
       }
@@ -181,7 +185,7 @@ export default function mermaidToolsExtension(pi: ExtensionAPI) {
       const content: Array<{ type: "text"; text: string } | { type: "image"; data: string; mimeType: string }> = []
 
       if (params.save_as) {
-        const { filename, path } = publish(outPath, String(params.save_as))
+        const { filename, path } = publish(outPath, String(params.save_as), ctx?.cwd) // [estudos-ia] ctx.cwd = pasta de dados
         content.push({
           type: "text",
           text: `Published to viz/.\nfilename: ${filename}\npath: ${path}\n\nLOOK at the diagram below to confirm it is correct before returning it.`,

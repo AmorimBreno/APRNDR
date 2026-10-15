@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,7 +19,11 @@ describe("perfil estudos real", () => {
 			join(pastaPerfis, "estudos", "skills", "teach"),
 			join(pastaPerfis, "estudos", "skills", "visualize"),
 		]);
-		expect(perfil.extensoes).toEqual([join(pastaPerfis, "estudos", "extensions", "visual-tools")]);
+		expect(perfil.extensoes).toEqual([]);
+		expect(perfil.extensoesSubagentes).toEqual([
+			join(pastaPerfis, "estudos", "extensions", "visual-tools", "tools", "mermaid_tools.ts"),
+			join(pastaPerfis, "estudos", "extensions", "visual-tools", "tools", "svg_tools.ts"),
+		]);
 		expect(perfil.agentePadrao).toBe("professor");
 		expect(perfil.paineis).toEqual(["teste"]);
 	});
@@ -65,6 +69,17 @@ describe("profile.json inválido", () => {
 		expect(() => validarProfileJson({ ...valido, caderno: true }, "x")).toThrow(/caderno/);
 	});
 
+	it("extensoesSubagentes é opcional e aceita só caminhos relativos", () => {
+		expect(validarProfileJson(valido, "x").extensoesSubagentes).toBeUndefined();
+		expect(validarProfileJson({ ...valido, extensoesSubagentes: ["extensions/a.ts"] }, "x").extensoesSubagentes).toEqual([
+			"extensions/a.ts",
+		]);
+		expect(() => validarProfileJson({ ...valido, extensoesSubagentes: [resolve("/a.ts")] }, "x")).toThrow(
+			/campo extensoesSubagentes\[0\]: deve ser um caminho relativo/,
+		);
+		expect(() => validarProfileJson({ ...valido, extensoesSubagentes: "extensions/a.ts" }, "x")).toThrow(/campo extensoesSubagentes/);
+	});
+
 	describe("em disco", () => {
 		let pasta: string | undefined;
 		afterEach(async () => {
@@ -76,6 +91,17 @@ describe("profile.json inválido", () => {
 			pasta = await mkdtemp(join(tmpdir(), "estudos-perfil-"));
 			await writeFile(join(pasta, "profile.json"), JSON.stringify({ ...valido, nome: "" }));
 			await expect(lerPerfil(pasta)).rejects.toThrow(/profile\.json: campo nome/);
+		});
+
+		it("sem extensoesSubagentes a lista fica vazia; com um arquivo que não existe, diz o campo", async () => {
+			pasta = await mkdtemp(join(tmpdir(), "estudos-perfil-"));
+			await writeFile(join(pasta, "AGENTS.md"), "");
+			await mkdir(join(pasta, "agents"));
+			await writeFile(join(pasta, "agents", "geral.md"), "---\nname: geral\n---\n\nGeral.\n");
+			await writeFile(join(pasta, "profile.json"), JSON.stringify(valido));
+			expect((await lerPerfil(pasta)).extensoesSubagentes).toEqual([]);
+			await writeFile(join(pasta, "profile.json"), JSON.stringify({ ...valido, extensoesSubagentes: ["extensions/nao.ts"] }));
+			await expect(lerPerfil(pasta)).rejects.toThrow(/campo extensoesSubagentes\[0\]: extensions\/nao\.ts não existe/);
 		});
 
 		it("acusa arquivo de agente que não existe", async () => {

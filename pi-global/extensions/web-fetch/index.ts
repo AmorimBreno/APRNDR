@@ -1,14 +1,19 @@
 /**
  * web-fetch: ferramenta web_fetch para o pesquisador (agents/researcher.md).
  *
- * Fica em ~/.pi/agent/extensions/web-fetch/index.ts porque é ali que o
- * pi-interactive-subagents procura a ferramenta (getToolExtensionPath em
- * pi-extension/subagents/index.ts). Instale com extras/instalar.sh.
+ * Fica em ~/.pi/agent/extensions/web-fetch/index.ts, as extensões globais do pi,
+ * para valer no pi do terminal e nas sessões do app (principal e subagentes).
+ * A fonte é pi-global/; instale com node scripts/instalar-pi-global.mjs.
  *
  * Primeiro tenta o Tavily Extract (POST https://api.tavily.com/extract, chave em
  * TAVILY_API_KEY), que devolve a página limpa em markdown. Se não houver chave
  * ou o Tavily falhar, baixa a página direto e tira as tags HTML.
  * Para trocar de serviço, reescreva só a função extrair().
+ *
+ * O Tavily pode devolver uma cópia antiga da página (num teste, o npm mostrou a
+ * versão 1.1.0 quando a atual era 1.2.0). Por isso o texto vindo dele avisa que
+ * pode estar em cache, e o parâmetro fresh=true pula o Tavily e baixa a página
+ * ao vivo, para quando a data importa (versões, preços, datas).
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -71,23 +76,34 @@ export default function webFetch(pi: ExtensionAPI) {
 			max_chars: Type.Optional(
 				Type.Number({ description: `Maximum characters to return. Default ${LIMITE_PADRAO}.`, minimum: 1000 }),
 			),
+			fresh: Type.Optional(
+				Type.Boolean({
+					description:
+						"Fetch the live page directly, skipping the extraction service (which may return a cached copy). Use it when recency matters, e.g. versions, prices and dates. Default false.",
+				}),
+			),
 		}),
 		async execute(_toolCallId, params, signal) {
 			if (!/^https?:\/\//i.test(params.url)) {
 				throw new Error("A URL precisa começar com http:// ou https://");
 			}
 			const limite = Math.round(params.max_chars ?? LIMITE_PADRAO);
+			const aoVivo = params.fresh === true;
 			let fonte = "tavily";
-			let texto = await extrair(params.url, signal).catch(() => undefined);
+			let texto = aoVivo ? undefined : await extrair(params.url, signal).catch(() => undefined);
 			if (!texto) {
 				fonte = "direct";
 				texto = await baixarDireto(params.url, signal);
 			}
 			const cortado = texto.length > limite;
 			const saida = cortado ? `${texto.slice(0, limite)}\n\n[truncated: ${texto.length - limite} more characters]` : texto;
+			const aviso =
+				fonte === "tavily"
+					? "Note: this content came from an extraction service and may be a cached copy, not the live page. If recency matters (versions, prices, dates), call web_fetch again with fresh: true.\n\n"
+					: "";
 			return {
-				content: [{ type: "text", text: `Content of ${params.url}:\n\n${saida}` }],
-				details: { url: params.url, source: fonte, chars: texto.length, truncated: cortado },
+				content: [{ type: "text", text: `${aviso}Content of ${params.url}:\n\n${saida}` }],
+				details: { url: params.url, source: fonte, fresh: aoVivo, chars: texto.length, truncated: cortado },
 			};
 		},
 	});

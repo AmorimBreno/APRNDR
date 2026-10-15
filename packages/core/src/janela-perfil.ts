@@ -22,17 +22,19 @@
 // (abort, evento session_shutdown para as extensões, dispose), com uma
 // diferença: a sessão nova é montada antes de descartar a antiga. Se a montagem
 // falhar, a antiga continua valendo (só a resposta em andamento foi abortada).
+//
+// Extensões do núcleo em toda sessão principal: a ponte de eventos (ponte.ts,
+// com responder e acaoDaInterface aqui) e a ferramenta subagent
+// (subagentes.ts), além das que vierem em opcoes.extensoesNucleo. As sessões
+// filhas dos subagentes não recebem nenhuma delas.
 
 import { existsSync } from "node:fs";
 import {
 	type AgentSession,
-	createAgentSessionFromServices,
-	createAgentSessionServices,
 	getAgentDir,
 	type ModelRuntime,
 	type SessionStartEvent,
 	SessionManager,
-	SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 import {
 	converterHistorico,
@@ -52,7 +54,9 @@ import {
 	nomeDoModelo,
 	resolverModelo,
 } from "./modelos.ts";
+import { criarSessaoPi, encerrarSessaoPi, ligarSessaoPi } from "./montagem.ts";
 import { type AgenteDoPerfil, lerPerfil, type Perfil } from "./perfis.ts";
+import { PonteSessao } from "./ponte.ts";
 import {
 	acharAgente,
 	acharArquivoSessao,
@@ -60,7 +64,6 @@ import {
 	agenteGravado,
 	ErroSessao,
 	type FabricaExtensoesNucleo,
-	filtrarFerramentas,
 	garantirPastas,
 	listarSessoes,
 	montarOpcoesRecursos,
@@ -68,9 +71,13 @@ import {
 	type ResumoSessao,
 	TIPO_ENTRADA_AGENTE,
 } from "./sessoes.ts";
+import { criarExtensaoSubagente } from "./subagentes.ts";
 
 export interface OpcoesJanelaPerfil {
-	/** Extensões inline que o núcleo injeta em toda sessão (ponte de eventos, subagente). */
+	/**
+	 * Extensões inline a mais em toda sessão principal, além das do próprio
+	 * núcleo (ponte de eventos e subagent). Não entram nas sessões filhas.
+	 */
 	extensoesNucleo?: FabricaExtensoesNucleo;
 	/** Pasta global do pi. Padrão: ~/.pi/agent (ou PI_CODING_AGENT_DIR). */
 	pastaPi?: string;
@@ -100,12 +107,6 @@ function mensagemDe(erro: unknown): string {
 	return erro instanceof Error ? erro.message : String(erro);
 }
 
-function nivelDoPi(tipo: string): Diagnostico["nivel"] {
-	if (tipo === "info") return "info";
-	if (tipo === "error") return "erro";
-	return "aviso";
-}
-
 export class JanelaPerfil {
 	private perfilAtual: Perfil;
 	private readonly pastaPi: string;
@@ -113,6 +114,8 @@ export class JanelaPerfil {
 	private registro?: ModelRuntime;
 	private sessao?: AgentSession;
 	private agenteAtual?: AgenteDoPerfil;
+	/** Ponte de eventos da sessão atual. */
+	private ponte?: PonteSessao;
 	private diagnosticos: Diagnostico[] = [];
 	private estadoAtual?: EstadoSessao;
 	private readonly ouvintes = new Set<(evento: EventoNucleo) => void>();
@@ -229,8 +232,30 @@ export class JanelaPerfil {
 		const sessao = this.sessao;
 		if (!sessao) return [];
 		const fila = sessao.clearQueue();
+		// Antes do abort: uma ferramenta que espera a interface recebe o
+		// cancelamento e pode terminar (o abort espera a sessão ficar ociosa).
+		this.ponte?.cancelarPendentes("abortado");
 		await sessao.abort();
 		return [...fila.steering, ...fila.followUp];
+	}
+
+	/**
+	 * Responde a um pedido da interface (EventoNucleo "pedido_interface"): a
+	 * ferramenta que espera recebe "interface:resposta" {id, dados}. Devolve
+	 * false se o pedido não existe ou não espera mais resposta.
+	 */
+	responder(id: string, dados: unknown): boolean {
+		return this.ponte?.responder(id, dados) ?? false;
+	}
+
+	/**
+	 * Ação feita na interface (por exemplo, um botão de um painel): emite
+	 * "interface:acao" {painel, acao, dados} para a extensão do perfil reagir.
+	 */
+	acaoDaInterface(painel: string, acao: string, dados?: unknown): void {
+		this.exigirSessao();
+		if (!this.ponte) throw new ErroSessao("A sessão desta janela não tem a ponte de eventos.");
+		this.ponte.acaoDaInterface(painel, acao, dados);
 	}
 
 	/** Troca o modelo da sessão aberta. Vale a partir da próxima requisição ao modelo. */
@@ -327,14 +352,17 @@ export class JanelaPerfil {
 
 	/** Encerra a janela: interrompe a resposta, avisa as extensões e descarta a sessão. */
 	async descartar(): Promise<void> {
+		this.ponte?.cancelarPendentes("sessao_encerrada");
 		await this.sessao?.abort();
 		await this.emOrdem(async () => {
 			const sessao = this.sessao;
 			this.sessao = undefined;
 			this.estadoAtual = undefined;
+			this.ponte?.encerrar("sessao_encerrada");
+			this.ponte = undefined;
 			this.cancelarAssinatura?.();
 			this.cancelarAssinatura = undefined;
-			if (sessao) await this.encerrarSessao(sessao, "quit");
+			if (sessao) await encerrarSessaoPi(sessao, "quit");
 		});
 		this.ouvintes.clear();
 	}
@@ -401,7 +429,10 @@ export class JanelaPerfil {
 	/** Monta a sessão nova e só então descarta a antiga. */
 	private async trocarSessao(gerente: SessionManager, pedido: PedidoMontagem, motivo: MotivoTroca): Promise<EstadoSessao> {
 		const antiga = this.sessao;
-		// Aborta primeiro para a resposta interrompida ficar gravada antes de o arquivo ser relido.
+		// Aborta primeiro para a resposta interrompida ficar gravada antes de o
+		// arquivo ser relido. Os pedidos da interface são cancelados antes, para
+		// nenhuma ferramenta segurar o abort esperando o usuário.
+		this.ponte?.cancelarPendentes("sessao_encerrada");
 		if (antiga) await antiga.abort();
 		const anterior = antiga?.sessionFile;
 		const inicio: SessionStartEvent =
@@ -414,18 +445,20 @@ export class JanelaPerfil {
 		if (antiga) {
 			this.cancelarAssinatura?.();
 			this.cancelarAssinatura = undefined;
+			this.ponte?.encerrar("sessao_encerrada");
 			try {
-				await this.encerrarSessao(antiga, motivo === "startup" ? "quit" : motivo, gerente.getSessionFile());
+				await encerrarSessaoPi(antiga, motivo === "startup" ? "quit" : motivo, gerente.getSessionFile());
 			} catch (erro) {
 				this.emitir({ tipo: "erro", origem: "extensao", mensagem: `ao encerrar a sessão anterior: ${mensagemDe(erro)}` });
 			}
 		}
 		this.sessao = montada.sessao;
+		this.ponte = montada.ponte;
 		this.agenteAtual = montada.agente;
 		this.diagnosticos = montada.diagnosticos;
 		this.execucao = undefined;
 		this.iniciando = false;
-		await this.vincular(montada.sessao, montada.agente);
+		await this.vincular(montada.sessao, montada.agente, montada.ponte);
 		const estado = this.atualizarEstado();
 		for (const diagnostico of this.diagnosticos) this.emitir({ tipo: "diagnostico", ...diagnostico });
 		return estado;
@@ -436,7 +469,7 @@ export class JanelaPerfil {
 		gerente: SessionManager,
 		pedido: PedidoMontagem,
 		inicio: SessionStartEvent,
-	): Promise<{ sessao: AgentSession; agente: AgenteDoPerfil; diagnosticos: Diagnostico[] }> {
+	): Promise<{ sessao: AgentSession; agente: AgenteDoPerfil; diagnosticos: Diagnostico[]; ponte: PonteSessao }> {
 		const perfil = this.perfilAtual;
 		const diagnosticos: Diagnostico[] = [];
 		const registro = await this.obterRegistro();
@@ -451,59 +484,40 @@ export class JanelaPerfil {
 			});
 			agente = acharAgente(perfil, perfil.agentePadrao);
 		}
-		const avisoRaciocinio = interpretarRaciocinio(agente.definicao.raciocinio).aviso;
-		if (avisoRaciocinio) adicionarDiagnostico(diagnosticos, { nivel: "aviso", mensagem: `agente ${agente.nome}: ${avisoRaciocinio}` });
 
 		const escolha = this.escolherModelo(pedido.modelo, agente, gerente, registro, diagnosticos);
 
-		const cwd = perfil.pastaDados;
-		// A pasta de dados não é um projeto: nada de .pi/ local (settings, extensões, skills).
-		const settingsManager = SettingsManager.create(cwd, this.pastaPi, { projectTrusted: false });
-		const extensoesNucleo = this.fabricaExtensoes?.({ perfil, agente }) ?? [];
-		const servicos = await createAgentSessionServices({
-			cwd,
-			agentDir: this.pastaPi,
-			settingsManager,
-			modelRuntime: registro,
-			resourceLoaderOptions: montarOpcoesRecursos(perfil, agente, extensoesNucleo, diagnosticos),
+		const ponte = new PonteSessao((evento) => this.emitir(evento));
+		const extensoesNucleo = [
+			ponte.extensao,
+			criarExtensaoSubagente({
+				perfil,
+				pastaPi: this.pastaPi,
+				registro,
+				agentePrincipal: agente.nome,
+				emitir: (evento) => this.emitir(evento),
+			}),
+			...(this.fabricaExtensoes?.({ perfil, agente }) ?? []),
+		];
+		const sessao = await criarSessaoPi({
+			perfil,
+			agente,
+			modo: "principal",
+			pastaPi: this.pastaPi,
+			registro,
+			gerente,
+			inicio,
+			modelo: escolha.modelo,
+			raciocinio: escolha.raciocinio,
+			extensoesNucleo,
+			relerCodigo: pedido.relerCodigo,
+			diagnosticos,
 		});
-		// O pi guarda as fábricas das extensões em cache por caminho; um loader novo
-		// reusaria o código antigo. Um segundo reload() limpa o cache e relê do disco.
-		if (pedido.relerCodigo) await servicos.resourceLoader.reload();
-
-		const criada = await createAgentSessionFromServices({
-			services: servicos,
-			sessionManager: gerente,
-			sessionStartEvent: inicio,
-			model: escolha.modelo,
-			thinkingLevel: escolha.raciocinio,
-		});
-
-		for (const diagnostico of servicos.diagnostics) {
-			adicionarDiagnostico(diagnosticos, { nivel: nivelDoPi(diagnostico.type), mensagem: diagnostico.message });
-		}
-		const extensoes = servicos.resourceLoader.getExtensions();
-		for (const falha of extensoes.errors) {
-			adicionarDiagnostico(diagnosticos, { nivel: "erro", mensagem: `extensão ${falha.path} não carregou: ${falha.error}` });
-		}
-		for (const aviso of extensoes.warnings ?? []) {
-			adicionarDiagnostico(diagnosticos, { nivel: "aviso", mensagem: `extensão ${aviso.path}: ${aviso.warning}` });
-		}
-		for (const diagnostico of servicos.resourceLoader.getSkills().diagnostics) {
-			adicionarDiagnostico(diagnosticos, {
-				nivel: nivelDoPi(diagnostico.type),
-				mensagem: `skill${diagnostico.path ? ` ${diagnostico.path}` : ""}: ${diagnostico.message}`,
-			});
-		}
-		if (criada.modelFallbackMessage) {
-			adicionarDiagnostico(diagnosticos, { nivel: "aviso", mensagem: criada.modelFallbackMessage });
-		}
 
 		// O createAgentSession só grava modelo e raciocínio numa sessão nova. Numa
 		// sessão com conversa, a escolha explícita (troca de agente, recarregar) é
 		// gravada aqui, para voltar ao reabrir a sessão (o pi restaura o último
 		// model_change ou o modelo da última resposta, e o último thinking_level_change).
-		const sessao = criada.session;
 		const gravadoNaSessao = gerente.buildSessionContext();
 		if (gravadoNaSessao.messages.length > 0) {
 			const modelo = sessao.model;
@@ -516,7 +530,7 @@ export class JanelaPerfil {
 			}
 		}
 		if (gravado !== agente.nome) gerente.appendCustomEntry(TIPO_ENTRADA_AGENTE, { agente: agente.nome });
-		return { sessao, agente, diagnosticos };
+		return { sessao, agente, diagnosticos, ponte };
 	}
 
 	private escolherModelo(
@@ -550,54 +564,18 @@ export class JanelaPerfil {
 	}
 
 	/** Assina os eventos da sessão nova, liga as extensões e aplica as ferramentas do agente. */
-	private async vincular(sessao: AgentSession, agente: AgenteDoPerfil): Promise<void> {
+	private async vincular(sessao: AgentSession, agente: AgenteDoPerfil, ponte: PonteSessao): Promise<void> {
 		const traduzir = criarTradutorEventos();
 		this.cancelarAssinatura = sessao.subscribe((evento) => {
-			for (const traduzido of traduzir(evento)) this.emitir(traduzido);
-		});
-		// Emite session_start para as extensões (sdk.md: o MCP, por exemplo, conecta
-		// nesse evento) e passa os erros de extensão para os eventos da janela. Sem
-		// uiContext, ctx.hasUI fica falso e ctx.mode fica "print".
-		await sessao.bindExtensions({
-			onError: (erro) =>
-				this.emitir({
-					tipo: "erro",
-					origem: "extensao",
-					mensagem: `${erro.extensionPath} (${erro.event}): ${erro.error}`,
-				}),
-		});
-		// Depois do session_start, porque uma extensão pode registrar ferramentas nele.
-		const { ativas, faltando } = filtrarFerramentas(
-			sessao.getAllTools().map((ferramenta) => ferramenta.name),
-			agente.definicao.ferramentas,
-		);
-		for (const nome of faltando) {
-			adicionarDiagnostico(this.diagnosticos, {
-				nivel: "aviso",
-				mensagem: `ferramenta "${nome}" do agente ${agente.nome} não existe nesta sessão; ignorada`,
-			});
-		}
-		if (ativas) sessao.setActiveToolsByName(ativas);
-	}
-
-	/** Avisa as extensões (session_shutdown) e descarta a sessão, como o pi faz ao trocar de sessão. */
-	private async encerrarSessao(
-		sessao: AgentSession,
-		motivo: "quit" | "reload" | "new" | "resume",
-		arquivoDestino?: string,
-	): Promise<void> {
-		try {
-			await sessao.abort();
-			if (sessao.extensionRunner.hasHandlers("session_shutdown")) {
-				await sessao.extensionRunner.emit({
-					type: "session_shutdown",
-					reason: motivo,
-					...(arquivoDestino ? { targetSessionFile: arquivoDestino } : {}),
-				});
+			for (const traduzido of traduzir(evento)) {
+				// A execução acabou: nenhuma ferramenta espera mais a interface.
+				if (traduzido.tipo === "execucao_fim") ponte.cancelarPendentes("execucao_terminada");
+				this.emitir(traduzido);
 			}
-		} finally {
-			sessao.dispose();
-		}
+		});
+		await ligarSessaoPi(sessao, agente, "principal", this.diagnosticos, (mensagem) =>
+			this.emitir({ tipo: "erro", origem: "extensao", mensagem }),
+		);
 	}
 
 	private atualizarEstado(): EstadoSessao {

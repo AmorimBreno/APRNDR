@@ -12,10 +12,12 @@
 //   --append-system-prompt do CLI; cada item é um caminho de arquivo ou texto.
 // - Skills: só as do perfil (noSkills + additionalSkillPaths, como o --skill do
 //   CLI) e, se o agente declara skills, só essas (skillsOverride, exemplo
-//   04-skills.ts do SDK).
+//   04-skills.ts do SDK). Numa sessão filha (subagente), o agente que não
+//   declara skills fica sem nenhuma.
 // - Extensões: as do perfil (additionalExtensionPaths, como o -e do CLI) mais as
 //   globais de ~/.pi/agent, que o loader descobre sozinho, mais as fábricas
 //   inline do núcleo (extensionFactories, sdk.md "Inline extension factories").
+//   As sessões filhas carregam também as extensoesSubagentes do perfil.
 // - Sessões gravadas em <pasta de dados>/.sessoes-pi: o SessionManager aceita um
 //   diretório próprio (exemplo 11-sessions.ts: "Custom session directory (no cwd
 //   encoding)"; session-format.md e settings.md, sessionDir).
@@ -38,8 +40,24 @@ import type { AgenteDoPerfil, Perfil } from "./perfis.ts";
 /** Subpasta da pasta de dados onde ficam os arquivos de sessão do pi. */
 export const PASTA_SESSOES = ".sessoes-pi";
 
+/** Subpasta de PASTA_SESSOES com as sessões filhas (subagentes); fica fora da lista de sessões. */
+export const PASTA_SUBAGENTES = "subagentes";
+
 /** customType da entrada de sessão que diz qual agente a sessão usa. */
 export const TIPO_ENTRADA_AGENTE = "nucleo.agente";
+
+/** customType da entrada que liga uma sessão filha à sessão e à chamada subagent que a criaram. */
+export const TIPO_ENTRADA_SUBAGENTE = "nucleo.subagente";
+
+/**
+ * Sessão principal (a da janela, com as extensões do núcleo) ou sessão filha
+ * de um subagente (sem as extensões do núcleo, com as extensoesSubagentes do
+ * perfil e só os recursos que o agente declara).
+ */
+export type ModoSessao = "principal" | "subagente";
+
+/** O que fazer quando o agente não declara skills ou ferramentas. */
+export type SemDeclaracao = "todas" | "nenhuma";
 
 /** O que o núcleo sabe na hora de montar uma sessão. */
 export interface ContextoMontagem {
@@ -85,6 +103,11 @@ export function pastaSessoes(perfil: Pick<Perfil, "pastaDados">): string {
 	return join(perfil.pastaDados, PASTA_SESSOES);
 }
 
+/** Pasta dos arquivos das sessões filhas (subagentes) do perfil. */
+export function pastaSubagentes(perfil: Pick<Perfil, "pastaDados">): string {
+	return join(pastaSessoes(perfil), PASTA_SUBAGENTES);
+}
+
 /** Cria a pasta de dados e a de sessões, se ainda não existirem. */
 export async function garantirPastas(perfil: Pick<Perfil, "pastaDados">): Promise<void> {
 	await mkdir(pastaSessoes(perfil), { recursive: true });
@@ -109,10 +132,15 @@ export function adicionarDiagnostico(lista: Diagnostico[], diagnostico: Diagnost
 
 /**
  * Skills do agente: se ele declara skills, só essas (pelo nome do SKILL.md);
- * se não declara, todas. `faltando` = nomes declarados que não foram achados.
+ * se não declara, todas (ou nenhuma, com semDeclaracao "nenhuma").
+ * `faltando` = nomes declarados que não foram achados.
  */
-export function filtrarSkills(skills: Skill[], declaradas: readonly string[]): { skills: Skill[]; faltando: string[] } {
-	if (declaradas.length === 0) return { skills, faltando: [] };
+export function filtrarSkills(
+	skills: Skill[],
+	declaradas: readonly string[],
+	semDeclaracao: SemDeclaracao = "todas",
+): { skills: Skill[]; faltando: string[] } {
+	if (declaradas.length === 0) return { skills: semDeclaracao === "todas" ? skills : [], faltando: [] };
 	return {
 		skills: skills.filter((skill) => declaradas.includes(skill.name)),
 		faltando: declaradas.filter((nome) => !skills.some((skill) => skill.name === nome)),
@@ -122,17 +150,24 @@ export function filtrarSkills(skills: Skill[], declaradas: readonly string[]): {
 /**
  * Ferramentas do agente: se ele declara ferramentas, ativa só as que existem
  * na sessão; se não declara, `ativas` fica indefinido e valem as do pi (as
- * padrão mais as das extensões). `faltando` = declaradas que não existem.
+ * padrão mais as das extensões), ou fica vazio com semDeclaracao "nenhuma".
+ * `faltando` = declaradas que não existem.
  */
 export function filtrarFerramentas(
 	disponiveis: readonly string[],
 	declaradas: readonly string[],
+	semDeclaracao: SemDeclaracao = "todas",
 ): { ativas?: string[]; faltando: string[] } {
-	if (declaradas.length === 0) return { faltando: [] };
+	if (declaradas.length === 0) return semDeclaracao === "todas" ? { faltando: [] } : { ativas: [], faltando: [] };
 	return {
 		ativas: declaradas.filter((nome) => disponiveis.includes(nome)),
 		faltando: declaradas.filter((nome) => !disponiveis.includes(nome)),
 	};
+}
+
+/** Na sessão principal valem todas as skills e ferramentas sem declaração; na filha, nenhuma. */
+export function semDeclaracaoDo(modo: ModoSessao): SemDeclaracao {
+	return modo === "principal" ? "todas" : "nenhuma";
 }
 
 /**
@@ -144,9 +179,10 @@ export function montarOpcoesRecursos(
 	agente: AgenteDoPerfil,
 	extensoesNucleo: InlineExtension[],
 	diagnosticos: Diagnostico[],
+	modo: ModoSessao = "principal",
 ): OpcoesRecursos {
 	return {
-		additionalExtensionPaths: [...perfil.extensoes],
+		additionalExtensionPaths: modo === "principal" ? [...perfil.extensoes] : [...perfil.extensoes, ...perfil.extensoesSubagentes],
 		additionalSkillPaths: [...perfil.skills],
 		// Só as skills do perfil: nada de ~/.pi/agent/skills nem de .pi/skills.
 		noSkills: true,
@@ -156,7 +192,7 @@ export function montarOpcoesRecursos(
 		appendSystemPrompt: [perfil.instrucoes, agente.definicao.prompt].filter((parte) => parte.trim().length > 0),
 		extensionFactories: extensoesNucleo,
 		skillsOverride: (base) => {
-			const { skills, faltando } = filtrarSkills(base.skills, agente.definicao.skills);
+			const { skills, faltando } = filtrarSkills(base.skills, agente.definicao.skills, semDeclaracaoDo(modo));
 			for (const nome of faltando) {
 				adicionarDiagnostico(diagnosticos, {
 					nivel: "aviso",

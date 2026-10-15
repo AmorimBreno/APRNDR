@@ -1,6 +1,7 @@
 // Eventos do núcleo: a tradução dos eventos de uma sessão do pi para um tipo
 // genérico, que o servidor e o front usam no protocolo. Nada aqui conhece um
-// perfil específico: só execução, texto, raciocínio, ferramenta, uso e erro.
+// perfil específico: só execução, texto, raciocínio, ferramenta, uso, erro e
+// as mensagens da ponte de interface (painel, ação e dados, sem interpretar).
 //
 // Fontes no pi: AgentSessionEvent (sdk.md, "Subscribing to events") e os tipos
 // de mensagem de message-types.md. "agent_end" marca o fim de uma execução de
@@ -41,6 +42,15 @@ export interface EstadoSessao {
 	diagnosticos: Diagnostico[];
 }
 
+/**
+ * Por que um pedido da interface foi cancelado sem resposta do usuário:
+ * - abortado: a execução foi interrompida (JanelaPerfil.abortar);
+ * - execucao_terminada: a execução acabou e ninguém mais espera a resposta;
+ * - sessao_encerrada: a sessão foi trocada, recarregada ou a janela descartada;
+ * - pedido_invalido: o pedido veio sem painel ou sem ação.
+ */
+export type MotivoCancelamento = "abortado" | "execucao_terminada" | "sessao_encerrada" | "pedido_invalido";
+
 export type EventoNucleo =
 	/** A sessão começou a responder. */
 	| { tipo: "execucao_inicio" }
@@ -62,13 +72,23 @@ export type EventoNucleo =
 	| { tipo: "ferramenta_inicio"; id: string; nome: string; argumentos: unknown; idPai?: string }
 	| { tipo: "ferramenta_progresso"; id: string; nome: string; resumo: string; idPai?: string }
 	| { tipo: "ferramenta_fim"; id: string; nome: string; erro: boolean; resumo: string; duracaoMs?: number; idPai?: string }
-	| ({ tipo: "uso"; modelo: string } & UsoModelo)
+	/**
+	 * Uso e custo de uma resposta. Quando vem de uma sessão filha (subagente),
+	 * `agente` é o agente da filha e `idFerramenta` é a chamada subagent que a criou.
+	 */
+	| ({ tipo: "uso"; modelo: string; agente?: string; idFerramenta?: string } & UsoModelo)
 	/** Mensagens esperando na fila (enviadas enquanto a sessão respondia). */
 	| { tipo: "fila"; mensagens: string[] }
 	| { tipo: "erro"; origem: "modelo" | "extensao" | "nucleo"; mensagem: string }
 	| ({ tipo: "diagnostico" } & Diagnostico)
 	/** Mudou a sessão, o agente, o modelo ou os recursos ativos. */
-	| { tipo: "estado_sessao"; estado: EstadoSessao };
+	| { tipo: "estado_sessao"; estado: EstadoSessao }
+	/** Ponte: uma ferramenta pediu para mostrar algo num painel ("interface:mostrar"). */
+	| { tipo: "acao_interface"; painel: string; acao: string; dados: unknown }
+	/** Ponte: uma ferramenta espera a resposta do usuário ("interface:pedido"); responda com JanelaPerfil.responder. */
+	| { tipo: "pedido_interface"; id: string; painel: string; acao: string; dados: unknown }
+	/** Ponte: o pedido `id` não espera mais resposta (a ferramenta recebeu o cancelamento). */
+	| { tipo: "pedido_interface_cancelado"; id: string; motivo: MotivoCancelamento };
 
 /** Item do histórico de uma sessão, para mostrar a conversa ao reabrir. */
 export type ItemHistorico =

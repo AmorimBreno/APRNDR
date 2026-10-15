@@ -38,6 +38,8 @@ export const esquemaPerfil = z.strictObject({
 	agentePadrao: z.string().min(1),
 	skills: z.array(caminhoRelativo),
 	extensoes: z.array(caminhoRelativo),
+	/** Extensões carregadas só nas sessões filhas (subagentes), além das globais e das do perfil. */
+	extensoesSubagentes: z.array(caminhoRelativo).optional(),
 	/** Identificadores dos painéis que a janela do perfil usa. */
 	paineis: z.array(z.string().min(1)),
 });
@@ -68,6 +70,8 @@ export interface Perfil {
 	skills: string[];
 	/** Caminhos absolutos. */
 	extensoes: string[];
+	/** Caminhos absolutos; só nas sessões filhas (subagentes). Vazio se o profile.json não declarar. */
+	extensoesSubagentes: string[];
 	paineis: string[];
 }
 
@@ -166,6 +170,10 @@ export async function lerPerfil(pasta: string): Promise<Perfil> {
 	for (const [indice, extensao] of json.extensoes.entries()) {
 		extensoes.push(await resolverExistente(`extensoes[${indice}]`, extensao));
 	}
+	const extensoesSubagentes: string[] = [];
+	for (const [indice, extensao] of (json.extensoesSubagentes ?? []).entries()) {
+		extensoesSubagentes.push(await resolverExistente(`extensoesSubagentes[${indice}]`, extensao));
+	}
 
 	return {
 		id: json.id,
@@ -177,6 +185,7 @@ export async function lerPerfil(pasta: string): Promise<Perfil> {
 		agentePadrao: json.agentePadrao,
 		skills,
 		extensoes,
+		extensoesSubagentes,
 		paineis: json.paineis,
 	};
 }

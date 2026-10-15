@@ -5,5 +5,8 @@ export * from "./agentes.ts";
 export * from "./eventos.ts";
 export * from "./janela-perfil.ts";
 export * from "./modelos.ts";
+export * from "./montagem.ts";
 export * from "./perfis.ts";
+export * from "./ponte.ts";
 export * from "./sessoes.ts";
+export * from "./subagentes.ts";

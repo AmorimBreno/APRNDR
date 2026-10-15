@@ -26,10 +26,12 @@ As linhas alteradas nos arquivos do learn são marcadas com o comentário [estud
 8. agents/mermaid-maker.md e svg-maker.md: modelo trocado para openrouter/anthropic/claude-sonnet-5.5.
 9. agents/professor.md (novo): agente geral do perfil, openrouter/openai/gpt-6.1-sol, com as skills teach e visualize.
 10. AGENTS.md (novo, era o APPEND_SYSTEM.md): aulas em português e regras de estilo do Breno, como instruções fixas do perfil.
+11. agents/researcher.md: safe_bash saiu da linha tools (só existia no pi-interactive-subagents). O researcher fica com web_search e web_fetch.
+12. extensions/visual-tools/tools/mermaid_tools.ts e svg_tools.ts: no app, os desenhistas são sessões filhas criadas pelo núcleo dentro do processo do servidor, e não processos separados. Por isso o estado (o arquivo-fonte do desenho) passou do módulo para a função da extensão, com uma pasta de trabalho própria por sessão, e a publicação usa o cwd da sessão (ctx.cwd, a pasta de dados) no lugar do process.cwd(). As ferramentas são carregadas pelo campo extensoesSubagentes do profile.json.
+13. extensions/visual-tools/tools/_common.ts: publish() recebe a pasta base (o ctx.cwd da sessão); sem ela, continua usando o process.cwd().
+14. extensions/visual-tools/index.ts: continua igual, mas saiu do profile.json (extensoes ficou vazio). Ele só registrava as ferramentas no interactive-subagents, que o app não usa.
 
 ## Pendências para a Etapa 2/3
 
-- extensions/visual-tools/index.ts registra as ferramentas de desenho no interactive-subagents, que não é usado no Windows. O app vai criar os subagentes e carregar essas ferramentas por conta própria.
-- agents/researcher.md lista safe_bash, que só existe no interactive-subagents.
 - extensions/quiz.ts e ask-user-question.ts desenham com ctx.ui.custom e só funcionam no terminal. No app elas ganham versões web com os mesmos nomes e parâmetros.
 - Os comentários de quiz.ts e ask-user-question.ts ainda falam do log do Obsidian.

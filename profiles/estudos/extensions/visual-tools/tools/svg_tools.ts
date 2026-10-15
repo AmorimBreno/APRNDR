@@ -21,6 +21,7 @@
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent"
 import { Type } from "@sinclair/typebox"
+import { randomUUID } from "node:crypto" // [estudos-ia]
 import {
   applyEdit,
   existsSync,
@@ -41,7 +42,6 @@ const RENDER_TIMEOUT_MS = 60_000
 
 type RenderDetails = { ok: boolean; path: string; filename?: string }
 
-let session: Session | null = null
 
 // [estudos-ia] No Windows não há rsvg-convert nem magick. Primeiro tenta o
 // @resvg/resvg-js (binário nativo via npm), com as fontes do sistema carregadas
@@ -81,6 +81,10 @@ async function renderSvg(svgPath: string, outPath: string, workDir: string) {
 }
 
 export default function svgToolsExtension(pi: ExtensionAPI) {
+  // [estudos-ia] Estado por sessão, não por módulo: no app as sessões filhas rodam no mesmo processo (o pi guarda o módulo em cache)
+  // e podem rodar ao mesmo tempo; cada uma tem o seu arquivo-fonte numa pasta própria.
+  let session: Session | null = null // [estudos-ia]
+  const sessionGroup = `${GROUP}-${randomUUID().slice(0, 8)}` // [estudos-ia]
   // ── write_svg ──────────────────────────────────────────────────────────────
   pi.registerTool({
     name: "write_svg",
@@ -100,7 +104,7 @@ export default function svgToolsExtension(pi: ExtensionAPI) {
       const source = (params.source ?? "").trim()
       if (!source) throw new Error("`write_svg` requires a non-empty `source`.")
       if (!source.includes("<svg")) throw new Error("`write_svg`: source must be a complete <svg>…</svg> document.")
-      session = writeBody(GROUP, BODY_FILE, source)
+      session = writeBody(sessionGroup, BODY_FILE, source)
       const lines = source.split("\n").length
       return {
         content: [
@@ -164,7 +168,7 @@ export default function svgToolsExtension(pi: ExtensionAPI) {
         }),
       ),
     }),
-    async execute(_id, params) {
+    async execute(_id, params, _signal, _onUpdate, ctx) { // [estudos-ia] ctx
       if (!session || !existsSync(session.bodyPath)) {
         throw new Error("render_svg: no source yet — call write_svg first.")
       }
@@ -192,7 +196,7 @@ export default function svgToolsExtension(pi: ExtensionAPI) {
       const content: Array<{ type: "text"; text: string } | { type: "image"; data: string; mimeType: string }> = []
 
       if (params.save_as) {
-        const { filename, path } = publish(outPath, String(params.save_as))
+        const { filename, path } = publish(outPath, String(params.save_as), ctx?.cwd) // [estudos-ia] ctx.cwd = pasta de dados
         content.push({
           type: "text",
           text: `Published to viz/.\nfilename: ${filename}\npath: ${path}\n\nLOOK at the picture below to confirm the geometry is correct before returning it.`,

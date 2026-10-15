@@ -146,8 +146,9 @@ export function snippetAround(content: string, index: number, contextLines = 3):
 }
 
 /** Copy a rendered PNG into <cwd>/viz with a unique, slugified name. */
-export function publish(pngPath: string, slug: string): { filename: string; path: string } {
-  const filesDir = join(process.cwd(), FILES_DIRNAME)
+// [estudos-ia] baseDir: o cwd da sessão (ctx.cwd). No app as sessões rodam dentro do processo do servidor, cujo process.cwd() não é a pasta de dados.
+export function publish(pngPath: string, slug: string, baseDir: string = process.cwd()): { filename: string; path: string } { // [estudos-ia]
+  const filesDir = join(baseDir, FILES_DIRNAME) // [estudos-ia]
   mkdirSync(filesDir, { recursive: true })
   const clean =
     slug

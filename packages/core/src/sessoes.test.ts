@@ -88,6 +88,34 @@ describe("filtros", () => {
 		expect(filtrarSkills(todas, [])).toEqual({ skills: todas, faltando: [] });
 		expect(filtrarSkills(todas, ["visualize", "x"])).toEqual({ skills: [todas[1]], faltando: ["x"] });
 	});
+
+	it("com semDeclaracao nenhuma (sessão filha), sem declaração não fica nada", () => {
+		expect(filtrarFerramentas(disponiveis, [], "nenhuma")).toEqual({ ativas: [], faltando: [] });
+		expect(filtrarSkills([skill("teach")], [], "nenhuma")).toEqual({ skills: [], faltando: [] });
+		expect(filtrarFerramentas(disponiveis, ["read"], "nenhuma")).toEqual({ ativas: ["read"], faltando: [] });
+	});
+});
+
+describe("montarOpcoesRecursos no modo subagente", () => {
+	it("researcher: extensões do perfil e das filhas, nenhuma skill, prompt do researcher", async () => {
+		const perfil = await lerPerfil(pastaEstudos);
+		const researcher = acharAgente(perfil, "researcher");
+		const opcoes = montarOpcoesRecursos(perfil, researcher, [], [], "subagente");
+		expect(opcoes.additionalExtensionPaths).toEqual([...perfil.extensoes, ...perfil.extensoesSubagentes]);
+		expect(opcoes.additionalExtensionPaths).toContain(join(pastaEstudos, "extensions", "visual-tools", "tools", "mermaid_tools.ts"));
+		expect(opcoes.noContextFiles).toBe(true);
+		expect(opcoes.extensionFactories).toEqual([]);
+		expect(opcoes.appendSystemPrompt?.[1]).toMatch(/^You are a research specialist/);
+		const base = { skills: [skill("teach"), skill("visualize")], diagnostics: [] };
+		expect(opcoes.skillsOverride?.(base).skills).toEqual([]);
+		// Na sessão principal, as extensões das filhas não entram.
+		expect(montarOpcoesRecursos(perfil, researcher, [], []).additionalExtensionPaths).toEqual(perfil.extensoes);
+	});
+
+	it("researcher declara só web_search e web_fetch (safe_bash saiu)", async () => {
+		const perfil = await lerPerfil(pastaEstudos);
+		expect(acharAgente(perfil, "researcher").definicao.ferramentas).toEqual(["web_search", "web_fetch"]);
+	});
 });
 
 describe("agente gravado na sessão", () => {

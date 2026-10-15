@@ -1,7 +1,8 @@
 ---
 name: researcher
 description: Web researcher — searches the web and synthesizes findings
-tools: web_search, web_fetch, safe_bash
+# [estudos-ia] era "web_search, web_fetch, safe_bash"; safe_bash só existia no pi-interactive-subagents, que o app não usa
+tools: web_search, web_fetch
 model: openrouter/z-ai/glm-5.3
 thinking: medium
 system-prompt: append

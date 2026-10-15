@@ -2,3 +2,5 @@
 * text=auto eol=lf
 *.png binary
 *.pdf binary
+# Os .cmd ficam com CRLF: o cmd.exe lê errado scripts em lote com fim de linha LF.
+*.cmd text eol=crlf

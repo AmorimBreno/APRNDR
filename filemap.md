@@ -7,6 +7,7 @@ filemap.md — este mapa; atualizar ao criar ou mover arquivos
 
 docs/PLANO.md — etapas, tarefas e estado atual; atualizar ao aceitar uma tarefa
 docs/teste-etapa-N.md — roteiro de teste que o Breno roda no fim de cada etapa
+docs/teste-etapa-1.md — roteiro da Etapa 1: pi no Windows Terminal com o perfil de estudos
 docs/historico/ — documentos do checkpoint 1 (pi no WSL com tmux e Obsidian); só consulta
 
 pi-global/ — fonte versionada do que vai para ~/.pi/agent (instalar com scripts/instalar-pi-global.mjs)
@@ -32,5 +33,6 @@ profiles/estudos/extensions/visual-tools/tools/_common.ts — acha o navegador (
 referencias/plano-cd.html — artefato de plano de estudo usado antes; referência visual para o design
 
 scripts/instalar-pi-global.mjs — copia pi-global/ para ~/.pi/agent (mescla o settings.json)
+scripts/pi-estudos.cmd — abre o pi no terminal com o perfil de estudos, em %LOCALAPPDATA%\estudos-app\pi-teste (fora do repositório)
 scripts/testar-render.mjs — gera PNGs de teste pelo mesmo código das visual-tools (em %TEMP%/estudos-render-teste)
 scripts/prova-cega/prova-cega.mjs — compara modelos de professor às cegas; grava em <dados>/comparacao

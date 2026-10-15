@@ -10,7 +10,7 @@
 
 import { spawn } from "node:child_process"
 import { tmpdir } from "node:os"
-import { basename, dirname, join } from "node:path"
+import { basename, delimiter, dirname, join } from "node:path" // [estudos-ia] delimiter
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 
 // rsvg-convert lives under MacPorts (/opt/local/bin); magick/gs under
@@ -34,6 +34,11 @@ export const CHROME_CANDIDATES = [
   "/usr/bin/chromium",
   "/usr/bin/chromium-browser",
   "/snap/bin/chromium",
+  // [estudos-ia] Windows nativo: Edge (instalado em todo Windows) e Chrome.
+  "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe", // [estudos-ia]
+  "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe", // [estudos-ia]
+  "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe", // [estudos-ia]
+  ...(process.env.LOCALAPPDATA ? [join(process.env.LOCALAPPDATA, "Google", "Chrome", "Application", "chrome.exe")] : []), // [estudos-ia]
 ]
 
 export function findChrome(): string | undefined {
@@ -56,7 +61,7 @@ export function run(
   opts: { cwd: string; timeoutMs: number; env?: Record<string, string> },
 ): Promise<RunResult> {
   return new Promise((resolveRun) => {
-    const augmentedPath = [...EXTRA_PATH, process.env.PATH ?? ""].join(":")
+    const augmentedPath = [...EXTRA_PATH, process.env.PATH ?? ""].join(delimiter) // [estudos-ia] era ":"; no Windows o separador é ";"
     const child = spawn(cmd, args, {
       cwd: opts.cwd,
       env: { ...process.env, ...(opts.env ?? {}), PATH: augmentedPath },

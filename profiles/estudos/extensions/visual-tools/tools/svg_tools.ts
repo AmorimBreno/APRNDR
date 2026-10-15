@@ -43,8 +43,27 @@ type RenderDetails = { ok: boolean; path: string; filename?: string }
 
 let session: Session | null = null
 
+// [estudos-ia] No Windows não há rsvg-convert nem magick. Primeiro tenta o
+// @resvg/resvg-js (binário nativo via npm), com as fontes do sistema carregadas
+// para o texto aparecer, e com zoom 2 como o -z 2 do rsvg-convert. Se falhar,
+// segue para rsvg-convert e magick, quando estiverem no PATH.
+async function renderWithResvg(svgPath: string, outPath: string) { // [estudos-ia]
+  try { // [estudos-ia]
+    const { renderAsync } = await import("@resvg/resvg-js") // [estudos-ia]
+    // [estudos-ia] Sem nomes explícitos, "sans-serif" cai numa fonte qualquer do sistema (no Windows, uma condensada).
+    const font = { loadSystemFonts: true, defaultFontFamily: "Arial", sansSerifFamily: "Arial", serifFamily: "Times New Roman", monospaceFamily: "Consolas" } // [estudos-ia]
+    const img = await renderAsync(readFileSync(svgPath, "utf8"), { fitTo: { mode: "zoom", value: 2 }, font }) // [estudos-ia]
+    writeFileSync(outPath, img.asPng()) // [estudos-ia]
+    return { code: 0, stdout: "", stderr: "", timedOut: false } // [estudos-ia]
+  } catch (err) { // [estudos-ia]
+    return { code: 1, stdout: "", stderr: `resvg-js: ${err instanceof Error ? err.message : String(err)}`, timedOut: false } // [estudos-ia]
+  } // [estudos-ia]
+} // [estudos-ia]
+
 /** Render an SVG file to PNG via rsvg-convert, falling back to magick. */
 async function renderSvg(svgPath: string, outPath: string, workDir: string) {
+  const resvg = await renderWithResvg(svgPath, outPath) // [estudos-ia]
+  if (resvg.code === 0 && existsSync(outPath)) return { ok: true as const, res: resvg } // [estudos-ia]
   // rsvg-convert renders at the SVG's intrinsic size; -z 2 doubles it for crispness.
   let res = await run("rsvg-convert", ["-z", "2", svgPath, "-o", outPath], {
     cwd: workDir,
@@ -57,7 +76,8 @@ async function renderSvg(svgPath: string, outPath: string, workDir: string) {
     timeoutMs: RENDER_TIMEOUT_MS,
   })
   if (magick.code === 0 && existsSync(outPath)) return { ok: true as const, res: magick }
-  return { ok: false as const, res: res.code !== null ? res : magick }
+  const last = res.code !== null ? res : magick // [estudos-ia]
+  return { ok: false as const, res: { ...last, stderr: `${resvg.stderr}\n${last.stderr}` } } // [estudos-ia] o erro do resvg-js vem primeiro
 }
 
 export default function svgToolsExtension(pi: ExtensionAPI) {
@@ -161,7 +181,7 @@ export default function svgToolsExtension(pi: ExtensionAPI) {
           content: [
             {
               type: "text",
-              text: `${note}SVG render FAILED — no image produced (tried rsvg-convert then magick). Fix the source with edit_svg and call render_svg again.\n\nError:\n${detail}`,
+              text: `${note}SVG render FAILED — no image produced (tried resvg-js, rsvg-convert, then magick). Fix the source with edit_svg and call render_svg again.\n\nError:\n${detail}`, // [estudos-ia]
             },
           ],
           details: { ok: false, path: "" } as RenderDetails,

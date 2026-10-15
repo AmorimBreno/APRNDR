@@ -41,6 +41,10 @@ import {
 const TOOL_DIR = dirname(fileURLToPath(import.meta.url))
 const EXTENSION_DIR = dirname(TOOL_DIR)
 const MMDC_BIN = join(EXTENSION_DIR, "node_modules", ".bin", "mmdc")
+// [estudos-ia] No Windows o .bin/mmdc é um script de shell que o spawn não executa
+// (e o mmdc.cmd exigiria shell). Roda o cli.js do mermaid-cli com o próprio Node.
+const MMDC_JS = join(EXTENSION_DIR, "node_modules", "@mermaid-js", "mermaid-cli", "src", "cli.js") // [estudos-ia]
+const IS_WINDOWS = process.platform === "win32" // [estudos-ia]
 const GROUP = "mermaid"
 const BODY_FILE = "diagram.mmd"
 const RENDER_TIMEOUT_MS = 120_000
@@ -154,8 +158,8 @@ export default function mermaidToolsExtension(pi: ExtensionAPI) {
 
       const outPath = join(workDir, `render-${Date.now()}.png`)
       const res = await run(
-        MMDC_BIN,
-        ["-i", bodyPath, "-o", outPath, "-p", cfgPath, "-s", "2", "-b", "white"],
+        IS_WINDOWS ? process.execPath : MMDC_BIN, // [estudos-ia]
+        [...(IS_WINDOWS ? [MMDC_JS] : []), "-i", bodyPath, "-o", outPath, "-p", cfgPath, "-s", "2", "-b", "white"], // [estudos-ia]
         { cwd: workDir, timeoutMs: RENDER_TIMEOUT_MS, env: { PUPPETEER_SKIP_DOWNLOAD: "1" } },
       )
 

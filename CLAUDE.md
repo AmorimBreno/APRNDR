@@ -10,7 +10,10 @@ Stack: TypeScript, monorepo pnpm, Node 24 com o SDK do pi (@earendil-works/pi-co
 
 - node scripts/instalar-pi-global.mjs: copia pi-global/ para ~/.pi/agent. Rode de novo depois de mudar algo em pi-global/.
 - node scripts/testar-render.mjs: gera PNGs de teste de mermaid e de SVG.
-- A partir da Etapa 2: pnpm install, pnpm dev, pnpm typecheck, pnpm test.
+- pnpm install: instala as dependências do monorepo (as visual-tools do perfil continuam com npm install dentro da pasta delas).
+- pnpm dev: sobe o servidor (apps/server, porta 7431, tsx watch) e o front (apps/web, porta 7430, Vite) em paralelo. Abrir http://localhost:7430.
+- pnpm typecheck: tsc --noEmit em todos os pacotes.
+- pnpm test: roda os testes com o vitest.
 
 ## Convenções
 

@@ -1,0 +1,5 @@
+# Pacotes do monorepo. A pasta profiles/ fica de fora de propósito: as
+# visual-tools têm package.json próprio, instalado com npm dentro da pasta.
+packages:
+  - packages/*
+  - apps/*

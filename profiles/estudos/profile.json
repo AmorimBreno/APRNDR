@@ -1,0 +1,16 @@
+{
+	"id": "estudos",
+	"nome": "Estudos",
+	"pastaDados": "G:\\Meu Drive\\estudos-dados",
+	"instrucoes": "AGENTS.md",
+	"agentePadrao": "professor",
+	"agentes": [
+		{ "arquivo": "agents/professor.md", "papel": "geral", "selecionavel": true },
+		{ "arquivo": "agents/researcher.md", "papel": "pesquisa", "selecionavel": true },
+		{ "arquivo": "agents/mermaid-maker.md", "papel": "desenho", "selecionavel": false },
+		{ "arquivo": "agents/svg-maker.md", "papel": "desenho", "selecionavel": false }
+	],
+	"skills": ["skills/teach", "skills/visualize"],
+	"extensoes": ["extensions/visual-tools"],
+	"paineis": ["teste"]
+}

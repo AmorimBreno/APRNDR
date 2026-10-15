@@ -4,11 +4,28 @@ AGENTS.md — regras do projeto para o Claude Code (não vai para o pi)
 CLAUDE.md — comandos e convenções curtas para o Claude Code
 ESPECIFICACAO.md — o que o app deve ser; seção 13 = decisões de 2026-10-15
 filemap.md — este mapa; atualizar ao criar ou mover arquivos
+package.json — raiz do monorepo: scripts dev, typecheck e test; versões fixas; builds liberados (pnpm.onlyBuiltDependencies)
+pnpm-workspace.yaml — pacotes do workspace (packages/*, apps/*; profiles/ fica de fora)
+tsconfig.base.json — opções de TypeScript comuns (estrito, ESM, Bundler); cada pacote estende
+vitest.config.ts — testes de packages/*/src e apps/*/src
 
 docs/PLANO.md — etapas, tarefas e estado atual; atualizar ao aceitar uma tarefa
 docs/teste-etapa-N.md — roteiro de teste que o Breno roda no fim de cada etapa
 docs/teste-etapa-1.md — roteiro da Etapa 1: pi no Windows Terminal com o perfil de estudos
 docs/historico/ — documentos do checkpoint 1 (pi no WSL com tmux e Obsidian); só consulta
+
+packages/core/ — @estudos/core: núcleo genérico (não conhece estudos); consumido direto do src/index.ts
+packages/core/src/perfis.ts — esquema zod do profile.json e leitura da pasta profiles/ (lerPerfis, lerPerfil)
+packages/core/src/agentes.ts — leitura dos arquivos de agente (frontmatter pelo parseFrontmatter do pi + prompt)
+packages/core/src/*.test.ts — testes vitest do núcleo
+packages/ui/ — @estudos/ui: componentes e hooks React comuns (vazio até a tarefa 2.5)
+
+apps/server/ — @estudos/server: Hono (HTTP) + ws (WebSocket) na porta 7431; dev com tsx watch
+apps/server/src/config.ts — porta do servidor e caminhos da raiz do repositório e de profiles/
+apps/server/src/index.ts — rotas /api/saude e /api/perfis e WebSocket /ws (por enquanto só ping e pong)
+apps/web/ — @estudos/web: Vite + React na porta 7430, com proxy de /api e /ws para a 7431
+apps/web/vite.config.ts — porta e proxy do Vite
+apps/web/src/App.tsx — página mínima que mostra /api/saude e os perfis (a tela provisória é a tarefa 2.5)
 
 pi-global/ — fonte versionada do que vai para ~/.pi/agent (instalar com scripts/instalar-pi-global.mjs)
 pi-global/settings.json — provedor e modelo padrão do pi
@@ -16,6 +33,7 @@ pi-global/extensions/web-search/index.ts — ferramenta web_search (Tavily)
 pi-global/extensions/web-fetch/index.ts — ferramenta web_fetch (Tavily Extract, com download direto de reserva)
 
 profiles/estudos/ — perfil de estudos (recursos do pi e, depois, profile.json e painéis)
+profiles/estudos/profile.json — definição do perfil de estudos (pasta de dados, agentes, skills, extensões, painéis)
 profiles/estudos/AGENTS.md — instruções fixas do perfil: idioma e regras de estilo do Breno
 profiles/estudos/ORIGEM.md — de onde vieram os arquivos do learn e o que mudou
 profiles/estudos/README-learn.md — README original do learn

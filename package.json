@@ -1,0 +1,29 @@
+{
+	"name": "estudos-ia",
+	"private": true,
+	"type": "module",
+	"packageManager": "pnpm@10.33.0",
+	"engines": {
+		"node": ">=22.19"
+	},
+	"scripts": {
+		"dev": "pnpm --parallel --filter \"./apps/*\" dev",
+		"typecheck": "pnpm -r typecheck",
+		"test": "vitest run"
+	},
+	"devDependencies": {
+		"@types/node": "24.19.0",
+		"typescript": "7.0.2",
+		"vitest": "5.0.3",
+		"vite": "8.3.2"
+	},
+	"pnpm": {
+		"onlyBuiltDependencies": [
+			"esbuild"
+		],
+		"ignoredBuiltDependencies": [
+			"@google/genai",
+			"protobufjs"
+		]
+	}
+}

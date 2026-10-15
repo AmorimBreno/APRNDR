@@ -27,7 +27,15 @@ packages/core/src/subagentes.ts — ferramenta subagent: sessão filha em <dados
 packages/core/src/protocolo.ts — protocolo do WebSocket: mensagens do cliente (esquema zod e validarMensagemCliente), mensagens do servidor e dados de cada resposta; só zod e import type
 packages/core/src/janela-perfil.ts — JanelaPerfil: uma sessão do pi por janela (iniciar, enviar, abortar, trocar modelo e agente, histórico, recarregar, responder e acaoDaInterface da ponte)
 packages/core/src/*.test.ts — testes vitest do núcleo (sem rede; janela-perfil.test.ts usa perfil e pasta do pi temporários)
-packages/ui/ — @estudos/ui: componentes e hooks React comuns (vazio até a tarefa 2.5)
+packages/ui/ — @estudos/ui: lógica do front comum a todos os perfis (sobrevive ao redesenho); importa do núcleo só tipos de @estudos/core/protocolo
+packages/ui/src/index.ts — exporta tudo do pacote
+packages/ui/src/tipos.ts — tipos do núcleo derivados do protocolo (EventoNucleo, EstadoSessao, ItemHistorico, InfoModelo, ResumoSessao)
+packages/ui/src/cliente.ts — ClienteConexao: WebSocket em /ws, reconexão com espera crescente, pedir() com pedidoId e promessa da resposta, estado da conexão; obterCliente() = cliente único da página
+packages/ui/src/estado-janela.ts — reducer puro da janela de perfil (sessão, conversa com ferramentas no lugar, execução, fila, uso somado, carregando, erros, pedidos e ações da ponte por painel, aviso de recarregado)
+packages/ui/src/use-janela-perfil.ts — hook useJanelaPerfil(perfilId): abre o perfil, aplica o reducer, ações (enviar, abortar, trocar modelo e agente, sessões, modelos, recarregar, ponte); reabre a sessão ao reconectar
+packages/ui/src/use-perfis.ts — hook usePerfis e buscarPerfis: GET /api/perfis (perfis válidos e erros)
+packages/ui/src/paineis.tsx — registro de painéis (id para componente), AreaPaineis e PainelGenerico (ações em JSON, responder pedido com texto ou cancelar)
+packages/ui/src/estado-janela.test.ts, cliente.test.ts — testes vitest do reducer e do cliente (WebSocket falso, sem DOM)
 
 apps/server/ — @estudos/server: Hono (HTTP) + ws (WebSocket) na porta 7431; dev com dev.mjs
 apps/server/dev.mjs — modo dev: roda src/index.ts com o tsx e reinicia quando apps/server/src ou packages/core/src mudam, pedindo o encerramento pelo IPC (o tsx watch mata o processo na hora no Windows)
@@ -42,7 +50,14 @@ apps/server/src/log.ts — log no console e em %LOCALAPPDATA%\estudos-app\logs\s
 apps/server/src/servidor.test.ts — testes do servidor sem rede (rotas, mensagens com janela falsa, watcher, chaves)
 apps/web/ — @estudos/web: Vite + React na porta 7430, com proxy de /api e /ws para a 7431
 apps/web/vite.config.ts — porta e proxy do Vite
-apps/web/src/App.tsx — página mínima que mostra /api/saude e os perfis (a tela provisória é a tarefa 2.5)
+apps/web/index.html — página do Vite (só body sem margem; sem tema)
+apps/web/src/main.tsx — monta o App no #raiz
+apps/web/src/App.tsx — rotas por hash: #/ = perfis, #/perfil/<id> = janela do perfil
+apps/web/src/paineis.ts — registro de painéis do front (teste = PainelGenerico; ids sem componente também usam o genérico)
+apps/web/src/provisorio/ — tela provisória SEM ESTILO (Etapa 2); será jogada fora no redesenho, a lógica está no packages/ui
+apps/web/src/provisorio/TelaPerfis.tsx — lista de perfis e erros dos inválidos
+apps/web/src/provisorio/JanelaPerfil.tsx — janela do perfil: carregando, sessões, nova conversa, seletores de agente e modelo, recarregar, custo, diagnósticos, avisos, chat e área de painéis
+apps/web/src/provisorio/Chat.tsx — conversa (texto ao vivo, raciocínio em details, ferramentas com status e progresso) e campo de mensagem (Enter envia, Shift+Enter quebra)
 
 pi-global/ — fonte versionada do que vai para ~/.pi/agent (instalar com scripts/instalar-pi-global.mjs)
 pi-global/settings.json — provedor e modelo padrão do pi

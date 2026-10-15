@@ -81,6 +81,10 @@ importers:
         version: 4.6.5
 
   packages/ui:
+    dependencies:
+      '@estudos/core':
+        specifier: workspace:*
+        version: link:../core
     devDependencies:
       '@types/react':
         specifier: 19.3.0

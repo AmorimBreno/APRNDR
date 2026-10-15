@@ -33,14 +33,43 @@ function descreverErro(erro: unknown): string {
 	return String(erro);
 }
 
+// Console desligado depois que a saída quebra. Quando o processo que lê o
+// stdout/stderr morre (por exemplo, o pnpm dev encerrado), cada escrita no
+// console dá EPIPE; sem isso, o tratador de "exceção não tratada" escrevia o
+// erro no console, que dava EPIPE de novo, e o log crescia sem parar.
+let consoleAtivo = true;
+let fluxosVigiados = false;
+
+function vigiarFluxos(): void {
+	if (fluxosVigiados) return;
+	fluxosVigiados = true;
+	for (const fluxo of [process.stdout, process.stderr]) {
+		fluxo.on("error", () => {
+			consoleAtivo = false;
+		});
+	}
+}
+
+/** true para erros de saída quebrada (EPIPE), que não devem ser registrados de novo. */
+export function ehSaidaQuebrada(erro: unknown): boolean {
+	return (erro as { code?: unknown } | undefined)?.code === "EPIPE";
+}
+
 /** Cria o log. Sem `pasta`, escreve só no console (os testes usam assim). */
 export function criarLog(pasta?: string): Log {
 	let pastaPronta = false;
+	vigiarFluxos();
 	const escrever = (nivel: NivelLog, mensagem: string) => {
 		const agora = new Date();
 		const linha = `${dataLocal(agora)} ${horaLocal(agora)} [${nivel}] ${mensagem}`;
-		if (nivel === "erro") console.error(linha);
-		else console.log(linha);
+		if (consoleAtivo) {
+			try {
+				if (nivel === "erro") console.error(linha);
+				else console.log(linha);
+			} catch {
+				consoleAtivo = false;
+			}
+		}
 		if (!pasta) return;
 		try {
 			if (!pastaPronta) {
@@ -49,7 +78,12 @@ export function criarLog(pasta?: string): Log {
 			}
 			appendFileSync(join(pasta, `servidor-${dataLocal(agora)}.log`), `${linha}\n`);
 		} catch (erro) {
-			console.error(`Não foi possível escrever no log: ${descreverErro(erro)}`);
+			if (!consoleAtivo) return;
+			try {
+				console.error(`Não foi possível escrever no log: ${descreverErro(erro)}`);
+			} catch {
+				consoleAtivo = false;
+			}
 		}
 	};
 	return {

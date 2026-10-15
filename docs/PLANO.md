@@ -9,13 +9,16 @@ Cada etapa termina com um roteiro de teste em docs/ que o Breno executa. A etapa
 
 Etapa 1 aprovada pelo Breno em 2026-10-15: o roteiro docs/teste-etapa-1.md passou inteiro (perfil carregado, resposta seguindo as regras, quiz, ask_user_question, busca e PNGs). Abrir o pi com o perfil: scripts\pi-estudos.cmd.
 
-Próximo passo: Etapa 2, depois da aprovação do Breno para começar.
+Etapa 2: tarefas 2.1 a 2.7 feitas e revisadas (o orquestrador conferiu no navegador do app: perfil abre, resposta ao vivo, painel teste com pedido e resposta, nova conversa, reinício do servidor com a conversa de volta). Esperando o Breno rodar docs/teste-etapa-2.md e aprovar. Depois vem a parada para as referências de design.
 
 Tarefa 2.3 feita (aguarda revisão): ponte de eventos (docs/ponte-de-eventos.md) e ferramenta subagent no núcleo; as ferramentas dos desenhistas vêm do campo novo extensoesSubagentes do profile.json; web_fetch ganhou fresh=true e avisa quando o conteúdo do Tavily pode estar em cache.
 
 Decisão da tarefa 2.2: a troca de agente no SDK é limpa e continua a mesma conversa (o pi grava as mudanças de prompt e ferramentas como patches no transcript); a sessão é remontada sobre o mesmo arquivo com o prompt, as skills, as ferramentas e o modelo do novo agente, e o agente fica gravado numa entrada "custom" (nucleo.agente).
 
 Pendências observadas:
+- Etapa 3: o botão Cancelar do PainelGenerico manda responder_pedido com {cancelado: true} nos dados, e a ferramenta recebe isso como resposta; o protocolo precisa de um cancelamento de verdade (a ferramenta já entende {cancelado: true, motivo} vindo do núcleo).
+- Etapa 3 (design): o seletor de modelo lista todos os modelos do OpenRouter (centenas); precisa de busca ou de uma lista curta (os do profile.json mais favoritos).
+- O log do servidor de 2026-10-15 ficou com ~58 MB por um ciclo de EPIPE (corrigido em apps/server/src/log.ts); o arquivo pode ser apagado com o ok do Breno.
 - O npm install das visual-tools baixou ~700 MB de Chrome do puppeteer em ~/.cache/puppeteer, que não é usado (o desenho usa o Edge). O .puppeteerrc.cjs impede novos downloads; apagar a pasta só com o ok do Breno.
 
 

@@ -26,7 +26,7 @@ import { carregarChaves } from "./chaves.ts";
 import { CHAVES_API, ESPERA_WATCHER_MS, PASTA_LOGS, PASTA_PERFIS, PORTA_SERVIDOR } from "./config.ts";
 import { tratarMensagem } from "./conexao.ts";
 import { type Conexao, Janelas } from "./janelas.ts";
-import { criarLog } from "./log.ts";
+import { criarLog, ehSaidaQuebrada } from "./log.ts";
 import { observar } from "./observador.ts";
 
 const pacote = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string };
@@ -128,5 +128,9 @@ process.on("message", (mensagem) => {
 // O dev.mjs morreu (canal IPC fechado): não fica servidor órfão segurando a porta.
 process.on("disconnect", () => void encerrar("o processo pai saiu"));
 
-process.on("uncaughtException", (erro) => log.erro("Exceção não tratada", erro));
+process.on("uncaughtException", (erro) => {
+	// Saída quebrada (EPIPE) já desliga o console no log.ts; registrar de novo faria um ciclo.
+	if (ehSaidaQuebrada(erro)) return;
+	log.erro("Exceção não tratada", erro);
+});
 process.on("unhandledRejection", (erro) => log.erro("Promessa rejeitada sem tratamento", erro));

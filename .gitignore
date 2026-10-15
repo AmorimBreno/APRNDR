@@ -1,10 +1,10 @@
 node_modules/
+dist/
+.vite/
+coverage/
+*.log
 .env
 .env.*
 
-# Estado de interface do Obsidian (muda a cada clique, não é conteúdo)
-vault/.obsidian/workspace*.json
-vault/.obsidian/cache
-
 # Gabarito da prova cega (qual letra é qual modelo): fica fora do git até a revelação
-extras/prova-cega/gabarito-*.json
+scripts/prova-cega/gabarito-*.json

@@ -3,18 +3,19 @@
  * Prova cega do professor.
  *
  * Manda o mesmo pedido de aula para vários modelos do OpenRouter e grava as
- * respostas em vault/comparacao/<tema>/ com nomes A, B, C..., sem dizer qual
- * modelo escreveu qual. O gabarito (letra -> modelo, custo, tokens) fica em
- * extras/prova-cega/gabarito-<tema>.json, fora do vault e fora do git.
+ * respostas em <pasta de dados>/comparacao/<tema>/ com nomes A, B, C..., sem
+ * dizer qual modelo escreveu qual. O gabarito (letra -> modelo, custo, tokens)
+ * fica em scripts/prova-cega/gabarito-<tema>.json, fora do git.
  *
- * O pedido junta o que o professor do pi recebe (skill teach + APPEND_SYSTEM)
+ * O pedido junta o que o professor do pi recebe (skill teach + AGENTS.md do perfil)
  * com um aluno simulado cuja sondagem já foi feita. Não há ferramentas: o
  * quiz é escrito como texto. O que se compara é a qualidade da explicação.
  *
- * Uso (no WSL, a partir da raiz do repositório, com OPENROUTER_API_KEY definida):
- *   node extras/prova-cega/prova-cega.mjs [pasta] [modelo ...]
+ * Uso (a partir da raiz do repositório, com OPENROUTER_API_KEY definida):
+ *   node scripts/prova-cega/prova-cega.mjs [pasta] [modelo ...]
  *
- * pasta: nome da subpasta em vault/comparacao (padrão: r2-ajustado).
+ * pasta: nome da subpasta em <pasta de dados>/comparacao (padrão: r2-ajustado).
+ * A pasta de dados vem de ESTUDOS_DADOS (padrão: G:\Meu Drive\estudos-dados).
  * modelos: ids do OpenRouter (padrão: os três da primeira rodada).
  */
 
@@ -23,17 +24,18 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+const DADOS = process.env.ESTUDOS_DADOS ?? "G:\\Meu Drive\\estudos-dados";
 const TEMA = process.argv[2] ?? "r2-ajustado";
 const MODELOS = process.argv.length > 3 ? process.argv.slice(3) : ["openai/gpt-6.1-sol", "z-ai/glm-5.3", "deepseek/deepseek-v4-pro-0813"];
 
 const chave = process.env.OPENROUTER_API_KEY;
 if (!chave) {
-	console.error("OPENROUTER_API_KEY não está definida. Veja docs/instalacao.md, passo 2.");
+	console.error("OPENROUTER_API_KEY não está definida. Veja docs/teste-etapa-1.md.");
 	process.exit(1);
 }
 
-const skillTeach = readFileSync(join(RAIZ, "vault/.pi/skills/teach/SKILL.md"), "utf8");
-const appendSystem = readFileSync(join(RAIZ, "vault/.pi/APPEND_SYSTEM.md"), "utf8");
+const skillTeach = readFileSync(join(RAIZ, "profiles/estudos/skills/teach/SKILL.md"), "utf8");
+const appendSystem = readFileSync(join(RAIZ, "profiles/estudos/AGENTS.md"), "utf8");
 
 const sistema = `You are a teacher. Your output is rendered as markdown in Obsidian (LaTeX and mermaid render natively).
 
@@ -94,7 +96,7 @@ const letras = embaralhados.map((_, i) => String.fromCharCode(65 + i));
 console.log(`Perguntando a ${MODELOS.length} modelos em paralelo (pode levar alguns minutos)...`);
 const resultados = await Promise.allSettled(embaralhados.map(perguntar));
 
-const pasta = join(RAIZ, "vault/comparacao", TEMA);
+const pasta = join(DADOS, "comparacao", TEMA);
 mkdirSync(pasta, { recursive: true });
 const gabarito = { tema: TEMA, data: new Date().toISOString(), respostas: {} };
 let custoTotal = 0;
@@ -142,7 +144,7 @@ ${letrasOk.map((_, i) => `${i + 1}.`).join("\n")}
 	"utf8",
 );
 
-const arqGabarito = join(RAIZ, "extras/prova-cega", `gabarito-${TEMA}.json`);
+const arqGabarito = join(RAIZ, "scripts/prova-cega", `gabarito-${TEMA}.json`);
 writeFileSync(arqGabarito, JSON.stringify(gabarito, null, 2), "utf8");
-console.log(`\nPronto. Respostas em vault/comparacao/${TEMA}/. Custo total: US$ ${custoTotal.toFixed(4)}.`);
-console.log("O gabarito (qual letra é qual modelo) está em extras/prova-cega/. Não abra antes de avaliar.");
+console.log(`\nPronto. Respostas em ${pasta}. Custo total: US$ ${custoTotal.toFixed(4)}.`);
+console.log("O gabarito (qual letra é qual modelo) está em scripts/prova-cega/. Não abra antes de avaliar.");

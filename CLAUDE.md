@@ -14,6 +14,7 @@ Stack: TypeScript, monorepo pnpm, Node 24 com o SDK do pi (@earendil-works/pi-co
 - pnpm dev: sobe o servidor (apps/server, porta 7431, reinicia sozinho pelo apps/server/dev.mjs) e o front (apps/web, porta 7430, Vite) em paralelo. Abrir http://localhost:7430.
 - pnpm typecheck: tsc --noEmit em todos os pacotes.
 - pnpm test: roda os testes com o vitest.
+- Lançador: wscript launcher\iniciar.vbs sobe o pnpm dev escondido se preciso e abre o Edge em modo app (ESTUDOS_SEM_NAVEGADOR=1 não abre o navegador); wscript launcher\parar.vbs (ou node launcher\parar.mjs) encerra o app; powershell -ExecutionPolicy Bypass -File scripts\criar-atalho.ps1 cria os atalhos "Estudos" e "Parar Estudos" na área de trabalho. Logs em %LOCALAPPDATA%\estudos-app\logs (lancador-*.log e dev-*.log).
 
 ## Convenções
 

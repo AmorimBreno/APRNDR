@@ -91,3 +91,10 @@ scripts/testar-nucleo.ts — verificação do núcleo com chamadas reais (sessã
 scripts/testar-servidor.ts — verificação da tarefa 2.4 pelo WebSocket do pnpm dev (perfil, pergunta, sessões, modelo, watcher; --reabrir <sessaoId> depois de reiniciar)
 scripts/testar-ponte.ts — verificação da tarefa 2.3 com chamadas reais (ponte, subagentes researcher e mermaid-maker, web_fetch fresh); rodar com o tsx e as chaves
 scripts/prova-cega/prova-cega.mjs — compara modelos de professor às cegas; grava em <dados>/comparacao
+
+launcher/iniciar.vbs — alvo do atalho "Estudos": roda o iniciar.mjs sem janela (avisa se faltar o node)
+launcher/iniciar.mjs — lançador: confere a saúde, sobe o pnpm dev escondido (Start-Process -WindowStyle Hidden), espera e abre o Edge --app; log lancador-*.log, saída dev-*.log, PID em %LOCALAPPDATA%\estudos-app\lancador.pid.json
+launcher/parar.vbs — alvo do atalho "Parar Estudos": roda o parar.mjs sem janela
+launcher/parar.mjs — encerra a árvore do pnpm dev gravada e os node do app nas portas 7430/7431; nunca toca em outros processos
+launcher/comum.mjs — caminhos, portas, log, PowerShell e avisos comuns ao lançador
+scripts/criar-atalho.ps1 — cria os atalhos "Estudos" e "Parar Estudos" na área de trabalho (rodar com -ExecutionPolicy Bypass)

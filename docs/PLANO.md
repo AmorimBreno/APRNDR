@@ -9,7 +9,9 @@ Cada etapa termina com um roteiro de teste em docs/ que o Breno executa. A etapa
 
 Etapa 1 aprovada pelo Breno em 2026-10-15: o roteiro docs/teste-etapa-1.md passou inteiro (perfil carregado, resposta seguindo as regras, quiz, ask_user_question, busca e PNGs). Abrir o pi com o perfil: scripts\pi-estudos.cmd.
 
-Etapa 2: tarefas 2.1 a 2.7 feitas e revisadas (o orquestrador conferiu no navegador do app: perfil abre, resposta ao vivo, painel teste com pedido e resposta, nova conversa, reinício do servidor com a conversa de volta). Esperando o Breno rodar docs/teste-etapa-2.md e aprovar. Depois vem a parada para as referências de design.
+Etapa 2: tarefas 2.1 a 2.7 feitas e revisadas (o orquestrador conferiu no navegador do app: perfil abre, resposta ao vivo, painel teste com pedido e resposta, nova conversa, reinício do servidor com a conversa de volta). Etapa 2 aprovada pelo Breno em 2026-10-15 (docs/teste-etapa-2.md passou inteiro).
+
+Próximo passo: parada de design. Esperando as referências do Breno (imagens ou Claude Design); depois, mockups das telas da base para aprovação, e só então a Etapa 3.
 
 Tarefa 2.3 feita (aguarda revisão): ponte de eventos (docs/ponte-de-eventos.md) e ferramenta subagent no núcleo; as ferramentas dos desenhistas vêm do campo novo extensoesSubagentes do profile.json; web_fetch ganhou fresh=true e avisa quando o conteúdo do Tavily pode estar em cache.
 

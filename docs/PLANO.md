@@ -7,7 +7,13 @@ Cada etapa termina com um roteiro de teste em docs/ que o Breno executa. A etapa
 
 ## Estado atual
 
-Etapa 1: 1.1, 1.2 e 1.3 feitas. Teste de fumaça ok (auth do OpenRouter pronta, três modelos disponíveis, resposta em português seguindo o AGENTS.md do perfil, web_search e web_fetch com o Tavily, custo de US$ 0,06). Esperando o Breno rodar docs/teste-etapa-1.md e aprovar. Abrir o pi com o perfil: scripts\pi-estudos.cmd.
+Etapa 1 aprovada pelo Breno em 2026-10-15: o roteiro docs/teste-etapa-1.md passou inteiro (perfil carregado, resposta seguindo as regras, quiz, ask_user_question, busca e PNGs). Abrir o pi com o perfil: scripts\pi-estudos.cmd.
+
+Próximo passo: Etapa 2, depois da aprovação do Breno para começar.
+
+Pendências observadas:
+- web_fetch pelo Tavily Extract pode devolver uma cópia antiga da página (no teste, o npm mostrou a versão 1.1.0 quando a atual era 1.2.0). Ver na tarefa 2.3, quando o researcher virar subagente: buscar direto primeiro quando a data importar, ou avisar o modelo de que o conteúdo pode estar em cache.
+- O npm install das visual-tools baixou ~700 MB de Chrome do puppeteer em ~/.cache/puppeteer, que não é usado (o desenho usa o Edge). O .puppeteerrc.cjs impede novos downloads; apagar a pasta só com o ok do Breno.
 
 
 ## Etapa 0: preparar o repositório (feita)
@@ -25,7 +31,7 @@ Etapa 1: 1.1, 1.2 e 1.3 feitas. Teste de fumaça ok (auth do OpenRouter pronta, 
 
 1.3 (feita) Teste de fumaça e roteiro (Medium; depende de 1.1, 1.2 e das chaves). pi -p a partir de uma pasta fora do repositório, com as extensões, skills e o AGENTS.md do perfil: resposta em português seguindo as regras, web_search com resultados do Tavily, pi auth check do OpenRouter. Escreve docs/teste-etapa-1.md para o Breno rodar no Windows Terminal.
 
-Aprovação: o Breno roda docs/teste-etapa-1.md.
+Aprovação: o Breno rodou docs/teste-etapa-1.md e aprovou em 2026-10-15.
 
 
 ## Etapa 2: base do app e integração com o pi (Fase 1 da especificação)

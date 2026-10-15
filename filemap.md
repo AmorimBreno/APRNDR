@@ -17,7 +17,11 @@ docs/historico/ — documentos do checkpoint 1 (pi no WSL com tmux e Obsidian); 
 packages/core/ — @estudos/core: núcleo genérico (não conhece estudos); consumido direto do src/index.ts
 packages/core/src/perfis.ts — esquema zod do profile.json e leitura da pasta profiles/ (lerPerfis, lerPerfil)
 packages/core/src/agentes.ts — leitura dos arquivos de agente (frontmatter pelo parseFrontmatter do pi + prompt)
-packages/core/src/*.test.ts — testes vitest do núcleo
+packages/core/src/modelos.ts — nomes provedor/id resolvidos no registro de modelos do pi, níveis de raciocínio, modelos disponíveis
+packages/core/src/eventos.ts — tipo EventoNucleo (protocolo genérico), tradução dos eventos da sessão do pi e do histórico
+packages/core/src/sessoes.ts — opções do DefaultResourceLoader por (perfil, agente), filtros de skills e ferramentas, agente gravado na sessão, lista de sessões em <dados>/.sessoes-pi
+packages/core/src/janela-perfil.ts — JanelaPerfil: uma sessão do pi por janela (iniciar, enviar, abortar, trocar modelo e agente, histórico, recarregar)
+packages/core/src/*.test.ts — testes vitest do núcleo (sem rede; janela-perfil.test.ts usa perfil e pasta do pi temporários)
 packages/ui/ — @estudos/ui: componentes e hooks React comuns (vazio até a tarefa 2.5)
 
 apps/server/ — @estudos/server: Hono (HTTP) + ws (WebSocket) na porta 7431; dev com tsx watch
@@ -53,4 +57,5 @@ referencias/plano-cd.html — artefato de plano de estudo usado antes; referênc
 scripts/instalar-pi-global.mjs — copia pi-global/ para ~/.pi/agent (mescla o settings.json)
 scripts/pi-estudos.cmd — abre o pi no terminal com o perfil de estudos, em %LOCALAPPDATA%\estudos-app\pi-teste (fora do repositório)
 scripts/testar-render.mjs — gera PNGs de teste pelo mesmo código das visual-tools (em %TEMP%/estudos-render-teste)
+scripts/testar-nucleo.ts — verificação do núcleo com chamadas reais (sessão, prompt, troca de modelo e agente, histórico, recarregar); rodar com o tsx e as chaves
 scripts/prova-cega/prova-cega.mjs — compara modelos de professor às cegas; grava em <dados>/comparacao

@@ -11,6 +11,8 @@ Etapa 1 aprovada pelo Breno em 2026-10-15: o roteiro docs/teste-etapa-1.md passo
 
 Próximo passo: Etapa 2, depois da aprovação do Breno para começar.
 
+Decisão da tarefa 2.2: a troca de agente no SDK é limpa e continua a mesma conversa (o pi grava as mudanças de prompt e ferramentas como patches no transcript); a sessão é remontada sobre o mesmo arquivo com o prompt, as skills, as ferramentas e o modelo do novo agente, e o agente fica gravado numa entrada "custom" (nucleo.agente).
+
 Pendências observadas:
 - web_fetch pelo Tavily Extract pode devolver uma cópia antiga da página (no teste, o npm mostrou a versão 1.1.0 quando a atual era 1.2.0). Ver na tarefa 2.3, quando o researcher virar subagente: buscar direto primeiro quando a data importar, ou avisar o modelo de que o conteúdo pode estar em cache.
 - O npm install das visual-tools baixou ~700 MB de Chrome do puppeteer em ~/.cache/puppeteer, que não é usado (o desenho usa o Edge). O .puppeteerrc.cjs impede novos downloads; apagar a pasta só com o ok do Breno.

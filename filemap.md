@@ -12,6 +12,7 @@ vitest.config.ts — testes de packages/*/src e apps/*/src
 docs/PLANO.md — etapas, tarefas e estado atual; atualizar ao aceitar uma tarefa
 docs/teste-etapa-N.md — roteiro de teste que o Breno roda no fim de cada etapa
 docs/teste-etapa-1.md — roteiro da Etapa 1: pi no Windows Terminal com o perfil de estudos
+docs/teste-etapa-2.md — roteiro da Etapa 2: app pelo atalho, sessão, subagente, ponte de eventos e edição ao vivo
 docs/ponte-de-eventos.md — protocolo da ponte (interface:mostrar, pedido, resposta, acao) para quem escreve extensão de perfil
 docs/historico/ — documentos do checkpoint 1 (pi no WSL com tmux e Obsidian); só consulta
 
@@ -77,6 +78,7 @@ profiles/estudos/skills/teach/SKILL.md — método de ensino (base do explicador
 profiles/estudos/skills/visualize/SKILL.md — quando e como pedir um diagrama
 profiles/estudos/extensions/quiz.ts — ferramenta quiz (desenha no terminal)
 profiles/estudos/extensions/ask-user-question.ts — ferramenta ask_user_question (desenha no terminal)
+profiles/estudos/extensions/painel-teste.ts — ferramentas de teste da ponte (mostrar_painel_teste, perguntar_no_painel_teste); arquivo do projeto, não do learn
 profiles/estudos/extensions/visual-tools/ — ferramentas write/edit/render de mermaid e SVG dos desenhistas; npm install dentro da pasta
 profiles/estudos/extensions/visual-tools/tools/mermaid_tools.ts, svg_tools.ts — as ferramentas; carregadas só nas sessões filhas (extensoesSubagentes do profile.json)
 profiles/estudos/extensions/visual-tools/index.ts — registrava as ferramentas no interactive-subagents; fora do profile.json, não é usado pelo app

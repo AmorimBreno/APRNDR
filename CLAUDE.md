@@ -1,6 +1,8 @@
 # estudos-ia, branch app-perfis
 
-Antes de qualquer tarefa: AGENTS.md (regras do projeto), ESPECIFICACAO.md (o que o app é; a seção 13 tem as decisões mais recentes) e docs/PLANO.md (etapas e estado atual). Para achar arquivos: filemap.md.
+@AGENTS.md
+
+Antes de qualquer tarefa: AGENTS.md (regras do projeto, importado acima), ESPECIFICACAO.md (o que o app é; a seção 13 tem as decisões mais recentes) e docs/PLANO.md (etapas e estado atual). Para achar arquivos: filemap.md.
 
 Stack: TypeScript, monorepo pnpm, Node 24 com o SDK do pi (@earendil-works/pi-coding-agent 1.2.0), React com Vite. Roda no Windows nativo.
 

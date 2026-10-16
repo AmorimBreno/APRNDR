@@ -1,6 +1,8 @@
-// Ordem dos estilos (design-system/README.md): tokens, componentes, depois os do app.
+// Ordem dos estilos (design-system/README.md): tokens, componentes, as peças
+// comuns do @estudos/ui e, por último, os do app.
 import "@estudos/design-system/tokens.css";
 import "@estudos/design-system/componentes.css";
+import "@estudos/ui/estilo.css";
 import "./estilo.css";
 
 import { StrictMode } from "react";

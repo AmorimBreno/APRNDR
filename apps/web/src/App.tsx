@@ -2,7 +2,7 @@
 // perfil (o hash faz o recarregar da página manter o perfil).
 
 import { useEffect, useState } from "react";
-import { JanelaPerfilProvisoria } from "./provisorio/JanelaPerfil.tsx";
+import { JanelaPerfil } from "./telas/JanelaPerfil.tsx";
 import { TelaPerfis } from "./telas/TelaPerfis.tsx";
 
 function perfilDoHash(hash: string): string | undefined {
@@ -21,5 +21,5 @@ export function App() {
 
 	const perfil = perfilDoHash(hash);
 	// key: outro perfil começa com o estado zerado.
-	return perfil ? <JanelaPerfilProvisoria key={perfil} perfilId={perfil} /> : <TelaPerfis />;
+	return perfil ? <JanelaPerfil key={perfil} perfilId={perfil} /> : <TelaPerfis />;
 }

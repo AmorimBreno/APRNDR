@@ -53,9 +53,6 @@ a.linha:hover .linha__texto .overline, a.linha:focus-visible .linha__texto .over
 .painel-carregando > * { margin: 0; max-width: var(--measure-read); }
 .painel-carregando .overline { color: var(--ink-muted); }
 .painel-carregando__etapa { display: flex; align-items: center; gap: var(--space-3); color: var(--ink-muted); }
-.aviso-erro { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4) var(--space-5); border-left: var(--border-strong) solid var(--brick); border-radius: var(--radius-sm); background: var(--brick-tint); color: var(--ink); }
-.aviso-erro p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-.aviso-erro .overline { color: var(--brick-text); }
 
 @media (max-width: 900px) {
 	.tela { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
@@ -69,6 +66,69 @@ a.linha:hover .linha__texto .overline, a.linha:focus-visible .linha__texto .over
 	.linha { transition: none; }
 }
 
-/* ── Janela provisória (até a tarefa 3.3): controles nativos legíveis no escuro ── */
+/* ── Janela do perfil ── */
 
-.provisorio a { color: var(--amber); }
+.janela { position: relative; display: grid; grid-template-rows: var(--course-bar) minmax(0, 1fr); height: 100%; }
+
+/* Topo: a linha tijolo da lista de perfis, virada aba (como a CourseBar). */
+.topo { position: relative; z-index: 3; display: flex; align-items: center; gap: var(--space-6); min-width: 0; padding: 0 var(--space-6); background: var(--brick); color: var(--on-brick); }
+.topo__voltar, .topo__icone { flex: none; display: inline-flex; align-items: center; gap: var(--space-2); height: var(--control-md); padding: 0 var(--space-3); border: 0; border-radius: var(--radius-md); background: transparent; color: inherit; cursor: pointer; }
+.topo__voltar { margin-left: calc(var(--space-3) * -1); }
+.topo__icone { justify-content: center; width: var(--control-md); padding: 0; }
+.topo__voltar:hover, .topo__icone:hover { box-shadow: inset 0 0 0 var(--border-strong) currentColor; }
+.topo__titulo { flex: 0 1 auto; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.topo__titulo h1 { margin: 0; overflow: hidden; font-size: 24px; line-height: 28px; white-space: nowrap; text-overflow: ellipsis; }
+.topo__controles { flex: 1; display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.topo__controle { position: relative; display: inline-grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--space-2); align-items: center; min-width: 0; max-width: 300px; padding: 6px var(--space-3); border: var(--border-strong) solid currentColor; border-radius: var(--radius-md); background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.topo__controle .overline { grid-column: 1; }
+.topo__controle > .ap-icon { grid-column: 2; grid-row: 1 / span 2; }
+.topo__valor, .topo__select { grid-column: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.topo__select { appearance: none; margin: 0; padding: 0; border: 0; outline: 0; background: transparent; color: inherit; cursor: pointer; }
+.topo__select option { background: var(--surface-raised); color: var(--ink); }
+.topo__controle:hover { box-shadow: inset 0 -3px 0 currentColor; }
+.topo__controle:focus-visible, .topo__controle:focus-within { outline: none; box-shadow: var(--focus-ring); }
+.topo__controle:disabled, .topo__controle:has(select:disabled) { cursor: default; opacity: var(--opacity-disabled); box-shadow: none; }
+.topo__uso { flex: none; display: flex; flex-direction: column; gap: 2px; text-align: right; }
+.topo__acoes { flex: none; display: flex; align-items: center; gap: var(--space-2); align-self: stretch; padding-left: var(--space-4); border-left: var(--border-strong) solid currentColor; }
+.topo__painel { display: inline-flex; align-items: center; gap: var(--space-2); height: var(--control-md); padding: 0 var(--space-4) 2px; border: 0; border-radius: var(--radius-md); background: var(--paper); color: var(--on-paper); box-shadow: var(--key-lip); cursor: pointer; }
+.topo__painel:active { transform: translateY(1px); box-shadow: var(--key-lip-pressed); }
+.topo__painel--aberto { background: var(--surface-ground); color: var(--ink); }
+.topo__contador { padding: 0 6px; border-radius: var(--radius-full); background: var(--amber); color: var(--on-amber); }
+.topo button:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.topo button:disabled { cursor: default; opacity: var(--opacity-disabled); }
+
+.corpo { display: grid; grid-template-columns: 264px minmax(0, 1fr); gap: var(--space-4); min-height: 0; padding: var(--space-4); }
+.corpo--paineis { grid-template-columns: 264px minmax(0, 1fr) 360px; }
+.coluna { min-height: 0; padding: var(--space-5); border-radius: var(--radius-xl); background: var(--surface-panel); overflow-y: auto; }
+.coluna--paineis { padding: var(--space-3); background: var(--surface-ground); border: var(--border-hair) solid var(--line); }
+
+.centro { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.rolagem { flex: 1; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; }
+.centro__coluna { display: flex; flex-direction: column; gap: var(--space-6); max-width: var(--measure-read); margin: 0 auto; padding: var(--space-8) 0 var(--space-12); }
+.centro__pe { flex: none; display: flex; justify-content: center; padding: var(--space-3) 0 0; border-top: var(--border-hair) solid var(--line); overflow: hidden; scrollbar-gutter: stable; }
+/* Espaço na margem para o número dos blocos (ap-block__num fica fora da coluna);
+ * o scrollbar-gutter dos dois deixa a barra alinhada com a coluna. */
+.rolagem, .centro__pe { padding-left: 72px; padding-right: 32px; }
+
+.aviso-recarregado { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-left: var(--border-strong) solid var(--amber); border-radius: var(--radius-sm); background: var(--amber-tint); color: var(--ink); }
+.aviso-recarregado p { margin: 0; }
+.aviso-recarregado .overline { color: var(--amber); }
+.diagnosticos { padding: var(--space-3) var(--space-4); border: var(--border-hair) solid var(--line); border-radius: var(--radius-sm); color: var(--ink-muted); }
+.diagnosticos summary { cursor: pointer; }
+.diagnosticos ul { display: flex; flex-direction: column; gap: var(--space-1); margin: var(--space-3) 0 0; padding-left: var(--space-5); }
+.diagnosticos li { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+@media (max-width: 1180px) {
+	.topo__uso { display: none; }
+	.corpo--paineis { grid-template-columns: 220px minmax(0, 1fr); }
+	.coluna--paineis { position: absolute; top: calc(var(--course-bar) + var(--space-4)); right: var(--space-4); bottom: var(--space-4); z-index: 2; width: min(380px, calc(100vw - 32px)); box-sizing: border-box; background: var(--surface-ground); border-color: var(--line-strong); }
+	.corpo { grid-template-columns: 220px minmax(0, 1fr); }
+}
+
+@media (max-width: 760px) {
+	.corpo, .corpo--paineis { grid-template-columns: minmax(0, 1fr); }
+	.coluna--historico { display: none; }
+	.topo { gap: var(--space-3); padding: 0 var(--space-4); }
+	.topo__titulo { display: none; }
+	.rolagem, .centro__pe { padding-left: var(--space-4); padding-right: var(--space-4); }
+}

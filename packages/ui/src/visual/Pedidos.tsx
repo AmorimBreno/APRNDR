@@ -46,6 +46,7 @@ export function BotaoPedido({ pedido, resumo, numero, abrir }: PropsBotaoPedido)
 			type="button"
 			className={`botao-pedido${pendente ? " botao-pedido--pendente" : ""}`}
 			aria-haspopup="dialog"
+			data-pedido={pedido.id}
 			aria-label={`${rotulo}: ${situacaoDoPedido(pedido)}. ${pendente ? "Abrir para responder" : "Abrir para rever"}`}
 			onClick={abrir}
 		>

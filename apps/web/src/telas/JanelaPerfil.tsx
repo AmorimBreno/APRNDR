@@ -14,9 +14,11 @@ import {
 	type ItemAssistente,
 	BarraPergunta,
 	BotaoPedido,
+	comTransicao,
 	DocumentoConversa,
 	entradaDoPainel,
 	idsDosPaineis,
+	iniciarVoo,
 	ModalPedido,
 	numerarPedidos,
 	type RegistroPedido,
@@ -31,6 +33,7 @@ import {
 	semEsperar,
 	useJanelaPerfil,
 	usePerfis,
+	type Voo,
 } from "@estudos/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { registroPaineis } from "../paineis.ts";
@@ -62,6 +65,8 @@ export function JanelaPerfil({ perfilId, voltar }: PropsJanelaPerfil) {
 	const [sessoes, setSessoes] = useState<ResumoSessao[]>([]);
 	const [modelos, setModelos] = useState<InfoModelo[]>([]);
 	const [paineisAbertos, setPaineisAbertos] = useState(false);
+	/** A mensagem enviada voando do campo até a nota (movimento.ts). */
+	const [voo, setVoo] = useState<Voo>();
 	const aberta = conexao === "aberta";
 	const sessaoId = estado.sessao?.sessaoId;
 
@@ -110,13 +115,41 @@ export function JanelaPerfil({ perfilId, voltar }: PropsJanelaPerfil) {
 	const estadoDoAberto = aberto?.estado;
 	const painelDoAberto = aberto?.painel;
 	const anterior = useRef<{ id?: string; estado?: string }>({});
+	// O modal nasce do botão do pedido e, ao fechar ou minimizar, encolhe de
+	// volta para dentro dele (View Transition com o nome pedido-aberto).
+	const botaoDoPedidoNaTela = (id: string) => document.querySelector<HTMLElement>(`[data-pedido="${CSS.escape(id)}"]`);
+	const abrirPedido = (id: string) => {
+		const botao = botaoDoPedidoNaTela(id);
+		if (!botao) return setPedidoAberto(id);
+		void comTransicao(
+			() => {
+				botao.style.viewTransitionName = "";
+				setPedidoAberto(id);
+			},
+			{ antes: () => (botao.style.viewTransitionName = "pedido-aberto"), classe: "transicao-pedido" },
+		);
+	};
+	const fecharPedido = () => {
+		const botao = pedidoAberto ? botaoDoPedidoNaTela(pedidoAberto) : null;
+		if (!botao) return setPedidoAberto(undefined);
+		void comTransicao(
+			() => {
+				setPedidoAberto(undefined);
+				botao.style.viewTransitionName = "pedido-aberto";
+			},
+			{ classe: "transicao-pedido" },
+		).then(() => {
+			botao.style.viewTransitionName = "";
+		});
+	};
 	useEffect(() => {
 		const antes = anterior.current;
 		anterior.current = { ...(pedidoAberto ? { id: pedidoAberto } : {}), ...(estadoDoAberto ? { estado: estadoDoAberto } : {}) };
 		// Só na passagem de "esperando" para outra coisa com o modal aberto: reabrir para rever não fecha.
 		if (!pedidoAberto || !painelDoAberto || antes.id !== pedidoAberto || antes.estado !== "pendente" || estadoDoAberto === "pendente") return;
 		const revisa = entradaDoPainel(registroPaineis, painelDoAberto).revisarAoResponder;
-		if (!(revisa && estadoDoAberto === "respondido")) setPedidoAberto(undefined);
+		if (!(revisa && estadoDoAberto === "respondido")) fecharPedido();
+		// fecharPedido muda a cada render; o que importa é a passagem de estado.
 	}, [pedidoAberto, estadoDoAberto, painelDoAberto]);
 	const numeros = useMemo(() => numerarPedidos(registroPaineis, registros), [registros]);
 
@@ -144,8 +177,25 @@ export function JanelaPerfil({ perfilId, voltar }: PropsJanelaPerfil) {
 	const enviar = () => {
 		const mensagem = texto.trim();
 		if (!mensagem) return;
+		// O fantasma sai do campo agora e pousa na nota quando o eco do servidor chegar.
+		const campo = document.querySelector(".ap-ask__input");
+		const novo = campo ? iniciarVoo(mensagem, campo.getBoundingClientRect()) : undefined;
+		setVoo(novo);
 		setTexto("");
-		acoes.enviar(mensagem).catch(() => setTexto(mensagem));
+		acoes.enviar(mensagem).then(
+			(resultado) => {
+				// Na fila, não há nota para pousar agora: a mensagem aparece na lista da fila.
+				if (resultado === "enfileirada") {
+					novo?.cancelar();
+					setVoo(undefined);
+				}
+			},
+			() => {
+				novo?.cancelar();
+				setVoo(undefined);
+				setTexto(mensagem);
+			},
+		);
 	};
 
 	const parar = () => {
@@ -196,7 +246,7 @@ export function JanelaPerfil({ perfilId, voltar }: PropsJanelaPerfil) {
 			pedido={registro}
 			resumo={resumoDoPedido(registroPaineis, registro)}
 			numero={numeros[registro.id] ?? 1}
-			abrir={() => setPedidoAberto(registro.id)}
+			abrir={() => abrirPedido(registro.id)}
 		/>
 	);
 	// Pedidos sem a chamada de ferramenta na conversa (id diferente do da chamada) vão para o fim.
@@ -326,6 +376,8 @@ export function JanelaPerfil({ perfilId, voltar }: PropsJanelaPerfil) {
 								conversa={estado.conversa}
 								pedidoDaChamada={(id) => (registros[id] ? botaoDoPedido(registros[id]) : undefined)}
 								autorDaResposta={autorDaResposta}
+								{...(voo ? { voo } : {})}
+								aoPousar={() => setVoo(undefined)}
 								depois={soltos.map((registro) => (
 									<div key={registro.id} className="documento__pedido">
 										{botaoDoPedido(registro)}
@@ -380,7 +432,7 @@ export function JanelaPerfil({ perfilId, voltar }: PropsJanelaPerfil) {
 					responder={acoes.responderPedido}
 					cancelar={acoes.cancelarPedido}
 					acaoDaInterface={acoes.acaoDaInterface}
-					fechar={() => setPedidoAberto(undefined)}
+					fechar={fecharPedido}
 					{...(agenteAtual
 						? {
 								quemPergunta:

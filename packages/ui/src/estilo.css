@@ -61,6 +61,40 @@ a.linha:hover .linha__texto .overline, a.linha:focus-visible .linha__texto .over
 	.linha { transition: none; }
 }
 
+/* ── Movimento (design-system/ESTUDOS.md): molas em CSS para o que não usa a Motion ── */
+
+:root {
+	/* Mola amortecida (ζ 0,55: passa 12% e assenta) e a viva (ζ 0,38: passa 27%, brincalhona). */
+	--mola: linear(0.0, 0.038, 0.135, 0.269, 0.418, 0.569, 0.709, 0.832, 0.933, 1.012, 1.068, 1.103, 1.122, 1.126, 1.12, 1.107, 1.09, 1.071, 1.052, 1.035, 1.02, 1.007, 0.998, 0.991, 0.987, 0.984, 0.984, 0.985, 0.987, 0.989, 0.991, 0.994, 0.996, 1);
+	--mola-viva: linear(0.0, 0.079, 0.275, 0.526, 0.78, 0.997, 1.155, 1.246, 1.275, 1.255, 1.202, 1.133, 1.063, 1.003, 0.959, 0.933, 0.924, 0.929, 0.944, 0.963, 0.982, 0.999, 1.011, 1.018, 1.021, 1.02, 1.016, 1.01, 1.005, 1.001, 0.997, 0.995, 0.994, 1);
+}
+
+/* Palavras novas da resposta que está chegando (rehype-palavras.ts). */
+.palavra { display: inline; animation: palavra-aparece .32s ease-out both; }
+@keyframes palavra-aparece { from { opacity: 0; } to { opacity: 1; } }
+
+/* O visto do "Concluída" se desenha, na linha de ferramenta que terminou ao vivo. */
+.ferramenta--viva .ferramenta__status--ok .ap-icon path { stroke-dasharray: 32; stroke-dashoffset: 32; animation: visto-desenha .42s .08s ease-out forwards; }
+@keyframes visto-desenha { to { stroke-dashoffset: 0; } }
+
+/* O fantasma da mensagem que voa do campo até a nota (movimento.ts). */
+.voo-mensagem { position: fixed; z-index: 2000; box-sizing: border-box; padding: 10px var(--space-4); border-radius: var(--radius-md); background: var(--surface-raised); color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; pointer-events: none; transform-origin: 0 0; transition: background-color .25s ease-out, color .25s ease-out; }
+.voo-mensagem--pousando { background: var(--cream); color: var(--on-cream); box-shadow: var(--sticker-shadow); }
+
+/* Modais: entram com mola; vindo do botão do pedido, a View Transition faz o resto. */
+.ap-modal { animation: modal-entra .5s var(--mola) both; }
+.ap-modal-root { animation: veu-entra .2s ease-out both; }
+@keyframes modal-entra { from { opacity: 0; transform: translateY(24px) scale(.92); } }
+@keyframes veu-entra { from { opacity: 0; } }
+.transicao-pedido .ap-modal, .transicao-pedido .ap-modal-root { animation: none; }
+::view-transition-group(pedido-aberto) { animation-duration: .55s; animation-timing-function: var(--mola); }
+::view-transition-old(pedido-aberto), ::view-transition-new(pedido-aberto) { height: 100%; animation-duration: .3s; }
+
+@media (prefers-reduced-motion: reduce) {
+	.palavra, .ap-modal, .ap-modal-root { animation: none; }
+	.ferramenta--viva .ferramenta__status--ok .ap-icon path { animation: none; stroke-dashoffset: 0; }
+}
+
 /* ── Aviso de erro (tijolo claro, texto ink) ── */
 
 .aviso-erro { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4) var(--space-5); border-left: var(--border-strong) solid var(--brick); border-radius: var(--radius-sm); background: var(--brick-tint); color: var(--ink); }
@@ -112,8 +146,8 @@ a.linha:hover .linha__texto .overline, a.linha:focus-visible .linha__texto .over
 
 /* Ferramentas: linhas técnicas no poço, coladas umas nas outras. */
 .ferramenta { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-2) var(--space-3); border: var(--border-hair) solid var(--line); border-radius: var(--radius-sm); background: var(--surface-well); color: var(--ink-muted); }
-.ferramenta + .ferramenta { margin-top: -36px; }
-.ap-block + .ferramenta, .ap-note + .ferramenta { margin-top: -20px; }
+.documento__item--ferramenta + .documento__item--ferramenta { margin-top: -36px; }
+.documento__item--resposta + .documento__item--ferramenta, .documento__item--usuario + .documento__item--ferramenta { margin-top: -20px; }
 .ferramenta--filha { margin-left: var(--space-6); }
 .ferramenta__linha { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
 .ferramenta__nome { flex: none; color: var(--ink); }
@@ -232,7 +266,7 @@ a.linha:hover .linha__texto .overline, a.linha:focus-visible .linha__texto .over
 .pergunta__resposta { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4) var(--space-5); border-left: var(--border-strong) solid var(--amber); border-radius: var(--radius-sm); background: var(--surface-raised); }
 .pergunta__resposta .overline { color: var(--ink-muted); }
 .pergunta__resposta ul { margin: 0; padding-left: var(--space-5); }
-.documento__pedido + .documento__pedido { margin-top: -32px; }
+.documento__item--pedido + .documento__item--pedido { margin-top: -32px; }
 
 @media (prefers-reduced-motion: reduce) {
 	.historico__item, .botao-pedido { transition: none; }

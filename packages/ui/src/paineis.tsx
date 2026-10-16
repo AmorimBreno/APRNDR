@@ -6,8 +6,10 @@
 // Um id sem componente registrado usa o PainelGenerico, que só mostra o que
 // chegou em JSON e deixa responder aos pedidos com um texto.
 //
-// Visual provisório: elementos HTML com o estilo padrão do navegador.
+// Cada painel fica num Card do design system. O PainelGenerico por dentro
+// ainda é provisório (HTML com o estilo padrão) até a tarefa 3.4.
 
+import { Card, pad2 } from "@estudos/design-system";
 import { type ComponentType, useState } from "react";
 import type { AcaoRecebida, PedidoPendente } from "./estado-janela.ts";
 import type { MotivoCancelamento } from "./tipos.ts";
@@ -133,22 +135,22 @@ export function idsDosPaineis(paineis: string[], acoesPorPainel: Record<string, 
 
 export function AreaPaineis(props: PropsAreaPaineis) {
 	const ids = idsDosPaineis(props.paineis, props.acoesPorPainel, props.pedidos);
-	if (ids.length === 0) return <p>Este perfil não tem painéis.</p>;
+	if (ids.length === 0) return <p className="body-sm paineis__vazio">Este perfil não tem painéis.</p>;
 	return (
-		<div>
-			{ids.map((id) => {
+		<div className="paineis">
+			{ids.map((id, indice) => {
 				const Componente = componenteDoPainel(props.registro, id);
+				const pedidos = props.pedidos.filter((pedido) => pedido.painel === id);
 				return (
-					<section key={id}>
-						<h3>Painel {id}</h3>
+					<Card key={id} index={pad2(indice + 1)} label={pedidos.length ? "Esperando você" : "Painel"} title={id} className="paineis__card">
 						<Componente
 							painel={id}
 							acoes={props.acoesPorPainel[id] ?? []}
-							pedidos={props.pedidos.filter((pedido) => pedido.painel === id)}
+							pedidos={pedidos}
 							responder={props.responder}
 							acaoDaInterface={(acao, dados) => props.acaoDaInterface(id, acao, dados)}
 						/>
-					</section>
+					</Card>
 				);
 			})}
 		</div>

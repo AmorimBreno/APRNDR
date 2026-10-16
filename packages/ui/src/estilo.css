@@ -1,0 +1,87 @@
+/* Estilos das peças comuns da janela do perfil (packages/ui/src/visual/), por
+ * cima do design system APRNDR. Carregar depois do tokens.css e do
+ * componentes.css do @estudos/design-system. */
+
+/* Fórmulas do Markdown (rehype-katex). */
+@import "katex/dist/katex.min.css";
+
+/* ── Aviso de erro (tijolo claro, texto ink) ── */
+
+.aviso-erro { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4) var(--space-5); border-left: var(--border-strong) solid var(--brick); border-radius: var(--radius-sm); background: var(--brick-tint); color: var(--ink); }
+.aviso-erro p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-sans); font-size: 15px; line-height: 24px; }
+.aviso-erro .overline { color: var(--brick-text); }
+
+/* ── Conversa como documento ── */
+
+.documento { display: flex; flex-direction: column; gap: 44px; }
+.nota__texto { margin: 0; white-space: pre-wrap; }
+
+.bloco__raciocinio { margin: 0 0 1em; padding-left: var(--space-3); border-left: var(--border-strong) solid var(--line); }
+.bloco__raciocinio summary { cursor: pointer; color: var(--ink-muted); }
+.bloco__raciocinio summary:focus-visible { outline: none; border-radius: 2px; box-shadow: var(--focus-ring); }
+.bloco__raciocinio p { margin: var(--space-2) 0 0; white-space: pre-wrap; color: var(--ink-muted); }
+.bloco__modelo { padding-left: 10px; color: var(--ink-subtle); }
+
+/* Ferramentas: linhas técnicas no poço, coladas umas nas outras. */
+.ferramenta { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-2) var(--space-3); border: var(--border-hair) solid var(--line); border-radius: var(--radius-sm); background: var(--surface-well); color: var(--ink-muted); }
+.ferramenta + .ferramenta { margin-top: -36px; }
+.ap-block + .ferramenta, .ap-note + .ferramenta { margin-top: -20px; }
+.ferramenta--filha { margin-left: var(--space-6); }
+.ferramenta__linha { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.ferramenta__nome { flex: none; color: var(--ink); }
+.ferramenta__args { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--ink-subtle); }
+.ferramenta__fim { flex: none; display: flex; align-items: center; gap: var(--space-2); margin-left: auto; }
+.ferramenta__detalhe { display: -webkit-box; margin: 0; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ferramenta__detalhe .ap-cursor { width: 7px; height: 12px; }
+
+/* ── Barra de pergunta ── */
+
+.barra { display: flex; flex-direction: column; gap: var(--space-2); width: 100%; max-width: var(--measure-read); }
+.barra__fila { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.barra__item { display: flex; align-items: baseline; gap: var(--space-3); padding: var(--space-2) var(--space-3); border: var(--border-control) dashed var(--line-strong); border-radius: var(--radius-md); color: var(--ink-muted); }
+.barra__item .overline { flex: none; }
+.barra__item-texto { min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.barra__status { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.barra__status .overline { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--ink-muted); }
+
+/* ── Histórico de conversas ── */
+
+.historico { display: flex; flex-direction: column; gap: var(--space-3); }
+.historico__secao { margin: var(--space-2) 0 0; color: var(--ink-muted); }
+.historico__vazio { margin: 0; color: var(--ink-muted); }
+.historico__lista { display: flex; flex-direction: column; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.historico__item { display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 10px var(--space-3); border: var(--border-control) solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--ink); text-align: left; cursor: pointer; transition: background-color .12s ease-out; }
+.historico__item:hover { background: var(--surface-hover); }
+.historico__item:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.historico__item:disabled { cursor: default; opacity: var(--opacity-disabled); }
+.historico__item--atual, .historico__item--atual:hover { border-color: var(--amber); background: var(--amber-tint); cursor: default; }
+.historico__item--atual:disabled { opacity: 1; }
+.historico__titulo { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; }
+.historico__meta { color: var(--ink-muted); font-size: 12px; line-height: 16px; }
+
+/* ── Seletor de modelo (modal) ── */
+
+.seletor { display: flex; flex-direction: column; gap: var(--space-4); }
+.seletor__secao { margin: 0 0 var(--space-2); color: var(--ink-muted); }
+.seletor__lista { display: flex; flex-direction: column; gap: var(--space-1); max-height: 46vh; margin: 0; padding: 0; overflow-y: auto; list-style: none; }
+.modelo { display: flex; align-items: center; gap: var(--space-3); width: 100%; padding: 10px var(--space-3); border: var(--border-control) solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised); color: var(--ink); text-align: left; cursor: pointer; }
+.modelo:hover { background: var(--surface-hover); }
+.modelo:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.modelo--atual, .modelo--atual:hover { border-color: var(--amber); background: var(--amber-tint); }
+.modelo__texto { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.modelo__nome, .modelo__detalhes { overflow-wrap: anywhere; color: var(--ink-muted); }
+
+/* ── Área de painéis ── */
+
+.paineis { display: flex; flex-direction: column; gap: var(--space-4); }
+.paineis__vazio { margin: 0; color: var(--ink-muted); }
+.paineis__card .ap-card__label { color: inherit; }
+.paineis__card pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: 13px; line-height: 20px; }
+
+@media (prefers-reduced-motion: reduce) {
+	.historico__item { transition: none; }
+}
+
+/* Fórmulas: o KaTeX usa as fontes dele; a de bloco rola se for larga. */
+.ap-prose .katex { font-size: 1.05em; }
+.ap-prose .katex-display { margin: 0 0 1em; padding: var(--space-2) 0; overflow-x: auto; overflow-y: hidden; }

@@ -4,13 +4,20 @@
 	"private": true,
 	"type": "module",
 	"exports": {
-		".": "./src/index.ts"
+		".": "./src/index.ts",
+		"./estilo.css": "./src/estilo.css"
 	},
 	"scripts": {
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"@estudos/core": "workspace:*"
+		"@estudos/core": "workspace:*",
+		"@estudos/design-system": "workspace:*",
+		"katex": "0.16.22",
+		"react-markdown": "10.1.0",
+		"rehype-katex": "7.0.1",
+		"remark-gfm": "4.0.1",
+		"remark-math": "6.0.0"
 	},
 	"peerDependencies": {
 		"react": "^19.3.0",

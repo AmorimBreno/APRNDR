@@ -2,6 +2,7 @@
 // gravadas, da mais recente para a mais antiga. A aberta fica marcada.
 
 import { Button } from "@estudos/design-system";
+import { motion } from "motion/react";
 import type { ResumoSessao } from "../tipos.ts";
 
 const dataHora = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -31,11 +32,16 @@ export function Historico(props: PropsHistorico) {
 				<p className="historico__vazio body-sm">Nenhuma conversa gravada ainda. Ela aparece aqui depois da primeira mensagem.</p>
 			) : (
 				<ul className="historico__lista">
-					{props.sessoes.map((sessao) => {
+					{props.sessoes.map((sessao, indice) => {
 						const atual = sessao.id === props.atual;
 						const meta = [formatarData(sessao.modificadaEm), `${sessao.mensagens} mensagens`, sessao.agente].filter(Boolean).join(" · ");
 						return (
-							<li key={sessao.id}>
+							<motion.li
+								key={sessao.id}
+								initial={{ opacity: 0, x: -12 }}
+								animate={{ opacity: 1, x: 0 }}
+								transition={{ type: "spring", stiffness: 420, damping: 30, delay: Math.min(indice, 12) * 0.03 }}
+							>
 								<button
 									type="button"
 									className={`historico__item${atual ? " historico__item--atual" : ""}`}
@@ -45,10 +51,18 @@ export function Historico(props: PropsHistorico) {
 										if (!atual) props.abrirSessao(sessao.id);
 									}}
 								>
+									{/* A marca da conversa aberta desliza de um item para o outro (layoutId). */}
+									{atual ? (
+										<motion.span
+											layoutId="historico-atual"
+											className="historico__marca"
+											transition={{ type: "spring", stiffness: 420, damping: 32 }}
+										/>
+									) : null}
 									<span className="historico__titulo body-strong">{sessao.titulo || "Sem título"}</span>
 									<span className="historico__meta data">{meta}</span>
 								</button>
-							</li>
+							</motion.li>
 						);
 					})}
 				</ul>

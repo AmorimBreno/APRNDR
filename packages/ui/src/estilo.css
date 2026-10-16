@@ -191,11 +191,13 @@ a.linha:hover .linha__texto .overline, a.linha:focus-visible .linha__texto .over
 .historico__secao { margin: var(--space-2) 0 0; color: var(--ink-muted); }
 .historico__vazio { margin: 0; color: var(--ink-muted); }
 .historico__lista { display: flex; flex-direction: column; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
-.historico__item { display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 10px var(--space-3); border: var(--border-control) solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--ink); text-align: left; cursor: pointer; transition: background-color .12s ease-out; }
+.historico__item { position: relative; display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 10px var(--space-3); border: var(--border-control) solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--ink); text-align: left; cursor: pointer; transition: background-color .12s ease-out; }
 .historico__item:hover { background: var(--surface-hover); }
 .historico__item:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .historico__item:disabled { cursor: default; opacity: var(--opacity-disabled); }
-.historico__item--atual, .historico__item--atual:hover { border-color: var(--amber); background: var(--amber-tint); cursor: default; }
+.historico__item--atual, .historico__item--atual:hover { background: transparent; cursor: default; }
+.historico__marca { position: absolute; inset: calc(var(--border-control) * -1); z-index: 0; border: var(--border-control) solid var(--amber); border-radius: var(--radius-md); background: var(--amber-tint); }
+.historico__titulo, .historico__meta { position: relative; z-index: 1; }
 .historico__item--atual:disabled { opacity: 1; }
 .historico__titulo { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; }
 .historico__meta { color: var(--ink-muted); font-size: 12px; line-height: 16px; }

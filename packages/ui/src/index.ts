@@ -14,6 +14,7 @@ export * from "./use-perfis.ts";
 export * from "./visual/AgenteAnimado.tsx";
 export * from "./visual/Avatares.tsx";
 export * from "./visual/BarraPergunta.tsx";
+export * from "./visual/Contador.tsx";
 export * from "./visual/Conversa.tsx";
 export * from "./visual/FaixaMarca.tsx";
 export * from "./visual/Fala.tsx";

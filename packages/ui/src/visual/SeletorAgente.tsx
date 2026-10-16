@@ -6,6 +6,7 @@
 // Enter ou espaço escolhem; Esc fecha e volta o foco ao botão; Tab fecha.
 
 import { Icon } from "@estudos/design-system";
+import { AnimatePresence, motion } from "motion/react";
 import { type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
 
 export interface OpcaoAgente {
@@ -106,8 +107,16 @@ export function SeletorAgente(props: PropsSeletorAgente) {
 				</span>
 				<Icon name="chevron-down" size={16} />
 			</button>
+			<AnimatePresence>
 			{aberto ? (
-				<div ref={menu} id={idMenu} className="menu-agente" role="menu" aria-label="Escolher agente" onKeyDown={teclaNoMenu}>
+				<motion.div
+					ref={menu}
+					initial={{ opacity: 0, scale: 0.9, y: -6 }}
+					animate={{ opacity: 1, scale: 1, y: 0 }}
+					exit={{ opacity: 0, scale: 0.95, y: -4, transition: { duration: 0.1 } }}
+					transition={{ type: "spring", stiffness: 560, damping: 26 }}
+					style={{ transformOrigin: "0 0" }} id={idMenu} className="menu-agente" role="menu" aria-label="Escolher agente" onKeyDown={teclaNoMenu}
+				>
 					{opcoes.map((agente) => {
 						const marcado = agente.nome === props.atual;
 						return (
@@ -128,8 +137,9 @@ export function SeletorAgente(props: PropsSeletorAgente) {
 							</button>
 						);
 					})}
-				</div>
+				</motion.div>
 			) : null}
+			</AnimatePresence>
 		</div>
 	);
 }

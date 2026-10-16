@@ -15,6 +15,7 @@ import {
 	BarraPergunta,
 	BotaoPedido,
 	comTransicao,
+	Contador,
 	DocumentoConversa,
 	entradaDoPainel,
 	idsDosPaineis,
@@ -35,6 +36,7 @@ import {
 	usePerfis,
 	type Voo,
 } from "@estudos/ui";
+import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { registroPaineis } from "../paineis.ts";
 import { TelaCarregando } from "./TelaCarregando.tsx";
@@ -287,7 +289,8 @@ export function JanelaPerfil({ perfilId, voltar }: PropsJanelaPerfil) {
 				<div className="topo__uso" title={`Sessão ${sessaoId ?? "?"} · raciocínio ${estado.sessao?.raciocinio ?? "?"}`}>
 					<span className="overline">Custo da sessão</span>
 					<span className="data">
-						US$ {dolar.format(uso.custo)} · {inteiro.format(uso.tokensTotal)} tokens
+						US$ <Contador valor={uso.custo} formatar={(valor) => dolar.format(valor)} /> ·{" "}
+						<Contador valor={uso.tokensTotal} formatar={(valor) => inteiro.format(Math.round(valor))} /> tokens
 					</span>
 				</div>
 
@@ -406,8 +409,16 @@ export function JanelaPerfil({ perfilId, voltar }: PropsJanelaPerfil) {
 					</div>
 				</main>
 
+				<AnimatePresence>
 				{paineisAbertos ? (
-					<aside className="coluna coluna--paineis" aria-label="Painéis">
+					<motion.aside
+						className="coluna coluna--paineis"
+						aria-label="Painéis"
+						initial={{ opacity: 0, x: 48 }}
+						animate={{ opacity: 1, x: 0 }}
+						exit={{ opacity: 0, x: 48, transition: { duration: 0.16 } }}
+						transition={{ type: "spring", stiffness: 380, damping: 30 }}
+					>
 						<AreaPaineis
 							paineis={perfil?.paineis ?? []}
 							registro={registroPaineis}
@@ -417,8 +428,9 @@ export function JanelaPerfil({ perfilId, voltar }: PropsJanelaPerfil) {
 							cancelar={acoes.cancelarPedido}
 							acaoDaInterface={acoes.acaoDaInterface}
 						/>
-					</aside>
+					</motion.aside>
 				) : null}
+				</AnimatePresence>
 			</div>
 
 			{aberto ? (

@@ -41,6 +41,7 @@ packages/ui/src/use-perfis.ts — hook usePerfis e buscarPerfis: GET /api/perfis
 packages/ui/src/paineis.tsx — registro de painéis (componente, título, soModal, resumir o pedido, revisarAoResponder), AreaPaineis (só ações; os pedidos vão para o modal) e PainelGenerico (ações e pedidos em JSON, responder com texto ou cancelar, revisão)
 packages/ui/src/estilo.css — estilos da tela de faixa e folha (.tela, .faixa, .folha, .linha, .tecla-papel) e das peças da janela (aviso de erro, documento, ferramentas, barra, histórico, seletor de modelo, painéis) e o CSS do KaTeX; exportado como @estudos/ui/estilo.css
 packages/ui/src/visual/Markdown.tsx — markdown das respostas (react-markdown, GFM, LaTeX com remark-math e rehype-katex; sem HTML cru)
+packages/ui/src/visual/Contador.tsx — número que rola até o valor novo como odômetro (custo e tokens da sessão)
 packages/ui/src/visual/Conversa.tsx — DocumentoConversa: respostas como bloco sem etiqueta, com o número e o botão de informações na margem e o autor em cima (raciocínio recolhível), mensagens do usuário em StudentNote, ferramentas em linhas técnicas (status, duração, progresso, resumo)
 packages/ui/src/visual/AgenteAnimado.tsx — o agente vivo: atividadeDoAgente (parado, pensando, escrevendo, pesquisando, perguntando) e a foto que reage a cada uma (Motion, ritmos sorteados, selos de bolhas, lupa e ?)
 packages/ui/src/visual/AgenteAnimado.test.ts — testes da regra das atividades

@@ -16,19 +16,19 @@ No fim, anote o resultado de cada passo e mande para o Claude Code. A Etapa 3 s�
 
 ## Teste
 
-### Tela de perfis e carregamento
+### Tela de perfis, cadernos e carregamento
 
-1. Abra o app com o atalho "Estudos". Por quê: confere o lançador com o tema novo. O que você deve ver: nenhuma janela de terminal; abre o Edge em modo app com o fundo quase preto, a faixa escura à esquerda com APRNDR (o ponto tijolo depois do R), "Seus perfis · outubro de 2026", o ideograma 学習 com "aprendizado" ao lado e, no pé, "01 Perfil pronto". À direita, a folha de papel com "Escolha um perfil" e "01 perfil".
+1. Abra o app com o atalho "Estudos". Por quê: confere o lançador e a tela de perfis em cards. O que você deve ver: nenhuma janela de terminal; abre o Edge em modo app com o fundo quase preto, APRNDR no topo (o ponto tijolo depois do R), "Escolha um perfil · outubro de 2026" e a tecla Recarregar. Embaixo, o card do perfil Estudos, mais alto que largo, com a moldura verde (a cor moss do perfil): no topo, as linhas de console "> Perfil 01 · 02 agentes: professor, researcher" e "> Modelo: openai/gpt-6.1-sol"; no meio, a sua ilustração inteira sobre o papel (o branco da imagem vira o papel do tema); embaixo, "ESTUDOS" grande, "学習 aprendizado", "Abrir perfil" com a barra, o lema "Entender antes de decorar" e o selo 学 no canto.
 
-2. Passe o mouse sobre a linha do perfil Estudos, sem clicar. Por quê: no design system, a linha escolhida da lista fica tijolo. O que você deve ver: a linha inteira fica tijolo, com o texto claro, e o "Perfil 01 · 02 agentes · 02 painéis" continua legível. Ao tirar o mouse, ela volta ao papel. Com o perfil já aberto no servidor, aparece também a etiqueta verde "Aberto".
+2. Passe o mouse sobre o card, sem clicar. Por quê: é o "carregando" da tela de boot da referência. O que você deve ver: o card sobe um degrau de cor e a barra enche até o fim, devagar; ao tirar o mouse, ela volta. Se o perfil já estiver aberto no servidor, a barra diz "Continuar" no lugar de "Abrir perfil".
 
-3. Clique em "Recarregar lista" no pé da folha. Por quê: confere a tecla de papel. O que você deve ver: "Carregando perfis" com o cursor âmbar piscando por um instante e a lista de volta.
+3. Clique em Recarregar no topo. Por quê: confere a releitura da lista. O que você deve ver: "Carregando perfis" com o cursor âmbar por um instante e o card de volta.
 
-4. Clique na linha do perfil Estudos. Por quê: confere a tela de carregamento. O que você deve ver: a faixa da marca com o ideograma 始 ("começo") e o botão Perfis; à direita, "Perfil", "ESTUDOS" grande e a etapa ("Montando a sessão" ou o que o núcleo estiver fazendo) com o cursor âmbar. Pode passar rápido; se piscar e sumir, tudo bem.
+4. Clique no card. Por quê: o perfil de estudos abre primeiro nos cadernos. O que você deve ver: a faixa escura com APRNDR, "Estudos · outubro de 2026", o ideograma 書 ("escrever"), "00 Cadernos" e o botão Perfis; à direita, a folha de papel com "Seus cadernos", "Nenhum caderno ainda" e para que eles servem, a linha tracejada "Novo plano de estudos" com "Em breve" e, no pé, a tecla "Conversar com o professor". Clique nela: aparece a tela de carregamento (a faixa com 始 e o botão Cadernos; pode passar rápido) e depois a janela do perfil. Na barra tijolo, o botão da esquerda agora diz "Cadernos" e volta para esta tela.
 
 ### Janela do perfil
 
-5. Olhe a janela aberta. Por quê: confere o layout. O que você deve ver: no topo, a barra tijolo com Perfis, "Perfil · ESTUDOS", os controles Agente e Modelo, "Custo da sessão" com o valor em US$ e os tokens (some quando a janela é estreita), o botão de recarregar e a tecla "Painéis". À esquerda, a faixa com "Nova conversa" e a lista de conversas, com a aberta marcada em âmbar. No meio, a conversa (vazia: um bloco verde com 問 e "Conversa nova") e, no pé, o campo "Pergunte, peça ou responda…" com a tecla âmbar de enviar.
+5. Olhe a janela aberta. Por quê: confere o layout. O que você deve ver: no topo, a barra tijolo com Cadernos, "Perfil · ESTUDOS", os controles Agente e Modelo, "Custo da sessão" com o valor em US$ e os tokens (some quando a janela é estreita), o botão de recarregar e a tecla "Painéis". À esquerda, a faixa com "Nova conversa" e a lista de conversas, com a aberta marcada em âmbar. No meio, a conversa (vazia: um bloco verde com 問 e "Conversa nova") e, no pé, o campo "Pergunte, peça ou responda…" com a tecla âmbar de enviar.
 
 6. Clique em "Nova conversa" e mande: "Em três itens curtos, com uma palavra em negrito em cada, explique a média aritmética. Mostre a fórmula em LaTeX e termine com duas linhas de Python." Por quê: confere a conversa como documento e o markdown. O que você deve ver: a sua mensagem numa nota creme, levemente torta, com "Você escreveu"; a resposta num bloco com o número "01 —" na margem, a etiqueta "Resposta" e "Escrevendo" com o cursor âmbar enquanto chega. No fim: lista com negrito, a fórmula desenhada (não o texto com $), o código numa caixa escura e o nome do modelo no pé do bloco. Se o modelo mandar o raciocínio, aparece um "Raciocínio" recolhível no topo do bloco; alguns modelos não mandam, e isso não reprova.
 
@@ -62,7 +62,7 @@ Os pedidos que esperam a sua resposta (perguntas, questões do quiz, o pedido do
 
 18. Clique no botão de recarregar do topo (a seta em círculo). Por quê: confere o aviso de perfil recarregado. O que você deve ver: no topo da conversa, uma faixa âmbar escura com "Perfil recarregado" e "Você pediu.", com o botão Fechar.
 
-19. Com a tela de perfis aberta (clique em Perfis no topo), abra no editor apps\web\src\telas\TelaPerfis.tsx, troque "Escolha um perfil" por "Escolha um perfil teste" e salve. Por quê: edição ao vivo da tela. O que você deve ver: o texto muda na hora, sem a página recarregar. Desfaça e salve de novo.
+19. Com a tela de perfis aberta (clique em Perfis no topo), abra no editor apps\web\src\telas\TelaPerfis.tsx, troque "Escolha um perfil" por "Escolha um perfil teste" e salve (para chegar à tela de perfis: Cadernos no topo e depois Perfis). Por quê: edição ao vivo da tela. O que você deve ver: o texto muda na hora, sem a página recarregar. Desfaça e salve de novo.
 
 20. Abra o perfil, peça uma questão do quiz e deixe o modal aberto. Abra profiles\estudos\paineis\src\PainelQuiz.tsx, troque "Nota (opcional)" por "Nota (opcional, teste)" e salve. Por quê: o código de tela do perfil é recarregado pelo Vite, sem mexer na sessão do pi. O que você deve ver: o rótulo do campo muda no modal, e não aparece o aviso "Perfil recarregado". Desfaça, salve de novo e responda a questão.
 
@@ -95,10 +95,10 @@ Mande para o Claude Code: o número do passo, o que você fez, o que esperava e 
 Anote aqui, passo a passo, "ok" ou o que deu errado.
 
 Antes de começar (app parado):
-1. Abrir pelo atalho e tela de perfis:
-2. Linha tijolo no hover:
-3. Recarregar lista:
-4. Tela de carregamento:
+1. Abrir pelo atalho e card do perfil:
+2. Barra enchendo no hover:
+3. Recarregar:
+4. Cadernos, carregamento e janela:
 5. Layout da janela:
 6. Conversa como documento e markdown:
 7. Fila e Parar:

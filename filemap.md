@@ -39,7 +39,7 @@ packages/ui/src/estado-janela.ts — reducer puro da janela de perfil (sessão, 
 packages/ui/src/use-janela-perfil.ts — hook useJanelaPerfil(perfilId): abre o perfil, aplica o reducer, ações (enviar, abortar, trocar modelo e agente, sessões, modelos, recarregar, ponte); reabre a sessão ao reconectar
 packages/ui/src/use-perfis.ts — hook usePerfis e buscarPerfis: GET /api/perfis (perfis válidos e erros)
 packages/ui/src/paineis.tsx — registro de painéis (componente, título, soModal, resumir o pedido, revisarAoResponder), AreaPaineis (só ações; os pedidos vão para o modal) e PainelGenerico (ações e pedidos em JSON, responder com texto ou cancelar, revisão)
-packages/ui/src/estilo.css — estilos das peças da janela (aviso de erro, documento, ferramentas, barra, histórico, seletor de modelo, painéis) e o CSS do KaTeX; exportado como @estudos/ui/estilo.css
+packages/ui/src/estilo.css — estilos da tela de faixa e folha (.tela, .faixa, .folha, .linha, .tecla-papel) e das peças da janela (aviso de erro, documento, ferramentas, barra, histórico, seletor de modelo, painéis) e o CSS do KaTeX; exportado como @estudos/ui/estilo.css
 packages/ui/src/visual/Markdown.tsx — markdown das respostas (react-markdown, GFM, LaTeX com remark-math e rehype-katex; sem HTML cru)
 packages/ui/src/visual/Conversa.tsx — DocumentoConversa: respostas em LessonBlock numerado (raciocínio recolhível, modelo no pé), mensagens do usuário em StudentNote, ferramentas em linhas técnicas (status, duração, progresso, resumo)
 packages/ui/src/visual/BarraPergunta.tsx — AskBar com a fila, o aviso de respondendo e o Parar (Enter durante a resposta põe na fila)
@@ -50,6 +50,7 @@ packages/ui/src/visual/PainelPergunta.tsx — painel "pergunta" do ask_user_ques
 packages/ui/src/visual/Pedidos.tsx — pedidos na conversa: BotaoPedido (âmbar pulsando enquanto espera, só contorno depois), ModalPedido (responder, minimizar, rever), resumo e numeração por tipo
 packages/ui/src/visual/Pedidos.test.ts — testes da numeração e do resumo
 packages/ui/src/paineis-nucleo.ts — registro dos painéis do núcleo (pergunta), que o front junta com os dos perfis
+packages/ui/src/telas-iniciais.ts — tipos da tela inicial de um perfil (o que abre antes da conversa) e do registro delas
 packages/ui/src/paineis.test.ts — teste dos ids da área de painéis (os só de pedidos ficam de fora)
 packages/ui/src/estado-janela.test.ts, cliente.test.ts — testes vitest do reducer e do cliente (WebSocket falso, sem DOM)
 
@@ -68,12 +69,14 @@ apps/web/ — @estudos/web: Vite + React na porta 7430, com proxy de /api e /ws 
 apps/web/vite.config.ts — porta e proxy do Vite
 apps/web/index.html — página do Vite (título APRNDR)
 apps/web/src/main.tsx — carrega os estilos (tokens.css e componentes.css do design system, estilo.css do @estudos/ui, estilo.css do app) e monta o App no #raiz
-apps/web/src/estilo.css — estilo do app por cima do design system: altura da página, faixa da marca, folha de papel, linhas de perfil, tela de carregamento e o layout da janela do perfil
-apps/web/src/telas/FaixaMarca.tsx — faixa escura da esquerda (Wordmark, legenda, Ornament, pé livre), usada pela tela de perfis e pela de carregamento
-apps/web/src/telas/TelaPerfis.tsx — tela inicial: lista de perfis na folha de papel, perfis inválidos com o erro, servidor fora do ar
+apps/web/src/estilo.css — estilo do app por cima do design system: altura da página, cards da tela de perfis, tela de carregamento e o layout da janela do perfil
+packages/ui/src/visual/FaixaMarca.tsx — faixa escura da esquerda (Wordmark, legenda, Ornament, pé livre), usada pela tela de carregamento e pela tela de cadernos
+apps/web/src/telas/TelaPerfis.tsx — tela inicial: um card por perfil (console, capa no papel, nome, ideograma, barra que enche no hover, lema, selo), perfis com erro, servidor fora do ar
 apps/web/src/telas/TelaCarregando.tsx — tela enquanto a sessão do perfil é montada: etapa atual, aviso de conexão e erros
 apps/web/src/telas/JanelaPerfil.tsx — janela do perfil: barra tijolo (Perfis, SeletorAgente, SeletorModelo, custo, recarregar, painéis), histórico, conversa como documento com os botões dos pedidos e a barra de pergunta, modal do pedido (abre sozinho, minimiza, revisa), avisos, erros, diagnósticos e área de painéis (abre sozinha quando um painel dela recebe algo)
-apps/web/src/App.tsx — rotas por hash: #/ = perfis, #/perfil/<id> = janela do perfil
+apps/web/src/App.tsx — rotas por hash: #/ = perfis, #/perfil/<id> = tela inicial do perfil (se houver) ou conversa, #/perfil/<id>/conversa = conversa de perfil com tela inicial
+apps/web/src/App.test.ts — teste da leitura do hash
+apps/web/src/telas-iniciais.ts — registro das telas iniciais dos perfis (estudos = cadernos)
 apps/web/src/paineis.ts — registro de painéis do front: os do núcleo (pergunta), os do perfil de estudos (quiz) e o teste (PainelGenerico, com resumo do pedido); ids sem componente também usam o genérico
 
 pi-global/ — fonte versionada do que vai para ~/.pi/agent (instalar com scripts/instalar-pi-global.mjs)
@@ -82,7 +85,8 @@ pi-global/extensions/web-search/index.ts — ferramenta web_search (Tavily)
 pi-global/extensions/web-fetch/index.ts — ferramenta web_fetch (Tavily Extract, com download direto de reserva)
 
 profiles/estudos/ — perfil de estudos (recursos do pi e, depois, profile.json e painéis)
-profiles/estudos/profile.json — definição do perfil de estudos (pasta de dados, agentes, skills, extensões, extensões das sessões filhas, painéis)
+profiles/estudos/profile.json — definição do perfil de estudos (pasta de dados, agentes, skills, extensões, extensões das sessões filhas, painéis, aparência na tela de perfis)
+profiles/estudos/capa.png — capa do perfil na tela de perfis
 profiles/estudos/AGENTS.md — instruções fixas do perfil: idioma e regras de estilo do Breno
 profiles/estudos/ORIGEM.md — de onde vieram os arquivos do learn e o que mudou
 profiles/estudos/README-learn.md — README original do learn
@@ -96,7 +100,8 @@ profiles/estudos/extensions/quiz.ts — ferramenta quiz (desenha no terminal; fo
 profiles/estudos/extensions/quiz-web.ts — ferramenta quiz do app: mesmo nome, parâmetros, correção e resultado do quiz.ts, perguntando pela ponte no painel "quiz" e mandando o resultado depois; arquivo do projeto
 profiles/estudos/extensions/quiz-web.test.ts — testes do quiz web com um barramento falso
 profiles/estudos/paineis/ — @estudos/perfil-estudos: código de tela do perfil (o watcher do servidor ignora esta pasta; quem recarrega é o Vite)
-profiles/estudos/paineis/src/index.ts — registro dos painéis do perfil (quiz = Questões: só modal, revisa ao responder, resumo "Questão")
+profiles/estudos/paineis/src/index.ts — tela inicial do perfil (cadernos) e registro dos painéis (quiz = Questões: só modal, revisa ao responder, resumo "Questão")
+profiles/estudos/paineis/src/TelaCadernos.tsx — tela inicial do perfil de estudos: menu de cadernos com faixa e folha (vazio até a Etapa 4) e a tecla para a conversa
 profiles/estudos/paineis/src/PainelQuiz.tsx — painel do quiz no modal: QuizQuestion (ou teclas marcáveis no multi-select), Não sei, nota, Pular; revisão com o gabarito e o QuizFeedback
 profiles/estudos/paineis/src/estilo.css — estilos do painel do quiz
 profiles/estudos/extensions/ask-user-question.ts — ferramenta ask_user_question (desenha no terminal; no app vale a do núcleo, packages/core/src/pergunta.ts)

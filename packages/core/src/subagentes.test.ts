@@ -40,6 +40,25 @@ function extensaoComFerramenta(...nomes: string[]): string {
 	return ['import { Type } from "typebox";', "export default function (pi) {", ...registros, "}", ""].join("\n");
 }
 
+// Sem rede de verdade: com uma chave de provedor no ambiente (a
+// OPENROUTER_API_KEY do Breno, por exemplo), o pi acharia um modelo para os
+// agentes "sem modelo" e a filha chamaria a API. As chaves saem do ambiente
+// durante cada teste e voltam depois.
+const chavesGuardadas = new Map<string, string>();
+
+beforeEach(() => {
+	for (const [nome, valor] of Object.entries(process.env)) {
+		if (!nome.endsWith("_API_KEY") || valor === undefined) continue;
+		chavesGuardadas.set(nome, valor);
+		delete process.env[nome];
+	}
+});
+
+afterEach(() => {
+	for (const [nome, valor] of chavesGuardadas) process.env[nome] = valor;
+	chavesGuardadas.clear();
+});
+
 beforeEach(async () => {
 	raiz = await mkdtemp(join(tmpdir(), "nucleo-subagentes-"));
 	pastaPerfil = join(raiz, "perfil");

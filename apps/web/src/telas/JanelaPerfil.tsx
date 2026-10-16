@@ -271,6 +271,7 @@ export function JanelaPerfil({ perfilId }: { perfilId: string }) {
 							pedidos={estado.pedidos}
 							cancelados={estado.cancelados}
 							responder={acoes.responderPedido}
+							cancelar={acoes.cancelarPedido}
 							acaoDaInterface={acoes.acaoDaInterface}
 						/>
 					</aside>

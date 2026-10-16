@@ -25,6 +25,8 @@ export interface AcoesJanela {
 	recarregarPerfil(): Promise<EstadoSessao>;
 	/** Responde a um pedido da ponte. false = o pedido não esperava mais resposta. */
 	responderPedido(id: string, dados?: unknown): Promise<boolean>;
+	/** Cancela um pedido da ponte (a ferramenta recebe motivo "usuario"). false = ele não esperava mais resposta. */
+	cancelarPedido(id: string): Promise<boolean>;
 	/** Ação feita num painel; vira "interface:acao" na sessão. */
 	acaoDaInterface(painel: string, acao: string, dados?: unknown): Promise<void>;
 	limparErros(): void;
@@ -135,6 +137,11 @@ export function useJanelaPerfil(perfilId: string, cliente: ClienteConexao = obte
 			recarregarPerfil: () => pedir({ tipo: "recarregar_perfil", perfil }),
 			responderPedido: async (id, dados) => {
 				const resultado = await pedir({ tipo: "responder_pedido", perfil, id, ...(dados === undefined ? {} : { dados }) });
+				despachar({ tipo: "local:pedido_respondido", id });
+				return resultado;
+			},
+			cancelarPedido: async (id) => {
+				const resultado = await pedir({ tipo: "cancelar_pedido", perfil, id });
 				despachar({ tipo: "local:pedido_respondido", id });
 				return resultado;
 			},

@@ -249,6 +249,16 @@ export class JanelaPerfil {
 	}
 
 	/**
+	 * O usuário cancelou o pedido `id` na interface: a ferramenta recebe
+	 * "interface:resposta" {id, cancelado: true, motivo: "usuario"} e a janela
+	 * emite "pedido_interface_cancelado". Devolve false se o pedido não existe
+	 * ou não espera mais resposta.
+	 */
+	cancelarPedido(id: string): boolean {
+		return this.ponte?.cancelarPeloUsuario(id) ?? false;
+	}
+
+	/**
 	 * Ação feita na interface (por exemplo, um botão de um painel): emite
 	 * "interface:acao" {painel, acao, dados} para a extensão do perfil reagir.
 	 */

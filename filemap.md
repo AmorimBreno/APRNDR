@@ -35,7 +35,7 @@ packages/ui/src/cliente.ts — ClienteConexao: WebSocket em /ws, reconexão com 
 packages/ui/src/estado-janela.ts — reducer puro da janela de perfil (sessão, conversa com ferramentas no lugar, execução, fila, uso somado, carregando, erros, pedidos e ações da ponte por painel, aviso de recarregado)
 packages/ui/src/use-janela-perfil.ts — hook useJanelaPerfil(perfilId): abre o perfil, aplica o reducer, ações (enviar, abortar, trocar modelo e agente, sessões, modelos, recarregar, ponte); reabre a sessão ao reconectar
 packages/ui/src/use-perfis.ts — hook usePerfis e buscarPerfis: GET /api/perfis (perfis válidos e erros)
-packages/ui/src/paineis.tsx — registro de painéis (id para componente), AreaPaineis (cada painel num Card) e PainelGenerico (ações em JSON, responder pedido com texto ou cancelar; visual cru até a 3.4)
+packages/ui/src/paineis.tsx — registro de painéis (id para componente, ou componente e título), AreaPaineis (cada painel num Card; o que espera você ganha borda âmbar) e PainelGenerico (ações e pedidos em JSON numa caixa técnica, responder com texto ou cancelar)
 packages/ui/src/estilo.css — estilos das peças da janela (aviso de erro, documento, ferramentas, barra, histórico, seletor de modelo, painéis) e o CSS do KaTeX; exportado como @estudos/ui/estilo.css
 packages/ui/src/visual/Markdown.tsx — markdown das respostas (react-markdown, GFM, LaTeX com remark-math e rehype-katex; sem HTML cru)
 packages/ui/src/visual/Conversa.tsx — DocumentoConversa: respostas em LessonBlock numerado (raciocínio recolhível, modelo no pé), mensagens do usuário em StudentNote, ferramentas em linhas técnicas (status, duração, progresso, resumo)

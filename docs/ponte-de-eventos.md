@@ -24,7 +24,8 @@ Um pedido nunca fica pendurado. O núcleo responde com `{ id, cancelado: true, m
 - motivo "abortado": o usuário interrompeu a resposta (JanelaPerfil.abortar);
 - motivo "execucao_terminada": a execução do agente acabou e ninguém mais espera a resposta;
 - motivo "sessao_encerrada": a janela trocou de sessão ou de agente, recarregou ou foi fechada;
-- motivo "pedido_invalido": o pedido veio errado (ver acima).
+- motivo "pedido_invalido": o pedido veio errado (ver acima);
+- motivo "usuario": o usuário clicou em Cancelar no painel (JanelaPerfil.cancelarPedido, pedido "cancelar_pedido" do protocolo).
 
 A interface também recebe o evento `pedido_interface_cancelado` com o id e o motivo, para fechar o que estava perguntando.
 
@@ -106,5 +107,7 @@ export default function (pi: ExtensionAPI) {
 
 - A JanelaPerfil emite `acao_interface`, `pedido_interface` e `pedido_interface_cancelado` junto com os outros eventos (EventoNucleo, packages/core/src/eventos.ts).
 - `janela.responder(id, dados)` entrega a resposta do usuário. Devolve false se o pedido não existe mais (já respondido ou cancelado); nesse caso o front só fecha o que estava mostrando.
+- `janela.cancelarPedido(id)` cancela o pedido com motivo "usuario": a ferramenta recebe `{ id, cancelado: true, motivo: "usuario" }` e a janela emite `pedido_interface_cancelado`. Também devolve false se o pedido não espera mais resposta.
+- No front, cada painel recebe `responder(id, dados)` e `cancelar(id)`; o cancelamento nunca vai como uma resposta com `{cancelado: true}` nos dados.
 - `janela.acaoDaInterface(painel, acao, dados)` emite "interface:acao" na sessão aberta.
 - As sessões filhas dos subagentes não têm a ponte: um subagente não fala com a interface. Quem fala é a sessão principal da janela.

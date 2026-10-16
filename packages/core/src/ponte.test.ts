@@ -81,6 +81,21 @@ describe("PonteSessao", () => {
 		expect(ponte.responder("p1", {})).toBe(false);
 	});
 
+	it("cancelarPeloUsuario: só aquele pedido recebe o motivo usuario; os outros continuam", () => {
+		const r1 = pedir("p1");
+		const r2 = pedir("p2");
+		eventos = [];
+		expect(ponte.cancelarPeloUsuario("p1")).toBe(true);
+		expect(r1).toEqual([{ id: "p1", cancelado: true, motivo: "usuario" }]);
+		expect(r2).toEqual([]);
+		expect(eventos).toEqual([{ tipo: "pedido_interface_cancelado", id: "p1", motivo: "usuario" }]);
+		expect(ponte.pedidosPendentes).toEqual(["p2"]);
+		// De novo, ou um id desconhecido: nada a cancelar.
+		expect(ponte.cancelarPeloUsuario("p1")).toBe(false);
+		expect(ponte.cancelarPeloUsuario("outro")).toBe(false);
+		expect(ponte.responder("p1", {})).toBe(false);
+	});
+
 	it("pedido inválido ou com id repetido é recusado na hora, com motivo pedido_invalido", () => {
 		const semAcao = pedir("p1", "quiz", "");
 		expect(semAcao).toEqual([{ id: "p1", cancelado: true, motivo: "pedido_invalido", erro: "falta acao (texto)" }]);

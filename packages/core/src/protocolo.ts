@@ -38,6 +38,8 @@ export const esquemaMensagemCliente = z.discriminatedUnion("tipo", [
 	z.strictObject({ tipo: z.literal("recarregar_perfil"), ...comPerfil }),
 	/** Resposta do usuário a um "pedido_interface" (ponte de eventos). */
 	z.strictObject({ tipo: z.literal("responder_pedido"), ...comPerfil, id: texto, dados: z.unknown().optional() }),
+	/** O usuário cancelou um "pedido_interface": a ferramenta recebe o cancelamento com motivo "usuario". */
+	z.strictObject({ tipo: z.literal("cancelar_pedido"), ...comPerfil, id: texto }),
 	/** Ação feita num painel; vira "interface:acao" na sessão. */
 	z.strictObject({ tipo: z.literal("acao_interface"), ...comPerfil, painel: texto, acao: texto, dados: z.unknown().optional() }),
 ]);
@@ -61,6 +63,8 @@ export interface DadosResposta {
 	recarregar_perfil: EstadoSessao;
 	/** false = o pedido não espera mais resposta (já respondido ou cancelado). */
 	responder_pedido: boolean;
+	/** false = o pedido não espera mais resposta (já respondido ou cancelado). */
+	cancelar_pedido: boolean;
 	acao_interface: undefined;
 }
 

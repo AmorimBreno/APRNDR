@@ -22,8 +22,6 @@ Decisão da tarefa 2.2: a troca de agente no SDK é limpa e continua a mesma con
 Pendências observadas:
 - Ao recarregar a página depois de "Nova conversa" sem mandar mensagem, a sessão guardada na aba não existe em disco: o hook abre o perfil sem ela, mas o erro "Sessão ... não encontrada" fica na tela (já era assim na Etapa 2). Esconder esse erro esperado.
 - O teste "executarSubagente sem modelo > falha da filha vira resultado com isError" (packages/core/src/subagentes.test.ts) estoura os 5 s nesta máquina, com ou sem as mudanças da Etapa 3; investigar à parte.
-- Etapa 3: o botão Cancelar do PainelGenerico manda responder_pedido com {cancelado: true} nos dados, e a ferramenta recebe isso como resposta; o protocolo precisa de um cancelamento de verdade (a ferramenta já entende {cancelado: true, motivo} vindo do núcleo).
-- Etapa 3 (design): o seletor de modelo lista todos os modelos do OpenRouter (centenas); precisa de busca ou de uma lista curta (os do profile.json mais favoritos).
 - O log do servidor de 2026-10-15 ficou com ~58 MB por um ciclo de EPIPE (corrigido em apps/server/src/log.ts); o arquivo pode ser apagado com o ok do Breno.
 - O npm install das visual-tools baixou ~700 MB de Chrome do puppeteer em ~/.cache/puppeteer, que não é usado (o desenho usa o Edge). O .puppeteerrc.cjs impede novos downloads; apagar a pasta só com o ok do Breno.
 

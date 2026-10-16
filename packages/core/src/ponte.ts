@@ -9,7 +9,8 @@
 // - "interface:pedido" {id, painel, acao, dados}: a ferramenta espera a resposta
 //   do usuário. O núcleo repassa ("pedido_interface") e guarda o pedido até
 //   JanelaPerfil.responder(id, dados) emitir "interface:resposta" {id, dados}.
-//   Se a execução é abortada, termina ou a sessão é encerrada, o núcleo emite
+//   Se a execução é abortada, termina ou a sessão é encerrada, ou se o usuário
+//   cancela na interface (JanelaPerfil.cancelarPedido), o núcleo emite
 //   "interface:resposta" {id, cancelado: true, motivo}: nenhum pedido fica
 //   pendurado.
 // - "interface:acao" {painel, acao, dados}: o sentido contrário, uma ação feita
@@ -116,6 +117,17 @@ export class PonteSessao {
 		if (problema) throw new Error(`Ação da interface inválida: ${problema}.`);
 		if (!this.ativa || !this.barramento) throw new Error("A ponte desta sessão já foi encerrada.");
 		this.publicar(EVENTOS_PONTE.acao, { painel, acao, dados } satisfies MensagemInterface);
+	}
+
+	/**
+	 * O usuário cancelou o pedido `id` na interface: a ferramenta recebe
+	 * {id, cancelado: true, motivo: "usuario"}. Devolve false se o pedido não
+	 * existe ou não espera mais resposta.
+	 */
+	cancelarPeloUsuario(id: string): boolean {
+		if (!this.ativa || !this.pendentes.has(id)) return false;
+		this.cancelar(id, "usuario");
+		return true;
 	}
 
 	/** Cancela todos os pedidos pendentes: cada ferramenta recebe {id, cancelado: true, motivo}. */

@@ -109,6 +109,10 @@ class JanelaFalsa implements JanelaDoServidor {
 		this.chamadas.push(`responder ${id}`);
 		return id === "existe";
 	}
+	cancelarPedido(id: string) {
+		this.chamadas.push(`cancelar ${id}`);
+		return id === "existe";
+	}
 	acaoDaInterface(painel: string, acao: string) {
 		this.chamadas.push(`acao ${painel} ${acao}`);
 	}
@@ -289,11 +293,19 @@ describe("mensagens do WebSocket", () => {
 		expect(conexao.ultima()).toMatchObject({ ok: true, dados: { modelo: "openrouter/a/b" } });
 		await enviar(conexao, { tipo: "responder_pedido", perfil: "teste", id: "existe", dados: 1 });
 		expect(conexao.ultima()).toMatchObject({ ok: true, dados: true });
+		await enviar(conexao, { tipo: "cancelar_pedido", perfil: "teste", id: "sumiu" });
+		expect(conexao.ultima()).toMatchObject({ ok: true, dados: false });
 		await enviar(conexao, { tipo: "acao_interface", perfil: "teste", painel: "teste", acao: "clicou", dados: {} });
 		expect(conexao.ultima()).toEqual({ tipo: "resposta", pedido: "acao_interface", ok: true });
 		await enviar(conexao, { tipo: "listar_sessoes", perfil: "teste" });
 		expect(conexao.ultima()).toMatchObject({ ok: true, dados: [] });
-		expect(falsas[0]?.chamadas.slice(-4)).toEqual(["abortar", "trocarModelo openrouter/a/b", "responder existe", "acao teste clicou"]);
+		expect(falsas[0]?.chamadas.slice(-5)).toEqual([
+			"abortar",
+			"trocarModelo openrouter/a/b",
+			"responder existe",
+			"cancelar sumiu",
+			"acao teste clicou",
+		]);
 	});
 
 	it("descartarTodas descarta cada janela", async () => {

@@ -41,6 +41,7 @@ export type JanelaDoServidor = Pick<
 	| "modelosDisponiveis"
 	| "historico"
 	| "responder"
+	| "cancelarPedido"
 	| "acaoDaInterface"
 	| "assinar"
 	| "descartar"

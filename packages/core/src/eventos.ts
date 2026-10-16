@@ -47,9 +47,10 @@ export interface EstadoSessao {
  * - abortado: a execução foi interrompida (JanelaPerfil.abortar);
  * - execucao_terminada: a execução acabou e ninguém mais espera a resposta;
  * - sessao_encerrada: a sessão foi trocada, recarregada ou a janela descartada;
- * - pedido_invalido: o pedido veio sem painel ou sem ação.
+ * - pedido_invalido: o pedido veio sem painel ou sem ação;
+ * - usuario: o usuário cancelou o pedido na interface (JanelaPerfil.cancelarPedido).
  */
-export type MotivoCancelamento = "abortado" | "execucao_terminada" | "sessao_encerrada" | "pedido_invalido";
+export type MotivoCancelamento = "abortado" | "execucao_terminada" | "sessao_encerrada" | "pedido_invalido" | "usuario";
 
 export type EventoNucleo =
 	/** A sessão começou a responder. */

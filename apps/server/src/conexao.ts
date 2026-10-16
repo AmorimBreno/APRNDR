@@ -43,6 +43,7 @@ export function resumirMensagem(mensagem: MensagemCliente): string {
 			if (mensagem.agente) partes.push(`agente=${mensagem.agente}`);
 			break;
 		case "responder_pedido":
+		case "cancelar_pedido":
 			partes.push(`id=${mensagem.id}`);
 			break;
 		case "acao_interface":
@@ -81,6 +82,8 @@ async function executar(janelas: Janelas, conexao: Conexao, mensagem: MensagemCl
 			return janelas.recarregar(mensagem.perfil, "pedido");
 		case "responder_pedido":
 			return janelas.janela(mensagem.perfil).responder(mensagem.id, mensagem.dados);
+		case "cancelar_pedido":
+			return janelas.janela(mensagem.perfil).cancelarPedido(mensagem.id);
 		case "acao_interface":
 			janelas.janela(mensagem.perfil).acaoDaInterface(mensagem.painel, mensagem.acao, mensagem.dados);
 			return undefined;

@@ -288,7 +288,8 @@ export default function quizWeb(pi: ExtensionAPI) {
 			// Embaralha antes de resolver o gabarito: a correção segue a ordem mostrada.
 			if (params.shuffle !== false) opcoes = embaralhar(opcoes);
 			const mostradas: OpcaoMostrada[] = opcoes.map((opcao, i) => ({ index: i + 1, label: opcao.label }));
-			onUpdate?.({ content: [{ type: "text", text: "Awaiting user response..." }], details: { options: mostradas } });
+			// Só aparece na linha da ferramenta enquanto espera; o modelo recebe o resultado final.
+			onUpdate?.({ content: [{ type: "text", text: "Esperando a sua resposta no painel Questões" }], details: { options: mostradas } });
 
 			const { indices: certos, error: erroGabarito } = resolverGabarito(params.correctAnswer as string | string[], opcoes);
 			if (signal?.aborted) return resultadoCancelado(params.question, modo, certos, contexto);

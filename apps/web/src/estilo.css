@@ -82,12 +82,10 @@ a.linha:hover .linha__texto .overline, a.linha:focus-visible .linha__texto .over
 .topo__controle { position: relative; display: inline-grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--space-2); align-items: center; min-width: 0; max-width: 300px; padding: 6px var(--space-3); border: var(--border-strong) solid currentColor; border-radius: var(--radius-md); background: transparent; color: inherit; text-align: left; cursor: pointer; }
 .topo__controle .overline { grid-column: 1; }
 .topo__controle > .ap-icon { grid-column: 2; grid-row: 1 / span 2; }
-.topo__valor, .topo__select { grid-column: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.topo__select { appearance: none; margin: 0; padding: 0; border: 0; outline: 0; background: transparent; color: inherit; cursor: pointer; }
-.topo__select option { background: var(--surface-raised); color: var(--ink); }
+.topo__valor { grid-column: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .topo__controle:hover { box-shadow: inset 0 -3px 0 currentColor; }
-.topo__controle:focus-visible, .topo__controle:focus-within { outline: none; box-shadow: var(--focus-ring); }
-.topo__controle:disabled, .topo__controle:has(select:disabled) { cursor: default; opacity: var(--opacity-disabled); box-shadow: none; }
+.topo__controle:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.topo__controle:disabled { cursor: default; opacity: var(--opacity-disabled); box-shadow: none; }
 .topo__uso { flex: none; display: flex; flex-direction: column; gap: 2px; text-align: right; }
 .topo__acoes { flex: none; display: flex; align-items: center; gap: var(--space-2); align-self: stretch; padding-left: var(--space-4); border-left: var(--border-strong) solid currentColor; }
 .topo__painel { display: inline-flex; align-items: center; gap: var(--space-2); height: var(--control-md); padding: 0 var(--space-4) 2px; border: 0; border-radius: var(--radius-md); background: var(--paper); color: var(--on-paper); box-shadow: var(--key-lip); cursor: pointer; }

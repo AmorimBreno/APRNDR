@@ -59,6 +59,19 @@
 .historico__titulo { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; }
 .historico__meta { color: var(--ink-muted); font-size: 12px; line-height: 16px; }
 
+/* ── Seletor de agente (menu como o do Callout) ── */
+
+.seletor-agente { position: relative; display: inline-flex; min-width: 0; }
+.menu-agente { position: absolute; z-index: 10; top: calc(100% + 6px); left: 0; display: flex; flex-direction: column; gap: 2px; min-width: 100%; width: max-content; max-width: min(360px, calc(100vw - 32px)); padding: 6px; border-radius: var(--radius-md); background: var(--ink-inverse); color: var(--ink); box-shadow: 0 0 0 var(--border-control) var(--amber); }
+.menu-agente__item { display: flex; align-items: center; gap: var(--space-3); width: 100%; min-height: 48px; padding: 6px var(--space-3); border: 0; border-radius: var(--radius-sm); background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.menu-agente__item:focus { outline: none; }
+.menu-agente__item:hover, .menu-agente__item:focus-visible { background: var(--surface-hover); }
+.menu-agente__item:focus-visible { box-shadow: inset 0 0 0 2px var(--focus); }
+.menu-agente__item--atual { background: var(--amber-tint); }
+.menu-agente__item > .ap-icon { flex: none; margin-left: auto; color: var(--amber); }
+.menu-agente__texto { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.menu-agente__papel { color: var(--ink-muted); }
+
 /* ── Seletor de modelo (modal) ── */
 
 .seletor { display: flex; flex-direction: column; gap: var(--space-4); }

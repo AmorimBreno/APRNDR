@@ -12,6 +12,7 @@ import {
 	Historico,
 	type InfoModelo,
 	type ResumoSessao,
+	SeletorAgente,
 	SeletorModelo,
 	semEsperar,
 	useJanelaPerfil,
@@ -122,23 +123,12 @@ export function JanelaPerfil({ perfilId }: { perfilId: string }) {
 				</div>
 
 				<div className="topo__controles">
-					<label className="topo__controle">
-						<span className="overline">Agente</span>
-						<select
-							className="topo__select data"
-							value={agenteAtual}
-							onChange={(evento) => semEsperar(acoes.trocarAgente(evento.target.value))}
-							disabled={ocupado}
-						>
-							{agentes.some((agente) => agente.nome === agenteAtual) ? null : <option value={agenteAtual}>{agenteAtual}</option>}
-							{agentes.map((agente) => (
-								<option key={agente.nome} value={agente.nome}>
-									{agente.nome} ({agente.papel})
-								</option>
-							))}
-						</select>
-						<Icon name="chevron-down" size={16} />
-					</label>
+					<SeletorAgente
+						atual={agenteAtual}
+						agentes={agentes}
+						trocar={(agente) => semEsperar(acoes.trocarAgente(agente))}
+						desabilitado={ocupado}
+					/>
 					<SeletorModelo
 						{...(estado.sessao?.modelo ? { atual: estado.sessao.modelo } : {})}
 						doPerfil={modelosDoPerfil}

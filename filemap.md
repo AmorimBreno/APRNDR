@@ -51,13 +51,16 @@ apps/server/src/log.ts — log no console e em %LOCALAPPDATA%\estudos-app\logs\s
 apps/server/src/servidor.test.ts — testes do servidor sem rede (rotas, mensagens com janela falsa, watcher, chaves)
 apps/web/ — @estudos/web: Vite + React na porta 7430, com proxy de /api e /ws para a 7431
 apps/web/vite.config.ts — porta e proxy do Vite
-apps/web/index.html — página do Vite (só body sem margem; sem tema)
-apps/web/src/main.tsx — monta o App no #raiz
+apps/web/index.html — página do Vite (título APRNDR)
+apps/web/src/main.tsx — carrega os estilos (tokens.css, componentes.css do design system, estilo.css) e monta o App no #raiz
+apps/web/src/estilo.css — estilo do app por cima do design system: altura da página, faixa da marca, folha de papel, linhas de perfil, tela de carregamento
+apps/web/src/telas/FaixaMarca.tsx — faixa escura da esquerda (Wordmark, legenda, Ornament, pé livre), usada pela tela de perfis e pela de carregamento
+apps/web/src/telas/TelaPerfis.tsx — tela inicial: lista de perfis na folha de papel, perfis inválidos com o erro, servidor fora do ar
+apps/web/src/telas/TelaCarregando.tsx — tela enquanto a sessão do perfil é montada: etapa atual, aviso de conexão e erros
 apps/web/src/App.tsx — rotas por hash: #/ = perfis, #/perfil/<id> = janela do perfil
 apps/web/src/paineis.ts — registro de painéis do front (teste = PainelGenerico; ids sem componente também usam o genérico)
-apps/web/src/provisorio/ — tela provisória SEM ESTILO (Etapa 2); será jogada fora no redesenho, a lógica está no packages/ui
-apps/web/src/provisorio/TelaPerfis.tsx — lista de perfis e erros dos inválidos
-apps/web/src/provisorio/JanelaPerfil.tsx — janela do perfil: carregando, sessões, nova conversa, seletores de agente e modelo, recarregar, custo, diagnósticos, avisos, chat e área de painéis
+apps/web/src/provisorio/ — janela do perfil provisória SEM ESTILO (Etapa 2), no fundo escuro do tema; sai na tarefa 3.3, a lógica está no packages/ui
+apps/web/src/provisorio/JanelaPerfil.tsx — janela do perfil: sessões, nova conversa, seletores de agente e modelo, recarregar, custo, diagnósticos, avisos, chat e área de painéis
 apps/web/src/provisorio/Chat.tsx — conversa (texto ao vivo, raciocínio em details, ferramentas com status e progresso) e campo de mensagem (Enter envia, Shift+Enter quebra)
 
 pi-global/ — fonte versionada do que vai para ~/.pi/agent (instalar com scripts/instalar-pi-global.mjs)

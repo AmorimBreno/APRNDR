@@ -12,6 +12,7 @@ import {
 } from "@estudos/ui";
 import { useEffect, useState } from "react";
 import { registroPaineis } from "../paineis.ts";
+import { TelaCarregando } from "../telas/TelaCarregando.tsx";
 import { CampoMensagem, Conversa } from "./Chat.tsx";
 
 function formatarData(iso: string): string {
@@ -82,16 +83,15 @@ export function JanelaPerfilProvisoria({ perfilId }: { perfilId: string }) {
 		) : null;
 
 	if (!estado.pronto) {
+		const aviso = conexao === "reconectando" ? "Reconectando ao servidor" : conexao === "conectando" ? "Conectando ao servidor" : undefined;
 		return (
-			<main>
-				<p>
-					<a href="#/">Perfis</a>
-				</p>
-				<h1>Carregando perfil…</h1>
-				{estado.carregando ? <p>{estado.carregando}</p> : null}
-				{avisoConexao}
-				{erros}
-			</main>
+			<TelaCarregando
+				nomePerfil={perfil?.nome ?? perfilId}
+				{...(estado.carregando ? { etapa: estado.carregando } : {})}
+				{...(aviso ? { aviso } : {})}
+				erros={estado.erros}
+				limparErros={acoes.limparErros}
+			/>
 		);
 	}
 
@@ -104,7 +104,7 @@ export function JanelaPerfilProvisoria({ perfilId }: { perfilId: string }) {
 	const uso = estado.uso;
 
 	return (
-		<div style={{ display: "flex", height: "100vh", gap: 16, padding: 8, boxSizing: "border-box" }}>
+		<div className="provisorio" style={{ display: "flex", height: "100vh", gap: 16, padding: 8, boxSizing: "border-box" }}>
 			<aside style={{ width: 240, overflowY: "auto", flexShrink: 0 }}>
 				<p>
 					<a href="#/">Perfis</a>

@@ -45,6 +45,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@estudos/design-system':
+        specifier: workspace:*
+        version: link:../../design-system
       '@estudos/ui':
         specifier: workspace:*
         version: link:../../packages/ui

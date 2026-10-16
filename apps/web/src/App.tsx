@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { JanelaPerfilProvisoria } from "./provisorio/JanelaPerfil.tsx";
-import { TelaPerfis } from "./provisorio/TelaPerfis.tsx";
+import { TelaPerfis } from "./telas/TelaPerfis.tsx";
 
 function perfilDoHash(hash: string): string | undefined {
 	const achado = /^#\/perfil\/([^/]+)$/.exec(hash);

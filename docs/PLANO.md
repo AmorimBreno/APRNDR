@@ -13,13 +13,14 @@ Etapa 2: tarefas 2.1 a 2.7 feitas e revisadas (o orquestrador conferiu no navega
 
 Parada de design resolvida em 2026-10-16: o Breno trouxe o design system APRNDR (design-system/, feito no Claude Design). Decisões dele: a marca APRNDR vale para o app inteiro; sem mockups à parte, cada tela é feita direto no app e aprovada antes da próxima; a conversa da janela do perfil vira documento em coluna única (não balões de chat); react-markdown entra para formatar as respostas.
 
-Próximo passo: Etapa 3, tarefas 3.1 e 3.2; depois, aprovação da tela de perfis antes da 3.3.
+Tarefas 3.1 e 3.2 feitas (2026-10-16): design system como pacote do workspace, tema carregado no app, tela de perfis e tela de carregamento conferidas no navegador (perfil válido, perfil inválido, servidor fora do ar, tela estreita). Próximo passo: aprovação do Breno da tela de perfis e da de carregamento; depois, a 3.3.
 
 Tarefa 2.3 feita (aguarda revisão): ponte de eventos (docs/ponte-de-eventos.md) e ferramenta subagent no núcleo; as ferramentas dos desenhistas vêm do campo novo extensoesSubagentes do profile.json; web_fetch ganhou fresh=true e avisa quando o conteúdo do Tavily pode estar em cache.
 
 Decisão da tarefa 2.2: a troca de agente no SDK é limpa e continua a mesma conversa (o pi grava as mudanças de prompt e ferramentas como patches no transcript); a sessão é remontada sobre o mesmo arquivo com o prompt, as skills, as ferramentas e o modelo do novo agente, e o agente fica gravado numa entrada "custom" (nucleo.agente).
 
 Pendências observadas:
+- O teste "executarSubagente sem modelo > falha da filha vira resultado com isError" (packages/core/src/subagentes.test.ts) estoura os 5 s nesta máquina, com ou sem as mudanças da Etapa 3; investigar à parte.
 - Etapa 3: o botão Cancelar do PainelGenerico manda responder_pedido com {cancelado: true} nos dados, e a ferramenta recebe isso como resposta; o protocolo precisa de um cancelamento de verdade (a ferramenta já entende {cancelado: true, motivo} vindo do núcleo).
 - Etapa 3 (design): o seletor de modelo lista todos os modelos do OpenRouter (centenas); precisa de busca ou de uma lista curta (os do profile.json mais favoritos).
 - O log do servidor de 2026-10-15 ficou com ~58 MB por um ciclo de EPIPE (corrigido em apps/server/src/log.ts); o arquivo pode ser apagado com o ok do Breno.

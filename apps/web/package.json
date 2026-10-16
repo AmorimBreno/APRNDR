@@ -8,6 +8,7 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
+		"@estudos/design-system": "workspace:*",
 		"@estudos/ui": "workspace:*",
 		"react": "19.3.0",
 		"react-dom": "19.3.0"

@@ -368,3 +368,5 @@ O modelo de cada papel é configurável no profile.json. Provedor único: OpenRo
 13.9 Interface. Na integração (Fase 1), uma tela provisória sem estilo prova que o pi está ligado à interface. A interface real só é desenhada depois que o Breno mandar as referências de design. As ferramentas quiz e ask_user_question desenham no terminal; no app elas ganham versões web com os mesmos nomes e parâmetros, para as skills não mudarem.
 
 13.10 Estrutura do repositório. Além da seção 4: pi-global/ (fonte da configuração global do pi), scripts/ (instalação, testes e prova cega), docs/ (plano, roteiros de teste e histórico) e referencias/ (referências visuais).
+
+13.11 Visual (2026-10-16). O design system é o APRNDR, em design-system/ (manual em design-system/README.md), feito pelo Breno no Claude Design. A marca APRNDR vale para o app inteiro, não só para o perfil de estudos. As peças genéricas (tokens, fontes, botões, campos, cards, modal, medidores) servem ao núcleo; as de estudo (cadernos, curso, aula, questionário) são do perfil. A conversa da janela do perfil é um documento em coluna única, não um chat com balões.

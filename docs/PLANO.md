@@ -11,7 +11,9 @@ Etapa 1 aprovada pelo Breno em 2026-10-15: o roteiro docs/teste-etapa-1.md passo
 
 Etapa 2: tarefas 2.1 a 2.7 feitas e revisadas (o orquestrador conferiu no navegador do app: perfil abre, resposta ao vivo, painel teste com pedido e resposta, nova conversa, reinício do servidor com a conversa de volta). Etapa 2 aprovada pelo Breno em 2026-10-15 (docs/teste-etapa-2.md passou inteiro).
 
-Próximo passo: parada de design. Esperando as referências do Breno (imagens ou Claude Design); depois, mockups das telas da base para aprovação, e só então a Etapa 3.
+Parada de design resolvida em 2026-10-16: o Breno trouxe o design system APRNDR (design-system/, feito no Claude Design). Decisões dele: a marca APRNDR vale para o app inteiro; sem mockups à parte, cada tela é feita direto no app e aprovada antes da próxima; a conversa da janela do perfil vira documento em coluna única (não balões de chat); react-markdown entra para formatar as respostas.
+
+Próximo passo: Etapa 3, tarefas 3.1 e 3.2; depois, aprovação da tela de perfis antes da 3.3.
 
 Tarefa 2.3 feita (aguarda revisão): ponte de eventos (docs/ponte-de-eventos.md) e ferramenta subagent no núcleo; as ferramentas dos desenhistas vêm do campo novo extensoesSubagentes do profile.json; web_fetch ganhou fresh=true e avisa quando o conteúdo do Tavily pode estar em cache.
 
@@ -63,14 +65,26 @@ Começa depois da aprovação da Etapa 1.
 Aprovação: o Breno roda docs/teste-etapa-2.md.
 
 
-## Parada: referências de design
+## Parada: referências de design (feita)
 
-Pedir ao Breno as referências (imagens ou Claude Design). Lembrar do referencias/plano-cd.html. Fazer os mockups, aprovar, e só então implementar.
+O Breno trouxe o design system APRNDR (design-system/) em 2026-10-16 e dispensou os mockups à parte: as telas são aprovadas uma a uma no próprio app.
 
 
 ## Etapa 3: interface real da base
 
-Detalhar depois do design: tokens de tema, tela de perfis, janela do perfil (chat, seletores, histórico, área de painéis), tela de carregamento, versões web de ask_user_question (núcleo) e quiz (perfil) com os mesmos nomes e parâmetros das versões de terminal.
+Visual: o design system APRNDR em design-system/ (manual em design-system/README.md). Ele vira o pacote @estudos/design-system do workspace, mantido como foi exportado do Claude Design; as mudanças para compilar são mínimas e ficam listadas em design-system/ESTUDOS.md, para uma exportação nova poder substituir a pasta. O núcleo (packages/ui e apps/web) usa só as peças genéricas (tokens, fontes, Icon, Wordmark, Ornament, Button, Tag, Card, Callout, Prose, EmptyState, formulários, Modal, Stepper, Meter, Stat, Readout, SpecBox, AskBar, SuggestionChips, SelectionMenu). As peças de estudo (NotebookCover, SubjectWheel, CourseBar, ProgressTrack, ModuleCard, LessonBlock, StudentNote, SummaryCard, SectionRuler, quiz) são do perfil; só QuizQuestion e QuizFeedback entram já, no quiz web. Cada tela é aprovada pelo Breno no app antes da próxima.
+
+3.1 Pacote do design system (Light). package.json e tsconfig em design-system/, entrada no pnpm-workspace.yaml, correções mínimas de tipo (import type, cx aceitando bigint) listadas em design-system/ESTUDOS.md. O apps/web carrega tokens.css e bundle.css, e o fundo e a letra do app passam a ser os do tema.
+
+3.2 Tela de perfis e tela de carregamento (Medium). Faixa escura à esquerda com Wordmark e Ornament; folha de papel à direita com a lista de perfis (perfil aberto, perfis inválidos com o erro e como resolver). Tela de carregamento do perfil no mesmo estilo. Aprovação do Breno antes da 3.3.
+
+3.3 Janela do perfil (Heavy). Conversa como documento em coluna única de measure-read: respostas com Prose (react-markdown, sem HTML cru), mensagens do usuário como notas, ferramentas como linhas técnicas pequenas (subagentes recuados, progresso e duração), raciocínio recolhível. AskBar fixa no pé (Enter envia, Parar, fila). Topo com o perfil, o agente (Select), o modelo (com busca: os do profile.json primeiro), o custo da sessão e recarregar perfil. Histórico de sessões e nova conversa numa faixa lateral; área de painéis em Card. Avisos de conexão, erros e diagnósticos com Callout. Aprovação do Breno antes da 3.4.
+
+3.4 Painéis e pedidos (Careful). PainelGenerico no tema; cancelamento de verdade dos pedidos no protocolo (a pendência da Etapa 2); ask_user_question web no núcleo (Modal com RadioGroup e campo livre) e quiz web no perfil (QuizQuestion e QuizFeedback), com os mesmos nomes e parâmetros das versões de terminal.
+
+3.5 Roteiro (Light). docs/teste-etapa-3.md.
+
+Aprovação: o Breno roda docs/teste-etapa-3.md.
 
 
 ## Etapa 4: perfil de estudos (Fase 2 da especificação)

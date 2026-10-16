@@ -27,12 +27,14 @@ const profileJson = (id: string, pastaDados: string) => ({
 	skills: [],
 	extensoes: [],
 	paineis: ["teste"],
+	aparencia: { capa: "capa.svg", cor: "moss", lema: "Lema de teste" },
 });
 
 async function criarPerfil(pastaPerfis: string, pasta: string, id: string, pastaDados: string): Promise<void> {
 	const raiz = join(pastaPerfis, pasta);
 	await mkdir(join(raiz, "agents"), { recursive: true });
 	await writeFile(join(raiz, "AGENTS.md"), "");
+	await writeFile(join(raiz, "capa.svg"), '<svg xmlns="http://www.w3.org/2000/svg"/>');
 	await writeFile(join(raiz, "agents", "geral.md"), "---\nname: geral\nmodel: openrouter/x/y\n---\n\nGeral.\n");
 	await writeFile(join(raiz, "agents", "oculto.md"), "---\nname: oculto\n---\n\nOculto.\n");
 	await writeFile(join(raiz, "profile.json"), JSON.stringify(profileJson(id, pastaDados)));
@@ -189,11 +191,22 @@ describe("rotas HTTP", () => {
 				agentePadrao: "geral",
 				paineis: ["teste"],
 				aberto: false,
+				aparencia: { cor: "moss", lema: "Lema de teste", capa: "/api/perfis/teste/capa" },
 			},
 		]);
 		expect(corpo.erros).toHaveLength(1);
 		expect(corpo.erros[0]?.arquivo).toBe(join(pastaPerfis, "quebrado", "profile.json"));
 		expect(corpo.erros[0]?.mensagem).toMatch(/campo/);
+	});
+
+	it("GET /api/perfis/:id/capa serve a imagem com o tipo certo e dá 404 sem capa", async () => {
+		const app = criarApp(janelas, logMudo, "1");
+		const resposta = await app.request("/api/perfis/teste/capa");
+		expect(resposta.status).toBe(200);
+		expect(resposta.headers.get("content-type")).toBe("image/svg+xml");
+		expect(await resposta.text()).toContain("<svg");
+		expect((await app.request("/api/perfis/quebrado/capa")).status).toBe(404);
+		expect((await app.request("/api/perfis/nada/capa")).status).toBe(404);
 	});
 
 	it("GET /api/perfis/:id/sessoes lista as sessões (nenhuma) e dá 404 para perfil desconhecido", async () => {

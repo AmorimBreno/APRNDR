@@ -13,5 +13,6 @@
 	"skills": ["skills/teach", "skills/visualize"],
 	"extensoes": ["extensions/painel-teste.ts", "extensions/quiz-web.ts"],
 	"extensoesSubagentes": ["extensions/visual-tools/tools/mermaid_tools.ts", "extensions/visual-tools/tools/svg_tools.ts"],
-	"paineis": ["quiz", "teste"]
+	"paineis": ["quiz", "teste"],
+	"aparencia": { "capa": "capa.png", "cor": "moss", "lema": "Entender antes de decorar", "glifo": "学習" }
 }

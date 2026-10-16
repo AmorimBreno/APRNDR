@@ -29,6 +29,12 @@ describe("perfil estudos real", () => {
 		]);
 		expect(perfil.agentePadrao).toBe("professor");
 		expect(perfil.paineis).toEqual(["quiz", "teste"]);
+		expect(perfil.aparencia).toEqual({
+			capa: join(pastaPerfis, "estudos", "capa.png"),
+			cor: "moss",
+			lema: "Entender antes de decorar",
+			glifo: "学習",
+		});
 	});
 
 	it("os quatro agentes têm nome, papel e modelo certos", async () => {
@@ -70,6 +76,13 @@ describe("profile.json inválido", () => {
 	it("recusa pastaDados relativa e campo desconhecido", () => {
 		expect(() => validarProfileJson({ ...valido, pastaDados: "dados" }, "x")).toThrow(/campo pastaDados/);
 		expect(() => validarProfileJson({ ...valido, caderno: true }, "x")).toThrow(/caderno/);
+	});
+
+	it("aparencia é opcional; a capa precisa ser imagem e a cor, uma das do tema", () => {
+		expect(validarProfileJson(valido, "x").aparencia).toBeUndefined();
+		expect(validarProfileJson({ ...valido, aparencia: { cor: "moss", lema: "Oi" } }, "x").aparencia).toEqual({ cor: "moss", lema: "Oi" });
+		expect(() => validarProfileJson({ ...valido, aparencia: { capa: "capa.txt" } }, "x")).toThrow(/use uma imagem/);
+		expect(() => validarProfileJson({ ...valido, aparencia: { cor: "roxo" } }, "x")).toThrow(/aparencia/);
 	});
 
 	it("extensoesSubagentes é opcional e aceita só caminhos relativos", () => {

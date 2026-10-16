@@ -9,6 +9,16 @@ export interface AgenteSelecionavel {
 	modelo?: string;
 }
 
+/** Aparência do perfil na tela de perfis (aparencia do profile.json); tudo opcional. */
+export interface AparenciaPerfil {
+	/** Cor de marca do tema: amber, brick, sage, moss, cream ou steel. */
+	cor?: "amber" | "brick" | "sage" | "moss" | "cream" | "steel";
+	lema?: string;
+	glifo?: string;
+	/** URL da capa (/api/perfis/<id>/capa). */
+	capa?: string;
+}
+
 /** Perfil como /api/perfis devolve (apps/server/src/app.ts). */
 export interface ResumoPerfil {
 	id: string;
@@ -20,6 +30,7 @@ export interface ResumoPerfil {
 	paineis: string[];
 	/** true se o servidor já tem a janela do perfil aberta. */
 	aberto: boolean;
+	aparencia: AparenciaPerfil;
 }
 
 export interface ErroPerfil {

@@ -23,6 +23,21 @@ export const esquemaAgenteDoPerfil = z.strictObject({
 	modelo: z.string().min(1).optional(),
 });
 
+/** Cores de marca do tema (design system APRNDR) que um perfil pode usar como sua. */
+export const CORES_PERFIL = ["amber", "brick", "sage", "moss", "cream", "steel"] as const;
+
+/** Como o perfil aparece na tela de perfis. Tudo opcional; o front tem padrões. */
+export const esquemaAparencia = z.strictObject({
+	/** Imagem da capa (png, jpg, webp ou svg), relativa ao perfil. */
+	capa: caminhoRelativo.refine((valor) => /\.(png|jpe?g|webp|svg)$/i.test(valor), "use uma imagem png, jpg, webp ou svg").optional(),
+	/** A cor do perfil: a moldura e a barra do card. */
+	cor: z.enum(CORES_PERFIL).optional(),
+	/** Uma frase curta no pé do card. */
+	lema: z.string().min(1).max(80).optional(),
+	/** Ideograma do ornamento do card (um dos do design system; o front confere). */
+	glifo: z.string().min(1).max(4).optional(),
+});
+
 export const esquemaPerfil = z.strictObject({
 	id: z.string().regex(/^[a-z0-9][a-z0-9-]*$/, "use só letras minúsculas, números e hífen"),
 	nome: z.string().min(1),
@@ -42,6 +57,7 @@ export const esquemaPerfil = z.strictObject({
 	extensoesSubagentes: z.array(caminhoRelativo).optional(),
 	/** Identificadores dos painéis que a janela do perfil usa. */
 	paineis: z.array(z.string().min(1)),
+	aparencia: esquemaAparencia.optional(),
 });
 
 export type ProfileJson = z.infer<typeof esquemaPerfil>;
@@ -73,6 +89,15 @@ export interface Perfil {
 	/** Caminhos absolutos; só nas sessões filhas (subagentes). Vazio se o profile.json não declarar. */
 	extensoesSubagentes: string[];
 	paineis: string[];
+	/** Aparência na tela de perfis; a capa com caminho absoluto. */
+	aparencia: Aparencia;
+}
+
+export interface Aparencia {
+	capa?: string;
+	cor?: (typeof CORES_PERFIL)[number];
+	lema?: string;
+	glifo?: string;
 }
 
 export class ErroPerfil extends Error {
@@ -175,6 +200,13 @@ export async function lerPerfil(pasta: string): Promise<Perfil> {
 		extensoesSubagentes.push(await resolverExistente(`extensoesSubagentes[${indice}]`, extensao));
 	}
 
+	const aparencia: Aparencia = {
+		...(json.aparencia?.capa ? { capa: await resolverExistente("aparencia.capa", json.aparencia.capa) } : {}),
+		...(json.aparencia?.cor ? { cor: json.aparencia.cor } : {}),
+		...(json.aparencia?.lema ? { lema: json.aparencia.lema } : {}),
+		...(json.aparencia?.glifo ? { glifo: json.aparencia.glifo } : {}),
+	};
+
 	return {
 		id: json.id,
 		nome: json.nome,
@@ -187,6 +219,7 @@ export async function lerPerfil(pasta: string): Promise<Perfil> {
 		extensoes,
 		extensoesSubagentes,
 		paineis: json.paineis,
+		aparencia,
 	};
 }
 

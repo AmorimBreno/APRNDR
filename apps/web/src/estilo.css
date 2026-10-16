@@ -4,6 +4,10 @@
 
 :root { color-scheme: dark; }
 html, body, #raiz { height: 100%; }
+/* Escala do app (design-system/ESTUDOS.md): os tamanhos do manual ficaram grandes na tela do
+ * Breno; 90% foi o que ficou bom. No body, para valer também nos modais (que vão para o body).
+ * O Edge resolve as alturas de 100% com o zoom aplicado: a tela continua cheia. */
+body { zoom: 0.9; }
 
 /* ── Tela de perfis: um card quadrado por perfil ── */
 

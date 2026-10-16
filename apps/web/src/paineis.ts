@@ -1,8 +1,12 @@
-// Registro de painéis do front: id do painel (o que o profile.json lista) para
-// o componente React. Um id fora daqui usa o PainelGenerico do @estudos/ui.
+// Registro de painéis do front: id do painel para o componente React. Junta os
+// painéis do núcleo (pergunta, do ask_user_question) com os de cada perfil.
+// Um id fora daqui usa o PainelGenerico do @estudos/ui.
 
-import { PainelGenerico, type RegistroPaineis } from "@estudos/ui";
+import { paineisEstudos } from "@estudos/perfil-estudos";
+import { PainelGenerico, paineisDoNucleo, type RegistroPaineis } from "@estudos/ui";
 
 export const registroPaineis: RegistroPaineis = {
-	teste: PainelGenerico,
+	...paineisDoNucleo,
+	...paineisEstudos,
+	teste: { componente: PainelGenerico, titulo: "Teste" },
 };

@@ -5,9 +5,9 @@ CLAUDE.md — comandos e convenções curtas para o Claude Code
 ESPECIFICACAO.md — o que o app deve ser; seção 13 = decisões de 2026-10-15
 filemap.md — este mapa; atualizar ao criar ou mover arquivos
 package.json — raiz do monorepo: scripts dev, typecheck e test; versões fixas; builds liberados (pnpm.onlyBuiltDependencies)
-pnpm-workspace.yaml — pacotes do workspace (packages/*, apps/*; profiles/ fica de fora)
+pnpm-workspace.yaml — pacotes do workspace (packages/*, apps/*, design-system e profiles/*/paineis; o resto de profiles/ fica de fora)
 tsconfig.base.json — opções de TypeScript comuns (estrito, ESM, Bundler); cada pacote estende
-vitest.config.ts — testes de packages/*/src e apps/*/src
+vitest.config.ts — testes de packages/*/src, apps/*/src e profiles/*/extensions (com alias do typebox para a cópia do packages/core, como o pi faz)
 
 docs/PLANO.md — etapas, tarefas e estado atual; atualizar ao aceitar uma tarefa
 docs/teste-etapa-N.md — roteiro de teste que o Breno roda no fim de cada etapa
@@ -23,7 +23,9 @@ packages/core/src/modelos.ts — nomes provedor/id resolvidos no registro de mod
 packages/core/src/eventos.ts — tipo EventoNucleo (protocolo genérico, inclusive acao_interface e pedido_interface), tradução dos eventos da sessão do pi e do histórico
 packages/core/src/sessoes.ts — opções do DefaultResourceLoader por (perfil, agente) e modo (principal ou subagente), filtros de skills e ferramentas, agente gravado na sessão, lista de sessões em <dados>/.sessoes-pi
 packages/core/src/montagem.ts — criação de uma sessão do pi pelo SDK, ligação das extensões com o filtro de ferramentas e encerramento; comum à sessão principal e às filhas
-packages/core/src/ponte.ts — ponte de eventos: extensão inline que liga pi.events à janela (mostrar, pedido e resposta com cancelamento, ação da interface)
+packages/core/src/ponte.ts — ponte de eventos: extensão inline que liga pi.events à janela (mostrar, pedido e resposta com cancelamento, inclusive pelo usuário, ação da interface)
+packages/core/src/pergunta.ts — ask_user_question do app: mesmo nome, parâmetros e resultado da versão de terminal, perguntando pela ponte no painel "pergunta"; entra em toda sessão principal
+packages/core/src/pergunta.test.ts — testes da ferramenta com a ponte e o barramento do pi
 packages/core/src/subagentes.ts — ferramenta subagent: sessão filha em <dados>/.sessoes-pi/subagentes, progresso pelo onUpdate, texto final e uso da filha
 packages/core/src/protocolo.ts — protocolo do WebSocket: mensagens do cliente (esquema zod e validarMensagemCliente), mensagens do servidor e dados de cada resposta; só zod e import type
 packages/core/src/janela-perfil.ts — JanelaPerfil: uma sessão do pi por janela (iniciar, enviar, abortar, trocar modelo e agente, histórico, recarregar, responder e acaoDaInterface da ponte)
@@ -42,6 +44,9 @@ packages/ui/src/visual/Conversa.tsx — DocumentoConversa: respostas em LessonBl
 packages/ui/src/visual/BarraPergunta.tsx — AskBar com a fila, o aviso de respondendo e o Parar (Enter durante a resposta põe na fila)
 packages/ui/src/visual/SeletorModelo.tsx — botão do modelo atual e modal com busca no catálogo; os modelos do perfil primeiro
 packages/ui/src/visual/Historico.tsx — nova conversa e lista de sessões gravadas (a aberta marcada)
+packages/ui/src/visual/PainelPergunta.tsx — painel "pergunta" do ask_user_question: texto livre, uma escolha ou várias, sempre com Outra; Não responder cancela
+packages/ui/src/paineis-nucleo.ts — registro dos painéis do núcleo (pergunta), que o front junta com os dos perfis
+packages/ui/src/paineis.test.ts — teste da ordem dos painéis (os que esperam você no topo)
 packages/ui/src/estado-janela.test.ts, cliente.test.ts — testes vitest do reducer e do cliente (WebSocket falso, sem DOM)
 
 apps/server/ — @estudos/server: Hono (HTTP) + ws (WebSocket) na porta 7431; dev com dev.mjs
@@ -51,7 +56,7 @@ apps/server/src/index.ts — liga tudo: chaves, janelas, rotas, WebSocket /ws, w
 apps/server/src/app.ts — rotas HTTP: /api/saude, /api/perfis (válidos e erros à parte), /api/perfis/:id/sessoes
 apps/server/src/janelas.ts — Janelas: uma JanelaPerfil por perfil, compartilhada pelas conexões; lista de perfis em cache; registro de modelos compartilhado
 apps/server/src/conexao.ts — trata cada mensagem do WebSocket (validação, chamada à janela, resposta com pedidoId) e o resumo para o log
-apps/server/src/observador.ts — watcher (fs.watch recursivo) de profiles/ e ~/.pi/agent/extensions, com filtro por data de modificação e espera de 300 ms
+apps/server/src/observador.ts — watcher (fs.watch recursivo) de profiles/ (menos node_modules e profiles/<id>/paineis) e ~/.pi/agent/extensions, com filtro por data de modificação e espera de 300 ms
 apps/server/src/chaves.ts — lê OPENROUTER_API_KEY e TAVILY_API_KEY das variáveis de usuário do Windows quando faltam no processo
 apps/server/src/log.ts — log no console e em %LOCALAPPDATA%\estudos-app\logs\servidor-AAAA-MM-DD.log
 apps/server/src/servidor.test.ts — testes do servidor sem rede (rotas, mensagens com janela falsa, watcher, chaves)
@@ -65,7 +70,7 @@ apps/web/src/telas/TelaPerfis.tsx — tela inicial: lista de perfis na folha de 
 apps/web/src/telas/TelaCarregando.tsx — tela enquanto a sessão do perfil é montada: etapa atual, aviso de conexão e erros
 apps/web/src/telas/JanelaPerfil.tsx — janela do perfil: barra tijolo (Perfis, agente, modelo, custo, recarregar, painéis), histórico, conversa como documento com a barra de pergunta, avisos, erros, diagnósticos e área de painéis (abre sozinha quando chega algo)
 apps/web/src/App.tsx — rotas por hash: #/ = perfis, #/perfil/<id> = janela do perfil
-apps/web/src/paineis.ts — registro de painéis do front (teste = PainelGenerico; ids sem componente também usam o genérico)
+apps/web/src/paineis.ts — registro de painéis do front: os do núcleo (pergunta), os do perfil de estudos (quiz) e o teste (PainelGenerico); ids sem componente também usam o genérico
 
 pi-global/ — fonte versionada do que vai para ~/.pi/agent (instalar com scripts/instalar-pi-global.mjs)
 pi-global/settings.json — provedor e modelo padrão do pi
@@ -83,8 +88,14 @@ profiles/estudos/agents/researcher.md — pesquisador (glm-5.3, web_search e web
 profiles/estudos/agents/mermaid-maker.md, svg-maker.md — desenhistas (sonnet-5.5, olham o PNG que geram)
 profiles/estudos/skills/teach/SKILL.md — método de ensino (base do explicador)
 profiles/estudos/skills/visualize/SKILL.md — quando e como pedir um diagrama
-profiles/estudos/extensions/quiz.ts — ferramenta quiz (desenha no terminal)
-profiles/estudos/extensions/ask-user-question.ts — ferramenta ask_user_question (desenha no terminal)
+profiles/estudos/extensions/quiz.ts — ferramenta quiz (desenha no terminal; fora do profile.json, só para o pi no terminal)
+profiles/estudos/extensions/quiz-web.ts — ferramenta quiz do app: mesmo nome, parâmetros, correção e resultado do quiz.ts, perguntando pela ponte no painel "quiz" e mandando o resultado depois; arquivo do projeto
+profiles/estudos/extensions/quiz-web.test.ts — testes do quiz web com um barramento falso
+profiles/estudos/paineis/ — @estudos/perfil-estudos: código de tela do perfil (o watcher do servidor ignora esta pasta; quem recarrega é o Vite)
+profiles/estudos/paineis/src/index.ts — registro dos painéis do perfil (quiz = Questões)
+profiles/estudos/paineis/src/PainelQuiz.tsx — painel do quiz: QuizQuestion (ou teclas marcáveis no multi-select), Não sei, nota, Pular; resultado com o gabarito e o QuizFeedback
+profiles/estudos/paineis/src/estilo.css — estilos do painel do quiz
+profiles/estudos/extensions/ask-user-question.ts — ferramenta ask_user_question (desenha no terminal; no app vale a do núcleo, packages/core/src/pergunta.ts)
 profiles/estudos/extensions/painel-teste.ts — ferramentas de teste da ponte (mostrar_painel_teste, perguntar_no_painel_teste); arquivo do projeto, não do learn
 profiles/estudos/extensions/visual-tools/ — ferramentas write/edit/render de mermaid e SVG dos desenhistas; npm install dentro da pasta
 profiles/estudos/extensions/visual-tools/tools/mermaid_tools.ts, svg_tools.ts — as ferramentas; carregadas só nas sessões filhas (extensoesSubagentes do profile.json)

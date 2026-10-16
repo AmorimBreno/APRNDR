@@ -121,6 +121,9 @@ export function registrarMudancaPerfil(mudancas: Mudancas, pastaPerfis: string, 
 		mudancas.relerLista = true;
 		return;
 	}
+	// profiles/<id>/paineis é o código de tela do perfil: quem recarrega é o
+	// Vite (o pacote @estudos/perfil-<id> do workspace), não a sessão do pi.
+	if (resto[0] === "paineis") return;
 	const arquivo = resto.join("/");
 	if (arquivo === "profile.json") mudancas.relerLista = true;
 	const absoluta = join(pastaPerfis, pasta);

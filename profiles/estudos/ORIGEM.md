@@ -31,7 +31,13 @@ As linhas alteradas nos arquivos do learn são marcadas com o comentário [estud
 13. extensions/visual-tools/tools/_common.ts: publish() recebe a pasta base (o ctx.cwd da sessão); sem ela, continua usando o process.cwd().
 14. extensions/visual-tools/index.ts: continua igual, mas saiu do profile.json (extensoes ficou vazio). Ele só registrava as ferramentas no interactive-subagents, que o app não usa.
 
-## Pendências para a Etapa 2/3
+## Arquivos do projeto (não vêm do learn)
 
-- extensions/quiz.ts e ask-user-question.ts desenham com ctx.ui.custom e só funcionam no terminal. No app elas ganham versões web com os mesmos nomes e parâmetros.
+- extensions/painel-teste.ts: ferramentas de teste da ponte de eventos (Etapa 2).
+- extensions/quiz-web.ts e quiz-web.test.ts (Etapa 3): a ferramenta quiz no app, com o mesmo nome, os mesmos parâmetros, a mesma correção e o mesmo resultado do quiz.ts, perguntando pela ponte no painel "quiz". O profile.json carrega esta; o quiz.ts continua para o pi no terminal (scripts/pi-estudos.cmd).
+- paineis/ (Etapa 3): o código de tela do perfil, pacote @estudos/perfil-estudos do workspace (hoje, o painel do quiz).
+- O ask_user_question do app fica no núcleo (packages/core/src/pergunta.ts), com o mesmo nome, parâmetros e resultado do ask-user-question.ts; este continua só para o pi no terminal.
+
+## Pendências
+
 - Os comentários de quiz.ts e ask-user-question.ts ainda falam do log do Obsidian.

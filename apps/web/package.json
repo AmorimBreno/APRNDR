@@ -9,6 +9,7 @@
 	},
 	"dependencies": {
 		"@estudos/design-system": "workspace:*",
+		"@estudos/perfil-estudos": "workspace:*",
 		"@estudos/ui": "workspace:*",
 		"react": "19.3.0",
 		"react-dom": "19.3.0"

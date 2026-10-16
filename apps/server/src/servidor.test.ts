@@ -327,6 +327,8 @@ describe("watcher", () => {
 		registrarMudancaPerfil(mudancas, pastaPerfis, "teste\\agents\\geral.md");
 		registrarMudancaPerfil(mudancas, pastaPerfis, "teste\\extensions\\x\\node_modules\\y\\index.js");
 		registrarMudancaPerfil(mudancas, pastaPerfis, "teste\\AGENTS.md");
+		// O código de tela do perfil é recarregado pelo Vite, não pela sessão.
+		registrarMudancaPerfil(mudancas, pastaPerfis, "teste\\paineis\\src\\PainelQuiz.tsx");
 		expect(mudancas.relerLista).toBe(false);
 		expect([...(mudancas.perfis.get(join(pastaPerfis, "teste")) ?? [])]).toEqual(["agents/geral.md", "AGENTS.md"]);
 		registrarMudancaPerfil(mudancas, pastaPerfis, "teste\\profile.json");

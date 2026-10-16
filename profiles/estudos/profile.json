@@ -11,7 +11,7 @@
 		{ "arquivo": "agents/svg-maker.md", "papel": "desenho", "selecionavel": false }
 	],
 	"skills": ["skills/teach", "skills/visualize"],
-	"extensoes": ["extensions/painel-teste.ts"],
+	"extensoes": ["extensions/painel-teste.ts", "extensions/quiz-web.ts"],
 	"extensoesSubagentes": ["extensions/visual-tools/tools/mermaid_tools.ts", "extensions/visual-tools/tools/svg_tools.ts"],
-	"paineis": ["teste"]
+	"paineis": ["quiz", "teste"]
 }

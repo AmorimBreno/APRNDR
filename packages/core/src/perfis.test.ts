@@ -19,13 +19,16 @@ describe("perfil estudos real", () => {
 			join(pastaPerfis, "estudos", "skills", "teach"),
 			join(pastaPerfis, "estudos", "skills", "visualize"),
 		]);
-		expect(perfil.extensoes).toEqual([join(pastaPerfis, "estudos", "extensions", "painel-teste.ts")]);
+		expect(perfil.extensoes).toEqual([
+			join(pastaPerfis, "estudos", "extensions", "painel-teste.ts"),
+			join(pastaPerfis, "estudos", "extensions", "quiz-web.ts"),
+		]);
 		expect(perfil.extensoesSubagentes).toEqual([
 			join(pastaPerfis, "estudos", "extensions", "visual-tools", "tools", "mermaid_tools.ts"),
 			join(pastaPerfis, "estudos", "extensions", "visual-tools", "tools", "svg_tools.ts"),
 		]);
 		expect(perfil.agentePadrao).toBe("professor");
-		expect(perfil.paineis).toEqual(["teste"]);
+		expect(perfil.paineis).toEqual(["quiz", "teste"]);
 	});
 
 	it("os quatro agentes têm nome, papel e modelo certos", async () => {

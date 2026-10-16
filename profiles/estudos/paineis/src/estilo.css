@@ -1,0 +1,12 @@
+/* Estilos dos painéis do perfil de estudos, por cima do design system APRNDR
+ * (as alternativas usam as classes ap-quiz e ap-opt do QuizQuestion). */
+
+.quiz { display: flex; flex-direction: column; gap: var(--space-6); }
+.quiz__vazio { margin: 0; color: var(--ink-muted); }
+.quiz__item { display: flex; flex-direction: column; gap: var(--space-4); }
+.quiz__item + .quiz__item { padding-top: var(--space-6); border-top: var(--border-hair) solid var(--line); }
+.quiz__item--resultado .ap-quiz { gap: var(--space-4); }
+.quiz__detalhes { display: block; margin-top: var(--space-2); color: var(--ink-muted); font-weight: 400; }
+.quiz__botoes { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
+.quiz__nota { margin: var(--space-3) 0 0; }
+.quiz__nota .overline { margin-right: var(--space-2); }

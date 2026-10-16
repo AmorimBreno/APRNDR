@@ -50,7 +50,7 @@ No fim, anote o resultado de cada passo e mande para o Claude Code. A Etapa 3 s�
 
 14. Mande: "Use a ferramenta ask_user_question, com multiSelect, para eu escolher quais dias da semana posso estudar, com as opções segunda, quarta e sexta." Por quê: confere o modo de várias escolhas. O que você deve ver: "Escolha uma ou mais" com caixas de marcar. Marque duas e envie. A linha da ferramenta mostra as duas escolhidas.
 
-15. Mande: "Use a ferramenta quiz com uma questão de 4 alternativas: qual é a derivada de x²? Escreva em LaTeX." Por quê: confere o quiz no app (perfil). O que você deve ver: no card "Questões", com a borda âmbar, a questão com "Uma resposta", a fórmula desenhada e as alternativas em teclas A a D (as letras também escolhem pelo teclado), o campo "Nota (opcional)" e os botões Pular, Não sei e Conferir. Escolha uma alternativa errada, escreva uma nota e clique em Conferir. O que você deve ver: a certa fica verde com "Correta", a sua fica tijolo com "Sua resposta", as outras apagam, e embaixo a faixa tijolo "Ainda não" com a explicação e "Sua nota". A linha da ferramenta diz "User answered incorrectly" com a sua nota, e o professor retoma a partir do erro.
+15. Mande: "Use a ferramenta quiz com uma questão de 4 alternativas: qual é a derivada de x²? Escreva em LaTeX." Por quê: confere o quiz no app (perfil). O que você deve ver: no card "Questões", com a borda âmbar, a questão com "Uma resposta", a fórmula desenhada e as alternativas em teclas A a D (as letras também escolhem pelo teclado), o campo "Nota (opcional)" e os botões Pular, Não sei e Conferir. Na conversa, a linha da ferramenta quiz diz "Esperando a sua resposta no painel Questões". Escolha uma alternativa errada, escreva uma nota e clique em Conferir. O que você deve ver: a certa fica verde com "Correta", a sua fica tijolo com "Sua resposta", as outras apagam, e embaixo a faixa tijolo "Ainda não" com a explicação e "Sua nota". A linha da ferramenta diz "User answered incorrectly" com a sua nota, e o professor retoma a partir do erro.
 
 16. Peça outra questão do quiz e clique em "Não sei". Depois peça mais uma e clique em "Pular". Por quê: confere os outros dois caminhos. O que você deve ver: com Não sei, a faixa creme "Você marcou Não sei", e o professor trata como lacuna, sem dizer que você errou. Com Pular, a questão some sem retorno, a linha da ferramenta diz "User cancelled the quiz" e o professor segue sem erro. Os resultados ficam no card, o mais novo em cima.
 
@@ -79,8 +79,6 @@ No fim, anote o resultado de cada passo e mande para o Claude Code. A Etapa 3 s�
 ## O que ainda não existe ou já se sabe
 
 - As perguntas e as questões ficam só na área de painéis enquanto a conversa está aberta. Ao reabrir uma conversa antiga, aparece só a linha da ferramenta com o resultado em texto. Isso não reprova o teste.
-- Ao recarregar a página logo depois de "Nova conversa", sem mandar mensagem, aparece "Sessão … não encontrada". É esperado (a conversa nova só vai para o disco com a primeira mensagem); o app abre uma conversa nova no lugar e o erro some com "Limpar erros". Está anotado para corrigir.
-- A linha do quiz mostra "Awaiting user response..." enquanto espera. É o texto da ferramenta original, em inglês.
 - As imagens dos diagramas na conversa ainda não aparecem. O arquivo vai para estudos-dados\viz.
 - Cadernos, cursos e a aula (as outras telas do design system) são da Etapa 4.
 

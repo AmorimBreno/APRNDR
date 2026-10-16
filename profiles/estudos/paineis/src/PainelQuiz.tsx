@@ -9,7 +9,9 @@
 import { Button, cx, Icon, letter, QuizFeedback, QuizQuestion, Tag, TextArea } from "@estudos/design-system";
 import { Fala, Markdown, type PedidoPendente, type PropsPainel, type RegistroPedido } from "@estudos/ui";
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { motion } from "motion/react";
+import { useRef, useState } from "react";
+import { Carimbo, Confete, useTremido } from "./Comemoracao.tsx";
 
 interface OpcaoMostrada {
 	index: number;
@@ -181,11 +183,22 @@ function Pergunta(props: { pedido: PedidoPendente & { dados: DadosPergunta }; re
 	);
 }
 
-function Resultado({ dados, quem }: { dados: DadosResultado; quem?: ReactNode }) {
+/**
+ * O retorno da questão. `aoVivo`: você acabou de conferir (não está revendo),
+ * então o acerto ganha carimbo e confete, o erro treme e o retorno sobe com mola.
+ */
+function Resultado({ dados, quem, aoVivo = false }: { dados: DadosResultado; quem?: ReactNode; aoVivo?: boolean }) {
+	const alternativas = useTremido<HTMLDivElement>(aoVivo && !dados.correct && !dados.dontKnow);
+	const comemorar = aoVivo && dados.correct;
 	const estado = (indice: number): EstadoOpcao =>
 		dados.correctIndices.includes(indice) ? "correct" : dados.escolhas.includes(indice) ? "incorrect" : "dim";
 	const enunciado = <Enunciado question={dados.question} {...(dados.details ? { details: dados.details } : {})} />;
 	const feedback = (
+		<motion.div
+			initial={aoVivo ? { opacity: 0, y: 18, scale: 0.97 } : false}
+			animate={{ opacity: 1, y: 0, scale: 1 }}
+			transition={{ type: "spring", stiffness: 360, damping: 20, delay: aoVivo ? 0.18 : 0 }}
+		>
 		<QuizFeedback
 			status={dados.dontKnow ? "partial" : dados.correct ? "correct" : "incorrect"}
 			{...(dados.dontKnow ? { title: "Você marcou Não sei" } : {})}
@@ -197,12 +210,20 @@ function Resultado({ dados, quem }: { dados: DadosResultado; quem?: ReactNode })
 				</p>
 			) : null}
 		</QuizFeedback>
+		</motion.div>
 	);
+	const reacao = comemorar ? (
+		<>
+			<Carimbo />
+			<Confete />
+		</>
+	) : null;
 
 	if (dados.mode === "single-select") {
 		const correta = dados.correctIndices[0];
 		return (
-			<div className={`quiz__item quiz__item--resultado${quem ? " quiz__item--fala" : ""}`}>
+			<div ref={alternativas} className={`quiz__item quiz__item--resultado${quem ? " quiz__item--fala" : ""}`}>
+				{reacao}
 				{quem ? (
 					<Fala quem={quem}>
 						<p className="ap-quiz__prompt heading">{enunciado}</p>
@@ -220,7 +241,8 @@ function Resultado({ dados, quem }: { dados: DadosResultado; quem?: ReactNode })
 		);
 	}
 	return (
-		<div className="quiz__item quiz__item--resultado">
+		<div ref={alternativas} className="quiz__item quiz__item--resultado">
+			{reacao}
 			<section className="ap-quiz" aria-label="Questão respondida">
 				{quem ? (
 					<Fala quem={quem}>
@@ -237,9 +259,9 @@ function Resultado({ dados, quem }: { dados: DadosResultado; quem?: ReactNode })
 }
 
 /** Revisão no modal: o resultado da correção, ou o que aconteceu com a questão. */
-function Revisao({ registro, acoes, quem }: { registro: RegistroPedido; acoes: PropsPainel["acoes"]; quem?: ReactNode }) {
+function Revisao({ registro, acoes, quem, aoVivo = false }: { registro: RegistroPedido; acoes: PropsPainel["acoes"]; quem?: ReactNode; aoVivo?: boolean }) {
 	const resultado = acoes.find((acao) => acao.acao === "resultado" && ehResultado(acao.dados) && acao.dados.id === registro.id);
-	if (resultado) return <Resultado dados={resultado.dados as DadosResultado} {...(quem ? { quem } : {})} />;
+	if (resultado) return <Resultado dados={resultado.dados as DadosResultado} {...(quem ? { quem } : {})} aoVivo={aoVivo} />;
 	const dados = ehPergunta(registro) ? registro.dados : undefined;
 	return (
 		<div className="quiz__item">
@@ -262,7 +284,19 @@ function Revisao({ registro, acoes, quem }: { registro: RegistroPedido; acoes: P
 }
 
 export function PainelQuiz(props: PropsPainel) {
-	if (props.revisao) return <Revisao registro={props.revisao} acoes={props.acoes} {...(props.quemPergunta ? { quem: props.quemPergunta } : {})} />;
+	// O mesmo modal passa de "esperando" para a revisão quando você confere: aí a reação é ao vivo.
+	const viuPendente = useRef(false);
+	if (props.pedidos.length > 0) viuPendente.current = true;
+	if (props.revisao) {
+		return (
+			<Revisao
+				registro={props.revisao}
+				acoes={props.acoes}
+				{...(props.quemPergunta ? { quem: props.quemPergunta } : {})}
+				aoVivo={viuPendente.current}
+			/>
+		);
+	}
 	const perguntas = props.pedidos.filter(ehPergunta);
 	if (perguntas.length === 0) return <p className="body-sm quiz__vazio">Nenhuma questão esperando você.</p>;
 	return (

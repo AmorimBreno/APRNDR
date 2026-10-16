@@ -112,6 +112,7 @@ profiles/estudos/paineis/ — @estudos/perfil-estudos: código de tela do perfil
 profiles/estudos/paineis/src/index.ts — tela inicial do perfil (cadernos) e registro dos painéis (quiz = Questões: só modal, revisa ao responder, resumo "Questão")
 profiles/estudos/paineis/src/TelaCadernos.tsx — tela inicial do perfil de estudos: menu de cadernos com faixa e folha (vazio até a Etapa 4) e a tecla para a conversa
 profiles/estudos/paineis/src/PainelQuiz.tsx — painel do quiz no modal: QuizQuestion (ou teclas marcáveis no multi-select), Não sei, nota, Pular; revisão com o gabarito e o QuizFeedback
+profiles/estudos/paineis/src/Comemoracao.tsx — a reação do quiz ao conferir: Carimbo 完, Confete de papel com gravidade e o tremido do erro
 profiles/estudos/paineis/src/estilo.css — estilos do painel do quiz
 profiles/estudos/extensions/ask-user-question.ts — ferramenta ask_user_question (desenha no terminal; no app vale a do núcleo, packages/core/src/pergunta.ts)
 profiles/estudos/extensions/painel-teste.ts — ferramentas de teste da ponte (mostrar_painel_teste, perguntar_no_painel_teste); arquivo do projeto, não do learn

@@ -3,7 +3,7 @@
 
 .quiz { display: flex; flex-direction: column; gap: var(--space-6); }
 .quiz__vazio { margin: 0; color: var(--ink-muted); }
-.quiz__item { display: flex; flex-direction: column; gap: var(--space-4); }
+.quiz__item { position: relative; display: flex; flex-direction: column; gap: var(--space-4); }
 .quiz__item + .quiz__item { padding-top: var(--space-6); border-top: var(--border-hair) solid var(--line); }
 .quiz__item--resultado .ap-quiz { gap: var(--space-4); }
 .quiz__detalhes { display: block; margin-top: var(--space-2); color: var(--ink-muted); font-weight: 400; }
@@ -14,3 +14,8 @@
 /* Com a fala (o professor perguntando no modal), o enunciado do QuizQuestion já está no balão. */
 .quiz__item--fala .ap-quiz > .ap-quiz__prompt { display: none; }
 .quiz__item--fala .fala .ap-quiz__prompt { display: block; margin: 0; }
+
+/* A reação ao conferir (Comemoracao.tsx): o carimbo 完 do professor e o confete de papel. */
+.carimbo { position: absolute; z-index: 2; top: -4px; right: 0; display: grid; place-items: center; width: 64px; height: 64px; border: 4px double var(--brick); border-radius: 6px; color: var(--brick); font-family: var(--font-ornament); font-size: 38px; line-height: 1; pointer-events: none; }
+.confete { position: absolute; z-index: 3; top: 28px; right: 32px; width: 0; height: 0; pointer-events: none; }
+.confete__peca { position: absolute; left: 0; top: 0; border-radius: 1px; }

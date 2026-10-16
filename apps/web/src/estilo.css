@@ -88,6 +88,13 @@ a.linha:hover .linha__texto .overline, a.linha:focus-visible .linha__texto .over
 .topo__controle:disabled { cursor: default; opacity: var(--opacity-disabled); box-shadow: none; }
 .topo__uso { flex: none; display: flex; flex-direction: column; gap: 2px; text-align: right; }
 .topo__acoes { flex: none; display: flex; align-items: center; gap: var(--space-2); align-self: stretch; padding-left: var(--space-4); border-left: var(--border-strong) solid currentColor; }
+/* Tecla de papel com duas linhas (o modelo): ação que abre o modal, não campo. */
+.topo__tecla { display: inline-grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--space-2); align-items: center; min-width: 0; max-width: 300px; padding: 6px var(--space-3) 8px; border: 0; border-radius: var(--radius-md); background: var(--paper); color: var(--on-paper); text-align: left; box-shadow: var(--key-lip); cursor: pointer; }
+.topo__tecla .overline { grid-column: 1; color: var(--on-paper-muted); }
+.topo__tecla > .ap-icon { grid-column: 2; grid-row: 1 / span 2; }
+.topo__tecla:hover { background: var(--paper-hover); }
+.topo__tecla:active { transform: translateY(1px); box-shadow: var(--key-lip-pressed); }
+.topo__tecla:disabled { cursor: default; opacity: var(--opacity-disabled); transform: none; box-shadow: var(--key-lip); }
 .topo__painel { display: inline-flex; align-items: center; gap: var(--space-2); height: var(--control-md); padding: 0 var(--space-4) 2px; border: 0; border-radius: var(--radius-md); background: var(--paper); color: var(--on-paper); box-shadow: var(--key-lip); cursor: pointer; }
 .topo__painel:active { transform: translateY(1px); box-shadow: var(--key-lip-pressed); }
 .topo__painel--aberto { background: var(--surface-ground); color: var(--ink); }

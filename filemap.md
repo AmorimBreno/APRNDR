@@ -43,7 +43,7 @@ packages/ui/src/estilo.css — estilos das peças da janela (aviso de erro, docu
 packages/ui/src/visual/Markdown.tsx — markdown das respostas (react-markdown, GFM, LaTeX com remark-math e rehype-katex; sem HTML cru)
 packages/ui/src/visual/Conversa.tsx — DocumentoConversa: respostas em LessonBlock numerado (raciocínio recolhível, modelo no pé), mensagens do usuário em StudentNote, ferramentas em linhas técnicas (status, duração, progresso, resumo)
 packages/ui/src/visual/BarraPergunta.tsx — AskBar com a fila, o aviso de respondendo e o Parar (Enter durante a resposta põe na fila)
-packages/ui/src/visual/SeletorModelo.tsx — botão do modelo atual e modal com busca no catálogo; os modelos do perfil primeiro
+packages/ui/src/visual/SeletorModelo.tsx — tecla de papel do modelo atual (abre o modal, por isso não tem cara de campo) e modal com busca no catálogo; os modelos do perfil primeiro
 packages/ui/src/visual/SeletorAgente.tsx — botão do agente na barra do topo com menu próprio no visual do menu do Callout (o select nativo abre com o visual do Windows); teclado completo
 packages/ui/src/visual/Historico.tsx — nova conversa e lista de sessões gravadas (a aberta marcada)
 packages/ui/src/visual/PainelPergunta.tsx — painel "pergunta" do ask_user_question: texto livre, uma escolha ou várias, sempre com Outra; Não responder cancela

@@ -1,4 +1,4 @@
-// Seletor de modelo: um botão com o modelo atual que abre um modal com busca.
+// Seletor de modelo: uma tecla com o modelo atual que abre um modal com busca.
 // Os modelos do perfil (os dos agentes no profile.json) vêm primeiro; a lista
 // completa do OpenRouter tem centenas, então só aparece filtrada pela busca.
 
@@ -82,10 +82,18 @@ export function SeletorModelo(props: PropsSeletorModelo) {
 
 	return (
 		<>
-			<button type="button" className="topo__controle" onClick={() => setAberto(true)} disabled={props.desabilitado}>
+			{/* Tecla, não campo: abre um modal (o agente, que escolhe ali mesmo, é o campo com contorno). */}
+			<button
+				type="button"
+				className="topo__tecla"
+				aria-haspopup="dialog"
+				aria-label={`Modelo: ${props.atual ?? "nenhum"}. Abrir a escolha de modelo`}
+				onClick={() => setAberto(true)}
+				disabled={props.desabilitado}
+			>
 				<span className="overline">Modelo</span>
 				<span className="topo__valor data">{props.atual ?? "Nenhum"}</span>
-				<Icon name="chevron-down" size={16} />
+				<Icon name="arrow-up-right" size={16} strokeWidth={2.5} />
 			</button>
 			<Modal
 				open={aberto}

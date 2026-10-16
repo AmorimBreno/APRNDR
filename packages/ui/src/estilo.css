@@ -211,6 +211,14 @@ a.linha:hover .linha__texto .overline, a.linha:focus-visible .linha__texto .over
 .pedido { padding-bottom: var(--space-5); border-bottom: var(--border-hair) solid var(--line); }
 .pedido__botoes { display: flex; justify-content: flex-end; gap: var(--space-2); }
 
+/* Fala: a foto de quem pergunta na frente e o enunciado num balão com rabicho. */
+.fala { display: flex; align-items: flex-start; gap: var(--space-4); }
+.fala__quem { flex: none; padding-top: 2px; }
+.fala__balao { position: relative; flex: 1; min-width: 0; padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--surface-raised); transform-origin: 0 24px; }
+.fala__balao::before { content: ""; position: absolute; left: -7px; top: 16px; border-width: 7px 8px 7px 0; border-style: solid; border-color: transparent var(--surface-raised) transparent transparent; }
+.fala__balao > :first-child { margin-top: 0; }
+.fala__balao > :last-child { margin-bottom: 0; }
+
 /* ── Painel "pergunta" (ask_user_question) ── */
 
 .painel-pergunta { display: flex; flex-direction: column; gap: var(--space-5); }

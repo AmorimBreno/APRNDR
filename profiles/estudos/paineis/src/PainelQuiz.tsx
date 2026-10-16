@@ -7,7 +7,8 @@
 // com o QuizFeedback. O pedido nunca traz o gabarito.
 
 import { Button, cx, Icon, letter, QuizFeedback, QuizQuestion, Tag, TextArea } from "@estudos/design-system";
-import { Markdown, type PedidoPendente, type PropsPainel, type RegistroPedido } from "@estudos/ui";
+import { Fala, Markdown, type PedidoPendente, type PropsPainel, type RegistroPedido } from "@estudos/ui";
+import type { ReactNode } from "react";
 import { useState } from "react";
 
 interface OpcaoMostrada {
@@ -102,7 +103,7 @@ function OpcoesMultiplas(props: { opcoes: OpcaoMostrada[]; estado(indice: number
 	);
 }
 
-function Pergunta(props: { pedido: PedidoPendente & { dados: DadosPergunta }; responder: PropsPainel["responder"]; cancelar: PropsPainel["cancelar"] }) {
+function Pergunta(props: { pedido: PedidoPendente & { dados: DadosPergunta }; responder: PropsPainel["responder"]; cancelar: PropsPainel["cancelar"]; quem?: ReactNode }) {
 	const { dados, id } = props.pedido;
 	const [escolhas, setEscolhas] = useState<number[]>([]);
 	const [nota, setNota] = useState("");
@@ -122,17 +123,21 @@ function Pergunta(props: { pedido: PedidoPendente & { dados: DadosPergunta }; re
 	};
 	const comNota = nota.trim() ? { nota } : {};
 	const multipla = dados.mode === "multi-select";
+	const enunciado = <Enunciado question={dados.question} {...(dados.details ? { details: dados.details } : {})} />;
 
 	return (
-		<div className="quiz__item">
+		<div className={`quiz__item${props.quem ? " quiz__item--fala" : ""}`}>
+			{props.quem ? (
+				<Fala quem={props.quem}>
+					<p className="ap-quiz__prompt heading">{enunciado}</p>
+				</Fala>
+			) : null}
 			{multipla ? (
 				<section className="ap-quiz" aria-label="Questão">
 					<header className="ap-quiz__head">
 						<span className="ap-quiz__kicker overline">Marque todas as corretas</span>
 					</header>
-					<h3 className="ap-quiz__prompt heading">
-						<Enunciado question={dados.question} {...(dados.details ? { details: dados.details } : {})} />
-					</h3>
+					{props.quem ? null : <h3 className="ap-quiz__prompt heading">{enunciado}</h3>}
 					<OpcoesMultiplas
 						opcoes={dados.options}
 						rotulo="Alternativas"
@@ -145,7 +150,7 @@ function Pergunta(props: { pedido: PedidoPendente & { dados: DadosPergunta }; re
 			) : (
 				<QuizQuestion
 					kicker="Uma resposta"
-					prompt={<Enunciado question={dados.question} {...(dados.details ? { details: dados.details } : {})} />}
+					prompt={enunciado}
 					options={dados.options.map((opcao) => ({ id: String(opcao.index), label: <Markdown texto={opcao.label} emLinha /> }))}
 					value={escolhas[0] !== undefined ? String(escolhas[0]) : null}
 					onChange={(valor) => setEscolhas([Number(valor)])}
@@ -176,7 +181,7 @@ function Pergunta(props: { pedido: PedidoPendente & { dados: DadosPergunta }; re
 	);
 }
 
-function Resultado({ dados }: { dados: DadosResultado }) {
+function Resultado({ dados, quem }: { dados: DadosResultado; quem?: ReactNode }) {
 	const estado = (indice: number): EstadoOpcao =>
 		dados.correctIndices.includes(indice) ? "correct" : dados.escolhas.includes(indice) ? "incorrect" : "dim";
 	const enunciado = <Enunciado question={dados.question} {...(dados.details ? { details: dados.details } : {})} />;
@@ -197,9 +202,13 @@ function Resultado({ dados }: { dados: DadosResultado }) {
 	if (dados.mode === "single-select") {
 		const correta = dados.correctIndices[0];
 		return (
-			<div className="quiz__item quiz__item--resultado">
+			<div className={`quiz__item quiz__item--resultado${quem ? " quiz__item--fala" : ""}`}>
+				{quem ? (
+					<Fala quem={quem}>
+						<p className="ap-quiz__prompt heading">{enunciado}</p>
+					</Fala>
+				) : null}
 				<QuizQuestion
-					kicker="Respondida"
 					prompt={enunciado}
 					options={dados.options.map((opcao) => ({ id: String(opcao.index), label: <Markdown texto={opcao.label} emLinha /> }))}
 					value={dados.escolhas[0] !== undefined ? String(dados.escolhas[0]) : null}
@@ -213,10 +222,13 @@ function Resultado({ dados }: { dados: DadosResultado }) {
 	return (
 		<div className="quiz__item quiz__item--resultado">
 			<section className="ap-quiz" aria-label="Questão respondida">
-				<header className="ap-quiz__head">
-					<span className="ap-quiz__kicker overline">Respondida</span>
-				</header>
-				<h3 className="ap-quiz__prompt heading">{enunciado}</h3>
+				{quem ? (
+					<Fala quem={quem}>
+						<p className="ap-quiz__prompt heading">{enunciado}</p>
+					</Fala>
+				) : (
+					<h3 className="ap-quiz__prompt heading">{enunciado}</h3>
+				)}
 				<OpcoesMultiplas opcoes={dados.options} rotulo="Alternativas com o gabarito" estado={estado} />
 				{feedback}
 			</section>
@@ -225,16 +237,18 @@ function Resultado({ dados }: { dados: DadosResultado }) {
 }
 
 /** Revisão no modal: o resultado da correção, ou o que aconteceu com a questão. */
-function Revisao({ registro, acoes }: { registro: RegistroPedido; acoes: PropsPainel["acoes"] }) {
+function Revisao({ registro, acoes, quem }: { registro: RegistroPedido; acoes: PropsPainel["acoes"]; quem?: ReactNode }) {
 	const resultado = acoes.find((acao) => acao.acao === "resultado" && ehResultado(acao.dados) && acao.dados.id === registro.id);
-	if (resultado) return <Resultado dados={resultado.dados as DadosResultado} />;
+	if (resultado) return <Resultado dados={resultado.dados as DadosResultado} {...(quem ? { quem } : {})} />;
 	const dados = ehPergunta(registro) ? registro.dados : undefined;
 	return (
 		<div className="quiz__item">
 			{dados ? (
-				<h3 className="ap-quiz__prompt heading">
-					<Enunciado question={dados.question} {...(dados.details ? { details: dados.details } : {})} />
-				</h3>
+				<Fala quem={quem}>
+					<p className="ap-quiz__prompt heading">
+						<Enunciado question={dados.question} {...(dados.details ? { details: dados.details } : {})} />
+					</p>
+				</Fala>
 			) : null}
 			<p className="body quiz__vazio">
 				{registro.estado === "respondido"
@@ -248,13 +262,13 @@ function Revisao({ registro, acoes }: { registro: RegistroPedido; acoes: PropsPa
 }
 
 export function PainelQuiz(props: PropsPainel) {
-	if (props.revisao) return <Revisao registro={props.revisao} acoes={props.acoes} />;
+	if (props.revisao) return <Revisao registro={props.revisao} acoes={props.acoes} {...(props.quemPergunta ? { quem: props.quemPergunta } : {})} />;
 	const perguntas = props.pedidos.filter(ehPergunta);
 	if (perguntas.length === 0) return <p className="body-sm quiz__vazio">Nenhuma questão esperando você.</p>;
 	return (
 		<div className="quiz">
 			{perguntas.map((pedido) => (
-				<Pergunta key={pedido.id} pedido={pedido} responder={props.responder} cancelar={props.cancelar} />
+				<Pergunta key={pedido.id} pedido={pedido} responder={props.responder} cancelar={props.cancelar} {...(props.quemPergunta ? { quem: props.quemPergunta } : {})} />
 			))}
 		</div>
 	);

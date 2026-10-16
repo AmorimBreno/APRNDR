@@ -381,6 +381,16 @@ export function JanelaPerfil({ perfilId, voltar }: PropsJanelaPerfil) {
 					cancelar={acoes.cancelarPedido}
 					acaoDaInterface={acoes.acaoDaInterface}
 					fechar={() => setPedidoAberto(undefined)}
+					{...(agenteAtual
+						? {
+								quemPergunta:
+									aberto.estado === "pendente" ? (
+										<AgenteAnimado nome={agenteAtual} {...(avatarDe(agenteAtual) ? { avatar: avatarDe(agenteAtual)! } : {})} atividade="perguntando" tamanho={48} />
+									) : (
+										<AvatarAgente nome={agenteAtual} {...(avatarDe(agenteAtual) ? { avatar: avatarDe(agenteAtual)! } : {})} tamanho={48} />
+									),
+							}
+						: {})}
 				/>
 			) : null}
 		</div>

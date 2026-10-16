@@ -50,6 +50,7 @@ packages/ui/src/visual/SeletorModelo.tsx — tecla de papel do modelo atual (abr
 packages/ui/src/visual/SeletorAgente.tsx — botão do agente na barra do topo com menu próprio no visual do menu do Callout (o select nativo abre com o visual do Windows); teclado completo
 packages/ui/src/visual/Historico.tsx — nova conversa e lista de sessões gravadas (a aberta marcada)
 packages/ui/src/visual/PainelPergunta.tsx — painel "pergunta" do ask_user_question, mostrado no modal: texto livre, uma escolha ou várias, sempre com Outra; Não responder cancela; revisão com a sua resposta
+packages/ui/src/visual/Fala.tsx — a foto de quem pergunta na frente e o enunciado num balão (o professor perguntando nos modais de pedido)
 packages/ui/src/visual/InfoResposta.tsx — botão de informações de uma resposta (na margem, ao lado do número): balão com data, agente, modelo, duração, tokens e custo
 packages/ui/src/visual/InfoResposta.test.ts — testes das linhas do balão
 packages/ui/src/visual/Pedidos.tsx — pedidos na conversa: BotaoPedido (âmbar pulsando enquanto espera, só contorno depois), ModalPedido (responder, minimizar, rever), resumo e numeração por tipo

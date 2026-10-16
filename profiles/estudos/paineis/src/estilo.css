@@ -10,3 +10,7 @@
 .quiz__botoes { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
 .quiz__nota { margin: var(--space-3) 0 0; }
 .quiz__nota .overline { margin-right: var(--space-2); }
+
+/* Com a fala (o professor perguntando no modal), o enunciado do QuizQuestion já está no balão. */
+.quiz__item--fala .ap-quiz > .ap-quiz__prompt { display: none; }
+.quiz__item--fala .fala .ap-quiz__prompt { display: block; margin: 0; }

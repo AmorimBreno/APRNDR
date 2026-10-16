@@ -5,6 +5,7 @@
 // de respondido, o botão fica só com o contorno e abre o modal para rever.
 
 import { Button, Icon, Modal, pad2 } from "@estudos/design-system";
+import type { ReactNode } from "react";
 import type { AcaoRecebida, RegistroPedido } from "../estado-janela.ts";
 import { entradaDoPainel, type PropsPainel, type RegistroPaineis, type ResumoPedido, situacaoDoPedido } from "../paineis.tsx";
 import type { MotivoCancelamento } from "../tipos.ts";
@@ -74,6 +75,8 @@ export interface PropsModalPedido {
 	acaoDaInterface(painel: string, acao: string, dados?: unknown): Promise<void>;
 	/** Fecha o modal; se o pedido ainda espera, ele continua esperando (minimizar). */
 	fechar(): void;
+	/** A foto de quem pergunta, na frente do enunciado. */
+	quemPergunta?: ReactNode;
 }
 
 /** O modal de um pedido: para responder, ou para rever depois. */
@@ -88,7 +91,7 @@ export function ModalPedido(props: PropsModalPedido) {
 			open
 			onClose={props.fechar}
 			title={`${resumo.tipo} ${pad2(props.numero)}`}
-			kicker={`${entrada.titulo ?? pedido.painel} · ${situacaoDoPedido(pedido)}`}
+			kicker={entrada.titulo ?? pedido.painel}
 			tone={pendente ? "amber" : "panel"}
 			size="md"
 			closeLabel={pendente ? "Minimizar" : "Fechar"}
@@ -107,6 +110,7 @@ export function ModalPedido(props: PropsModalPedido) {
 				responder={props.responder}
 				cancelar={props.cancelar}
 				acaoDaInterface={(acao, dados) => props.acaoDaInterface(pedido.painel, acao, dados)}
+				{...(props.quemPergunta ? { quemPergunta: props.quemPergunta } : {})}
 			/>
 		</Modal>
 	);

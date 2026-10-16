@@ -5,10 +5,11 @@
 // Para rever (props.revisao): a pergunta e o que você respondeu.
 
 import { Button, Checkbox, RadioGroup, TextArea, TextField } from "@estudos/design-system";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import type { PedidoPendente, RegistroPedido } from "../estado-janela.ts";
 import { type PropsPainel, PainelGenerico, situacaoDoPedido } from "../paineis.tsx";
 import type { DadosPedidoPergunta, RespostaPergunta } from "../tipos.ts";
+import { Fala } from "./Fala.tsx";
 import { Markdown } from "./Markdown.tsx";
 
 const OUTRA = "__outra__";
@@ -18,7 +19,7 @@ function ehPergunta(pedido: PedidoPendente): pedido is PedidoPendente & { dados:
 	return pedido.acao === "perguntar" && typeof dados?.question === "string" && Array.isArray(dados.options);
 }
 
-function Pergunta(props: { id: string; dados: DadosPedidoPergunta; responder: PropsPainel["responder"]; cancelar: PropsPainel["cancelar"] }) {
+function Pergunta(props: { id: string; dados: DadosPedidoPergunta; responder: PropsPainel["responder"]; cancelar: PropsPainel["cancelar"]; quemPergunta?: ReactNode }) {
 	const { dados } = props;
 	const [escolhidas, setEscolhidas] = useState<string[]>([]);
 	const [outra, setOutra] = useState("");
@@ -60,14 +61,16 @@ function Pergunta(props: { id: string; dados: DadosPedidoPergunta; responder: Pr
 
 	return (
 		<section className="pergunta" aria-label="Pergunta do agente">
-			<div className="pergunta__enunciado heading">
-				<Markdown texto={dados.question} emLinha />
-			</div>
-			{dados.details ? (
-				<div className="pergunta__detalhes ap-prose body">
-					<Markdown texto={dados.details} />
+			<Fala quem={props.quemPergunta}>
+				<div className="pergunta__enunciado heading">
+					<Markdown texto={dados.question} emLinha />
 				</div>
-			) : null}
+				{dados.details ? (
+					<div className="pergunta__detalhes ap-prose body">
+						<Markdown texto={dados.details} />
+					</div>
+				) : null}
+			</Fala>
 
 			{dados.mode === "text" ? (
 				<TextArea label="Sua resposta" value={texto} onChange={(evento) => setTexto(evento.target.value)} rows={3} disabled={enviando} />
@@ -120,19 +123,22 @@ function respostasEmTexto(dados: DadosPedidoPergunta, resposta: unknown): string
 	return itens;
 }
 
-function Revisao({ registro }: { registro: RegistroPedido & { dados: DadosPedidoPergunta } }) {
+function Revisao(props: { registro: RegistroPedido & { dados: DadosPedidoPergunta }; quemPergunta?: ReactNode }) {
+	const { registro } = props;
 	const { dados } = registro;
 	const respostas = registro.estado === "respondido" ? respostasEmTexto(dados, registro.resposta) : [];
 	return (
 		<section className="pergunta" aria-label="Pergunta respondida">
-			<div className="pergunta__enunciado heading">
-				<Markdown texto={dados.question} emLinha />
-			</div>
-			{dados.details ? (
-				<div className="pergunta__detalhes ap-prose body">
-					<Markdown texto={dados.details} />
+			<Fala quem={props.quemPergunta}>
+				<div className="pergunta__enunciado heading">
+					<Markdown texto={dados.question} emLinha />
 				</div>
-			) : null}
+				{dados.details ? (
+					<div className="pergunta__detalhes ap-prose body">
+						<Markdown texto={dados.details} />
+					</div>
+				) : null}
+			</Fala>
 			<div className="pergunta__resposta">
 				<span className="overline">{registro.estado === "respondido" ? "Sua resposta" : situacaoDoPedido(registro)}</span>
 				{respostas.length > 0 ? (
@@ -151,14 +157,25 @@ function Revisao({ registro }: { registro: RegistroPedido & { dados: DadosPedido
 
 export function PainelPergunta(props: PropsPainel) {
 	if (props.revisao) {
-		return ehPergunta(props.revisao) ? <Revisao registro={props.revisao} /> : <PainelGenerico {...props} />;
+		return ehPergunta(props.revisao) ? (
+			<Revisao registro={props.revisao} {...(props.quemPergunta ? { quemPergunta: props.quemPergunta } : {})} />
+		) : (
+			<PainelGenerico {...props} />
+		);
 	}
 	const perguntas = props.pedidos.filter(ehPergunta);
 	const outros = props.pedidos.filter((pedido) => !ehPergunta(pedido));
 	return (
 		<div className="painel-pergunta">
 			{perguntas.map((pedido) => (
-				<Pergunta key={pedido.id} id={pedido.id} dados={pedido.dados} responder={props.responder} cancelar={props.cancelar} />
+				<Pergunta
+					key={pedido.id}
+					id={pedido.id}
+					dados={pedido.dados}
+					responder={props.responder}
+					cancelar={props.cancelar}
+					{...(props.quemPergunta ? { quemPergunta: props.quemPergunta } : {})}
+				/>
 			))}
 			{perguntas.length === 0 && outros.length === 0 ? <p className="body-sm painel-generico__vazio">Nenhuma pergunta esperando você.</p> : null}
 			{outros.length > 0 || props.acoes.length > 0 ? <PainelGenerico {...props} pedidos={outros} /> : null}

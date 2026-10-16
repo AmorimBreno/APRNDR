@@ -12,7 +12,7 @@
 // chegou em JSON e deixa responder aos pedidos com um texto ou cancelar.
 
 import { Button, Card, type IconName, pad2, TextArea } from "@estudos/design-system";
-import { type ComponentType, useState } from "react";
+import { type ComponentType, type ReactNode, useState } from "react";
 import type { AcaoRecebida, PedidoPendente, RegistroPedido } from "./estado-janela.ts";
 import type { MotivoCancelamento } from "./tipos.ts";
 
@@ -24,6 +24,8 @@ export interface PropsPainel {
 	pedidos: PedidoPendente[];
 	/** No modal, um pedido já respondido ou cancelado: mostrar só para rever. */
 	revisao?: RegistroPedido;
+	/** No modal, a foto de quem pergunta (o agente), para ir na frente do enunciado (Fala). */
+	quemPergunta?: ReactNode;
 	/** Pedidos cancelados pelo núcleo ou pelo usuário, por id, com o motivo. */
 	cancelados: Record<string, MotivoCancelamento>;
 	/** Responde ao pedido `id`. false = ele não esperava mais resposta. */

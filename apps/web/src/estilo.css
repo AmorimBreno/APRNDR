@@ -41,7 +41,7 @@ a.cartao:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 
 .cartao__arte { position: relative; flex: 1; display: grid; place-items: center; min-height: 0; border-radius: var(--radius-md); background: var(--paper); overflow: hidden; }
 /* Desenho de traço com fundo branco: no papel, o branco vira papel (o manual pede papel quente, nunca #fff). */
-.cartao__arte img { position: absolute; inset: var(--space-3); width: calc(100% - 2 * var(--space-3)); height: calc(100% - 2 * var(--space-3)); object-fit: contain; mix-blend-mode: multiply; user-select: none; }
+.cartao__arte img { position: absolute; inset: var(--space-3); width: calc(100% - 2 * var(--space-3)); height: calc(100% - 2 * var(--space-3)); will-change: transform; object-fit: contain; mix-blend-mode: multiply; user-select: none; }
 .cartao__glifo { font-family: var(--font-ornament); font-size: 120px; line-height: 1; color: var(--on-paper); }
 
 .cartao__nome { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -53,7 +53,7 @@ a.cartao:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .cartao__carregar { display: flex; flex-direction: column; gap: 6px; }
 .cartao__carregar .overline { color: var(--ink-muted); }
 .cartao__trilho { display: block; height: 14px; padding: 2px; border: var(--border-strong) solid var(--cor); border-radius: var(--radius-xs); box-sizing: border-box; }
-.cartao__enchimento { display: block; width: 28%; height: 100%; border-radius: 2px; background: var(--cor); transition: width .56s cubic-bezier(.65, 0, .25, 1); }
+.cartao__enchimento { display: block; width: 28%; height: 100%; border-radius: 2px; background: var(--cor); transition: width .7s var(--mola); }
 a.cartao:hover .cartao__enchimento, a.cartao:focus-visible .cartao__enchimento { width: 100%; }
 a.cartao:hover .cartao__carregar .overline, a.cartao:focus-visible .cartao__carregar .overline { color: var(--ink); }
 

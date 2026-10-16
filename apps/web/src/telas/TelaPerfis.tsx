@@ -9,7 +9,8 @@
 
 import { EmptyState, Icon, ORNAMENT_MEANINGS, type OrnamentGlyph, pad2, Wordmark } from "@estudos/design-system";
 import { type ErroPerfil, type ResumoPerfil, usePerfis } from "@estudos/ui";
-import type { CSSProperties } from "react";
+import { motion, useMotionValue, useSpring, useTransform } from "motion/react";
+import type { CSSProperties, PointerEvent } from "react";
 
 /** Até quantos cards ficam numa linha só, com a altura da tela. */
 const LIMITE_NUMA_LINHA = 4;
@@ -21,14 +22,42 @@ function glifoDe(perfil: ResumoPerfil): OrnamentGlyph {
 	return glifo && Object.hasOwn(ORNAMENT_MEANINGS, glifo) ? (glifo as OrnamentGlyph) : "学";
 }
 
+/** Inclinação máxima do card, em graus, quando o mouse está na borda. */
+const INCLINACAO = 7;
+
 function CartaoPerfil({ perfil }: { perfil: ResumoPerfil }) {
 	const aparencia = perfil.aparencia ?? {};
 	const glifo = glifoDe(perfil);
+	// O card inclina em 3D seguindo o mouse, com mola; a arte anda um pouco ao contrário (profundidade).
+	const px = useMotionValue(0);
+	const py = useMotionValue(0);
+	const mola = { stiffness: 220, damping: 18, mass: 0.6 };
+	const rotateY = useSpring(useTransform(px, [-0.5, 0.5], [-INCLINACAO, INCLINACAO]), mola);
+	const rotateX = useSpring(useTransform(py, [-0.5, 0.5], [INCLINACAO, -INCLINACAO]), mola);
+	const arteX = useSpring(useTransform(px, [-0.5, 0.5], [10, -10]), mola);
+	const arteY = useSpring(useTransform(py, [-0.5, 0.5], [8, -8]), mola);
+	const mover = (evento: PointerEvent<HTMLAnchorElement>) => {
+		const caixa = evento.currentTarget.getBoundingClientRect();
+		px.set((evento.clientX - caixa.left) / caixa.width - 0.5);
+		py.set((evento.clientY - caixa.top) / caixa.height - 0.5);
+	};
+	const soltar = () => {
+		px.set(0);
+		py.set(0);
+	};
 	return (
-		<a className={`cartao cartao--${aparencia.cor ?? "amber"}`} href={`#/perfil/${encodeURIComponent(perfil.id)}`}>
+		<motion.a
+			className={`cartao cartao--${aparencia.cor ?? "amber"}`}
+			href={`#/perfil/${encodeURIComponent(perfil.id)}`}
+			data-perfil={perfil.id}
+			style={{ rotateX, rotateY, transformPerspective: 1100 }}
+			onPointerMove={mover}
+			onPointerLeave={soltar}
+			whileTap={{ scale: 0.985 }}
+		>
 			<div className="cartao__arte">
 				{aparencia.capa ? (
-					<img src={aparencia.capa} alt="" draggable={false} />
+					<motion.img src={aparencia.capa} alt="" draggable={false} style={{ x: arteX, y: arteY }} />
 				) : (
 					<span className="cartao__glifo" lang="ja" aria-hidden="true">
 						{glifo}
@@ -57,7 +86,7 @@ function CartaoPerfil({ perfil }: { perfil: ResumoPerfil }) {
 					{glifo.charAt(0)}
 				</span>
 			</div>
-		</a>
+		</motion.a>
 	);
 }
 

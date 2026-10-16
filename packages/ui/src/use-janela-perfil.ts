@@ -150,7 +150,7 @@ export function useJanelaPerfil(perfilId: string, cliente: ClienteConexao = obte
 			recarregarPerfil: () => pedir({ tipo: "recarregar_perfil", perfil }),
 			responderPedido: async (id, dados) => {
 				const resultado = await pedir({ tipo: "responder_pedido", perfil, id, ...(dados === undefined ? {} : { dados }) });
-				despachar({ tipo: "local:pedido_respondido", id });
+				despachar({ tipo: "local:pedido_respondido", id, ...(dados === undefined ? {} : { dados }) });
 				return resultado;
 			},
 			cancelarPedido: async (id) => {

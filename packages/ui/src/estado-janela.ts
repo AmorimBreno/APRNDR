@@ -77,6 +77,20 @@ export interface PedidoPendente {
 	dados: unknown;
 }
 
+/** Situação de um pedido da ponte, para o botão na conversa e a revisão. */
+export type EstadoPedido = "pendente" | "respondido" | "cancelado";
+
+/** Um pedido da sessão aberta, com o que aconteceu com ele. */
+export interface RegistroPedido extends PedidoPendente {
+	estado: EstadoPedido;
+	/** Ordem de chegada (para numerar "Pergunta 01", "Pergunta 02"…). */
+	ordem: number;
+	/** O que o usuário mandou, quando respondeu. */
+	resposta?: unknown;
+	/** Por que foi cancelado. */
+	motivo?: MotivoCancelamento;
+}
+
 /** Ação da ponte ("interface:mostrar") recebida para um painel. */
 export interface AcaoRecebida {
 	chave: string;
@@ -110,6 +124,8 @@ export interface EstadoJanela {
 	acoesPorPainel: Record<string, AcaoRecebida[]>;
 	/** Pedidos cancelados pelo núcleo, por id (para o painel saber por quê). */
 	cancelados: Record<string, MotivoCancelamento>;
+	/** Todos os pedidos da sessão aberta, por id, com a situação de cada um. Zera ao trocar de sessão. */
+	registrosPedidos: Record<string, RegistroPedido>;
 	recarregado?: AvisoRecarregado;
 	/** Contador para as chaves dos itens (o reducer continua puro: vem no estado). */
 	contador: number;
@@ -119,8 +135,8 @@ export interface EstadoJanela {
 export type AcaoLocal =
 	/** A conexão caiu: a execução em andamento não vai mais mandar eventos para esta tela. */
 	| { tipo: "local:conexao_caiu" }
-	/** O usuário respondeu (ou cancelou) um pedido da ponte. */
-	| { tipo: "local:pedido_respondido"; id: string }
+	/** O usuário respondeu (ou cancelou) um pedido da ponte. `dados` = o que ele mandou. */
+	| { tipo: "local:pedido_respondido"; id: string; dados?: unknown }
 	| { tipo: "local:limpar_erros" }
 	| { tipo: "local:fechar_aviso_recarregado" };
 
@@ -152,6 +168,7 @@ export function estadoInicial(perfil: string): EstadoJanela {
 		pedidos: [],
 		acoesPorPainel: {},
 		cancelados: {},
+		registrosPedidos: {},
 		contador: 0,
 	};
 }
@@ -195,7 +212,7 @@ function comSessao(estado: EstadoJanela, sessao: EstadoSessao): EstadoJanela {
 		...estado,
 		sessao,
 		diagnosticos: [...sessao.diagnosticos, ...extras],
-		...(outraSessao ? { uso: usoZerado } : {}),
+		...(outraSessao ? { uso: usoZerado, registrosPedidos: {} } : {}),
 	};
 }
 
@@ -430,15 +447,26 @@ function aplicarEvento(estado: EstadoJanela, evento: EventoNucleo): EstadoJanela
 
 		case "pedido_interface": {
 			const pedido: PedidoPendente = { id: evento.id, painel: evento.painel, acao: evento.acao, dados: evento.dados };
-			return { ...estado, pedidos: [...estado.pedidos.filter((existente) => existente.id !== evento.id), pedido] };
+			const contador = estado.contador + 1;
+			return {
+				...estado,
+				contador,
+				pedidos: [...estado.pedidos.filter((existente) => existente.id !== evento.id), pedido],
+				registrosPedidos: { ...estado.registrosPedidos, [evento.id]: { ...pedido, estado: "pendente", ordem: contador } },
+			};
 		}
 
-		case "pedido_interface_cancelado":
+		case "pedido_interface_cancelado": {
+			const registro = estado.registrosPedidos[evento.id];
 			return {
 				...estado,
 				pedidos: estado.pedidos.filter((pedido) => pedido.id !== evento.id),
 				cancelados: { ...estado.cancelados, [evento.id]: evento.motivo },
+				...(registro?.estado === "pendente"
+					? { registrosPedidos: { ...estado.registrosPedidos, [evento.id]: { ...registro, estado: "cancelado", motivo: evento.motivo } } }
+					: {}),
 			};
+		}
 	}
 }
 
@@ -488,8 +516,15 @@ export function reduzirJanela(estado: EstadoJanela, acao: AcaoJanela): EstadoJan
 		case "local:conexao_caiu":
 			return aplicarEvento({ ...estado, fila: [] }, { tipo: "execucao_fim", abortada: true });
 
-		case "local:pedido_respondido":
-			return { ...estado, pedidos: estado.pedidos.filter((pedido) => pedido.id !== acao.id) };
+		case "local:pedido_respondido": {
+			const pedidos = estado.pedidos.filter((pedido) => pedido.id !== acao.id);
+			// Só um pendente vira respondido: se o núcleo já o cancelou (o evento
+			// chega antes da resposta do pedido), ele continua cancelado.
+			const registro = estado.registrosPedidos[acao.id];
+			if (registro?.estado !== "pendente") return { ...estado, pedidos };
+			const respondido: RegistroPedido = { ...registro, estado: "respondido", ...(acao.dados === undefined ? {} : { resposta: acao.dados }) };
+			return { ...estado, pedidos, registrosPedidos: { ...estado.registrosPedidos, [acao.id]: respondido } };
+		}
 
 		case "local:limpar_erros":
 			return { ...estado, erros: [] };

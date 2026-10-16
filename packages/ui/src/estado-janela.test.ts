@@ -187,6 +187,42 @@ describe("reduzirJanela", () => {
 		expect(estado.cancelados).toEqual({ q1: "abortado" });
 	});
 
+	it("registra cada pedido: pendente, respondido com a resposta, cancelado com o motivo; zera ao trocar de sessão", () => {
+		let estado = aplicar(
+			estadoInicial(PERFIL),
+			{ tipo: "resposta", pedido: "abrir_perfil", ok: true, dados: sessao({ sessaoId: "s1" }) },
+			ev({ tipo: "pedido_interface", id: "q1", painel: "pergunta", acao: "perguntar", dados: { question: "?" } }),
+			ev({ tipo: "pedido_interface", id: "q2", painel: "quiz", acao: "perguntar", dados: {} }),
+			ev({ tipo: "pedido_interface", id: "q3", painel: "quiz", acao: "perguntar", dados: {} }),
+		);
+		expect(Object.values(estado.registrosPedidos).map((registro) => [registro.id, registro.estado])).toEqual([
+			["q1", "pendente"],
+			["q2", "pendente"],
+			["q3", "pendente"],
+		]);
+		const ordens = Object.values(estado.registrosPedidos).map((registro) => registro.ordem);
+		expect([...ordens].sort((a, b) => a - b)).toEqual(ordens);
+
+		estado = aplicar(
+			estado,
+			{ tipo: "local:pedido_respondido", id: "q1", dados: { escolhas: [2] } },
+			// Cancelar pela interface: o evento do núcleo chega antes da resposta do pedido.
+			ev({ tipo: "pedido_interface_cancelado", id: "q2", motivo: "usuario" }),
+			{ tipo: "local:pedido_respondido", id: "q2" },
+			ev({ tipo: "pedido_interface_cancelado", id: "q3", motivo: "abortado" }),
+		);
+		expect(estado.registrosPedidos.q1).toMatchObject({ estado: "respondido", resposta: { escolhas: [2] } });
+		expect(estado.registrosPedidos.q2).toMatchObject({ estado: "cancelado", motivo: "usuario" });
+		expect(estado.registrosPedidos.q3).toMatchObject({ estado: "cancelado", motivo: "abortado" });
+		expect(estado.pedidos).toEqual([]);
+
+		// A mesma sessão (reconexão) mantém; outra sessão zera.
+		estado = aplicar(estado, { tipo: "resposta", pedido: "abrir_perfil", ok: true, dados: sessao({ sessaoId: "s1" }) });
+		expect(Object.keys(estado.registrosPedidos)).toHaveLength(3);
+		estado = aplicar(estado, { tipo: "resposta", pedido: "abrir_sessao", ok: true, dados: sessao({ sessaoId: "s2" }) });
+		expect(estado.registrosPedidos).toEqual({});
+	});
+
 	it("limita as ações guardadas por painel", () => {
 		let estado = estadoInicial(PERFIL);
 		for (let i = 0; i < LIMITE_ACOES_POR_PAINEL + 5; i++) {

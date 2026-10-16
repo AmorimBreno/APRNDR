@@ -64,6 +64,7 @@ import {
 	agenteGravado,
 	ErroSessao,
 	type FabricaExtensoesNucleo,
+	agentesPorMomento,
 	garantirPastas,
 	listarSessoes,
 	montarOpcoesRecursos,
@@ -358,7 +359,8 @@ export class JanelaPerfil {
 
 	/** Conversa da sessão aberta (ramo ativo), no formato genérico. */
 	historico(): ItemHistorico[] {
-		return this.sessao ? converterHistorico(this.sessao.messages) : [];
+		if (!this.sessao) return [];
+		return converterHistorico(this.sessao.messages, agentesPorMomento(this.sessao.sessionManager.getBranch()));
 	}
 
 	/** Encerra a janela: interrompe a resposta, avisa as extensões e descarta a sessão. */

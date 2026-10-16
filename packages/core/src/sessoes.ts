@@ -210,6 +210,22 @@ function nomeDaEntradaAgente(entrada: { type?: unknown; customType?: unknown; da
 	return typeof dados?.agente === "string" ? dados.agente : undefined;
 }
 
+/**
+ * Agente de cada resposta num caminho de entradas da sessão, pelo timestamp
+ * da mensagem: vale a última entrada nucleo.agente antes dela.
+ */
+export function agentesPorMomento(entradas: readonly SessionEntry[]): Map<number, string> {
+	const mapa = new Map<number, string>();
+	let agente: string | undefined;
+	for (const entrada of entradas) {
+		agente = nomeDaEntradaAgente(entrada) ?? agente;
+		if (!agente || entrada.type !== "message") continue;
+		const mensagem = (entrada as { message?: { role?: unknown; timestamp?: unknown } }).message;
+		if (mensagem?.role === "assistant" && typeof mensagem.timestamp === "number") mapa.set(mensagem.timestamp, agente);
+	}
+	return mapa;
+}
+
 /** Agente gravado num caminho de entradas da sessão (o último vale). */
 export function agenteGravado(entradas: readonly SessionEntry[]): string | undefined {
 	let agente: string | undefined;

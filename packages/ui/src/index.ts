@@ -14,6 +14,7 @@ export * from "./use-perfis.ts";
 export * from "./visual/BarraPergunta.tsx";
 export * from "./visual/Conversa.tsx";
 export * from "./visual/FaixaMarca.tsx";
+export * from "./visual/InfoResposta.tsx";
 export * from "./visual/Historico.tsx";
 export * from "./visual/Markdown.tsx";
 export * from "./visual/PainelPergunta.tsx";

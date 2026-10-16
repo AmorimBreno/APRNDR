@@ -41,12 +41,14 @@ packages/ui/src/use-perfis.ts — hook usePerfis e buscarPerfis: GET /api/perfis
 packages/ui/src/paineis.tsx — registro de painéis (componente, título, soModal, resumir o pedido, revisarAoResponder), AreaPaineis (só ações; os pedidos vão para o modal) e PainelGenerico (ações e pedidos em JSON, responder com texto ou cancelar, revisão)
 packages/ui/src/estilo.css — estilos da tela de faixa e folha (.tela, .faixa, .folha, .linha, .tecla-papel) e das peças da janela (aviso de erro, documento, ferramentas, barra, histórico, seletor de modelo, painéis) e o CSS do KaTeX; exportado como @estudos/ui/estilo.css
 packages/ui/src/visual/Markdown.tsx — markdown das respostas (react-markdown, GFM, LaTeX com remark-math e rehype-katex; sem HTML cru)
-packages/ui/src/visual/Conversa.tsx — DocumentoConversa: respostas em LessonBlock numerado (raciocínio recolhível, modelo no pé), mensagens do usuário em StudentNote, ferramentas em linhas técnicas (status, duração, progresso, resumo)
+packages/ui/src/visual/Conversa.tsx — DocumentoConversa: respostas como bloco sem etiqueta, com o número e o botão de informações na margem e o autor em cima (raciocínio recolhível), mensagens do usuário em StudentNote, ferramentas em linhas técnicas (status, duração, progresso, resumo)
 packages/ui/src/visual/BarraPergunta.tsx — AskBar com a fila, o aviso de respondendo e o Parar (Enter durante a resposta põe na fila)
 packages/ui/src/visual/SeletorModelo.tsx — tecla de papel do modelo atual (abre o modal, por isso não tem cara de campo) e modal com busca no catálogo; os modelos do perfil primeiro
 packages/ui/src/visual/SeletorAgente.tsx — botão do agente na barra do topo com menu próprio no visual do menu do Callout (o select nativo abre com o visual do Windows); teclado completo
 packages/ui/src/visual/Historico.tsx — nova conversa e lista de sessões gravadas (a aberta marcada)
 packages/ui/src/visual/PainelPergunta.tsx — painel "pergunta" do ask_user_question, mostrado no modal: texto livre, uma escolha ou várias, sempre com Outra; Não responder cancela; revisão com a sua resposta
+packages/ui/src/visual/InfoResposta.tsx — botão de informações de uma resposta (na margem, ao lado do número): balão com data, agente, modelo, duração, tokens e custo
+packages/ui/src/visual/InfoResposta.test.ts — testes das linhas do balão
 packages/ui/src/visual/Pedidos.tsx — pedidos na conversa: BotaoPedido (âmbar pulsando enquanto espera, só contorno depois), ModalPedido (responder, minimizar, rever), resumo e numeração por tipo
 packages/ui/src/visual/Pedidos.test.ts — testes da numeração e do resumo
 packages/ui/src/paineis-nucleo.ts — registro dos painéis do núcleo (pergunta), que o front junta com os dos perfis

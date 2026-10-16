@@ -57,7 +57,7 @@ export type EventoNucleo =
 	| { tipo: "execucao_inicio" }
 	/** A sessão terminou de verdade (agent_settled): não vai continuar sozinha. */
 	| { tipo: "execucao_fim"; abortada: boolean }
-	| { tipo: "mensagem_usuario"; texto: string }
+	| { tipo: "mensagem_usuario"; texto: string; momento?: string }
 	| { tipo: "texto_delta"; delta: string }
 	| { tipo: "raciocinio_delta"; delta: string }
 	/** Mensagem do assistente concluída. `erro` vem quando o provedor falhou. */
@@ -68,6 +68,12 @@ export type EventoNucleo =
 			modelo: string;
 			motivoParada: string;
 			erro?: string;
+			/** Quando o pedido ao modelo começou (ISO 8601). */
+			momento?: string;
+			/** Quanto a resposta levou, em ms (o pi mede; falta em mensagens antigas). */
+			duracaoMs?: number;
+			/** Tokens e custo desta resposta. */
+			uso?: UsoModelo;
 	  }
 	/** `idPai` existe quando outra ferramenta fez a chamada (ctx.executeTool). */
 	| { tipo: "ferramenta_inicio"; id: string; nome: string; argumentos: unknown; idPai?: string }
@@ -93,7 +99,7 @@ export type EventoNucleo =
 
 /** Item do histórico de uma sessão, para mostrar a conversa ao reabrir. */
 export type ItemHistorico =
-	| { papel: "usuario"; texto: string }
+	| { papel: "usuario"; texto: string; momento?: string }
 	| {
 			papel: "assistente";
 			texto: string;
@@ -101,6 +107,12 @@ export type ItemHistorico =
 			modelo: string;
 			ferramentas: Array<{ id: string; nome: string; argumentos: unknown }>;
 			erro?: string;
+			/** Quando o pedido ao modelo começou (ISO 8601). */
+			momento?: string;
+			duracaoMs?: number;
+			uso?: UsoModelo;
+			/** Agente que respondeu (a entrada nucleo.agente vigente na hora). */
+			agente?: string;
 	  }
 	| { papel: "ferramenta"; id: string; nome: string; erro: boolean; resumo: string };
 
@@ -206,10 +218,12 @@ export function criarTradutorEventos(): (evento: AgentSessionEvent) => EventoNuc
 			case "message_end": {
 				const mensagem = evento.message;
 				if (mensagem.role === "user") {
-					return [{ tipo: "mensagem_usuario", texto: juntarBlocos(mensagem.content, "text") }];
+					const momento = momentoDe((mensagem as { timestamp?: unknown }).timestamp);
+					return [{ tipo: "mensagem_usuario", texto: juntarBlocos(mensagem.content, "text"), ...(momento ? { momento } : {}) }];
 				}
 				if (mensagem.role !== "assistant") return [];
 				const modelo = nomeModeloDaMensagem(mensagem);
+				const uso = lerUso(mensagem.usage);
 				const saida: EventoNucleo[] = [
 					{
 						tipo: "mensagem_assistente",
@@ -218,9 +232,9 @@ export function criarTradutorEventos(): (evento: AgentSessionEvent) => EventoNuc
 						modelo,
 						motivoParada: mensagem.stopReason,
 						...(mensagem.stopReason === "error" ? { erro: mensagem.errorMessage ?? "erro do provedor" } : {}),
+						...dadosDaResposta(mensagem, uso),
 					},
 				];
-				const uso = lerUso(mensagem.usage);
 				if (uso && (uso.tokensTotal > 0 || uso.custo > 0)) saida.push({ tipo: "uso", modelo, ...uso });
 				if (mensagem.stopReason === "error") {
 					saida.push({ tipo: "erro", origem: "modelo", mensagem: mensagem.errorMessage ?? "erro do provedor" });
@@ -288,12 +302,32 @@ export function criarTradutorEventos(): (evento: AgentSessionEvent) => EventoNuc
 	};
 }
 
-/** Converte as mensagens de uma sessão do pi no histórico genérico. */
-export function converterHistorico(mensagens: readonly MensagemPi[]): ItemHistorico[] {
+/** Momento ISO de um timestamp em ms, se ele for válido. */
+function momentoDe(timestamp: unknown): string | undefined {
+	return typeof timestamp === "number" && Number.isFinite(timestamp) && timestamp > 0 ? new Date(timestamp).toISOString() : undefined;
+}
+
+/** Momento, duração e uso de uma resposta do modelo, quando a mensagem os tem. */
+function dadosDaResposta(mensagem: { timestamp?: unknown; durationMs?: unknown }, uso: UsoModelo | undefined): { momento?: string; duracaoMs?: number; uso?: UsoModelo } {
+	const momento = momentoDe(mensagem.timestamp);
+	const duracaoMs = typeof mensagem.durationMs === "number" && Number.isFinite(mensagem.durationMs) ? mensagem.durationMs : undefined;
+	return {
+		...(momento ? { momento } : {}),
+		...(duracaoMs !== undefined ? { duracaoMs } : {}),
+		...(uso && (uso.tokensTotal > 0 || uso.custo > 0) ? { uso } : {}),
+	};
+}
+
+/**
+ * Converte as mensagens de uma sessão do pi no histórico genérico.
+ * `agentes`: agente de cada resposta, pelo timestamp da mensagem (agentesPorMomento, em sessoes.ts).
+ */
+export function converterHistorico(mensagens: readonly MensagemPi[], agentes?: ReadonlyMap<number, string>): ItemHistorico[] {
 	const historico: ItemHistorico[] = [];
 	for (const mensagem of mensagens) {
 		if (mensagem.role === "user") {
-			historico.push({ papel: "usuario", texto: juntarBlocos(mensagem.content, "text") });
+			const momento = momentoDe((mensagem as { timestamp?: unknown }).timestamp);
+			historico.push({ papel: "usuario", texto: juntarBlocos(mensagem.content, "text"), ...(momento ? { momento } : {}) });
 		} else if (mensagem.role === "assistant") {
 			const ferramentas: Array<{ id: string; nome: string; argumentos: unknown }> = [];
 			for (const bloco of mensagem.content) {
@@ -306,6 +340,8 @@ export function converterHistorico(mensagens: readonly MensagemPi[]): ItemHistor
 				modelo: nomeModeloDaMensagem(mensagem),
 				ferramentas,
 				...(mensagem.stopReason === "error" ? { erro: mensagem.errorMessage ?? "erro do provedor" } : {}),
+				...dadosDaResposta(mensagem, lerUso(mensagem.usage)),
+				...(agentes?.get(mensagem.timestamp) ? { agente: agentes.get(mensagem.timestamp)! } : {}),
 			});
 		} else if (mensagem.role === "toolResult") {
 			historico.push({

@@ -65,7 +65,7 @@ describe("criarTradutorEventos", () => {
 		const saida = entrada.flatMap((item) => traduzir(evento(item)));
 		expect(saida).toEqual<EventoNucleo[]>([
 			{ tipo: "execucao_inicio" },
-			{ tipo: "mensagem_usuario", texto: "O que é desvio padrão?" },
+			{ tipo: "mensagem_usuario", texto: "O que é desvio padrão?", momento: "1970-01-01T00:00:00.001Z" },
 			{ tipo: "raciocinio_delta", delta: "Preciso" },
 			{ tipo: "texto_delta", delta: "Vou " },
 			{
@@ -74,6 +74,15 @@ describe("criarTradutorEventos", () => {
 				raciocinio: "Preciso buscar.",
 				modelo: "openrouter/openai/gpt-6.1-sol",
 				motivoParada: "toolUse",
+				momento: "1970-01-01T00:00:00.001Z",
+				uso: {
+					tokensEntrada: 120,
+					tokensSaida: 30,
+					tokensCacheLeitura: 10,
+					tokensCacheEscrita: 0,
+					tokensTotal: 160,
+					custo: 0.003,
+				},
 			},
 			{
 				tipo: "uso",
@@ -115,6 +124,8 @@ describe("criarTradutorEventos", () => {
 				modelo: "openrouter/openai/gpt-6.1-sol",
 				motivoParada: "error",
 				erro: "401 Unauthorized",
+				// Uso zerado não vai junto; o momento, sim.
+				momento: "1970-01-01T00:00:00.001Z",
 			},
 			{ tipo: "erro", origem: "modelo", mensagem: "401 Unauthorized" },
 		]);
@@ -172,14 +183,24 @@ describe("converterHistorico", () => {
 				timestamp: 2,
 			},
 		] as unknown as AgentSession["messages"];
-		expect(converterHistorico(mensagens)).toEqual([
-			{ papel: "usuario", texto: "Oi" },
+		expect(converterHistorico(mensagens, new Map([[1, "professor"]]))).toEqual([
+			{ papel: "usuario", texto: "Oi", momento: "1970-01-01T00:00:00.001Z" },
 			{
 				papel: "assistente",
 				texto: "Vou buscar.",
 				raciocinio: "Preciso buscar.",
 				modelo: "openrouter/openai/gpt-6.1-sol",
 				ferramentas: [{ id: "c1", nome: "web_search", argumentos: { query: "desvio padrão" } }],
+				momento: "1970-01-01T00:00:00.001Z",
+				uso: {
+					tokensEntrada: 120,
+					tokensSaida: 30,
+					tokensCacheLeitura: 10,
+					tokensCacheEscrita: 0,
+					tokensTotal: 160,
+					custo: 0.003,
+				},
+				agente: "professor",
 			},
 			{ papel: "ferramenta", id: "c1", nome: "web_search", erro: false, resumo: "3 resultados" },
 		]);

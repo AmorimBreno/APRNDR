@@ -181,9 +181,10 @@ describe("JanelaPerfil sem rede", () => {
 
 		const aberta = await janela.iniciar({ sessaoId: id });
 		expect(aberta).toMatchObject({ sessaoId: id, arquivo, agente: "outro" });
-		expect(janela.historico()).toEqual([
+		// O agente de cada resposta vem da entrada nucleo.agente vigente na hora.
+		expect(janela.historico()).toMatchObject([
 			{ papel: "usuario", texto: "Pergunta antiga" },
-			{ papel: "assistente", texto: "Resposta antiga", raciocinio: "", modelo: "provedor-de-teste/modelo-de-teste", ferramentas: [] },
+			{ papel: "assistente", texto: "Resposta antiga", raciocinio: "", modelo: "provedor-de-teste/modelo-de-teste", ferramentas: [], agente: "outro" },
 		]);
 
 		// Troca de agente: mesma sessão, mesmo arquivo, conversa mantida, troca gravada.

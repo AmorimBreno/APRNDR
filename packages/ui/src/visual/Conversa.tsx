@@ -2,9 +2,10 @@
 // cada resposta é um bloco numerado, cada mensagem do usuário é uma nota
 // colada e cada ferramenta é uma linha técnica pequena entre eles.
 
-import { Icon, LessonBlock, StudentNote, Tag } from "@estudos/design-system";
+import { Icon, pad2, StudentNote, Tag } from "@estudos/design-system";
 import { type ReactNode, useEffect, useRef } from "react";
 import type { ChamadaFerramenta, ItemConversa } from "../estado-janela.ts";
+import { InfoResposta } from "./InfoResposta.tsx";
 import { Markdown } from "./Markdown.tsx";
 
 const decimal = new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -75,35 +76,44 @@ export function LinhaFerramenta({ chamada }: { chamada: ChamadaFerramenta }) {
 	);
 }
 
-type ItemAssistente = Extract<ItemConversa, { tipo: "assistente" }>;
+export type ItemAssistente = Extract<ItemConversa, { tipo: "assistente" }>;
 
 /** Mensagem do assistente que só chamou ferramentas: não vira bloco. */
 function semConteudo(item: ItemAssistente): boolean {
 	return !item.emAndamento && !item.texto && !item.raciocinio && !item.erro;
 }
 
-function BlocoResposta({ item, numero }: { item: ItemAssistente; numero: number }) {
+/**
+ * Uma resposta: o número e o botão de informações na margem, o autor em cima
+ * (a foto e o nome do agente) e o texto. Sem etiqueta: é óbvio que é uma
+ * resposta; tipos diferentes (Explicação, Exemplo…) virão com etiqueta.
+ */
+function BlocoResposta({ item, numero, autor }: { item: ItemAssistente; numero: number; autor?: ReactNode }) {
 	return (
-		<LessonBlock
-			index={numero}
-			label="Resposta"
-			writing={item.emAndamento}
-			actions={item.modelo ? <span className="bloco__modelo data">{item.modelo}</span> : undefined}
-		>
-			{item.raciocinio ? (
-				<details className="bloco__raciocinio" open={item.emAndamento && !item.texto}>
-					<summary className="overline">Raciocínio</summary>
-					<p className="body-sm">{item.raciocinio}</p>
-				</details>
-			) : null}
-			{item.texto ? <Markdown texto={item.texto} /> : null}
-			{item.erro ? (
-				<div className="aviso-erro" role="alert">
-					<span className="overline">Erro do modelo</span>
-					<p className="body">{item.erro}</p>
-				</div>
-			) : null}
-		</LessonBlock>
+		<section className={`ap-block bloco${item.emAndamento ? " ap-block--writing" : ""}`} aria-busy={item.emAndamento || undefined}>
+			<span className="bloco__margem">
+				<span className="data" aria-hidden="true">
+					{pad2(numero)}
+				</span>
+				<InfoResposta item={item} numero={numero} />
+			</span>
+			{autor ? <header className="bloco__autor">{autor}</header> : null}
+			<div className="ap-block__body ap-prose lesson-body">
+				{item.raciocinio ? (
+					<details className="bloco__raciocinio" open={item.emAndamento && !item.texto}>
+						<summary className="overline">Raciocínio</summary>
+						<p className="body-sm">{item.raciocinio}</p>
+					</details>
+				) : null}
+				{item.texto ? <Markdown texto={item.texto} /> : null}
+				{item.erro ? (
+					<div className="aviso-erro" role="alert">
+						<span className="overline">Erro do modelo</span>
+						<p className="body">{item.erro}</p>
+					</div>
+				) : null}
+			</div>
+		</section>
 	);
 }
 
@@ -118,10 +128,12 @@ export interface PropsDocumentoConversa {
 	pedidoDaChamada?(id: string): ReactNode | undefined;
 	/** Depois do último item (por exemplo, pedidos sem chamada na conversa). */
 	depois?: ReactNode;
+	/** O cabeçalho de cada resposta (a foto e o nome do agente). Sem ele, só o nome do agente. */
+	autorDaResposta?(item: ItemAssistente): ReactNode;
 }
 
 /** Coluna da conversa; rola até o fim quando chega algo novo. */
-export function DocumentoConversa({ conversa, vazio, pedidoDaChamada, depois }: PropsDocumentoConversa) {
+export function DocumentoConversa({ conversa, vazio, pedidoDaChamada, depois, autorDaResposta }: PropsDocumentoConversa) {
 	const fim = useRef<HTMLDivElement>(null);
 	useEffect(() => {
 		fim.current?.scrollIntoView({ block: "end" });
@@ -146,7 +158,8 @@ export function DocumentoConversa({ conversa, vazio, pedidoDaChamada, depois }: 
 				}
 				if (semConteudo(item)) return null;
 				numero += 1;
-				return <BlocoResposta key={item.chave} item={item} numero={numero} />;
+				const autor = autorDaResposta ? autorDaResposta(item) : item.agente ? <span className="bloco__nome body-strong">{item.agente}</span> : undefined;
+				return <BlocoResposta key={item.chave} item={item} numero={numero} autor={autor} />;
 			})}
 			{depois}
 			<div ref={fim} />

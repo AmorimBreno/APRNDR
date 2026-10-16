@@ -37,8 +37,18 @@ export interface ChamadaFerramenta {
 	duracaoMs?: number;
 }
 
+/** Tokens e custo de uma resposta (o UsoModelo do núcleo). */
+export interface UsoResposta {
+	tokensEntrada: number;
+	tokensSaida: number;
+	tokensCacheLeitura: number;
+	tokensCacheEscrita: number;
+	tokensTotal: number;
+	custo: number;
+}
+
 export type ItemConversa =
-	| { tipo: "usuario"; chave: string; texto: string }
+	| { tipo: "usuario"; chave: string; texto: string; momento?: string }
 	| {
 			tipo: "assistente";
 			chave: string;
@@ -48,6 +58,11 @@ export type ItemConversa =
 			erro?: string;
 			/** true enquanto os pedaços ainda estão chegando. */
 			emAndamento: boolean;
+			/** Para o botão de informações da resposta: quando começou (ISO), quanto levou, o uso e o agente. */
+			momento?: string;
+			duracaoMs?: number;
+			uso?: UsoResposta;
+			agente?: string;
 	  }
 	| { tipo: "ferramenta"; chave: string; chamada: ChamadaFerramenta };
 
@@ -246,9 +261,19 @@ function acrescentarDelta(estado: EstadoJanela, campo: "texto" | "raciocinio", d
 	return { ...estado, conversa: [...estado.conversa, item], contador };
 }
 
+/** Os dados da resposta para o botão de informações, sem campos vazios. */
+function dadosDaResposta(final: { momento?: string; duracaoMs?: number; uso?: UsoResposta; agente?: string }) {
+	return {
+		...(final.momento ? { momento: final.momento } : {}),
+		...(final.duracaoMs !== undefined ? { duracaoMs: final.duracaoMs } : {}),
+		...(final.uso ? { uso: final.uso } : {}),
+		...(final.agente ? { agente: final.agente } : {}),
+	};
+}
+
 function fecharAssistente(
 	estado: EstadoJanela,
-	final: { texto: string; raciocinio: string; modelo: string; erro?: string },
+	final: { texto: string; raciocinio: string; modelo: string; erro?: string; momento?: string; duracaoMs?: number; uso?: UsoResposta; agente?: string },
 ): EstadoJanela {
 	const vazia = !final.texto && !final.raciocinio && !final.erro;
 	const indice = indiceEmAndamento(estado.conversa);
@@ -263,6 +288,7 @@ function fecharAssistente(
 				raciocinio: final.raciocinio,
 				modelo: final.modelo || undefined,
 				...(final.erro ? { erro: final.erro } : {}),
+				...dadosDaResposta(final),
 				emAndamento: false,
 			}),
 		};
@@ -276,6 +302,7 @@ function fecharAssistente(
 		raciocinio: final.raciocinio,
 		...(final.modelo ? { modelo: final.modelo } : {}),
 		...(final.erro ? { erro: final.erro } : {}),
+		...dadosDaResposta(final),
 		emAndamento: false,
 	};
 	return { ...estado, conversa: [...estado.conversa, item], contador };
@@ -311,7 +338,7 @@ export function conversaDoHistorico(itens: ItemHistorico[], contadorInicial = 0)
 	const ferramentas = new Map<string, number>();
 	for (const item of itens) {
 		if (item.papel === "usuario") {
-			conversa.push({ tipo: "usuario", chave: `h${++contador}`, texto: item.texto });
+			conversa.push({ tipo: "usuario", chave: `h${++contador}`, texto: item.texto, ...(item.momento ? { momento: item.momento } : {}) });
 		} else if (item.papel === "assistente") {
 			if (item.texto || item.raciocinio || item.erro) {
 				conversa.push({
@@ -321,6 +348,7 @@ export function conversaDoHistorico(itens: ItemHistorico[], contadorInicial = 0)
 					raciocinio: item.raciocinio,
 					...(item.modelo ? { modelo: item.modelo } : {}),
 					...(item.erro ? { erro: item.erro } : {}),
+					...dadosDaResposta(item),
 					emAndamento: false,
 				});
 			}
@@ -371,7 +399,8 @@ function aplicarEvento(estado: EstadoJanela, evento: EventoNucleo): EstadoJanela
 
 		case "mensagem_usuario": {
 			const [nova, contador] = chave(estado, "u");
-			return { ...estado, conversa: [...estado.conversa, { tipo: "usuario", chave: nova, texto: evento.texto }], contador };
+			const item: ItemConversa = { tipo: "usuario", chave: nova, texto: evento.texto, ...(evento.momento ? { momento: evento.momento } : {}) };
+			return { ...estado, conversa: [...estado.conversa, item], contador };
 		}
 
 		case "texto_delta":
@@ -381,11 +410,13 @@ function aplicarEvento(estado: EstadoJanela, evento: EventoNucleo): EstadoJanela
 			return acrescentarDelta(estado, "raciocinio", evento.delta);
 
 		case "mensagem_assistente":
+			// O agente da resposta ao vivo é o da sessão agora.
 			return fecharAssistente(estado, {
 				texto: evento.texto,
 				raciocinio: evento.raciocinio,
 				modelo: evento.modelo,
 				...(evento.erro ? { erro: evento.erro } : {}),
+				...dadosDaResposta({ ...evento, ...(estado.sessao?.agente ? { agente: estado.sessao.agente } : {}) }),
 			});
 
 		case "ferramenta_inicio":

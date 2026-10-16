@@ -1,11 +1,18 @@
-// Tela inicial: um card quadrado por perfil, como a escolha de perfil de um
-// app de vídeo, no layout das telas de boot retrô (console no topo, a arte, o
-// nome grande, o ideograma com a tradução, a barra de carregar e o lema), com
-// os tokens do design system: cor chapada e contorno, sem brilho. A aparência
-// vem do campo aparencia do profile.json (capa, cor, lema, glifo).
+// Tela inicial: um card por perfil, como a escolha de perfil de um app de
+// vídeo, no layout das telas de boot retrô (a arte, o nome grande, o
+// ideograma com a tradução, a barra de carregar e o lema), com os tokens do
+// design system: cor chapada e contorno, sem brilho. A aparência vem do campo
+// aparencia do profile.json (capa, cor, lema, glifo).
+//
+// Tamanho: até 4 perfis ficam numa linha com a altura da tela; com 1 ou 2,
+// cada card tem metade da largura. Com mais de 4, quebram em linhas.
 
 import { EmptyState, Icon, ORNAMENT_MEANINGS, type OrnamentGlyph, pad2, Wordmark } from "@estudos/design-system";
 import { type ErroPerfil, type ResumoPerfil, usePerfis } from "@estudos/ui";
+import type { CSSProperties } from "react";
+
+/** Até quantos cards ficam numa linha só, com a altura da tela. */
+const LIMITE_NUMA_LINHA = 4;
 
 const mesAno = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" });
 
@@ -14,24 +21,11 @@ function glifoDe(perfil: ResumoPerfil): OrnamentGlyph {
 	return glifo && Object.hasOwn(ORNAMENT_MEANINGS, glifo) ? (glifo as OrnamentGlyph) : "学";
 }
 
-function CartaoPerfil({ perfil, posicao }: { perfil: ResumoPerfil; posicao: number }) {
+function CartaoPerfil({ perfil }: { perfil: ResumoPerfil }) {
 	const aparencia = perfil.aparencia ?? {};
 	const glifo = glifoDe(perfil);
-	const padrao = perfil.agentes.find((agente) => agente.nome === perfil.agentePadrao);
 	return (
 		<a className={`cartao cartao--${aparencia.cor ?? "amber"}`} href={`#/perfil/${encodeURIComponent(perfil.id)}`}>
-			<div className="cartao__console data" aria-hidden="true">
-				<span>
-					&gt; Perfil {pad2(posicao)} · {pad2(perfil.agentes.length)} {perfil.agentes.length === 1 ? "agente" : "agentes"}:{" "}
-					<em>{perfil.agentes.map((agente) => agente.nome).join(", ")}</em>
-				</span>
-				{padrao?.modelo ? (
-					<span>
-						&gt; Modelo: <em>{padrao.modelo.replace(/^openrouter\//, "")}</em>
-					</span>
-				) : null}
-			</div>
-
 			<div className="cartao__arte">
 				{aparencia.capa ? (
 					<img src={aparencia.capa} alt="" draggable={false} />
@@ -70,9 +64,9 @@ function CartaoPerfil({ perfil, posicao }: { perfil: ResumoPerfil; posicao: numb
 function CartaoErro({ invalido }: { invalido: ErroPerfil }) {
 	return (
 		<div className="cartao cartao--erro" role="group" aria-label="Perfil com erro">
-			<div className="cartao__console data">
-				<span>&gt; Erro no profile.json</span>
-				<span className="cartao__arquivo">{invalido.arquivo}</span>
+			<div className="cartao__erro-cabeca">
+				<span className="overline">Erro no profile.json</span>
+				<span className="cartao__arquivo data">{invalido.arquivo}</span>
 			</div>
 			<p className="cartao__mensagem code">{invalido.mensagem}</p>
 			<div className="cartao__nome">
@@ -90,6 +84,7 @@ export function TelaPerfis() {
 	const { lista, erro, carregando, recarregar } = usePerfis();
 	const perfis = lista?.perfis ?? [];
 	const invalidos = lista?.erros ?? [];
+	const cartoes = perfis.length + invalidos.length;
 
 	let corpo;
 	if (erro) {
@@ -112,9 +107,13 @@ export function TelaPerfis() {
 		);
 	} else {
 		corpo = (
-			<nav className="perfis__grade" aria-label="Perfis">
-				{perfis.map((perfil, indice) => (
-					<CartaoPerfil key={perfil.id} perfil={perfil} posicao={indice + 1} />
+			<nav
+				className={`perfis__grade${cartoes > LIMITE_NUMA_LINHA ? " perfis__grade--varias-linhas" : ""}`}
+				style={{ "--colunas": Math.min(Math.max(cartoes, 2), LIMITE_NUMA_LINHA) } as CSSProperties}
+				aria-label="Perfis"
+			>
+				{perfis.map((perfil) => (
+					<CartaoPerfil key={perfil.id} perfil={perfil} />
 				))}
 				{invalidos.map((invalido) => (
 					<CartaoErro key={invalido.arquivo} invalido={invalido} />

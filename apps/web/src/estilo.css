@@ -7,20 +7,25 @@ html, body, #raiz { height: 100%; }
 
 /* ── Tela de perfis: um card quadrado por perfil ── */
 
-.perfis { display: flex; flex-direction: column; gap: var(--space-8); min-height: 100%; padding: var(--space-8) var(--space-8) var(--space-12); box-sizing: border-box; }
-.perfis__cabeca { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-4); max-width: 1264px; width: 100%; margin: 0 auto; }
+.perfis { display: flex; flex-direction: column; gap: var(--space-6); height: 100%; padding: var(--space-6) var(--space-8) var(--space-8); box-sizing: border-box; }
+.perfis__cabeca { flex: none; display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-4); }
 .perfis__marca { display: flex; flex-direction: column; gap: var(--space-2); }
 .perfis__marca h1 { margin: 0; color: var(--ink-muted); }
 .perfis__recarregar { display: inline-flex; align-items: center; gap: var(--space-2); height: var(--control-md); padding: 0 var(--space-4); border: var(--border-control) solid var(--line-strong); border-radius: var(--radius-md); background: transparent; color: var(--ink); cursor: pointer; }
 .perfis__recarregar:hover { background: var(--surface-hover); }
 .perfis__recarregar:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-.perfis__corpo { width: 100%; max-width: 1264px; margin: 0 auto; }
+.perfis__corpo { flex: 1; min-height: 0; overflow-y: auto; }
 .perfis__carregando { display: flex; align-items: center; gap: var(--space-3); color: var(--ink-muted); }
-.perfis__grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: var(--space-4); }
+/* Até 4 cards numa linha, com a altura toda; --colunas = max(cards, 2), então 1 ou 2 cards têm
+ * metade da largura cada (um só fica no meio). Com mais de 4, quebram em linhas na proporção 4:5. */
+.perfis__grade { --colunas: 2; display: flex; justify-content: center; gap: var(--space-4); height: 100%; }
+.perfis__grade > .cartao { flex: 0 0 calc((100% - (var(--colunas) - 1) * var(--space-4)) / var(--colunas)); min-height: 0; }
+.perfis__grade--varias-linhas { flex-wrap: wrap; height: auto; }
+.perfis__grade--varias-linhas > .cartao { aspect-ratio: 4 / 5; }
 
-/* O card (4:5, para a arte ter espaço): a moldura na cor do perfil, o console no topo, a arte no papel, o nome grande,
+/* O card: a moldura na cor do perfil, a arte no papel, o nome grande (escala com a largura do card),
  * a barra que enche no hover (o "carregando" da tela de boot) e o pé com o lema e o selo. */
-.cartao { --cor: var(--amber); --on-cor: var(--on-amber); position: relative; display: flex; flex-direction: column; gap: var(--space-3); aspect-ratio: 4 / 5; min-width: 0; padding: var(--space-5); border: var(--border-strong) solid var(--cor); border-radius: var(--radius-lg); background: var(--surface-panel); color: var(--ink); text-decoration: none; overflow: hidden; transition: background-color .24s ease-out; }
+.cartao { --cor: var(--amber); --on-cor: var(--on-amber); position: relative; box-sizing: border-box; container-type: inline-size; display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; padding: var(--space-6); border: var(--border-strong) solid var(--cor); border-radius: var(--radius-lg); background: var(--surface-panel); color: var(--ink); text-decoration: none; overflow: hidden; transition: background-color .24s ease-out; }
 .cartao--amber { --cor: var(--amber); --on-cor: var(--on-amber); }
 .cartao--brick { --cor: var(--brick); --on-cor: var(--on-brick); }
 .cartao--sage { --cor: var(--sage); --on-cor: var(--on-sage); }
@@ -30,17 +35,13 @@ html, body, #raiz { height: 100%; }
 a.cartao:hover { background: var(--surface-raised); }
 a.cartao:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 
-.cartao__console { display: flex; flex-direction: column; gap: 2px; min-width: 0; color: var(--ink-muted); font-size: 12px; line-height: 18px; }
-.cartao__console > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.cartao__console em { font-style: normal; color: var(--ink); }
-
 .cartao__arte { position: relative; flex: 1; display: grid; place-items: center; min-height: 0; border-radius: var(--radius-md); background: var(--paper); overflow: hidden; }
 /* Desenho de traço com fundo branco: no papel, o branco vira papel (o manual pede papel quente, nunca #fff). */
 .cartao__arte img { position: absolute; inset: var(--space-3); width: calc(100% - 2 * var(--space-3)); height: calc(100% - 2 * var(--space-3)); object-fit: contain; mix-blend-mode: multiply; user-select: none; }
 .cartao__glifo { font-family: var(--font-ornament); font-size: 120px; line-height: 1; color: var(--on-paper); }
 
 .cartao__nome { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.cartao__titulo { overflow: hidden; font-family: var(--font-display); font-size: 44px; line-height: 44px; font-weight: 800; letter-spacing: -0.02em; text-transform: uppercase; white-space: nowrap; text-overflow: ellipsis; }
+.cartao__titulo { overflow: hidden; font-family: var(--font-display); font-size: clamp(28px, 9.5cqi, 80px); line-height: 1; font-weight: 800; letter-spacing: -0.02em; text-transform: uppercase; white-space: nowrap; text-overflow: ellipsis; }
 .cartao__titulo--menor { font-size: 28px; line-height: 32px; }
 .cartao__legenda { display: flex; align-items: baseline; gap: var(--space-2); color: var(--ink-muted); }
 .cartao__legenda [lang="ja"] { font-family: var(--font-ornament); font-size: 18px; color: var(--ink); }
@@ -58,12 +59,15 @@ a.cartao:hover .cartao__carregar .overline, a.cartao:focus-visible .cartao__carr
 
 .cartao--erro { --cor: var(--brick); border-style: dashed; }
 .cartao--erro .cartao__pe { color: var(--brick-text); }
-.cartao__arquivo { color: var(--ink-subtle); }
+.cartao__erro-cabeca { display: flex; flex-direction: column; gap: var(--space-1); color: var(--brick-text); }
+.cartao__arquivo { color: var(--ink-muted); overflow-wrap: anywhere; }
 .cartao__mensagem { flex: 1; min-height: 0; margin: 0; overflow-y: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink-muted); }
 
-@media (max-width: 560px) {
-	.perfis { padding: var(--space-5) var(--space-4) var(--space-8); }
-	.cartao__titulo { font-size: 34px; line-height: 36px; }
+@media (max-width: 760px) {
+	.perfis { height: auto; min-height: 100%; padding: var(--space-5) var(--space-4) var(--space-8); }
+	.perfis__corpo { overflow: visible; }
+	.perfis__grade { flex-direction: column; height: auto; }
+	.perfis__grade > .cartao { flex: none; aspect-ratio: 4 / 5; }
 }
 
 @media (prefers-reduced-motion: reduce) {

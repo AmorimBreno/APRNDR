@@ -95,14 +95,27 @@ export function useJanelaPerfil(perfilId: string, cliente: ClienteConexao = obte
 	useEffect(() => {
 		const abrir = () => {
 			const sessaoId = sessaoAberta.current;
-			pedir({ tipo: "abrir_perfil", perfil: perfilId, ...(sessaoId ? { sessaoId } : {}) }).catch(() => {
-				// O erro já está em estado.erros. Se a sessão guardada não abriu
-				// (por exemplo, nova e ainda sem mensagem, então fora do disco),
-				// abre o perfil sem ela.
-				if (!sessaoId || cliente.estado !== "aberta") return;
-				sessaoAberta.current = undefined;
+			if (!sessaoId) {
 				pedir({ tipo: "abrir_perfil", perfil: perfilId }).catch(() => {});
-			});
+				return;
+			}
+			// Com a sessão guardada: ela pode não existir em disco (nova e ainda
+			// sem mensagem). Esse erro é esperado, então só aparece se abrir o
+			// perfil sem ela também falhar.
+			const pedido = { tipo: "abrir_perfil", perfil: perfilId, sessaoId } as const;
+			cliente.pedir(pedido).then(
+				(dados) => despachar({ tipo: "resposta", pedido: pedido.tipo, ok: true, dados }),
+				(erro: unknown) => {
+					if (cliente.estado !== "aberta") {
+						despachar({ tipo: "resposta", pedido: pedido.tipo, ok: false, erro: erro instanceof Error ? erro.message : String(erro) });
+						return;
+					}
+					sessaoAberta.current = undefined;
+					pedir({ tipo: "abrir_perfil", perfil: perfilId }).catch(() => {
+						despachar({ tipo: "resposta", pedido: pedido.tipo, ok: false, erro: erro instanceof Error ? erro.message : String(erro) });
+					});
+				},
+			);
 		};
 		const pararMensagens = cliente.aoReceber((mensagem) => {
 			// As respostas dos pedidos deste hook são despachadas por pedir().

@@ -24,8 +24,8 @@
 // falhar, a antiga continua valendo (só a resposta em andamento foi abortada).
 //
 // Extensões do núcleo em toda sessão principal: a ponte de eventos (ponte.ts,
-// com responder e acaoDaInterface aqui) e a ferramenta subagent
-// (subagentes.ts), além das que vierem em opcoes.extensoesNucleo. As sessões
+// com responder e acaoDaInterface aqui), a ferramenta ask_user_question
+// (pergunta.ts) e a ferramenta subagent (subagentes.ts), além das que vierem em opcoes.extensoesNucleo. As sessões
 // filhas dos subagentes não recebem nenhuma delas.
 
 import { existsSync } from "node:fs";
@@ -71,6 +71,7 @@ import {
 	type ResumoSessao,
 	TIPO_ENTRADA_AGENTE,
 } from "./sessoes.ts";
+import { criarExtensaoPergunta } from "./pergunta.ts";
 import { criarExtensaoSubagente } from "./subagentes.ts";
 
 export interface OpcoesJanelaPerfil {
@@ -500,6 +501,7 @@ export class JanelaPerfil {
 		const ponte = new PonteSessao((evento) => this.emitir(evento));
 		const extensoesNucleo = [
 			ponte.extensao,
+			criarExtensaoPergunta(),
 			criarExtensaoSubagente({
 				perfil,
 				pastaPi: this.pastaPi,

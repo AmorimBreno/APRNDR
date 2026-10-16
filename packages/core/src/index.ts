@@ -7,6 +7,7 @@ export * from "./janela-perfil.ts";
 export * from "./modelos.ts";
 export * from "./montagem.ts";
 export * from "./perfis.ts";
+export * from "./pergunta.ts";
 export * from "./ponte.ts";
 export * from "./protocolo.ts";
 export * from "./sessoes.ts";

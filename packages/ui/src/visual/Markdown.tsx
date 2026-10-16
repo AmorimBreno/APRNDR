@@ -18,9 +18,13 @@ const componentes: Components = {
 	a: ({ node: _node, ...props }) => <a {...props} target="_blank" rel="noreferrer" />,
 };
 
-export function Markdown({ texto }: { texto: string }) {
+// Em linha (rótulos de opção, enunciados curtos): os parágrafos viram texto solto.
+const componentesEmLinha: Components = { ...componentes, p: ({ children }) => <>{children}</> };
+
+/** `emLinha`: sem os parágrafos, para caber num rótulo. */
+export function Markdown({ texto, emLinha = false }: { texto: string; emLinha?: boolean }) {
 	return (
-		<ReactMarkdown remarkPlugins={pluginsRemark} rehypePlugins={pluginsRehype} components={componentes}>
+		<ReactMarkdown remarkPlugins={pluginsRemark} rehypePlugins={pluginsRehype} components={emLinha ? componentesEmLinha : componentes}>
 			{texto}
 		</ReactMarkdown>
 	);

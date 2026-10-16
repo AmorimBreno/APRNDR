@@ -14,4 +14,6 @@ export * from "./visual/BarraPergunta.tsx";
 export * from "./visual/Conversa.tsx";
 export * from "./visual/Historico.tsx";
 export * from "./visual/Markdown.tsx";
+export * from "./visual/PainelPergunta.tsx";
+export * from "./paineis-nucleo.ts";
 export * from "./visual/SeletorModelo.tsx";

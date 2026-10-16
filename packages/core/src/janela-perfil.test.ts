@@ -160,11 +160,11 @@ describe("JanelaPerfil sem rede", () => {
 		// Sessão vazia ainda não tem arquivo; trocar de agente começa outra.
 		const outro = await janela.trocarAgente("outro");
 		expect(outro.agente).toBe("outro");
-		// Sem ferramentas declaradas: as do pi e a subagent do núcleo; a das sessões filhas não entra.
-		expect(outro.ferramentas).toEqual(["read", "bash", "edit", "write", "subagent"]);
+		// Sem ferramentas declaradas: as do pi, a ask_user_question e a subagent do núcleo; a das sessões filhas não entra.
+		expect(outro.ferramentas).toEqual(["read", "bash", "edit", "write", "ask_user_question", "subagent"]);
 		expect(janela.sessaoPi?.getAllTools().map((ferramenta) => ferramenta.name)).not.toContain("ferramenta_filha");
 		expect(janela.sessaoPi?.resourceLoader.getExtensions().extensions.map((extensao) => extensao.path)).toEqual(
-			expect.arrayContaining(["<inline:nucleo-ponte>", "<inline:nucleo-subagente>"]),
+			expect.arrayContaining(["<inline:nucleo-ponte>", "<inline:nucleo-pergunta>", "<inline:nucleo-subagente>"]),
 		);
 		expect(janela.promptSistema).toContain("Delegate a self-contained task to a specialist subagent (geral)");
 		expect(outro.skills).toEqual(["skill-a", "skill-b"]);

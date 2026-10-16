@@ -16,6 +16,9 @@ import type { EstadoSessao, EventoNucleo, ItemHistorico } from "./eventos.ts";
 import type { InfoModelo } from "./modelos.ts";
 import type { ResumoSessao } from "./sessoes.ts";
 
+// Formato do pedido e da resposta do painel "pergunta" (ask_user_question).
+export type { DadosPedidoPergunta, ModoPergunta, OpcaoPergunta, RespostaPergunta } from "./pergunta.ts";
+
 const texto = z.string().min(1);
 /** Correlaciona a mensagem com a "resposta" do servidor. */
 const pedidoId = z.string().min(1).optional();

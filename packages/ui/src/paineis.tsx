@@ -145,13 +145,18 @@ export interface PropsAreaPaineis {
 	acaoDaInterface(painel: string, acao: string, dados?: unknown): Promise<void>;
 }
 
-/** Ids a mostrar: os do perfil e, depois, os que receberam ação ou pedido sem estar na lista. */
+/**
+ * Ids a mostrar: os do perfil e, depois, os que receberam ação ou pedido sem
+ * estar na lista. Os que esperam resposta do usuário sobem para o topo, na
+ * mesma ordem entre si.
+ */
 export function idsDosPaineis(paineis: string[], acoesPorPainel: Record<string, unknown>, pedidos: PedidoPendente[]): string[] {
 	const ids = [...paineis];
 	for (const id of [...Object.keys(acoesPorPainel), ...pedidos.map((pedido) => pedido.painel)]) {
 		if (!ids.includes(id)) ids.push(id);
 	}
-	return ids;
+	const esperando = new Set(pedidos.map((pedido) => pedido.painel));
+	return [...ids.filter((id) => esperando.has(id)), ...ids.filter((id) => !esperando.has(id))];
 }
 
 const semCancelados: Record<string, MotivoCancelamento> = {};

@@ -22,6 +22,7 @@ describe("mensagens válidas do cliente", () => {
 		{ tipo: "recarregar_perfil", perfil: "estudos" },
 		{ tipo: "responder_pedido", perfil: "estudos", id: "p1", dados: { escolha: 2 } },
 		{ tipo: "responder_pedido", perfil: "estudos", id: "p1" },
+		{ tipo: "cancelar_pedido", perfil: "estudos", id: "p1" },
 		{ tipo: "acao_interface", perfil: "estudos", painel: "teste", acao: "clicou", dados: null },
 	];
 

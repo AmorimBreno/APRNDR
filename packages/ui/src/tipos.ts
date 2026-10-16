@@ -5,7 +5,16 @@
 
 import type { DadosResposta, MensagemServidor } from "@estudos/core/protocolo";
 
-export type { DadosResposta, MensagemCliente, MensagemServidor, TipoMensagemCliente } from "@estudos/core/protocolo";
+export type {
+	DadosPedidoPergunta,
+	DadosResposta,
+	MensagemCliente,
+	MensagemServidor,
+	ModoPergunta,
+	OpcaoPergunta,
+	RespostaPergunta,
+	TipoMensagemCliente,
+} from "@estudos/core/protocolo";
 
 export type EventoNucleo = Extract<MensagemServidor, { tipo: "evento" }>["evento"];
 export type ItemHistorico = Extract<MensagemServidor, { tipo: "historico" }>["itens"][number];

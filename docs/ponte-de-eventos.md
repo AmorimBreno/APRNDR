@@ -103,6 +103,13 @@ export default function (pi: ExtensionAPI) {
 ```
 
 
+## Ferramentas que já usam a ponte
+
+- ask_user_question (núcleo, packages/core/src/pergunta.ts): pedido "perguntar" no painel "pergunta", com `{ question, details, mode, options, otherLabel }`; a interface responde `{ escolhas, outra, texto }`. O painel é do @estudos/ui e vale para qualquer perfil.
+- quiz (perfil de estudos, profiles/estudos/extensions/quiz-web.ts): pedido "perguntar" no painel "quiz", sem o gabarito; a interface responde `{ escolhas, naoSei, nota }`; depois de corrigir, a ferramenta manda "resultado" por "interface:mostrar" com o gabarito e a explicação.
+- mostrar_painel_teste e perguntar_no_painel_teste (profiles/estudos/extensions/painel-teste.ts): teste da ponte no painel "teste".
+
+
 ## Lado do núcleo (para o servidor e o front)
 
 - A JanelaPerfil emite `acao_interface`, `pedido_interface` e `pedido_interface_cancelado` junto com os outros eventos (EventoNucleo, packages/core/src/eventos.ts).

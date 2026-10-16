@@ -5,6 +5,62 @@
 /* Fórmulas do Markdown (rehype-katex). */
 @import "katex/dist/katex.min.css";
 
+/* ── Tela com a faixa da marca e a folha de papel (FaixaMarca; carregamento, cadernos) ── */
+
+.tela { display: grid; grid-template-columns: var(--menu-rail) minmax(0, 1fr); gap: var(--space-4); height: 100%; padding: var(--space-4); box-sizing: border-box; }
+
+.faixa { display: flex; flex-direction: column; justify-content: space-between; gap: var(--space-6); min-height: 0; padding: 28px var(--space-6) var(--space-6); border-radius: var(--radius-xl); background: var(--surface-panel); overflow: hidden; }
+.faixa__topo { display: flex; flex-direction: column; gap: 10px; }
+.faixa__topo .overline { color: var(--ink-muted); }
+.faixa__ornamento { align-self: center; }
+.faixa__pe { display: flex; flex-direction: column; gap: var(--space-5); }
+
+.folha { display: flex; flex-direction: column; min-height: 0; overflow: hidden; border-radius: var(--radius-xl); background: var(--paper); color: var(--on-paper); }
+.folha__cabeca, .folha__pe { flex: none; display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding: 20px var(--space-8) var(--space-4); }
+.folha__cabeca { border-bottom: var(--border-strong) solid var(--on-paper); }
+.folha__pe { margin-top: auto; padding: 14px var(--space-8); border-top: var(--border-strong) solid var(--on-paper); }
+.folha__cabeca .overline, .folha__pe .overline { color: var(--on-paper-muted); }
+.folha__corpo { flex: 1; min-height: 0; overflow-y: auto; }
+.folha__aviso { display: flex; flex-direction: column; gap: var(--space-3); max-width: 560px; padding: var(--space-8); }
+.folha__aviso p { margin: 0; }
+.folha__secao { padding: var(--space-6) var(--space-8) var(--space-2); color: var(--on-paper-muted); }
+
+/* Tecla de papel: o botão sobre a folha (o Button do design system é para o fundo escuro). */
+.tecla-papel { display: inline-flex; align-items: center; gap: var(--space-2); height: var(--control-md); padding: 0 var(--space-4) 2px; border: var(--border-control) solid var(--on-paper); border-radius: var(--radius-md); background: var(--paper); color: var(--on-paper); box-shadow: var(--key-lip); cursor: pointer; }
+.tecla-papel:hover { background: var(--paper-hover); }
+.tecla-papel:active { transform: translateY(1px); box-shadow: var(--key-lip-pressed); }
+.tecla-papel:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+/* Linha de perfil: como a linha da lista de cadernos; a escolhida (hover ou foco) fica tijolo. */
+.linha { display: flex; align-items: center; gap: var(--space-6); height: var(--wheel-row); padding: 0 var(--space-8); border-bottom: var(--border-hair) solid var(--paper-line); color: var(--on-paper); text-decoration: none; transition: background-color .24s ease-out, color .24s ease-out; }
+a.linha:hover, a.linha:focus-visible { outline: none; border-bottom-color: var(--brick); background: var(--brick); color: var(--on-brick); }
+.linha__numero { flex: none; width: 96px; }
+.linha__texto { flex: 1; display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.linha__texto .overline { color: var(--on-paper-muted); }
+a.linha:hover .linha__texto .overline, a.linha:focus-visible .linha__texto .overline { color: inherit; }
+.linha__titulo { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.linha__lado { flex: none; display: flex; align-items: center; gap: var(--space-4); }
+.linha__abrir { display: inline-flex; align-items: center; gap: var(--space-2); height: var(--control-md); padding: 0 var(--space-4) 2px; border-radius: var(--radius-md); background: var(--paper); color: var(--on-paper); box-shadow: var(--key-lip); }
+
+.linha--erro { align-items: flex-start; height: auto; padding-top: var(--space-5); padding-bottom: var(--space-5); }
+.linha--erro .linha__numero { color: var(--brick); }
+.linha__arquivo { color: var(--on-paper-muted); overflow-wrap: anywhere; }
+.linha--inativa { color: var(--on-paper-muted); cursor: default; }
+.linha--inativa .linha__numero { display: grid; place-items: center; width: 72px; height: 96px; border: var(--border-strong) dashed currentColor; border-radius: 3px 9px 9px 3px; }
+.linha__erro { margin: var(--space-2) 0 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--on-paper); }
+
+@media (max-width: 900px) {
+	.tela { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+	.faixa { flex-direction: row; align-items: center; padding: var(--space-5) var(--space-6); }
+	.faixa__ornamento, .faixa__pe .ap-stat { display: none; }
+	.linha { gap: var(--space-4); padding: 0 var(--space-5); }
+	.linha__numero { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.linha { transition: none; }
+}
+
 /* ── Aviso de erro (tijolo claro, texto ink) ── */
 
 .aviso-erro { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4) var(--space-5); border-left: var(--border-strong) solid var(--brick); border-radius: var(--radius-sm); background: var(--brick-tint); color: var(--ink); }

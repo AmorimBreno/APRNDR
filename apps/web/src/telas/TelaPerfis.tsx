@@ -1,60 +1,87 @@
-// Tela inicial: a faixa da marca e, na folha de papel, a lista de perfis
-// (GET /api/perfis). Perfis inválidos aparecem no fim, com o erro.
+// Tela inicial: um card quadrado por perfil, como a escolha de perfil de um
+// app de vídeo, no layout das telas de boot retrô (console no topo, a arte, o
+// nome grande, o ideograma com a tradução, a barra de carregar e o lema), com
+// os tokens do design system: cor chapada e contorno, sem brilho. A aparência
+// vem do campo aparencia do profile.json (capa, cor, lema, glifo).
 
-import { Icon, pad2, Stat, Tag } from "@estudos/design-system";
+import { EmptyState, Icon, ORNAMENT_MEANINGS, type OrnamentGlyph, pad2, Wordmark } from "@estudos/design-system";
 import { type ErroPerfil, type ResumoPerfil, usePerfis } from "@estudos/ui";
-import { FaixaMarca } from "./FaixaMarca.tsx";
 
 const mesAno = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" });
 
-function plural(n: number, um: string, varios: string): string {
-	return `${pad2(n)} ${n === 1 ? um : varios}`;
+function glifoDe(perfil: ResumoPerfil): OrnamentGlyph {
+	const glifo = perfil.aparencia?.glifo;
+	return glifo && Object.hasOwn(ORNAMENT_MEANINGS, glifo) ? (glifo as OrnamentGlyph) : "学";
 }
 
-function LinhaPerfil({ perfil, posicao }: { perfil: ResumoPerfil; posicao: number }) {
-	const detalhes = [
-		`Perfil ${pad2(posicao)}`,
-		plural(perfil.agentes.length, "agente", "agentes"),
-		plural(perfil.paineis.length, "painel", "painéis"),
-	].join(" · ");
+function CartaoPerfil({ perfil, posicao }: { perfil: ResumoPerfil; posicao: number }) {
+	const aparencia = perfil.aparencia ?? {};
+	const glifo = glifoDe(perfil);
+	const padrao = perfil.agentes.find((agente) => agente.nome === perfil.agentePadrao);
 	return (
-		<a className="linha" href={`#/perfil/${encodeURIComponent(perfil.id)}`}>
-			<span className="linha__numero display-lg" aria-hidden="true">
-				{pad2(posicao)}
-			</span>
-			<span className="linha__texto">
-				<span className="overline">{detalhes}</span>
-				<span className="linha__titulo display-md">{perfil.nome}</span>
-			</span>
-			<span className="linha__lado">
-				{perfil.aberto ? (
-					<Tag tone="sage" dot>
-						Aberto
-					</Tag>
-				) : null}
-				<span className="linha__abrir button">
-					Abrir <Icon name="arrow-right" size={18} strokeWidth={2.25} />
+		<a className={`cartao cartao--${aparencia.cor ?? "amber"}`} href={`#/perfil/${encodeURIComponent(perfil.id)}`}>
+			<div className="cartao__console data" aria-hidden="true">
+				<span>
+					&gt; Perfil {pad2(posicao)} · {pad2(perfil.agentes.length)} {perfil.agentes.length === 1 ? "agente" : "agentes"}:{" "}
+					<em>{perfil.agentes.map((agente) => agente.nome).join(", ")}</em>
 				</span>
-			</span>
+				{padrao?.modelo ? (
+					<span>
+						&gt; Modelo: <em>{padrao.modelo.replace(/^openrouter\//, "")}</em>
+					</span>
+				) : null}
+			</div>
+
+			<div className="cartao__arte">
+				{aparencia.capa ? (
+					<img src={aparencia.capa} alt="" draggable={false} />
+				) : (
+					<span className="cartao__glifo" lang="ja" aria-hidden="true">
+						{glifo}
+					</span>
+				)}
+			</div>
+
+			<div className="cartao__nome">
+				<span className="cartao__titulo">{perfil.nome}</span>
+				<span className="cartao__legenda">
+					<span lang="ja">{glifo}</span>
+					<span className="overline">{ORNAMENT_MEANINGS[glifo]}</span>
+				</span>
+			</div>
+
+			<div className="cartao__carregar">
+				<span className="overline">{perfil.aberto ? "Continuar" : "Abrir perfil"}</span>
+				<span className="cartao__trilho" aria-hidden="true">
+					<span className="cartao__enchimento" />
+				</span>
+			</div>
+
+			<div className="cartao__pe">
+				<span className="data">{aparencia.lema ? `“${aparencia.lema}”` : perfil.aberto ? "Aberto agora" : ""}</span>
+				<span className="cartao__selo" lang="ja" aria-hidden="true">
+					{glifo.charAt(0)}
+				</span>
+			</div>
 		</a>
 	);
 }
 
-function LinhaErro({ invalido }: { invalido: ErroPerfil }) {
+function CartaoErro({ invalido }: { invalido: ErroPerfil }) {
 	return (
-		<div className="linha linha--erro">
-			<span className="linha__numero">
-				<Icon name="alert" size={40} strokeWidth={2.5} label="Erro" />
-			</span>
-			<span className="linha__texto">
-				<span className="linha__arquivo data">{invalido.arquivo}</span>
-				<p className="linha__erro code">{invalido.mensagem}</p>
-			</span>
-			<span className="linha__lado">
-				<Tag tone="brick" icon="alert">
-					Inválido
-				</Tag>
-			</span>
+		<div className="cartao cartao--erro" role="group" aria-label="Perfil com erro">
+			<div className="cartao__console data">
+				<span>&gt; Erro no profile.json</span>
+				<span className="cartao__arquivo">{invalido.arquivo}</span>
+			</div>
+			<p className="cartao__mensagem code">{invalido.mensagem}</p>
+			<div className="cartao__nome">
+				<span className="cartao__titulo cartao__titulo--menor">Perfil com erro</span>
+			</div>
+			<div className="cartao__pe">
+				<span className="data">Corrija o arquivo e recarregue</span>
+				<Icon name="alert" size={22} strokeWidth={2.5} />
+			</div>
 		</div>
 	);
 }
@@ -67,77 +94,48 @@ export function TelaPerfis() {
 	let corpo;
 	if (erro) {
 		corpo = (
-			<div className="folha__aviso" role="alert">
-				<h2 className="display-sm" style={{ margin: 0 }}>
-					Servidor fora do ar
-				</h2>
-				<p className="body-lg">Não consegui ler a lista de perfis. Confira se o app está rodando (pnpm dev) e tente de novo.</p>
-				<p className="code" style={{ color: "var(--on-paper-muted)" }}>
-					{erro}
-				</p>
-			</div>
+			<EmptyState glyph="問" tone="brick" title="Servidor fora do ar" role="alert">
+				Não consegui ler a lista de perfis. Confira se o app está rodando (pnpm dev) e tente de novo. {erro}
+			</EmptyState>
 		);
 	} else if (!lista) {
 		corpo = (
-			<div className="folha__aviso">
-				<p className="overline" style={{ display: "flex", alignItems: "center", gap: 12 }}>
-					Carregando perfis <span className="ap-cursor" aria-hidden="true" />
-				</p>
-			</div>
+			<p className="perfis__carregando overline">
+				Carregando perfis <span className="ap-cursor" aria-hidden="true" />
+			</p>
+		);
+	} else if (perfis.length === 0 && invalidos.length === 0) {
+		corpo = (
+			<EmptyState glyph="始" tone="moss" title="Nenhum perfil ainda">
+				Perfis ficam em profiles/&lt;id&gt;/profile.json. Cada um define os agentes, as ferramentas e os painéis de um jeito de usar o app.
+			</EmptyState>
 		);
 	} else {
 		corpo = (
-			<>
-				{perfis.length === 0 ? (
-					<div className="folha__aviso">
-						<h2 className="display-sm" style={{ margin: 0 }}>
-							Nenhum perfil ainda
-						</h2>
-						<p className="body-lg">
-							Perfis ficam em profiles/&lt;id&gt;/profile.json. Cada um define os agentes, as ferramentas e os painéis de um jeito de usar o
-							app.
-						</p>
-					</div>
-				) : (
-					<nav aria-label="Perfis">
-						{perfis.map((perfil, indice) => (
-							<LinhaPerfil key={perfil.id} perfil={perfil} posicao={indice + 1} />
-						))}
-					</nav>
-				)}
-				{invalidos.length > 0 ? (
-					<section aria-label="Perfis com erro">
-						<p className="folha__secao overline">Com erro: corrija o profile.json e recarregue a lista</p>
-						{invalidos.map((invalido) => (
-							<LinhaErro key={invalido.arquivo} invalido={invalido} />
-						))}
-					</section>
-				) : null}
-			</>
+			<nav className="perfis__grade" aria-label="Perfis">
+				{perfis.map((perfil, indice) => (
+					<CartaoPerfil key={perfil.id} perfil={perfil} posicao={indice + 1} />
+				))}
+				{invalidos.map((invalido) => (
+					<CartaoErro key={invalido.arquivo} invalido={invalido} />
+				))}
+			</nav>
 		);
 	}
 
 	return (
-		<div className="tela">
-			<FaixaMarca legenda={`Seus perfis · ${mesAno.format(new Date())}`} glifo="学習">
-				<Stat value={pad2(perfis.length)} label={perfis.length === 1 ? "Perfil pronto" : "Perfis prontos"} size="lg" accent />
-			</FaixaMarca>
-			<main className="folha">
-				<header className="folha__cabeca">
-					<h1 className="overline" style={{ margin: 0 }}>
-						Escolha um perfil
-					</h1>
-					{lista ? <span className="data">{plural(perfis.length, "perfil", "perfis")}</span> : null}
-				</header>
-				<div className="folha__corpo">{corpo}</div>
-				<footer className="folha__pe">
-					<span className="overline">Perfis em profiles/</span>
-					<button type="button" className="tecla-papel button" onClick={recarregar} disabled={carregando}>
-						<Icon name="refresh" size={18} strokeWidth={2.25} />
-						Recarregar lista
-					</button>
-				</footer>
-			</main>
+		<div className="perfis">
+			<header className="perfis__cabeca">
+				<div className="perfis__marca">
+					<Wordmark size={32} />
+					<h1 className="overline">Escolha um perfil · {mesAno.format(new Date())}</h1>
+				</div>
+				<button type="button" className="perfis__recarregar button" onClick={recarregar} disabled={carregando}>
+					<Icon name="refresh" size={18} strokeWidth={2.25} />
+					Recarregar
+				</button>
+			</header>
+			<main className="perfis__corpo">{corpo}</main>
 		</div>
 	);
 }

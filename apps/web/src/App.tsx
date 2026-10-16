@@ -1,13 +1,42 @@
-// Rotas por hash: "#/" lista os perfis; "#/perfil/<id>" abre a janela do
-// perfil (o hash faz o recarregar da página manter o perfil).
+// Rotas por hash (o recarregar da página mantém a tela):
+// - "#/": a tela de perfis;
+// - "#/perfil/<id>": a tela inicial do perfil, se ele tiver uma (telas-iniciais.ts),
+//   ou a janela de conversa;
+// - "#/perfil/<id>/conversa": a janela de conversa de um perfil com tela inicial.
 
+import { usePerfis } from "@estudos/ui";
 import { useEffect, useState } from "react";
+import { telasIniciais } from "./telas-iniciais.ts";
 import { JanelaPerfil } from "./telas/JanelaPerfil.tsx";
 import { TelaPerfis } from "./telas/TelaPerfis.tsx";
 
-function perfilDoHash(hash: string): string | undefined {
-	const achado = /^#\/perfil\/([^/]+)$/.exec(hash);
-	return achado ? decodeURIComponent(achado[1]!) : undefined;
+interface Rota {
+	perfil?: string;
+	conversa: boolean;
+}
+
+export function rotaDoHash(hash: string): Rota {
+	const achado = /^#\/perfil\/([^/]+)(\/conversa)?$/.exec(hash);
+	return achado ? { perfil: decodeURIComponent(achado[1]!), conversa: Boolean(achado[2]) } : { conversa: false };
+}
+
+function irPara(hash: string): void {
+	window.location.hash = hash;
+}
+
+function TelaInicial({ perfilId }: { perfilId: string }) {
+	const { lista } = usePerfis();
+	const entrada = telasIniciais[perfilId]!;
+	const Componente = entrada.componente;
+	const perfil = lista?.perfis.find((item) => item.id === perfilId);
+	return (
+		<Componente
+			perfilId={perfilId}
+			{...(perfil ? { perfil } : {})}
+			abrirConversa={() => irPara(`#/perfil/${encodeURIComponent(perfilId)}/conversa`)}
+			voltar={() => irPara("#/")}
+		/>
+	);
 }
 
 export function App() {
@@ -19,7 +48,13 @@ export function App() {
 		return () => window.removeEventListener("hashchange", mudou);
 	}, []);
 
-	const perfil = perfilDoHash(hash);
+	const { perfil, conversa } = rotaDoHash(hash);
+	if (!perfil) return <TelaPerfis />;
+	const inicial = Object.hasOwn(telasIniciais, perfil) ? telasIniciais[perfil] : undefined;
+	if (inicial && !conversa) return <TelaInicial key={perfil} perfilId={perfil} />;
+	const voltar = inicial
+		? { rotulo: inicial.rotuloVoltar, hash: `#/perfil/${encodeURIComponent(perfil)}` }
+		: { rotulo: "Perfis", hash: "#/" };
 	// key: outro perfil começa com o estado zerado.
-	return perfil ? <JanelaPerfil key={perfil} perfilId={perfil} /> : <TelaPerfis />;
+	return <JanelaPerfil key={perfil} perfilId={perfil} voltar={voltar} />;
 }

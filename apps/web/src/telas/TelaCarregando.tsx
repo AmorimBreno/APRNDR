@@ -2,8 +2,7 @@
 // de volta e um painel com a etapa atual, os avisos de conexão e os erros.
 
 import { Button } from "@estudos/design-system";
-import type { ErroJanela } from "@estudos/ui";
-import { FaixaMarca } from "./FaixaMarca.tsx";
+import { type ErroJanela, FaixaMarca } from "@estudos/ui";
 
 const nomesOrigem: Record<ErroJanela["origem"], string> = {
 	modelo: "Erro do modelo",
@@ -21,14 +20,16 @@ export interface PropsTelaCarregando {
 	aviso?: string;
 	erros: ErroJanela[];
 	limparErros(): void;
+	/** Para onde o botão da faixa volta (a tela inicial do perfil ou a de perfis). */
+	voltar: { rotulo: string; hash: string };
 }
 
-export function TelaCarregando({ nomePerfil, etapa, aviso, erros, limparErros }: PropsTelaCarregando) {
+export function TelaCarregando({ nomePerfil, etapa, aviso, erros, limparErros, voltar }: PropsTelaCarregando) {
 	return (
 		<div className="tela">
 			<FaixaMarca legenda="Abrindo o perfil" glifo="始">
-				<Button icon="list" onClick={() => (window.location.hash = "#/")}>
-					Perfis
+				<Button icon="list" onClick={() => (window.location.hash = voltar.hash)}>
+					{voltar.rotulo}
 				</Button>
 			</FaixaMarca>
 			<main className="painel-carregando" aria-busy="true">

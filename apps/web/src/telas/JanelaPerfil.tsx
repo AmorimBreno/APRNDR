@@ -42,7 +42,13 @@ const nomesOrigem: Record<ErroJanela["origem"], string> = {
 	pedido: "Erro no pedido",
 };
 
-export function JanelaPerfil({ perfilId }: { perfilId: string }) {
+export interface PropsJanelaPerfil {
+	perfilId: string;
+	/** Para onde o botão da esquerda da barra volta: a tela inicial do perfil ou a de perfis. */
+	voltar: { rotulo: string; hash: string };
+}
+
+export function JanelaPerfil({ perfilId, voltar }: PropsJanelaPerfil) {
 	const { estado, conexao, acoes } = useJanelaPerfil(perfilId);
 	const perfis = usePerfis();
 	const perfil = perfis.lista?.perfis.find((item) => item.id === perfilId);
@@ -125,6 +131,7 @@ export function JanelaPerfil({ perfilId }: { perfilId: string }) {
 				{...(avisoConexao ? { aviso: avisoConexao } : {})}
 				erros={estado.erros}
 				limparErros={acoes.limparErros}
+				voltar={voltar}
 			/>
 		);
 	}
@@ -164,9 +171,9 @@ export function JanelaPerfil({ perfilId }: { perfilId: string }) {
 	return (
 		<div className="janela">
 			<header className="topo">
-				<button type="button" className="topo__voltar button" onClick={() => (window.location.hash = "#/")}>
+				<button type="button" className="topo__voltar button" onClick={() => (window.location.hash = voltar.hash)}>
 					<Icon name="list" size={18} strokeWidth={2.5} />
-					Perfis
+					{voltar.rotulo}
 				</button>
 				<div className="topo__titulo">
 					<span className="overline">Perfil</span>

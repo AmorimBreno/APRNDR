@@ -1,5 +1,7 @@
-// Faixa escura à esquerda das telas de fora do perfil (menu-rail do design
+// Faixa escura à esquerda das telas de faixa e folha (menu-rail do design
 // system): o nome do app, uma linha de onde estou, o ornamento e um pé livre.
+// Usada pela tela de carregamento e pelas telas iniciais dos perfis (os
+// cadernos do perfil de estudos). Estilos em estilo.css (.tela, .faixa, .folha).
 
 import { Ornament, type OrnamentGlyph, Wordmark } from "@estudos/design-system";
 import type { ReactNode } from "react";

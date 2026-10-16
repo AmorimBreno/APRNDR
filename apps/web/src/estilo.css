@@ -5,47 +5,70 @@
 :root { color-scheme: dark; }
 html, body, #raiz { height: 100%; }
 
-/* ── Faixa da marca e folha (tela de perfis e de carregamento) ── */
+/* ── Tela de perfis: um card quadrado por perfil ── */
 
-.tela { display: grid; grid-template-columns: var(--menu-rail) minmax(0, 1fr); gap: var(--space-4); height: 100%; padding: var(--space-4); box-sizing: border-box; }
+.perfis { display: flex; flex-direction: column; gap: var(--space-8); min-height: 100%; padding: var(--space-8) var(--space-8) var(--space-12); box-sizing: border-box; }
+.perfis__cabeca { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-4); max-width: 1264px; width: 100%; margin: 0 auto; }
+.perfis__marca { display: flex; flex-direction: column; gap: var(--space-2); }
+.perfis__marca h1 { margin: 0; color: var(--ink-muted); }
+.perfis__recarregar { display: inline-flex; align-items: center; gap: var(--space-2); height: var(--control-md); padding: 0 var(--space-4); border: var(--border-control) solid var(--line-strong); border-radius: var(--radius-md); background: transparent; color: var(--ink); cursor: pointer; }
+.perfis__recarregar:hover { background: var(--surface-hover); }
+.perfis__recarregar:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.perfis__corpo { width: 100%; max-width: 1264px; margin: 0 auto; }
+.perfis__carregando { display: flex; align-items: center; gap: var(--space-3); color: var(--ink-muted); }
+.perfis__grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: var(--space-4); }
 
-.faixa { display: flex; flex-direction: column; justify-content: space-between; gap: var(--space-6); min-height: 0; padding: 28px var(--space-6) var(--space-6); border-radius: var(--radius-xl); background: var(--surface-panel); overflow: hidden; }
-.faixa__topo { display: flex; flex-direction: column; gap: 10px; }
-.faixa__topo .overline { color: var(--ink-muted); }
-.faixa__ornamento { align-self: center; }
-.faixa__pe { display: flex; flex-direction: column; gap: var(--space-5); }
+/* O card (4:5, para a arte ter espaço): a moldura na cor do perfil, o console no topo, a arte no papel, o nome grande,
+ * a barra que enche no hover (o "carregando" da tela de boot) e o pé com o lema e o selo. */
+.cartao { --cor: var(--amber); --on-cor: var(--on-amber); position: relative; display: flex; flex-direction: column; gap: var(--space-3); aspect-ratio: 4 / 5; min-width: 0; padding: var(--space-5); border: var(--border-strong) solid var(--cor); border-radius: var(--radius-lg); background: var(--surface-panel); color: var(--ink); text-decoration: none; overflow: hidden; transition: background-color .24s ease-out; }
+.cartao--amber { --cor: var(--amber); --on-cor: var(--on-amber); }
+.cartao--brick { --cor: var(--brick); --on-cor: var(--on-brick); }
+.cartao--sage { --cor: var(--sage); --on-cor: var(--on-sage); }
+.cartao--moss { --cor: var(--moss); --on-cor: var(--on-moss); }
+.cartao--cream { --cor: var(--cream); --on-cor: var(--on-cream); }
+.cartao--steel { --cor: var(--steel); --on-cor: var(--on-steel); }
+a.cartao:hover { background: var(--surface-raised); }
+a.cartao:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 
-.folha { display: flex; flex-direction: column; min-height: 0; overflow: hidden; border-radius: var(--radius-xl); background: var(--paper); color: var(--on-paper); }
-.folha__cabeca, .folha__pe { flex: none; display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding: 20px var(--space-8) var(--space-4); }
-.folha__cabeca { border-bottom: var(--border-strong) solid var(--on-paper); }
-.folha__pe { margin-top: auto; padding: 14px var(--space-8); border-top: var(--border-strong) solid var(--on-paper); }
-.folha__cabeca .overline, .folha__pe .overline { color: var(--on-paper-muted); }
-.folha__corpo { flex: 1; min-height: 0; overflow-y: auto; }
-.folha__aviso { display: flex; flex-direction: column; gap: var(--space-3); max-width: 560px; padding: var(--space-8); }
-.folha__aviso p { margin: 0; }
-.folha__secao { padding: var(--space-6) var(--space-8) var(--space-2); color: var(--on-paper-muted); }
+.cartao__console { display: flex; flex-direction: column; gap: 2px; min-width: 0; color: var(--ink-muted); font-size: 12px; line-height: 18px; }
+.cartao__console > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.cartao__console em { font-style: normal; color: var(--ink); }
 
-/* Tecla de papel: o botão sobre a folha (o Button do design system é para o fundo escuro). */
-.tecla-papel { display: inline-flex; align-items: center; gap: var(--space-2); height: var(--control-md); padding: 0 var(--space-4) 2px; border: var(--border-control) solid var(--on-paper); border-radius: var(--radius-md); background: var(--paper); color: var(--on-paper); box-shadow: var(--key-lip); cursor: pointer; }
-.tecla-papel:hover { background: var(--paper-hover); }
-.tecla-papel:active { transform: translateY(1px); box-shadow: var(--key-lip-pressed); }
-.tecla-papel:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.cartao__arte { position: relative; flex: 1; display: grid; place-items: center; min-height: 0; border-radius: var(--radius-md); background: var(--paper); overflow: hidden; }
+/* Desenho de traço com fundo branco: no papel, o branco vira papel (o manual pede papel quente, nunca #fff). */
+.cartao__arte img { position: absolute; inset: var(--space-3); width: calc(100% - 2 * var(--space-3)); height: calc(100% - 2 * var(--space-3)); object-fit: contain; mix-blend-mode: multiply; user-select: none; }
+.cartao__glifo { font-family: var(--font-ornament); font-size: 120px; line-height: 1; color: var(--on-paper); }
 
-/* Linha de perfil: como a linha da lista de cadernos; a escolhida (hover ou foco) fica tijolo. */
-.linha { display: flex; align-items: center; gap: var(--space-6); height: var(--wheel-row); padding: 0 var(--space-8); border-bottom: var(--border-hair) solid var(--paper-line); color: var(--on-paper); text-decoration: none; transition: background-color .24s ease-out, color .24s ease-out; }
-a.linha:hover, a.linha:focus-visible { outline: none; border-bottom-color: var(--brick); background: var(--brick); color: var(--on-brick); }
-.linha__numero { flex: none; width: 96px; }
-.linha__texto { flex: 1; display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
-.linha__texto .overline { color: var(--on-paper-muted); }
-a.linha:hover .linha__texto .overline, a.linha:focus-visible .linha__texto .overline { color: inherit; }
-.linha__titulo { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.linha__lado { flex: none; display: flex; align-items: center; gap: var(--space-4); }
-.linha__abrir { display: inline-flex; align-items: center; gap: var(--space-2); height: var(--control-md); padding: 0 var(--space-4) 2px; border-radius: var(--radius-md); background: var(--paper); color: var(--on-paper); box-shadow: var(--key-lip); }
+.cartao__nome { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cartao__titulo { overflow: hidden; font-family: var(--font-display); font-size: 44px; line-height: 44px; font-weight: 800; letter-spacing: -0.02em; text-transform: uppercase; white-space: nowrap; text-overflow: ellipsis; }
+.cartao__titulo--menor { font-size: 28px; line-height: 32px; }
+.cartao__legenda { display: flex; align-items: baseline; gap: var(--space-2); color: var(--ink-muted); }
+.cartao__legenda [lang="ja"] { font-family: var(--font-ornament); font-size: 18px; color: var(--ink); }
 
-.linha--erro { align-items: flex-start; height: auto; padding-top: var(--space-5); padding-bottom: var(--space-5); }
-.linha--erro .linha__numero { color: var(--brick); }
-.linha__arquivo { color: var(--on-paper-muted); overflow-wrap: anywhere; }
-.linha__erro { margin: var(--space-2) 0 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--on-paper); }
+.cartao__carregar { display: flex; flex-direction: column; gap: 6px; }
+.cartao__carregar .overline { color: var(--ink-muted); }
+.cartao__trilho { display: block; height: 14px; padding: 2px; border: var(--border-strong) solid var(--cor); border-radius: var(--radius-xs); box-sizing: border-box; }
+.cartao__enchimento { display: block; width: 28%; height: 100%; border-radius: 2px; background: var(--cor); transition: width .56s cubic-bezier(.65, 0, .25, 1); }
+a.cartao:hover .cartao__enchimento, a.cartao:focus-visible .cartao__enchimento { width: 100%; }
+a.cartao:hover .cartao__carregar .overline, a.cartao:focus-visible .cartao__carregar .overline { color: var(--ink); }
+
+.cartao__pe { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: 32px; color: var(--ink-muted); }
+.cartao__pe .data { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.cartao__selo { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--radius-xs); background: var(--cor); color: var(--on-cor); font-family: var(--font-ornament); font-size: 20px; line-height: 1; }
+
+.cartao--erro { --cor: var(--brick); border-style: dashed; }
+.cartao--erro .cartao__pe { color: var(--brick-text); }
+.cartao__arquivo { color: var(--ink-subtle); }
+.cartao__mensagem { flex: 1; min-height: 0; margin: 0; overflow-y: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink-muted); }
+
+@media (max-width: 560px) {
+	.perfis { padding: var(--space-5) var(--space-4) var(--space-8); }
+	.cartao__titulo { font-size: 34px; line-height: 36px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.cartao, .cartao__enchimento { transition: none; }
+}
 
 /* ── Tela de carregamento ── */
 
@@ -53,18 +76,6 @@ a.linha:hover .linha__texto .overline, a.linha:focus-visible .linha__texto .over
 .painel-carregando > * { margin: 0; max-width: var(--measure-read); }
 .painel-carregando .overline { color: var(--ink-muted); }
 .painel-carregando__etapa { display: flex; align-items: center; gap: var(--space-3); color: var(--ink-muted); }
-
-@media (max-width: 900px) {
-	.tela { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
-	.faixa { flex-direction: row; align-items: center; padding: var(--space-5) var(--space-6); }
-	.faixa__ornamento, .faixa__pe .ap-stat { display: none; }
-	.linha { gap: var(--space-4); padding: 0 var(--space-5); }
-	.linha__numero { display: none; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-	.linha { transition: none; }
-}
 
 /* ── Janela do perfil ── */
 

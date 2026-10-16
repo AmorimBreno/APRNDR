@@ -71,6 +71,27 @@ Os pedidos que esperam a sua resposta (perguntas, questões do quiz, o pedido do
 22. Deixe a janela do app estreita, mais ou menos da largura de meia tela. Por quê: confere a tela estreita. O que você deve ver: o custo some do topo; a área de painéis, quando aberta, fica por cima da conversa; numa janela bem estreita (menos de 760 px), a lista de conversas e o nome do perfil saem e ficam a conversa e o campo. Nada deve ficar cortado de lado nem pedir rolagem horizontal.
 
 
+### Ajustes de interface e animação (3.6)
+
+Estes passos conferem o que mudou depois do pedido de 2026-10-16 (escala, respostas, fotos, animações). Se o app já estava aberto, aperte F5 antes.
+
+23. Olhe o tamanho geral. Por quê: o app passou a rodar em 90%, o tamanho que ficou bom no seu zoom. O que você deve ver: tudo um pouco menor que antes e confortável de ler com o zoom do Edge em 100%.
+
+24. Na conversa, olhe uma resposta do professor. Por quê: confere a resposta sem etiqueta. O que você deve ver: em cima, a foto do professor (só o rosto, num círculo de papel) e "Professor"; nenhuma etiqueta "Resposta" e nenhum nome de modelo no pé. Na margem esquerda, o número ("09") e um botãozinho "i". Clique no "i": um balão abre com mola e mostra Quando, Agente, Modelo, Levou, Tokens (entrada, cache e saída) e Custo. Clique fora ou aperte Esc para fechar. As suas mensagens têm o seu avatar desenhado ao lado da nota.
+
+25. Mande uma pergunta curta. Por quê: confere a mensagem voando e o professor vivo. O que você deve ver: o texto sai do campo, sobe e voa até virar a nota creme, que bate e achata um pouco ao pousar. Na linha acima do campo, a foto pequena do professor reage ao que ele faz: balançando com "…" (pensando) e dando pulinhos irregulares (escrevendo), com o nome da atividade ao lado. No bloco da resposta, a foto também pula e aparece "Escrevendo"; as palavras novas surgem com um fade.
+
+26. Peça uma busca na web ao professor (por exemplo, "pesquise em que ano foi criado o teorema de Bayes"). Por quê: confere "pesquisando" e as ferramentas vivas. O que você deve ver: a foto inclina de um lado para o outro com uma lupa no canto e "Pesquisando"; a linha da ferramenta entra deslizando, e ao terminar "Executando" troca por "Concluída" com um pulinho e o visto se desenhando.
+
+27. Peça uma pergunta com ask_user_question e, depois, uma questão do quiz. Por quê: confere o modal com o professor e a reação do quiz. O que você deve ver: a foto do professor dá um pulo com um "?" e "Preparando uma pergunta"; o modal abre com mola, com a foto dele na frente do enunciado, num balão de fala; o topo do modal mostra só o nome do painel (sem "Esperando você" nem "Respondido"). Clique em "Responder depois": o modal encolhe de volta para dentro do botão na conversa; clique no botão: ele cresce de novo a partir dele. No quiz, acerte uma questão: um carimbo 完 cai girando e bate, e sai confete de papel; erre outra: as alternativas tremem. Em ambos, o retorno sobe com mola.
+
+28. Olhe o histórico à esquerda e troque de conversa. Por quê: confere os detalhes. O que você deve ver: a marca âmbar da conversa aberta desliza até o item novo; o custo e os tokens no topo rolam como odômetro quando mudam. O menu do agente e a gaveta de painéis abrem com mola.
+
+29. Volte para os perfis (Cadernos e depois Perfis) e passe o mouse no card. Por quê: confere a inclinação e as trocas de tela. O que você deve ver: o card inclina em 3D seguindo o mouse e a ilustração anda um pouco ao contrário; a barra enche com uma mola que passa e volta. Clique: o card cresce até virar a tela de cadernos. Clique em "Conversar com o professor": a faixa escura da esquerda se transforma na barra tijolo do topo.
+
+30. Ative "Mostrar animações" desligado no Windows (Configurações > Acessibilidade > Efeitos visuais) e recarregue. Por quê: as animações respeitam o "reduzir movimento". O que você deve ver: nada voa, pula ou inclina; as telas trocam direto; tudo continua funcionando. Depois, ligue de novo.
+
+
 ## Fim
 
 1. Feche a janela do app e use o atalho "Parar Estudos". Por quê: fechar a janela não para o servidor.
@@ -117,4 +138,12 @@ Antes de começar (app parado):
 20. Edição ao vivo do painel do perfil:
 21. Edição ao vivo da extensão:
 22. Tela estreita:
+23. Escala em 90%:
+24. Resposta sem etiqueta, botão i e fotos:
+25. Mensagem voando e professor vivo:
+26. Pesquisando e ferramentas vivas:
+27. Modal com o professor, minimizar e reação do quiz:
+28. Histórico, odômetro, menu e gaveta:
+29. Card inclinando e trocas de tela:
+30. Reduzir movimento:
 Fim (Parar Estudos):

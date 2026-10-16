@@ -17,7 +17,9 @@ Tarefas 3.1 e 3.2 feitas (2026-10-16): design system como pacote do workspace, t
 
 3.6 Ajustes de interface e animação (pedido do Breno em 2026-10-16, antes do 4.1; o plano do 4.1 já escrito fica esperando). Decisões dele: escala em 90%; resposta sem a etiqueta "Resposta" (só tipos diferentes têm etiqueta) e sem o modelo no pé, com um botão de informações ao lado do número; foto do professor (a imagem que ele mandou, com o aviso de direitos mantido no arquivo) e avatar do usuário no estilo Notion (desenho próprio em SVG); professor animado por estado (pensando, escrevendo, pesquisando, preparando questão); professor na frente da pergunta nos modais, sem "Respondido" escrito; animações com física em tudo (mensagem voando do campo para a nota, texto aparecendo, ferramentas vivas, modal nascendo do botão, cards com inclinação 3D, quiz com carimbo e confete, menus, odômetro, histórico, trocas de tela com View Transitions). Biblioteca Motion 13.5.1.
 
-Próximo passo: 3.6; depois, a aprovação do plano do item 4.1 (pasta de dados, matérias e eventos.jsonl).
+Tarefa 3.6 feita (2026-10-16), um commit por parte: escala, informações da resposta (o núcleo manda momento, duração, uso e agente), fotos, professor animado, modal com o professor, animações da conversa, cards, quiz, detalhes e trocas de tela. Conferido no navegador o que não exige mandar mensagem na conversa aberta do Breno (escala, informações, fotos, histórico, odômetro, cards, trocas de tela); o voo, o professor vivo, o modal nascendo do botão e a reação do quiz ficam para os passos 23 a 30 do roteiro.
+
+Próximo passo: o Breno confere a 3.6 (passos 23 a 30 de docs/teste-etapa-3.md); depois, a aprovação do plano do item 4.1 (pasta de dados, matérias e eventos.jsonl).
 
 Tarefa 2.3 feita (aguarda revisão): ponte de eventos (docs/ponte-de-eventos.md) e ferramenta subagent no núcleo; as ferramentas dos desenhistas vêm do campo novo extensoesSubagentes do profile.json; web_fetch ganhou fresh=true e avisa quando o conteúdo do Tavily pode estar em cache.
 

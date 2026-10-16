@@ -5,6 +5,7 @@
 // - "#/perfil/<id>/conversa": a janela de conversa de um perfil com tela inicial.
 
 import { usePerfis } from "@estudos/ui";
+import { MotionConfig } from "motion/react";
 import { useEffect, useState } from "react";
 import { telasIniciais } from "./telas-iniciais.ts";
 import { JanelaPerfil } from "./telas/JanelaPerfil.tsx";
@@ -39,7 +40,16 @@ function TelaInicial({ perfilId }: { perfilId: string }) {
 	);
 }
 
+/** Com "reduzir movimento" no Windows, as animações da Motion param de se mover. */
 export function App() {
+	return (
+		<MotionConfig reducedMotion="user">
+			<Rotas />
+		</MotionConfig>
+	);
+}
+
+function Rotas() {
 	const [hash, setHash] = useState(() => window.location.hash);
 
 	useEffect(() => {

@@ -7,7 +7,9 @@
 
 import { Button, EmptyState, Icon, pad2, Tag } from "@estudos/design-system";
 import {
+	AgenteAnimado,
 	AreaPaineis,
+	atividadeDoAgente,
 	AvatarAgente,
 	type ItemAssistente,
 	BarraPergunta,
@@ -23,6 +25,7 @@ import {
 	Historico,
 	type InfoModelo,
 	type ResumoSessao,
+	ROTULOS_ATIVIDADE,
 	SeletorAgente,
 	SeletorModelo,
 	semEsperar,
@@ -156,18 +159,37 @@ export function JanelaPerfil({ perfilId, voltar }: PropsJanelaPerfil) {
 	const ocupado = !aberta || estado.executando;
 	const uso = estado.uso;
 
-	// O cabeçalho de cada resposta: a foto e o nome do agente que respondeu.
+	// O cabeçalho de cada resposta: a foto e o nome do agente que respondeu. Na
+	// resposta que está chegando, a foto reage ao que ele faz.
+	const atividade = atividadeDoAgente(estado);
+	const avatarDe = (nome: string) => agentes.find((agente) => agente.nome === nome)?.avatar;
+	const nomeBonito = (nome: string) => nome.charAt(0).toUpperCase() + nome.slice(1);
 	const autorDaResposta = (item: ItemAssistente) => {
 		const nome = item.agente ?? agenteAtual;
 		if (!nome) return undefined;
-		const avatar = agentes.find((agente) => agente.nome === nome)?.avatar;
+		const avatar = avatarDe(nome);
+		const vivo = item.emAndamento && atividade !== "parado";
 		return (
 			<>
-				<AvatarAgente nome={nome} {...(avatar ? { avatar } : {})} />
-				<span className="bloco__nome body-strong">{nome.charAt(0).toUpperCase() + nome.slice(1)}</span>
+				{vivo ? (
+					<AgenteAnimado nome={nome} {...(avatar ? { avatar } : {})} atividade={atividade} />
+				) : (
+					<AvatarAgente nome={nome} {...(avatar ? { avatar } : {})} />
+				)}
+				<span className="bloco__nome body-strong">{nomeBonito(nome)}</span>
+				{vivo ? <span className="bloco__fazendo overline">{ROTULOS_ATIVIDADE[atividade as Exclude<typeof atividade, "parado">]}</span> : null}
 			</>
 		);
 	};
+	const situacao =
+		atividade === "parado" || !agenteAtual ? undefined : (
+			<span className="barra__situacao" role="status">
+				<AgenteAnimado nome={agenteAtual} {...(avatarDe(agenteAtual) ? { avatar: avatarDe(agenteAtual)! } : {})} atividade={atividade} tamanho={28} />
+				<span className="overline">
+					{nomeBonito(agenteAtual)} · {ROTULOS_ATIVIDADE[atividade]}
+				</span>
+			</span>
+		);
 
 	const botaoDoPedido = (registro: RegistroPedido) => (
 		<BotaoPedido
@@ -327,6 +349,7 @@ export function JanelaPerfil({ perfilId, voltar }: PropsJanelaPerfil) {
 							fila={estado.fila}
 							enviar={enviar}
 							parar={parar}
+							{...(situacao ? { situacao } : {})}
 						/>
 					</div>
 				</main>

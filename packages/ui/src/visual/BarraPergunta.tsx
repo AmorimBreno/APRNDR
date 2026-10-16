@@ -3,6 +3,7 @@
 // responde, Enter continua valendo: a mensagem entra na fila da sessão.
 
 import { AskBar, Button } from "@estudos/design-system";
+import type { ReactNode } from "react";
 
 export interface PropsBarraPergunta {
 	texto: string;
@@ -13,6 +14,8 @@ export interface PropsBarraPergunta {
 	fila: string[];
 	enviar(): void;
 	parar(): void;
+	/** O que mostrar enquanto o agente responde (a foto animada e o que ele faz). Sem ele, "Respondendo". */
+	situacao?: ReactNode;
 }
 
 export function BarraPergunta(props: PropsBarraPergunta) {
@@ -30,9 +33,11 @@ export function BarraPergunta(props: PropsBarraPergunta) {
 			) : null}
 			{props.executando ? (
 				<div className="barra__status">
-					<span className="overline" role="status">
-						Respondendo <span className="ap-cursor" aria-hidden="true" />
-					</span>
+					{props.situacao ?? (
+						<span className="overline" role="status">
+							Respondendo <span className="ap-cursor" aria-hidden="true" />
+						</span>
+					)}
 					<Button size="sm" icon="stop" onClick={props.parar}>
 						Parar
 					</Button>

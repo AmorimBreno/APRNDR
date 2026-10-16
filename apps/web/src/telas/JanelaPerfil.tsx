@@ -8,6 +8,8 @@
 import { Button, EmptyState, Icon, pad2, Tag } from "@estudos/design-system";
 import {
 	AreaPaineis,
+	AvatarAgente,
+	type ItemAssistente,
 	BarraPergunta,
 	BotaoPedido,
 	DocumentoConversa,
@@ -154,6 +156,19 @@ export function JanelaPerfil({ perfilId, voltar }: PropsJanelaPerfil) {
 	const ocupado = !aberta || estado.executando;
 	const uso = estado.uso;
 
+	// O cabeçalho de cada resposta: a foto e o nome do agente que respondeu.
+	const autorDaResposta = (item: ItemAssistente) => {
+		const nome = item.agente ?? agenteAtual;
+		if (!nome) return undefined;
+		const avatar = agentes.find((agente) => agente.nome === nome)?.avatar;
+		return (
+			<>
+				<AvatarAgente nome={nome} {...(avatar ? { avatar } : {})} />
+				<span className="bloco__nome body-strong">{nome.charAt(0).toUpperCase() + nome.slice(1)}</span>
+			</>
+		);
+	};
+
 	const botaoDoPedido = (registro: RegistroPedido) => (
 		<BotaoPedido
 			pedido={registro}
@@ -288,6 +303,7 @@ export function JanelaPerfil({ perfilId, voltar }: PropsJanelaPerfil) {
 							<DocumentoConversa
 								conversa={estado.conversa}
 								pedidoDaChamada={(id) => (registros[id] ? botaoDoPedido(registros[id]) : undefined)}
+								autorDaResposta={autorDaResposta}
 								depois={soltos.map((registro) => (
 									<div key={registro.id} className="documento__pedido">
 										{botaoDoPedido(registro)}

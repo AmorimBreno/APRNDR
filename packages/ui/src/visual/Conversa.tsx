@@ -5,6 +5,7 @@
 import { Icon, pad2, StudentNote, Tag } from "@estudos/design-system";
 import { type ReactNode, useEffect, useRef } from "react";
 import type { ChamadaFerramenta, ItemConversa } from "../estado-janela.ts";
+import { AvatarUsuario } from "./Avatares.tsx";
 import { InfoResposta } from "./InfoResposta.tsx";
 import { Markdown } from "./Markdown.tsx";
 
@@ -146,9 +147,12 @@ export function DocumentoConversa({ conversa, vazio, pedidoDaChamada, depois, au
 			{conversa.map((item) => {
 				if (item.tipo === "usuario") {
 					return (
-						<StudentNote key={item.chave} label="Você escreveu">
-							<p className="nota__texto">{item.texto}</p>
-						</StudentNote>
+						<div key={item.chave} className="nota-usuario">
+							<StudentNote label="Você escreveu">
+								<p className="nota__texto">{item.texto}</p>
+							</StudentNote>
+							<AvatarUsuario className="nota-usuario__avatar" />
+						</div>
 					);
 				}
 				if (item.tipo === "ferramenta") {

@@ -76,6 +76,14 @@ a.linha:hover .linha__texto .overline, a.linha:focus-visible .linha__texto .over
 .bloco__raciocinio summary { cursor: pointer; color: var(--ink-muted); }
 .bloco__raciocinio summary:focus-visible { outline: none; border-radius: 2px; box-shadow: var(--focus-ring); }
 .bloco__raciocinio p { margin: var(--space-2) 0 0; white-space: pre-wrap; color: var(--ink-muted); }
+/* Fotos: o agente num círculo de papel (o branco da imagem vira papel), o usuário desenhado. */
+.avatar { position: relative; flex: none; display: inline-grid; place-items: center; overflow: hidden; border-radius: var(--radius-full); background: var(--paper); box-shadow: 0 0 0 var(--border-control) var(--line-strong); }
+.avatar img { max-width: none; mix-blend-mode: multiply; user-select: none; }
+.avatar--inicial { background: var(--cream); color: var(--on-cream); font-family: var(--font-display); font-weight: 800; line-height: 1; }
+.nota-usuario { display: flex; align-items: flex-end; justify-content: flex-end; gap: var(--space-3); }
+.nota-usuario > .ap-note { margin-left: 0; }
+.nota-usuario__avatar { margin-bottom: -4px; }
+
 /* Margem da resposta: o número e o botão de informações (no lugar do nome do modelo no pé). */
 .bloco { position: relative; }
 .bloco__margem { position: absolute; top: 4px; right: calc(100% + var(--space-4)); display: flex; align-items: center; gap: var(--space-2); color: var(--ink-subtle); }

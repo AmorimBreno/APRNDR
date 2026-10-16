@@ -11,6 +11,7 @@ export * from "./telas-iniciais.ts";
 export * from "./tipos.ts";
 export * from "./use-janela-perfil.ts";
 export * from "./use-perfis.ts";
+export * from "./visual/Avatares.tsx";
 export * from "./visual/BarraPergunta.tsx";
 export * from "./visual/Conversa.tsx";
 export * from "./visual/FaixaMarca.tsx";

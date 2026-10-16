@@ -5,7 +5,7 @@
 	"instrucoes": "AGENTS.md",
 	"agentePadrao": "professor",
 	"agentes": [
-		{ "arquivo": "agents/professor.md", "papel": "geral", "selecionavel": true },
+		{ "arquivo": "agents/professor.md", "papel": "geral", "selecionavel": true, "avatar": { "arquivo": "avatares/professor.png", "recorte": [156, 137, 350] } },
 		{ "arquivo": "agents/researcher.md", "papel": "pesquisa", "selecionavel": true },
 		{ "arquivo": "agents/mermaid-maker.md", "papel": "desenho", "selecionavel": false },
 		{ "arquivo": "agents/svg-maker.md", "papel": "desenho", "selecionavel": false }

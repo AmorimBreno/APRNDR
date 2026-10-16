@@ -42,3 +42,4 @@ As linhas alteradas nos arquivos do learn são marcadas com o comentário [estud
 ## Pendências
 
 - Os comentários de quiz.ts e ask-user-question.ts ainda falam do log do Obsidian.
+- avatares/professor.png (Etapa 3): a foto do professor na conversa (agentes[].avatar do profile.json), imagem escolhida pelo Breno. O arquivo traz o aviso "©2022 KENJIKUN. All Rights Reserved. Reproduction without permission is prohibited." e fica inteiro; a conversa mostra só o recorte do rosto. Uso pessoal, num repositório privado, por decisão do Breno.

@@ -29,7 +29,19 @@ export function criarApp(janelas: Janelas, log: Log, versao: string): Hono {
 				nome: perfil.nome,
 				agentes: perfil.agentes
 					.filter((agente) => agente.selecionavel)
-					.map((agente) => ({ nome: agente.nome, papel: agente.papel, ...(agente.modelo ? { modelo: agente.modelo } : {}) })),
+					.map((agente) => ({
+						nome: agente.nome,
+						papel: agente.papel,
+						...(agente.modelo ? { modelo: agente.modelo } : {}),
+						...(agente.avatar
+							? {
+									avatar: {
+										url: `/api/perfis/${encodeURIComponent(perfil.id)}/agentes/${encodeURIComponent(agente.nome)}/avatar`,
+										...(agente.avatar.recorte ? { recorte: agente.avatar.recorte } : {}),
+									},
+								}
+							: {}),
+					})),
 				agentePadrao: perfil.agentePadrao,
 				paineis: perfil.paineis,
 				aberto: janelas.aberta(perfil.id),
@@ -59,6 +71,17 @@ export function criarApp(janelas: Janelas, log: Log, versao: string): Hono {
 		if (!capa) return c.json({ ok: false, erro: `O perfil "${id}" não tem capa.` }, 404);
 		const tipo = TIPOS_IMAGEM[extname(capa).toLowerCase()] ?? "application/octet-stream";
 		return c.body(new Uint8Array(await readFile(capa)), 200, { "content-type": tipo, "cache-control": "no-cache" });
+	});
+
+	// A foto de um agente (agentes[].avatar do profile.json).
+	app.get("/api/perfis/:id/agentes/:nome/avatar", async (c) => {
+		const id = c.req.param("id");
+		const nome = c.req.param("nome");
+		const { perfis } = await janelas.perfis();
+		const avatar = perfis.find((perfil) => perfil.id === id)?.agentes.find((agente) => agente.nome === nome)?.avatar;
+		if (!avatar) return c.json({ ok: false, erro: `O agente "${nome}" do perfil "${id}" não tem foto.` }, 404);
+		const tipo = TIPOS_IMAGEM[extname(avatar.arquivo).toLowerCase()] ?? "application/octet-stream";
+		return c.body(new Uint8Array(await readFile(avatar.arquivo)), 200, { "content-type": tipo, "cache-control": "no-cache" });
 	});
 
 	app.onError((erro, c) => {

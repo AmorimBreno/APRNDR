@@ -3,10 +3,17 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+/** Foto de um agente: a URL e, se houver, o quadrado do rosto [x, y, lado] em pixels da imagem. */
+export interface DadosAvatarAgente {
+	url: string;
+	recorte?: [number, number, number];
+}
+
 export interface AgenteSelecionavel {
 	nome: string;
 	papel: string;
 	modelo?: string;
+	avatar?: DadosAvatarAgente;
 }
 
 /** Aparência do perfil na tela de perfis (aparencia do profile.json); tudo opcional. */

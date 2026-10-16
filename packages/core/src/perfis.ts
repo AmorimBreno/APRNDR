@@ -12,6 +12,16 @@ const caminhoRelativo = z
 	.min(1)
 	.refine((valor) => !isAbsolute(valor), "deve ser um caminho relativo à pasta do perfil");
 
+const imagem = caminhoRelativo.refine((valor) => /\.(png|jpe?g|webp|svg)$/i.test(valor), "use uma imagem png, jpg, webp ou svg");
+
+/** Foto do agente na conversa: a imagem e, se ela não for só o rosto, o quadrado a mostrar. */
+export const esquemaAvatar = z.strictObject({
+	/** Imagem, relativa ao perfil. */
+	arquivo: imagem,
+	/** Quadrado do rosto na imagem, em pixels: [x, y, lado]. Sem ele, a imagem inteira. */
+	recorte: z.tuple([z.number().min(0), z.number().min(0), z.number().positive()]).optional(),
+});
+
 export const esquemaAgenteDoPerfil = z.strictObject({
 	/** Arquivo de definição do agente, relativo à pasta do perfil. */
 	arquivo: caminhoRelativo,
@@ -21,6 +31,7 @@ export const esquemaAgenteDoPerfil = z.strictObject({
 	selecionavel: z.boolean(),
 	/** Sobrescreve o modelo do frontmatter do agente. */
 	modelo: z.string().min(1).optional(),
+	avatar: esquemaAvatar.optional(),
 });
 
 /** Cores de marca do tema (design system APRNDR) que um perfil pode usar como sua. */
@@ -29,7 +40,7 @@ export const CORES_PERFIL = ["amber", "brick", "sage", "moss", "cream", "steel"]
 /** Como o perfil aparece na tela de perfis. Tudo opcional; o front tem padrões. */
 export const esquemaAparencia = z.strictObject({
 	/** Imagem da capa (png, jpg, webp ou svg), relativa ao perfil. */
-	capa: caminhoRelativo.refine((valor) => /\.(png|jpe?g|webp|svg)$/i.test(valor), "use uma imagem png, jpg, webp ou svg").optional(),
+	capa: imagem.optional(),
 	/** A cor do perfil: a moldura e a barra do card. */
 	cor: z.enum(CORES_PERFIL).optional(),
 	/** Uma frase curta no pé do card. */
@@ -69,6 +80,8 @@ export interface AgenteDoPerfil {
 	selecionavel: boolean;
 	/** Modelo efetivo: o do profile.json, se houver, senão o do frontmatter. */
 	modelo?: string;
+	/** Foto na conversa, com o caminho absoluto. */
+	avatar?: { arquivo: string; recorte?: [number, number, number] };
 	definicao: DefinicaoAgente;
 }
 
@@ -174,11 +187,18 @@ export async function lerPerfil(pasta: string): Promise<Perfil> {
 		if (agentes.some((outro) => outro.nome === definicao.nome)) {
 			throw erroDeCampo(campo, `agente ${definicao.nome} repetido`);
 		}
+		const avatar = agente.avatar
+			? {
+					arquivo: await resolverExistente(`agentes[${indice}].avatar.arquivo`, agente.avatar.arquivo),
+					...(agente.avatar.recorte ? { recorte: agente.avatar.recorte } : {}),
+				}
+			: undefined;
 		agentes.push({
 			nome: definicao.nome,
 			papel: agente.papel,
 			selecionavel: agente.selecionavel,
 			modelo: agente.modelo ?? definicao.modelo,
+			...(avatar ? { avatar } : {}),
 			definicao,
 		});
 	}

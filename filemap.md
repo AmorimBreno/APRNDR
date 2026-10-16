@@ -13,6 +13,7 @@ docs/PLANO.md — etapas, tarefas e estado atual; atualizar ao aceitar uma taref
 docs/teste-etapa-N.md — roteiro de teste que o Breno roda no fim de cada etapa
 docs/teste-etapa-1.md — roteiro da Etapa 1: pi no Windows Terminal com o perfil de estudos
 docs/teste-etapa-2.md — roteiro da Etapa 2: app pelo atalho, sessão, subagente, ponte de eventos e edição ao vivo
+docs/teste-etapa-3.md — roteiro da Etapa 3: tema APRNDR, tela de perfis e de carregamento, janela do perfil, seletor de modelo, painéis, ask_user_question, quiz, cancelamento e edição ao vivo
 docs/ponte-de-eventos.md — protocolo da ponte (interface:mostrar, pedido, resposta, acao) para quem escreve extensão de perfil
 docs/historico/ — documentos do checkpoint 1 (pi no WSL com tmux e Obsidian); só consulta
 

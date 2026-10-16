@@ -90,6 +90,15 @@ a.linha:hover .linha__texto .overline, a.linha:focus-visible .linha__texto .over
 ::view-transition-group(pedido-aberto) { animation-duration: .55s; animation-timing-function: var(--mola); }
 ::view-transition-old(pedido-aberto), ::view-transition-new(pedido-aberto) { height: 100%; animation-duration: .3s; }
 
+/* Trocas de tela (App.tsx): o resto da tela sai e entra num fade curto; os elementos
+ * com nome (o card ↔ a tela de cadernos, a faixa ↔ a barra) se transformam com mola. */
+::view-transition-group(*) { animation-duration: .62s; animation-timing-function: var(--mola); }
+::view-transition-old(*), ::view-transition-new(*) { height: 100%; }
+::view-transition-old(root) { animation: tela-sai .2s ease-in both; }
+::view-transition-new(root) { animation: tela-entra .36s .1s ease-out both; }
+@keyframes tela-sai { to { opacity: 0; } }
+@keyframes tela-entra { from { opacity: 0; transform: translateY(10px); } }
+
 @media (prefers-reduced-motion: reduce) {
 	.palavra, .ap-modal, .ap-modal-root { animation: none; }
 	.ferramenta--viva .ferramenta__status--ok .ap-icon path { animation: none; stroke-dashoffset: 0; }

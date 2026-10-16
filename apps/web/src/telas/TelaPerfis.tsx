@@ -50,7 +50,7 @@ function CartaoPerfil({ perfil }: { perfil: ResumoPerfil }) {
 			className={`cartao cartao--${aparencia.cor ?? "amber"}`}
 			href={`#/perfil/${encodeURIComponent(perfil.id)}`}
 			data-perfil={perfil.id}
-			style={{ rotateX, rotateY, transformPerspective: 1100 }}
+			style={{ rotateX, rotateY, transformPerspective: 1100, viewTransitionName: `perfil-${perfil.id}` }}
 			onPointerMove={mover}
 			onPointerLeave={soltar}
 			whileTap={{ scale: 0.985 }}

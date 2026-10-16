@@ -1,10 +1,12 @@
-// Rotas por hash (o recarregar da página mantém a tela):
+// Rotas por hash (o recarregar da página mantém a tela). A troca de tela é
+// animada por View Transition (movimento.ts, comTransicao).
+//
 // - "#/": a tela de perfis;
 // - "#/perfil/<id>": a tela inicial do perfil, se ele tiver uma (telas-iniciais.ts),
 //   ou a janela de conversa;
 // - "#/perfil/<id>/conversa": a janela de conversa de um perfil com tela inicial.
 
-import { usePerfis } from "@estudos/ui";
+import { comTransicao, usePerfis } from "@estudos/ui";
 import { MotionConfig } from "motion/react";
 import { useEffect, useState } from "react";
 import { telasIniciais } from "./telas-iniciais.ts";
@@ -53,7 +55,10 @@ function Rotas() {
 	const [hash, setHash] = useState(() => window.location.hash);
 
 	useEffect(() => {
-		const mudou = () => setHash(window.location.hash);
+		// A troca de tela acontece numa View Transition: os elementos com o mesmo
+		// view-transition-name se transformam um no outro (o card do perfil vira a
+		// tela de cadernos; a faixa da marca vira a barra da conversa).
+		const mudou = () => void comTransicao(() => setHash(window.location.hash));
 		window.addEventListener("hashchange", mudou);
 		return () => window.removeEventListener("hashchange", mudou);
 	}, []);

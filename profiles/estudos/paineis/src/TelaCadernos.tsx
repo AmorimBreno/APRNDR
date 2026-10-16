@@ -13,7 +13,8 @@ export function TelaCadernos(props: PropsTelaInicial) {
 	// Os cadernos chegam na Etapa 4; até lá, a lista é vazia.
 	const cadernos: number = 0;
 	return (
-		<div className="tela">
+		// O card do perfil, na tela de perfis, tem o mesmo nome: ele cresce até virar esta tela.
+		<div className="tela" style={{ viewTransitionName: `perfil-${props.perfilId}` }}>
 			<FaixaMarca legenda={`${props.perfil?.nome ?? "Estudos"} · ${mesAno.format(new Date())}`} glifo="書">
 				<Stat value={pad2(cadernos)} label="Cadernos" size="lg" accent />
 				<Button icon="arrow-left" onClick={props.voltar}>

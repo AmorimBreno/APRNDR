@@ -16,7 +16,8 @@ export interface PropsFaixaMarca {
 
 export function FaixaMarca({ legenda, glifo, children }: PropsFaixaMarca) {
 	return (
-		<aside className="faixa">
+		// O mesmo nome da barra tijolo da conversa: a faixa vira a barra ao abrir a conversa.
+		<aside className="faixa" style={{ viewTransitionName: "faixa-marca" }}>
 			<div className="faixa__topo">
 				<Wordmark size={40} />
 				<span className="overline">{legenda}</span>

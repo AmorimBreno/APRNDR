@@ -12,3 +12,10 @@ Mudanças no código (o TypeScript do projeto é estrito e usa verbatimModuleSyn
 - components/src/util.ts: `cx` aceita também `0n`, porque o `error` dos campos é ReactNode e `error && ...` pode dar bigint. Linha marcada com [estudos-ia].
 
 Fora do pacote, também do estudos-ia: pnpm-workspace.yaml lista design-system.
+
+## Regras do app que mudam o manual
+
+O README.md continua como foi exportado. Onde o app segue outra regra, por decisão do Breno, ela fica aqui.
+
+- Movimento (2026-10-16). O manual pede "movimento curto (120–320ms, ease-out), sem bounce". O app usa animação com física: molas com um pouco de bounce, entradas brincalhonas, texto que aparece, elementos que se transformam uns nos outros (View Transitions do navegador e a biblioteca Motion). Continua valendo: tudo para com prefers-reduced-motion, e nada de brilho, degradê ou desfoque.
+- Escala (2026-10-16). O app roda com zoom de 90% na raiz: os tamanhos do manual ficaram grandes demais na tela do Breno.

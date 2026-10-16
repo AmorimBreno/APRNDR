@@ -12,7 +12,8 @@
 	},
 	"dependencies": {
 		"@estudos/design-system": "workspace:*",
-		"@estudos/ui": "workspace:*"
+		"@estudos/ui": "workspace:*",
+		"motion": "13.5.1"
 	},
 	"peerDependencies": {
 		"react": "^19.3.0",

@@ -1,0 +1,34 @@
+/* APRNDR — tokens.css, gerado do tokens.json (não edite à mão: mude o tokens.json e gere de novo).
+ * Variáveis CSS das cores, espaços, raios, bordas, tamanhos e sombras; @font-face das fontes em fonts/;
+ * uma classe por estilo de texto (.display-lg, .lesson-body, .overline…).
+ * Ordem de carga: tokens.css, depois components/bundle.css, depois React 18 e components/bundle.js. */
+@font-face { font-family: "Unbounded"; src: url("fonts/Unbounded-Variable.woff2") format("woff2"); font-weight: 200 900; font-style: normal; font-display: swap; }
+@font-face { font-family: "Archivo"; src: url("fonts/Archivo-Variable.woff2") format("woff2"); font-weight: 100 900; font-style: normal; font-display: swap; }
+@font-face { font-family: "Archivo"; src: url("fonts/Archivo-Variable-Italic.woff2") format("woff2"); font-weight: 100 900; font-style: italic; font-display: swap; }
+@font-face { font-family: "Sono"; src: url("fonts/Sono-Variable.woff2") format("woff2"); font-weight: 200 800; font-style: normal; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("fonts/IBMPlexMono-500.woff2") format("woff2"); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: "Fraunces"; src: url("fonts/Fraunces-Variable.woff2") format("woff2"); font-weight: 100 900; font-style: normal; font-display: swap; }
+@font-face { font-family: "Fraunces"; src: url("fonts/Fraunces-Variable-Italic.woff2") format("woff2"); font-weight: 100 900; font-style: italic; font-display: swap; }
+@font-face { font-family: "Zen Antique"; src: url("fonts/ZenAntique-Ornament.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+:root, [data-theme="dark"] { --surface-ground: #0f0e0d; --surface-panel: #1a1917; --surface-raised: #24221f; --surface-hover: #2e2b27; --surface-well: #080807; --scrim: #000000b8; --line: #38342f; --line-strong: #7d7466; --ink: #f2eadb; --ink-muted: #bdb19e; --ink-subtle: #998e7e; --ink-inverse: #15130f; --amber: #e0a15e; --on-amber: var(--ink-inverse); --amber-tint: #3a2b1a; --brick: #b83a2d; --on-brick: #fbf1e1; --brick-text: #e57a66; --brick-tint: #3a1c17; --sage: #668a65; --on-sage: var(--ink-inverse); --sage-text: #95bd91; --sage-tint: #1e2a1d; --moss: #4e6851; --on-moss: var(--ink); --cream: #dcc9a9; --on-cream: var(--ink-inverse); --steel: #919693; --on-steel: var(--ink-inverse); --paper: #f3ecdf; --paper-hover: #e9e0cf; --paper-line: #d6cbb7; --on-paper: var(--ink-inverse); --on-paper-muted: #64594a; --amber-pastel: #fbe6cc; --amber-line: #d18a3f; --amber-deep: #7a4512; --brick-pastel: #f7dbd4; --brick-line: var(--brick); --brick-deep: #86271d; --sage-pastel: #dcebd8; --sage-line: var(--sage); --sage-deep: #2f4d2e; --moss-pastel: #d3e0d4; --moss-line: var(--moss); --moss-deep: #24392a; --cream-pastel: #f7ecd6; --cream-line: #b39d78; --cream-deep: #4d3f29; --steel-pastel: #e1e5e3; --steel-line: #7f8582; --steel-deep: #2e3331; --holo-1: #f6cde0; --holo-2: #fbdcc0; --holo-3: #f5f3c0; --holo-4: #d9edc8; --holo-5: #c8dcec; --holo-6: #d2c6e6; --focus: var(--amber); --focus-ring: 0 0 0 2px #0f0e0d, 0 0 0 4px #e0a15e; --key-lip: inset 0 -3px 0 #00000047; --key-lip-pressed: inset 0 -1px 0 #00000047; --sticker-shadow: 0 2px 0 #00000033, 0 10px 18px -10px #0000008c; }
+:root { --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-12: 48px; --space-16: 64px; --radius-xs: 4px; --radius-sm: 8px; --radius-md: 12px; --radius-lg: 24px; --radius-xl: 32px; --radius-full: 9999px; --border-hair: 1px; --border-control: 1.5px; --border-strong: 2px; --control-sm: 32px; --control-md: 40px; --control-lg: 48px; --measure-read: 720px; --course-bar: 96px; --menu-rail: 300px; --wheel-row: 128px; --modal-sm: 440px; --modal-md: 640px; --modal-lg: 880px; --opacity-disabled: 0.42; --font-display: "Unbounded", "Archivo", system-ui, sans-serif; --font-sans: "Archivo", system-ui, -apple-system, "Segoe UI", sans-serif; --font-mono: "Sono", ui-monospace, "Cascadia Mono", Consolas, monospace; --font-numbers: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace; --font-serif: "Fraunces", Georgia, "Times New Roman", serif; --font-ornament: "Zen Antique", "Yu Mincho", "MS Mincho", serif; }
+.display-xl { font-family: var(--font-display); font-size: 96px; line-height: 0.92; font-weight: 800; letter-spacing: -0.03em; }
+.display-lg { font-family: var(--font-display); font-size: 56px; line-height: 56px; font-weight: 800; letter-spacing: -0.02em; }
+.display-md { font-family: var(--font-display); font-size: 34px; line-height: 38px; font-weight: 700; letter-spacing: -0.01em; }
+.display-sm { font-family: var(--font-display); font-size: 20px; line-height: 26px; font-weight: 700; }
+.button { font-family: var(--font-display); font-size: 13px; line-height: 16px; font-weight: 600; letter-spacing: 0.04em; }
+.lesson-body { font-family: var(--font-sans); font-size: 19px; line-height: 32px; font-weight: 400; }
+.heading { font-family: var(--font-sans); font-size: 20px; line-height: 28px; font-weight: 700; }
+.body-lg { font-family: var(--font-sans); font-size: 17px; line-height: 28px; font-weight: 400; }
+.body { font-family: var(--font-sans); font-size: 15px; line-height: 24px; font-weight: 400; }
+.body-strong { font-family: var(--font-sans); font-size: 15px; line-height: 24px; font-weight: 600; }
+.body-sm { font-family: var(--font-sans); font-size: 13px; line-height: 20px; font-weight: 400; }
+.overline { font-family: var(--font-mono); font-size: 11px; line-height: 16px; font-weight: 500; letter-spacing: 0.14em; }
+.data { font-family: var(--font-mono); font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: 0.02em; }
+.data-lg { font-family: var(--font-numbers); font-size: 28px; line-height: 32px; font-weight: 500; }
+.data-xl { font-family: var(--font-numbers); font-size: 56px; line-height: 56px; font-weight: 500; letter-spacing: -0.02em; }
+.code { font-family: var(--font-mono); font-size: 14px; line-height: 22px; font-weight: 400; }
+.quote { font-family: var(--font-serif); font-size: 26px; line-height: 34px; font-weight: 400; font-style: italic; font-variation-settings: 'opsz' 72; }
+.lead { font-family: var(--font-serif); font-size: 20px; line-height: 30px; font-weight: 400; font-variation-settings: 'opsz' 24; }
+.glyph-xl { font-family: var(--font-ornament); font-size: 160px; line-height: 1; font-weight: 400; }
+.glyph-md { font-family: var(--font-ornament); font-size: 56px; line-height: 1; font-weight: 400; }

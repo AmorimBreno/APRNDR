@@ -1,0 +1,48 @@
+<!-- @dsCard group="Dados" height=312 subtitle="Barras contornadas de painel: progresso por módulo, questões por dia, revisão" -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Meter — prévia</title>
+<style>
+  body { padding: 24px; }
+  .row { display: flex; flex-wrap: wrap; gap: 16px; align-items: stretch; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Aprndr, h = React.createElement;
+  var modules = [
+    { label: '01', title: 'Módulo 01 · Limites', value: 1 },
+    { label: '02', title: 'Módulo 02 · Continuidade', value: 1 },
+    { label: '03', title: 'Módulo 03 · Derivadas', value: 0.62 },
+    { label: '04', title: 'Módulo 04 · Integrais', value: 0 }
+  ];
+  var week = [
+    { label: 'Seg', title: 'Segunda: 8 questões', value: 0.4 },
+    { label: 'Ter', title: 'Terça: 16 questões', value: 0.8 },
+    { label: 'Qua', title: 'Quarta: 11 questões', value: 0.55 },
+    { label: 'Qui', title: 'Quinta: 20 questões', value: 1 },
+    { label: 'Sex', title: 'Sexta: 6 questões', value: 0.3 }
+  ];
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', { className: 'row' },
+      h(A.Card, { tone: 'panel', index: '01', label: 'Cálculo I' },
+        h(A.Meter, { label: 'Progresso por módulo', items: modules })
+      ),
+      h(A.Card, { tone: 'amber', index: '02', label: 'Esta semana' },
+        h(A.Meter, { label: 'Questões por dia', items: week, tone: 'ink', height: 104, showValues: false })
+      ),
+      h(A.Card, { tone: 'panel', index: '03', label: 'Revisão' },
+        h(A.Meter, { label: 'Urgência por módulo', tone: 'brick', items: [
+          { label: '01', title: 'Módulo 01 · Limites', value: 0.15 },
+          { label: '02', title: 'Módulo 02 · Continuidade', value: 0.7 },
+          { label: '03', title: 'Módulo 03 · Derivadas', value: 0.9 }
+        ] })
+      )
+    )
+  );
+</script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+<!-- @dsCard group="Formulários" height=290 subtitle="Rótulo de painel, ajuda, ícone e erro" -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>TextField — prévia</title>
+<style>
+  body { padding: 24px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px 20px; max-width: 760px; }
+  @media (max-width: 560px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Aprndr, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', { className: 'grid' },
+      h(A.TextField, { label: 'Nome do curso', placeholder: 'Ex.: Cálculo I', hint: 'Aparece na capa do curso.' }),
+      h(A.TextField, { label: 'Matéria', icon: 'book', defaultValue: 'Ciência de Dados' }),
+      h(A.TextField, { label: 'Link da aula', defaultValue: 'aula-03', error: 'Cole o link completo, começando com https://' }),
+      h(A.TextField, { label: 'Prazo da avaliação', size: 'lg', placeholder: 'dd/mm/aaaa', inputMode: 'numeric' })
+    )
+  );
+</script>
+</body>
+</html>

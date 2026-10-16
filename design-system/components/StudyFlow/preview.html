@@ -1,0 +1,464 @@
+<!-- @dsCard group="Telas" height=800 width=1280 page subtitle="Menu de cadernos → a linha selecionada sobe e vira a aba do curso → aula ao vivo em coluna única" -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Fluxo de estudo — página</title>
+<style>
+  html, body { margin: 0; height: 800px; overflow: hidden; }
+  .app { position: relative; width: 1280px; height: 800px; overflow: hidden; background: var(--surface-ground); color: var(--ink); }
+
+  /* ── Menu ── */
+  .menu { position: absolute; inset: 0; display: grid; grid-template-columns: var(--menu-rail) 1fr; gap: 16px; padding: 16px; }
+  .rail { display: flex; flex-direction: column; justify-content: space-between; gap: 24px; padding: 28px 24px 24px; border-radius: var(--radius-xl); background: var(--surface-panel); }
+  .rail-top { display: flex; flex-direction: column; gap: 10px; }
+  .rail-top .overline { color: var(--ink-muted); }
+  .rail-orn { align-self: center; }
+  .rail-bottom { display: flex; flex-direction: column; gap: 20px; }
+  .sheet { position: relative; display: flex; flex-direction: column; overflow: hidden; border-radius: var(--radius-xl); background: var(--paper); color: var(--on-paper); }
+  .sheet-head, .sheet-foot { display: flex; align-items: baseline; justify-content: space-between; padding: 20px 32px 16px; }
+  .sheet-head { border-bottom: 2px solid var(--on-paper); }
+  .sheet-foot { margin-top: auto; padding: 14px 32px; border-top: 2px solid var(--on-paper); }
+  .sheet-head .overline, .sheet-foot .overline { color: var(--on-paper-muted); }
+  .sheet-count { color: var(--on-paper); }
+
+  /* ── Curso ── */
+  .course { position: absolute; inset: 0; display: flex; flex-direction: column; background: var(--surface-ground); }
+  .course .ap-cbar { flex: none; z-index: 3; }
+  .lesson-wrap { position: relative; flex: 1; overflow-y: auto; scroll-behavior: smooth; }
+  .lesson-col { display: flex; flex-direction: column; gap: 44px; width: var(--measure-read); margin: 0 auto; padding: 56px 0 260px; }
+  .lesson-head { display: flex; flex-direction: column; gap: 14px; }
+  .lesson-meta { display: flex; align-items: center; gap: 12px; color: var(--ink-muted); }
+  .lesson-head h1 { margin: 0; }
+  .lesson-head .lead { margin: 4px 0 0; color: var(--ink-muted); }
+  .ruler-dock { position: absolute; left: 64px; top: 50%; z-index: 2; transform: translateY(-40%); }
+  .ask-dock { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; display: flex; justify-content: center; padding: 14px 0 18px; border-top: 1px solid var(--line); background: var(--surface-ground); }
+
+  /* ── Transição: a linha sobe e vira a aba ── */
+  .ghost { position: absolute; z-index: 10; display: flex; align-items: center; overflow: hidden; background: var(--brick); color: var(--on-brick); pointer-events: none; }
+  .ghost-title { padding-left: 128px; white-space: nowrap; }
+  .menu.is-leaving .sheet { opacity: 0; transform: translateY(48px); transition: opacity .24s ease-in, transform .45s cubic-bezier(.65, 0, .25, 1); }
+  .menu.is-leaving .rail { opacity: 0; transform: translateX(-24px); transition: opacity .22s ease-in, transform .4s cubic-bezier(.65, 0, .25, 1); }
+  .menu.is-leaving .ap-wheel__row.is-selected, .menu.is-entering .ap-wheel__row.is-selected { visibility: hidden; }
+  .menu.is-entering .rail, .menu.is-entering .sheet-head, .menu.is-entering .sheet-foot { animation: fade-in .4s ease-out .15s both; }
+  .menu.is-entering .ap-wheel__row:not(.is-selected) { animation: fade-in .35s ease-out .2s both; }
+  .course.is-entering { animation: fade-in .28s ease-out .24s both; }
+  .course.is-entering .ap-cbar { visibility: hidden; }
+  .course.is-entering .lesson-wrap, .course.is-entering .ask-dock, .course.is-entering .ruler-dock { animation: rise-in .4s cubic-bezier(.2, .8, .2, 1) .2s both; }
+  .course.is-landing .ap-cbar > * { animation: fade-in .22s ease-out both; }
+  .course.is-leaving { opacity: 0; pointer-events: none; transition: opacity .24s ease-in; }
+  .course.is-leaving .ap-cbar { visibility: hidden; }
+  @keyframes fade-in { from { opacity: 0; } }
+  @keyframes rise-in { from { opacity: 0; transform: translateY(28px); } }
+  @media (prefers-reduced-motion: reduce) {
+    .menu *, .course *, .ghost { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Aprndr, h = React.createElement;
+  var useState = React.useState, useRef = React.useRef, useEffect = React.useEffect, useLayoutEffect = React.useLayoutEffect;
+  var REDUCE = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var BAR = { top: 0, left: 0, width: 1280, height: 96 };
+
+  /* ── dados de exemplo ── */
+  var SUBJECTS = [
+    { id: 'calc', title: 'Cálculo I', modules: 4, curModule: 3, names: ['Limites', 'Continuidade', 'Derivadas', 'Integrais'], cover: { tone: 'moss', glyph: '解', label: 'Cálculo', number: 3 }, aula: 7,
+      lead: 'Hoje: o que acontece com a taxa média quando o intervalo encolhe até zero.',
+      blocks: [
+        { label: 'Explicação', text: ['A derivada mede **quão rápido** uma função muda num ponto. Calcule a taxa média num intervalo e vá encolhendo o intervalo até quase zero.'], idea: 'A derivada é o limite da taxa média quando o intervalo encolhe até zero.' },
+        { quiz: { prompt: 'Qual é a derivada de f(x) = x² no ponto x = 3?', options: [['a', '3'], ['b', '6'], ['c', '9'], ['d', '2x, para qualquer x']], correct: 'b', ok: 'Isso: f′(x) = 2x, então em x = 3 a inclinação é 6.', bad: 'Quase: 2x é a fórmula. A questão pedia o valor em x = 3, que é 6.' } },
+        { note: 'E se fosse x³? A regra muda?' },
+        { label: 'Resposta', text: ['A ideia é a mesma. Entre x e x + h, x³ sobe 3x²h + 3xh² + h³. Dividindo por h e deixando h ir a zero, sobra **3x²**.', 'Repare no padrão: o expoente desce e perde 1. É a regra da potência.'] }
+      ],
+      more: ['Vamos ver isso no gráfico: em x = 0 a curva de x³ fica plana por um instante, então a derivada ali é 0, mesmo a função continuando a subir depois.', 'Na regra da potência, xⁿ vira n·xⁿ⁻¹. Teste com x⁴: a derivada é 4x³.'],
+      reply: 'Boa dúvida. Vamos por partes: o que muda é só o expoente. Para x⁵, a derivada é 5x⁴ — o 5 desce e o expoente perde 1.' },
+    { id: 'dados', title: 'Ciência de Dados', modules: 6, curModule: 2, names: ['Estatística', 'Regressão linear', 'Classificação', 'Árvores', 'Validação', 'Projeto'], cover: { tone: 'amber', glyph: '知', label: 'Dados', number: 4 }, aula: 4,
+      lead: 'Hoje: como achar a reta que erra menos nos seus dados.',
+      blocks: [
+        { label: 'Explicação', text: ['A regressão linear procura a reta que passa **o mais perto possível** de todos os pontos. "Perto" aqui é a soma dos erros ao quadrado: quanto menor, melhor a reta.'], idea: 'A melhor reta é a que minimiza a soma dos erros ao quadrado.' }
+      ],
+      more: ['O erro de cada ponto é a distância vertical até a reta. Elevar ao quadrado deixa tudo positivo e pesa mais os erros grandes.'],
+      reply: 'Vamos por partes: o erro ao quadrado pune mais quem está longe da reta. Por isso um ponto muito fora puxa a reta para perto dele.',
+      test: { prompt: 'Por que a regressão linear eleva os erros ao quadrado?', options: [['a', 'Para o cálculo ficar mais rápido'], ['b', 'Para a reta passar pela origem'], ['c', 'Para erros positivos e negativos não se cancelarem, e os grandes pesarem mais'], ['d', 'Para ignorar pontos fora da curva']], correct: 'c', ok: 'Isso: ao quadrado, todo erro fica positivo e os grandes pesam mais.', bad: 'Ainda não: sem o quadrado, erros para cima e para baixo se cancelariam.' } },
+    { id: 'merc', title: 'Mercado Financeiro e de Capitais', modules: 5, curModule: 1, names: ['Renda fixa', 'Renda variável', 'Derivativos', 'Fundos', 'Risco'], cover: { tone: 'steel', glyph: '読', label: 'Mercado', number: 5 }, aula: 2,
+      lead: 'Hoje: o que você está fazendo quando compra um título de renda fixa.',
+      blocks: [
+        { label: 'Explicação', text: ['Na renda fixa você **empresta dinheiro** para alguém — governo, banco ou empresa — e combina antes como vai ser pago: uma taxa fixa, um índice como o CDI, ou um índice mais uma taxa.'], idea: 'Renda fixa é um empréstimo com as regras de pagamento combinadas antes.' }
+      ],
+      more: ['"Fixa" não quer dizer que o rendimento é garantido: quer dizer que a regra do pagamento é conhecida desde o início.'],
+      reply: 'Vamos por partes: o risco está em quem pega o dinheiro emprestado. Por isso um título de empresa costuma pagar mais que um do governo.',
+      test: { prompt: 'O que é "fixo" num título de renda fixa?', options: [['a', 'A regra de pagamento, combinada no início'], ['b', 'O rendimento, que é garantido'], ['c', 'O preço do título até o vencimento'], ['d', 'O risco de quem emite']], correct: 'a', ok: 'Isso: a regra é conhecida desde o início.', bad: 'Ainda não: o que fica fixo é a regra do pagamento, não o resultado.' } },
+    { id: 'algo', title: 'Algoritmos', modules: 3, curModule: 3, names: ['Busca', 'Recursão', 'Ordenação'], cover: { tone: 'ink', glyph: '考', label: 'Algoritmos', number: 6 }, aula: 9,
+      lead: 'Hoje: ordenar dividindo a lista ao meio até não sobrar nada para ordenar.',
+      blocks: [
+        { label: 'Explicação', text: ['O merge sort **divide** a lista ao meio até ficarem listas de um item, que já estão ordenadas. Depois **junta** as metades em ordem, duas a duas.'], idea: 'Dividir até ficar trivial e juntar em ordem: é por isso que o merge sort é O(n log n).' }
+      ],
+      more: ['Cada nível de divisão custa n comparações para juntar, e existem log n níveis. Daí o n log n.'],
+      reply: 'Vamos por partes: juntar duas listas já ordenadas é fácil — você compara só os primeiros de cada uma.',
+      test: { prompt: 'Qual é a complexidade do merge sort no pior caso?', options: [['a', 'O(n)'], ['b', 'O(log n)'], ['c', 'O(n²)'], ['d', 'O(n log n)']], correct: 'd', ok: 'Isso: log n níveis, n comparações em cada um.', bad: 'Ainda não: são log n níveis de divisão, com n comparações para juntar em cada nível.' } },
+    { id: 'fis', title: 'Física II', modules: 5, curModule: 1, names: ['Termodinâmica', 'Gases', 'Ondas', 'Óptica', 'Fluidos'], cover: { tone: 'sage', glyph: '学', label: 'Física', number: 7 }, aula: 1,
+      lead: 'Hoje: a diferença entre calor e temperatura.',
+      blocks: [
+        { label: 'Explicação', text: ['Temperatura mede a **agitação média** das partículas. Calor é energia **em trânsito**: ela passa do corpo mais quente para o mais frio até as temperaturas se igualarem.'], idea: 'Temperatura é um estado; calor é energia passando de um corpo para outro.' }
+      ],
+      more: ['Por isso não faz sentido dizer que um corpo "tem calor": ele tem energia interna, e troca calor.'],
+      reply: 'Vamos por partes: dois corpos na mesma temperatura podem ter energias diferentes — o maior guarda mais energia.',
+      test: { prompt: 'O que é calor?', options: [['a', 'A temperatura de um corpo'], ['b', 'A energia guardada num corpo'], ['c', 'A agitação de uma partícula'], ['d', 'Energia passando de um corpo mais quente para um mais frio']], correct: 'd', ok: 'Isso: calor é energia em trânsito.', bad: 'Ainda não: temperatura e energia interna são estados; calor é a energia que passa.' } }
+  ];
+  function pad(n) { return n < 10 ? '0' + n : String(n); }
+  function find(id) { return SUBJECTS.filter(function (s) { return s.id === id; })[0]; }
+  function pctOf(s) { return Math.round(((s.curModule - 1) / s.modules) * 100); }
+  function itemsOf() {
+    return SUBJECTS.map(function (s) {
+      return { id: s.id, title: s.title, kicker: 'Caderno ' + pad(s.cover.number) + ' · ' + s.modules + ' módulos', meta: pctOf(s) + '%', cover: s.cover };
+    });
+  }
+  function stepsFor(s, cur) {
+    var out = [];
+    for (var i = 1; i <= s.modules; i++) {
+      out.push({ id: 'm' + i, mod: i, kind: 'module', label: 'Módulo ' + pad(i) + ' · ' + s.names[i - 1] });
+      out.push({ id: 'q' + i, mod: i, kind: 'quiz', label: 'Questionário ' + pad(i) });
+    }
+    out.push({ id: 'fin', mod: s.modules + 1, kind: 'final', label: 'Teste final' });
+    var curMod = out[cur].mod;
+    return out.map(function (st, i) {
+      var state = i < cur ? 'done' : i === cur ? 'current' : st.kind !== 'final' && st.mod > curMod ? 'locked' : 'todo';
+      return Object.assign({}, st, { state: state });
+    });
+  }
+  function rich(t) {
+    return t.split('**').map(function (part, i) { return i % 2 ? h('strong', { key: i }, part) : part; });
+  }
+
+  /* ── aula ── */
+  var uid = 0;
+  function nextId() { uid += 1; return 'b' + uid; }
+  function initialItems(s) {
+    return s.blocks.map(function (b) {
+      if (b.note) return { id: nextId(), type: 'note', text: b.note };
+      if (b.quiz) return { id: nextId(), type: 'quiz', quiz: b.quiz, value: null };
+      return { id: nextId(), type: 'block', label: b.label, text: b.text, idea: b.idea, shown: Infinity };
+    });
+  }
+  function charsOf(item) { return item.text.join('').length; }
+
+  function Lesson(props) {
+    var s = props.subject;
+    var init = useState(function () { return initialItems(s); });
+    var items = init[0], setItems = init[1];
+    var endedS = useState(false), ended = endedS[0], setEnded = endedS[1];
+    var curS = useState(items[0].id), cur = curS[0], setCur = curS[1];
+    var moreS = useState(0), more = moreS[0], setMore = moreS[1];
+    var askS = useState(''), ask = askS[0], setAsk = askS[1];
+    var scrollRef = useRef(null);
+    var writing = items.some(function (it) { return it.type === 'block' && it.shown < charsOf(it); });
+
+    // a IA "escreve": revela o texto aos poucos
+    useEffect(function () {
+      if (!writing) return;
+      var t = setInterval(function () {
+        setItems(function (list) {
+          return list.map(function (it) { return it.type === 'block' && it.shown < charsOf(it) ? Object.assign({}, it, { shown: it.shown + 5 }) : it; });
+        });
+      }, 28);
+      return function () { clearInterval(t); };
+    }, [writing]);
+
+    // rola até o fim quando entra conteúdo novo
+    var count = items.length + (ended ? 1 : 0);
+    useEffect(function () {
+      var el = scrollRef.current;
+      if (el && count > s.blocks.length) el.scrollTop = el.scrollHeight;
+    }, [count]);
+    useEffect(function () {
+      var el = scrollRef.current;
+      if (el && writing) el.scrollTop = el.scrollHeight;
+    });
+
+    function onScroll() {
+      var el = scrollRef.current;
+      if (!el) return;
+      var at = items[0].id;
+      items.forEach(function (it) {
+        var node = document.getElementById('lesson-' + it.id);
+        if (node && node.offsetTop - 140 <= el.scrollTop) at = it.id;
+      });
+      if (at !== cur) setCur(at);
+    }
+    function goTo(id) {
+      var node = document.getElementById('lesson-' + id);
+      if (node && scrollRef.current) scrollRef.current.scrollTop = node.offsetTop - 48;
+      setCur(id);
+    }
+    function addBlock(label, text, idea) {
+      setItems(function (list) { return list.concat([{ id: nextId(), type: 'block', label: label, text: text, idea: idea, shown: 0 }]); });
+    }
+    function addNote(text, label) {
+      setItems(function (list) { return list.concat([{ id: nextId(), type: 'note', text: text, label: label }]); });
+    }
+    function onSend(text) {
+      addNote(text);
+      setTimeout(function () { addBlock('Resposta', [s.reply]); }, 350);
+    }
+    function onSuggestion(v) {
+      if (v === 'Continuar') { addBlock('Explicação', [s.more[more % s.more.length]]); setMore(more + 1); }
+      else if (v === 'Outro exemplo') { addBlock('Exemplo', [s.more[(more + 1) % s.more.length]]); setMore(more + 1); }
+      else if (v === 'Não entendi') { addNote('Não entendi essa parte.', 'Você pediu'); setTimeout(function () { addBlock('Reexplicação', [s.reply]); }, 350); }
+      else if (v === 'Me testa') {
+        var q = s.test || (s.blocks[1] && s.blocks[1].quiz);
+        if (q) setItems(function (list) { return list.concat([{ id: nextId(), type: 'quiz', quiz: q, value: null }]); });
+        else addBlock('Pergunta', ['As perguntas começam quando o primeiro módulo estiver pronto.']);
+      }
+    }
+    // os três pontos do callout: perguntar sobre a frase, reexplicar ou pedir um exemplo
+    function onIdea(id, idea) {
+      if (id === 'ask') {
+        setAsk('Sobre “' + idea + '”: ');
+        setTimeout(function () {
+          var ta = document.querySelector('.ask-dock textarea');
+          if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+        }, 30);
+      } else if (id === 'rephrase') {
+        addNote('Explica de outro jeito: “' + idea + '”', 'Você pediu');
+        setTimeout(function () { addBlock('Reexplicação', [s.reply]); }, 350);
+      } else if (id === 'example') {
+        addNote('Me dá um exemplo disso.', 'Você pediu');
+        setTimeout(function () { addBlock('Exemplo', [s.more[(more + 1) % s.more.length]]); setMore(more + 1); }, 350);
+      }
+    }
+    function answer(id, value) {
+      setItems(function (list) { return list.map(function (it) { return it.id === id ? Object.assign({}, it, { value: value }) : it; }); });
+    }
+
+    var n = 0;
+    var nodes = items.map(function (it) {
+      if (it.type === 'note') return h(A.StudentNote, { key: it.id, id: 'lesson-' + it.id, label: it.label }, h('p', null, it.text));
+      n += 1;
+      if (it.type === 'quiz') {
+        var q = it.quiz, answered = it.value != null;
+        return h(A.LessonBlock, { key: it.id, id: 'lesson-' + it.id, index: n, label: 'Pergunta' },
+          h(A.QuizQuestion, {
+            prompt: q.prompt,
+            options: q.options.map(function (o) { return { id: o[0], label: o[1] }; }),
+            value: it.value, onChange: function (v) { answer(it.id, v); },
+            correctId: answered ? q.correct : undefined
+          },
+            answered ? h(A.QuizFeedback, { status: it.value === q.correct ? 'correct' : 'incorrect' }, h('p', null, it.value === q.correct ? q.ok : q.bad)) : null
+          )
+        );
+      }
+      var left = it.shown, paras = [];
+      it.text.forEach(function (t, i) {
+        if (left <= 0) return;
+        var part = t.slice(0, left);
+        left -= t.length;
+        paras.push(h('p', { key: i }, rich(part)));
+      });
+      var done = it.shown >= charsOf(it);
+      var isWriting = !done;
+      return h(A.LessonBlock, {
+        key: it.id, id: 'lesson-' + it.id, index: n, label: it.label, writing: isWriting,
+        actions: done ? [
+          h(A.Button, { key: 'r', variant: 'ghost', size: 'sm', icon: 'refresh', onClick: function () { onSuggestion('Não entendi'); } }, 'Reexplicar'),
+          h(A.Button, { key: 'e', variant: 'ghost', size: 'sm', icon: 'bulb', onClick: function () { onSuggestion('Outro exemplo'); } }, 'Outro exemplo')
+        ] : null
+      }, paras, done && it.idea ? h(A.Callout, { key: 'idea', onAction: function (id) { onIdea(id, it.idea); } }, it.idea) : null);
+    });
+
+    var ruler = items.map(function (it) { return { id: it.id, label: it.type === 'note' ? 'Você' : it.type === 'quiz' ? 'Pergunta' : it.label }; });
+
+    return [
+      h('div', { key: 'wrap', className: 'lesson-wrap', ref: scrollRef, onScroll: onScroll },
+        h('article', { className: 'lesson-col' },
+          h('header', { className: 'lesson-head' },
+            h('div', { className: 'lesson-meta' },
+              h('span', { className: 'overline' }, 'Módulo ' + pad(s.curModule) + ' · Aula ' + pad(s.aula)),
+              h(A.Tag, { tone: 'brick', dot: true }, 'Ao vivo')
+            ),
+            h('h1', { className: 'display-lg' }, s.names[s.curModule - 1]),
+            h('p', { className: 'lead' }, s.lead)
+          ),
+          nodes,
+          ended ? h(A.SummaryCard, {
+            title: 'Aula ' + pad(s.aula) + ' — ' + s.names[s.curModule - 1],
+            kicker: 'Resumo gerado · fim da aula',
+            stats: [{ label: 'Blocos', value: String(n) }, { label: 'Perguntas', value: String(items.filter(function (i) { return i.type === 'quiz'; }).length) }, { label: 'Suas notas', value: String(items.filter(function (i) { return i.type === 'note'; }).length) }],
+            onOpen: function () {}, onDownload: function () {}
+          }) : null
+        )
+      ),
+      h('div', { key: 'ruler', className: 'ruler-dock' }, h(A.SectionRuler, { items: ruler, current: cur, onSelect: goTo })),
+      ended ? null : h('div', { key: 'ask', className: 'ask-dock' },
+        h(A.AskBar, {
+          suggestions: [
+            { label: 'Continuar', icon: 'arrow-right' },
+            { label: 'Outro exemplo', icon: 'bulb' },
+            { label: 'Não entendi', icon: 'help' },
+            { label: 'Me testa', icon: 'checklist' }
+          ],
+          onSuggestion: onSuggestion,
+          value: ask,
+          onChange: setAsk,
+          onSend: function (text) { onSend(text); setAsk(''); },
+          generating: writing,
+          onStop: function () { setItems(function (list) { return list.map(function (it) { return it.type === 'block' ? Object.assign({}, it, { shown: Infinity }) : it; }); }); },
+          onEnd: function () { setEnded(true); }
+        })
+      )
+    ];
+  }
+
+  /* ── criar plano ── */
+  function CreatePlan(props) {
+    var stepS = useState(0), step = stepS[0], setStep = stepS[1];
+    var nameS = useState(''), name = nameS[0], setName = nameS[1];
+    var lvlS = useState('ini');
+    var steps = ['Materiais', 'Nível', 'Objetivo', 'Revisão'];
+    var body;
+    if (step === 0) body = [
+      h(A.TextField, { key: 'n', label: 'Nome da matéria', placeholder: 'Ex.: Estatística', value: name, onChange: function (e) { setName(e.target.value); } }),
+      h(A.FileDrop, { key: 'f', label: 'Materiais das aulas', hint: 'PDF e .py até 20 MB cada', files: [] })
+    ];
+    else if (step === 1) body = h(A.RadioGroup, { legend: 'Qual é o seu nível nesse assunto?', orientation: 'horizontal', value: lvlS[0], onChange: lvlS[1], options: [{ value: 'ini', label: 'Iniciante' }, { value: 'inter', label: 'Intermediário' }, { value: 'avan', label: 'Avançado' }] });
+    else if (step === 2) body = h(A.TextArea, { label: 'Por que você quer estudar isso?', rows: 4, placeholder: 'Ex.: passar na P2 e entender a matéria de verdade' });
+    else body = h('p', { className: 'body' }, 'O tutor monta os módulos a partir das suas respostas. O conteúdo de cada módulo é gerado quando você chegar nele.');
+    var last = step === steps.length - 1;
+    return h(A.Modal, {
+      open: true, onClose: props.onClose, portal: false,
+      kicker: 'Novo plano · etapa ' + (step + 1) + ' de ' + steps.length,
+      title: 'Criar plano de estudos',
+      footer: [
+        step > 0 ? h(A.Button, { key: 'b', variant: 'ghost', icon: 'arrow-left', onClick: function () { setStep(step - 1); } }, 'Voltar') : null,
+        h(A.Button, { key: 'n', variant: 'primary', iconRight: last ? 'check' : 'arrow-right', onClick: function () { if (last) props.onCreate(name || 'Estatística'); else setStep(step + 1); } }, last ? 'Criar plano' : 'Continuar')
+      ]
+    }, h(A.Stepper, { steps: steps, current: step }), body);
+  }
+
+  /* ── app ── */
+  function App() {
+    var viewS = useState('menu'), view = viewS[0], setView = viewS[1];
+    var selS = useState('calc'), sel = selS[0], setSel = selS[1];
+    var phaseS = useState('idle'), phase = phaseS[0], setPhase = phaseS[1];
+    var ghostS = useState(null), ghost = ghostS[0], setGhost = ghostS[1];
+    var creatingS = useState(false), creating = creatingS[0], setCreating = creatingS[1];
+    var curStepS = useState({}), curStep = curStepS[0], setCurStep = curStepS[1];
+    var listS = useState(itemsOf()), list = listS[0], setList = listS[1];
+    var appRef = useRef(null), ghostRef = useRef(null), openRef = useRef(null);
+    var subject = find(sel) || SUBJECTS[0];
+
+    function rectOf(el) {
+      var a = appRef.current.getBoundingClientRect(), r = el.getBoundingClientRect();
+      var k = a.width / appRef.current.offsetWidth || 1;
+      return { top: (r.top - a.top) / k, left: (r.left - a.left) / k, width: r.width / k, height: r.height / k };
+    }
+    function open(id) {
+      if (phase !== 'idle') return;
+      setSel(id);
+      var row = appRef.current.querySelector('.menu .ap-wheel__row.is-selected');
+      if (REDUCE || !row) { setView('course'); return; }
+      setGhost({ from: rectOf(row), to: BAR, title: find(id).title, dir: 'up' });
+      setPhase('opening');
+      setView('course');
+    }
+    openRef.current = open;
+    function back() {
+      if (phase !== 'idle') return;
+      if (REDUCE) { setView('menu'); return; }
+      setGhost({ from: BAR, to: null, title: subject.title, dir: 'down' });
+      setPhase('closing');
+      setView('menu');
+    }
+
+    useLayoutEffect(function () {
+      if (!ghost || !ghostRef.current) return;
+      var to = ghost.to;
+      if (!to) {
+        var row = appRef.current.querySelector('.menu .ap-wheel__row.is-selected');
+        to = row ? rectOf(row) : { top: 336, left: 332, width: 932, height: 128 };
+      }
+      var f = ghost.from;
+      var px = function (r) { return { top: r.top + 'px', left: r.left + 'px', width: r.width + 'px', height: r.height + 'px' }; };
+      var anim = ghostRef.current.animate([px(f), px(to)], { duration: 560, easing: 'cubic-bezier(.65, 0, .25, 1)', fill: 'forwards' });
+      var t = ghostRef.current.querySelector('.ghost-title');
+      if (t) t.animate(ghost.dir === 'up' ? [{ opacity: 1 }, { opacity: 0, offset: 0.45 }, { opacity: 0 }] : [{ opacity: 0 }, { opacity: 0, offset: 0.6 }, { opacity: 1 }], { duration: 560, fill: 'forwards' });
+      var dir = ghost.dir;
+      anim.onfinish = function () {
+        setGhost(null);
+        if (dir === 'up') { setPhase('landing'); setTimeout(function () { setPhase('idle'); }, 240); }
+        else setPhase('idle');
+      };
+    }, [ghost]);
+
+    var showMenu = view === 'menu' || phase === 'opening';
+    var showCourse = view === 'course' || phase === 'closing';
+    var st = curStep[subject.id] != null ? curStep[subject.id] : (subject.curModule - 1) * 2;
+    var steps = stepsFor(subject, st);
+    var nextStep = steps[st + 1];
+    var idx = list.findIndex(function (it) { return it.id === sel; });
+
+    return h('div', { className: 'app', ref: appRef },
+      showMenu ? h('div', { className: 'menu' + (phase === 'opening' ? ' is-leaving' : phase === 'closing' ? ' is-entering' : '') },
+        h('aside', { className: 'rail' },
+          h('div', { className: 'rail-top' },
+            h(A.Wordmark, { size: 30 }),
+            h('span', { className: 'overline' }, 'Meu estudo · outubro 2026')
+          ),
+          h(A.Ornament, { glyph: '学習', className: 'rail-orn' }),
+          h('div', { className: 'rail-bottom' },
+            h(A.Stat, { value: 25, accent: true, size: 'lg', label: 'Dias seguidos estudando' }),
+            h(A.Button, { icon: 'plus', block: true, onClick: function () { setCreating(true); } }, 'Novo plano')
+          )
+        ),
+        h('main', { className: 'sheet' },
+          h('div', { className: 'sheet-head' },
+            h('span', { className: 'overline' }, 'Selecione um caderno'),
+            h('span', { className: 'data sheet-count' }, (idx < 0 ? 'Novo' : pad(idx + 1)) + ' / ' + pad(list.length))
+          ),
+          h(A.SubjectWheel, { items: list, value: sel, onChange: setSel, onOpen: open, onCreate: function () { setCreating(true); } }),
+          h('div', { className: 'sheet-foot' },
+            h('span', { className: 'overline' }, 'Role ou use ↑ ↓ para escolher · Enter abre'),
+            h('span', { className: 'overline' }, 'Clique na linha tijolo para entrar')
+          )
+        )
+      ) : null,
+      showCourse ? h('div', { className: 'course' + (phase === 'opening' ? ' is-entering' : phase === 'landing' ? ' is-landing' : phase === 'closing' ? ' is-leaving' : '') },
+        h(A.CourseBar, {
+          title: subject.title,
+          kicker: 'Caderno ' + pad(subject.cover.number) + ' · aula ' + pad(subject.aula),
+          cover: subject.cover,
+          steps: steps,
+          onStepClick: function (id) { var i = steps.findIndex(function (s) { return s.id === id; }); var c = Object.assign({}, curStep); c[subject.id] = i; setCurStep(c); },
+          onBack: back,
+          next: nextStep ? { label: nextStep.label.split(' · ')[0], onClick: function () { var c = Object.assign({}, curStep); c[subject.id] = st + 1; setCurStep(c); } } : undefined
+        }),
+        h(Lesson, { key: subject.id, subject: subject })
+      ) : null,
+      ghost ? h('div', { className: 'ghost', ref: ghostRef, style: { top: ghost.from.top, left: ghost.from.left, width: ghost.from.width, height: ghost.from.height } },
+        h('span', { className: 'ghost-title display-md' }, ghost.title)
+      ) : null,
+      creating ? h(CreatePlan, {
+        onClose: function () { setCreating(false); },
+        onCreate: function (name) {
+          var id = 'novo' + Date.now();
+          SUBJECTS.push({ id: id, title: name, modules: 4, curModule: 1, names: ['Fundamentos', 'Módulo 2', 'Módulo 3', 'Módulo 4'], cover: { tone: 'cream', glyph: '新', label: name.slice(0, 10), number: SUBJECTS.length + 3 }, aula: 1,
+            lead: 'O tutor está montando o primeiro módulo a partir dos seus materiais.',
+            blocks: [{ label: 'Boas-vindas', text: ['Vamos começar pelo que você já sabe. Me conte em uma frase o que vem à cabeça quando pensa em ' + name + '.'] }],
+            more: ['Com base no que você respondeu, o primeiro módulo começa pelos conceitos de base.'],
+            reply: 'Anotado. Vou usar isso para escolher os exemplos do primeiro módulo.' });
+          setList(itemsOf());
+          setSel(id);
+          setCreating(false);
+          // o plano novo também sobe e vira a aba, depois que a lista gira até ele
+          setTimeout(function () { openRef.current(id); }, 420);
+        }
+      }) : null
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')).render(h(App));
+</script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+<!-- @dsCard group="Estrutura" height=330 subtitle="Bloco-pôster com ideograma e uma ação" -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>EmptyState — prévia</title>
+<style>
+  body { padding: 24px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Aprndr, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h(A.EmptyState, {
+      glyph: '書',
+      title: 'Nenhum caderno ainda',
+      action: h(A.Button, { variant: 'primary', icon: 'plus' }, 'Criar caderno')
+    }, 'Cadernos guardam suas anotações, os resumos do tutor e os questionários de cada matéria.')
+  );
+</script>
+</body>
+</html>

@@ -1,0 +1,34 @@
+<!-- @dsCard group="Dados" height=286 subtitle="Caixas de ficha técnica com traço grosso, dentro de um card" -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>SpecBox — prévia</title>
+<style>
+  body { padding: 24px; }
+  .spec { display: grid; grid-template-columns: auto 1fr; gap: 12px; }
+  .spec .ap-spec__body { flex: 1; justify-content: center; }
+  .wrap { max-width: 640px; }
+  @media (max-width: 560px) { .spec { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Aprndr, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', { className: 'wrap' },
+      h(A.Card, { tone: 'cream', index: 'Cálculo I', label: 'Hoje' },
+        h('div', { className: 'spec' },
+          h(A.SpecBox, { title: 'Progresso' }, h(A.Stat, { variant: 'figure', value: 75, suffix: '%' })),
+          h(A.SpecBox, { title: 'Aula 07', code: 'Derivadas' },
+            h(A.Readout, { label: 'Blocos lidos', value: '9' }),
+            h(A.Readout, { label: 'Tempo de aula', value: '42', unit: 'min' })
+          )
+        )
+      )
+    )
+  );
+</script>
+</body>
+</html>

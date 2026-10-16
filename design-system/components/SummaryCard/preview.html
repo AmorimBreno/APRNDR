@@ -1,0 +1,32 @@
+<!-- @dsCard group="Aula" height=314 subtitle="O resumo gerado no fim da aula" -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>SummaryCard — prévia</title>
+<style>
+  body { padding: 28px; }
+  .wrap { max-width: 720px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Aprndr, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', { className: 'wrap' },
+      h(A.SummaryCard, {
+        title: 'Aula 07 — Derivadas',
+        kicker: 'Resumo gerado · 15:02',
+        stats: [
+          { label: 'Blocos', value: '9' },
+          { label: 'Questões', value: '4' },
+          { label: 'Acertos', value: '75', unit: '%' }
+        ],
+        onOpen: function () {}, onDownload: function () {}
+      })
+    )
+  );
+</script>
+</body>
+</html>

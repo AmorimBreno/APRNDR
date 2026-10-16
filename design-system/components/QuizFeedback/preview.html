@@ -1,0 +1,39 @@
+<!-- @dsCard group="Questionário" height=660 subtitle="Correta, parcial com critérios e ainda não" -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>QuizFeedback — prévia</title>
+<style>
+  body { padding: 24px; }
+  .col { display: flex; flex-direction: column; gap: 16px; max-width: 720px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Aprndr, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', { className: 'col' },
+      h(A.QuizFeedback, {
+        status: 'correct',
+        actions: h(A.Button, { variant: 'primary', iconRight: 'arrow-right' }, 'Próxima')
+      }, h('p', null, 'Isso: f′(x) = 2x, então em x = 3 a inclinação é 6.')),
+      h(A.QuizFeedback, {
+        status: 'partial', score: '7,5/10',
+        criteria: [
+          { label: 'Usa a ideia de taxa média', met: true },
+          { label: 'Mostra que a variação é zero', met: true },
+          { label: 'Fala do limite quando h vai a zero', met: false }
+        ],
+        actions: [
+          h(A.Button, { key: 'r', variant: 'ghost', icon: 'refresh' }, 'Reexplicar'),
+          h(A.Button, { key: 'n', variant: 'primary', iconRight: 'arrow-right' }, 'Próxima')
+        ]
+      }, h('p', null, 'Boa base. Faltou fechar com o limite: é ele que transforma a taxa média em derivada.')),
+      h(A.QuizFeedback, { status: 'incorrect' }, h('p', null, 'A resposta era 6. 2x é a fórmula da derivada; a questão pedia o valor no ponto x = 3.'))
+    )
+  );
+</script>
+</body>
+</html>

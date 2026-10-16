@@ -1,0 +1,36 @@
+<!-- @dsCard group="Formulários" height=462 subtitle="Área de soltar e lista de anexos: enviando, pronto e com erro" -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>FileDrop — prévia</title>
+<style>
+  body { padding: 24px; }
+  .wrap { max-width: 640px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Aprndr, h = React.createElement;
+  function Demo() {
+    var s = React.useState([
+      { name: 'Aula 03 - Derivadas.pdf', size: 2516582 },
+      { name: 'limites.py', size: 4096, progress: 0.6 },
+      { name: 'lista-completa.pdf', size: 31457280, error: 'Arquivo maior que 20 MB.' }
+    ]);
+    return h('div', { className: 'wrap' },
+      h(A.FileDrop, {
+        label: 'Materiais do curso',
+        accept: '.pdf,.py,.ipynb',
+        hint: 'ou clique para escolher · PDF e .py até 20 MB cada',
+        files: s[0],
+        onFiles: function (list) { s[1](s[0].concat(list.map(function (f) { return { name: f.name, size: f.size }; }))); },
+        onRemove: function (f, i) { s[1](s[0].filter(function (_, j) { return j !== i; })); }
+      })
+    );
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+</script>
+</body>
+</html>

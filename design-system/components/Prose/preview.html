@@ -1,0 +1,29 @@
+<!-- @dsCard group="Estrutura" height=720 subtitle="Markdown renderizado: títulos, listas, código, citação, tabela" -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Prose — prévia</title>
+<style>
+  body { padding: 24px; }
+  .wrap { max-width: 720px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Aprndr, h = React.createElement;
+  var html = [
+    '<h2>Derivada em uma frase</h2>',
+    '<p>A derivada mede <strong>quão rápido</strong> uma função muda num ponto. Pense na velocidade marcada no painel do carro: ela é <em>instantânea</em>, não a média da viagem. Veja também <a href="#">limites laterais</a>.</p>',
+    '<ul><li>Taxa média: variação de <code>f</code> dividida pela variação de <code>x</code>.</li><li>Encolha o intervalo <code>h</code> até quase zero.</li><li>O valor para onde a taxa média tende é a derivada.</li></ul>',
+    '<pre><code>def derivada(f, x, h=1e-6):\n    return (f(x + h) - f(x)) / h\n\nderivada(lambda x: x**2, 3)  # 6.000001</code></pre>',
+    '<blockquote>Derivar é dar zoom na curva até ela parecer uma reta.</blockquote>',
+    '<table><thead><tr><th>h</th><th>Taxa média em x = 3</th></tr></thead><tbody><tr><td>1</td><td>7</td></tr><tr><td>0,1</td><td>6,1</td></tr><tr><td>0,001</td><td>6,001</td></tr></tbody></table>'
+  ].join('');
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', { className: 'wrap' }, h(A.Prose, { dangerouslySetInnerHTML: { __html: html } }))
+  );
+</script>
+</body>
+</html>

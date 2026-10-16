@@ -1,0 +1,39 @@
+<!-- @dsCard group="Navegação" height=754 subtitle="Role, use ↑ ↓ ou clique: a linha do meio é a selecionada" -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>SubjectWheel — prévia</title>
+<style>
+  body { padding: 24px; }
+  .sheet { overflow: hidden; border-radius: var(--radius-xl); background: var(--paper); color: var(--on-paper); }
+  .head { display: flex; justify-content: space-between; align-items: baseline; padding: 20px 32px 16px; border-bottom: 2px solid var(--on-paper); }
+  .head .overline { color: var(--on-paper-muted); }
+  .head .count { color: var(--on-paper); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Aprndr, h = React.createElement;
+  var items = [
+    { id: 'calc', title: 'Cálculo I', kicker: 'Caderno 03 · 4 módulos', meta: '62%', cover: { tone: 'moss', glyph: '解', label: 'Cálculo', number: 3 } },
+    { id: 'dados', title: 'Ciência de Dados', kicker: 'Caderno 04 · 6 módulos', meta: '35%', cover: { tone: 'amber', glyph: '知', label: 'Dados', number: 4 } },
+    { id: 'merc', title: 'Mercado Financeiro e de Capitais', kicker: 'Caderno 05 · 5 módulos', meta: '18%', cover: { tone: 'steel', glyph: '読', label: 'Mercado', number: 5 } },
+    { id: 'algo', title: 'Algoritmos', kicker: 'Caderno 06 · 3 módulos', meta: '90%', cover: { tone: 'ink', glyph: '考', label: 'Algoritmos', number: 6 } }
+  ];
+  function Demo() {
+    var s = React.useState('dados');
+    var i = items.findIndex(function (it) { return it.id === s[0]; });
+    return h('div', { className: 'sheet' },
+      h('div', { className: 'head' },
+        h('span', { className: 'overline' }, 'Selecione um caderno'),
+        h('span', { className: 'data count' }, (i < 0 ? 'Novo' : String(i + 1).padStart(2, '0')) + ' / ' + String(items.length).padStart(2, '0'))
+      ),
+      h(A.SubjectWheel, { items: items, value: s[0], onChange: s[1], onOpen: function () {}, onCreate: function () {} })
+    );
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+</script>
+</body>
+</html>

@@ -1,0 +1,45 @@
+<!-- @dsCard group="Navegação" height=200 width=1280 subtitle="A aba tijolo do curso com a trilha de módulos, questionários e teste final" -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>CourseBar — prévia</title>
+<style>
+  body { padding: 0 0 24px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Aprndr, h = React.createElement;
+  var base = [
+    { id: 'm1', kind: 'module', label: 'Módulo 01 · Limites' },
+    { id: 'q1', kind: 'quiz', label: 'Questionário 01' },
+    { id: 'm2', kind: 'module', label: 'Módulo 02 · Continuidade' },
+    { id: 'q2', kind: 'quiz', label: 'Questionário 02' },
+    { id: 'm3', kind: 'module', label: 'Módulo 03 · Derivadas' },
+    { id: 'q3', kind: 'quiz', label: 'Questionário 03' },
+    { id: 'm4', kind: 'module', label: 'Módulo 04 · Integrais' },
+    { id: 'q4', kind: 'quiz', label: 'Questionário 04' },
+    { id: 'fin', kind: 'final', label: 'Teste final' }
+  ];
+  function Demo() {
+    var cur = React.useState(4);
+    var steps = base.map(function (s, i) {
+      return Object.assign({}, s, { state: i < cur[0] ? 'done' : i === cur[0] ? 'current' : i >= 6 && i < 8 ? 'locked' : 'todo' });
+    });
+    var next = base[cur[0] + 1];
+    return h(A.CourseBar, {
+      title: 'Cálculo I',
+      kicker: 'Caderno 03 · aula 07',
+      cover: { tone: 'moss', glyph: '解' },
+      steps: steps,
+      onStepClick: function (id) { cur[1](base.findIndex(function (s) { return s.id === id; })); },
+      onBack: function () {},
+      next: next ? { label: next.label, onClick: function () { cur[1](cur[0] + 1); } } : undefined
+    });
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+</script>
+</body>
+</html>

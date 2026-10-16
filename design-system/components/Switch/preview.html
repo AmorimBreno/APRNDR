@@ -1,0 +1,25 @@
+<!-- @dsCard group="Formulários" height=190 subtitle="Liga/desliga com efeito imediato" -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Switch — prévia</title>
+<style>
+  body { padding: 24px; }
+  .col { display: flex; flex-direction: column; gap: 18px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Aprndr, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', { className: 'col' },
+      h(A.Switch, { label: 'Explicações mais curtas', defaultChecked: true }),
+      h(A.Switch, { label: 'Modo foco', description: 'Esconde o menu e as notificações durante o questionário.' }),
+      h(A.Switch, { label: 'Ler respostas em voz alta (em breve)', disabled: true })
+    )
+  );
+</script>
+</body>
+</html>

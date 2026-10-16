@@ -1,0 +1,30 @@
+<!-- @dsCard group="Ícones" height=496 subtitle="29 desenhos de traço único, grade de 24px" -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Icon — prévia</title>
+<style>
+  body { padding: 24px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+  .cell { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px 8px 12px; border-radius: var(--radius-md); background: var(--surface-panel); color: var(--ink); }
+  .cell .overline { font-size: 10px; letter-spacing: .08em; color: var(--ink-muted); text-transform: none; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Aprndr, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', { className: 'grid' },
+      A.ICON_NAMES.map(function (n) {
+        return h('div', { className: 'cell', key: n },
+          h(A.Icon, { name: n, size: 24 }),
+          h('span', { className: 'overline' }, n)
+        );
+      })
+    )
+  );
+</script>
+</body>
+</html>

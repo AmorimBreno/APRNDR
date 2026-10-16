@@ -1,0 +1,27 @@
+<!-- @dsCard group="Dados" height=260 subtitle="Pôster em Unbounded (último dígito em tijolo) e leitura de painel em IBM Plex Mono" -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Stat — prévia</title>
+<style>
+  body { padding: 24px; }
+  .row { display: flex; flex-wrap: wrap; gap: 16px; align-items: stretch; }
+  .row > * { flex: 1; min-width: 180px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Aprndr, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', { className: 'row' },
+      h(A.Card, { tone: 'panel' }, h(A.Stat, { value: 25, accent: true, label: 'Dias seguidos estudando' })),
+      h(A.Card, { tone: 'cream' }, h(A.Stat, { value: 12, accent: true, label: 'Módulos concluídos' })),
+      h(A.Card, { tone: 'amber', label: 'Módulo 03' }, h(A.SpecBox, { title: 'Progresso' }, h(A.Stat, { variant: 'figure', value: 62, suffix: '%' }))),
+      h(A.Card, { tone: 'panel' }, h(A.Stat, { variant: 'figure', value: '8,7', suffix: '/10', label: 'Média do módulo 03' }))
+    )
+  );
+</script>
+</body>
+</html>

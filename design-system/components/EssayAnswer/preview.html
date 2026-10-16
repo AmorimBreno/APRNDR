@@ -1,0 +1,25 @@
+<!-- @dsCard group="Questionário" height=488 subtitle="Dissertativa com contador e mínimo para enviar" -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>EssayAnswer — prévia</title>
+<style>
+  body { padding: 24px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Aprndr, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h(A.EssayAnswer, {
+      number: 7, total: 10, kicker: 'Módulo 03 · Dissertativa',
+      prompt: 'Explique com suas palavras por que a derivada de uma função constante é zero.',
+      minLength: 80, maxLength: 1500,
+      defaultValue: 'Uma função constante não muda quando x muda, então a taxa média entre dois pontos é sempre 0/h = 0.'
+    })
+  );
+</script>
+</body>
+</html>

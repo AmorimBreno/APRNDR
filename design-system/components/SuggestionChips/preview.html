@@ -1,0 +1,27 @@
+<!-- @dsCard group="Aula" height=128 subtitle="Próximos passos em pílula" -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>SuggestionChips — prévia</title>
+<style>
+  body { padding: 24px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Aprndr, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h(A.SuggestionChips, {
+      items: [
+        { label: 'Explica de outro jeito', icon: 'refresh' },
+        { label: 'Me dá um exemplo', icon: 'bulb' },
+        { label: 'Resume em 3 tópicos', icon: 'notebook' },
+        { label: 'Me testa com uma questão', icon: 'help' }
+      ]
+    })
+  );
+</script>
+</body>
+</html>

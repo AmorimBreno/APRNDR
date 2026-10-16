@@ -1,0 +1,32 @@
+<!-- @dsCard group="Marca" height=420 subtitle="Ideogramas decorativos com a tradução ao lado" -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Ornament — prévia</title>
+<style>
+  body { padding: 24px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; align-items: stretch; }
+  .stack { display: flex; flex-direction: column; gap: 16px; }
+  .ap-card { align-items: center; justify-content: center; }
+  .stack .ap-card { flex: 1; }
+  @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } .stack { flex-direction: row; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Aprndr, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', { className: 'grid' },
+      h(A.Card, { tone: 'brick', poster: true }, h(A.Ornament, { glyph: '学' })),
+      h(A.Card, { tone: 'panel', poster: true }, h(A.Ornament, { glyph: '独創' })),
+      h('div', { className: 'stack' },
+        h(A.Card, { tone: 'moss' }, h(A.Ornament, { glyph: '復習', size: 'md' })),
+        h(A.Card, { tone: 'sage' }, h(A.Ornament, { glyph: '完', size: 'md' }))
+      )
+    )
+  );
+</script>
+</body>
+</html>

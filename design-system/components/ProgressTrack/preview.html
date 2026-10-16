@@ -1,0 +1,42 @@
+<!-- @dsCard group="Navegação" height=190 subtitle="Estações por tipo: livro = módulo, prancheta = questionário, bandeira = teste final" -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>ProgressTrack — prévia</title>
+<style>
+  body { padding: 24px; }
+  .band { display: flex; flex-direction: column; gap: 10px; padding: 26px 24px 40px; border-radius: var(--radius-lg); background: var(--brick); color: var(--on-brick); }
+  .legend { display: flex; flex-wrap: wrap; gap: 20px; margin-top: 18px; color: var(--ink-muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 8px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Aprndr, h = React.createElement;
+  var steps = [
+    { id: 'm1', kind: 'module', label: 'Módulo 01 · Limites', state: 'done' },
+    { id: 'q1', kind: 'quiz', label: 'Questionário 01', state: 'done' },
+    { id: 'm2', kind: 'module', label: 'Módulo 02 · Continuidade', state: 'done' },
+    { id: 'q2', kind: 'quiz', label: 'Questionário 02', state: 'done' },
+    { id: 'm3', kind: 'module', label: 'Módulo 03 · Derivadas', state: 'current' },
+    { id: 'q3', kind: 'quiz', label: 'Questionário 03', state: 'todo' },
+    { id: 'm4', kind: 'module', label: 'Módulo 04 · Integrais', state: 'locked' },
+    { id: 'q4', kind: 'quiz', label: 'Questionário 04', state: 'locked' },
+    { id: 'fin', kind: 'final', label: 'Teste final', state: 'todo' }
+  ];
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', null,
+      h('div', { className: 'band' }, h(A.ProgressTrack, { steps: steps, onStepClick: function () {} })),
+      h('div', { className: 'legend overline' },
+        h('span', null, h(A.Icon, { name: 'book', size: 16 }), 'Módulo'),
+        h('span', null, h(A.Icon, { name: 'checklist', size: 16 }), 'Questionário'),
+        h('span', null, h(A.Icon, { name: 'flag', size: 16 }), 'Teste final'),
+        h('span', null, 'Tracejado = ainda não gerado')
+      )
+    )
+  );
+</script>
+</body>
+</html>

@@ -1,0 +1,34 @@
+<!-- @dsCard group="Formulários" height=180 subtitle="Lista nativa: padrão e compacta" -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Select — prévia</title>
+<style>
+  body { padding: 24px; }
+  .row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 24px; }
+  .row > :first-child { width: 320px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Aprndr, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', { className: 'row' },
+      h(A.Select, {
+        label: 'Modelo de IA',
+        options: ['Claude', 'GPT', 'Gemini'],
+        hint: 'Cada modelo pode explicar de um jeito diferente.'
+      }),
+      h(A.Select, {
+        label: 'Nível',
+        size: 'sm',
+        defaultValue: 'inter',
+        options: [{ value: 'ini', label: 'Iniciante' }, { value: 'inter', label: 'Intermediário' }, { value: 'avan', label: 'Avançado' }]
+      })
+    )
+  );
+</script>
+</body>
+</html>

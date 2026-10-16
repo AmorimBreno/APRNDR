@@ -1,0 +1,39 @@
+<!-- @dsCard group="Estrutura" height=516 subtitle="Formato de pasta: aba do título, ícone no círculo preto e os três pontos que abrem o menu" -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Callout — prévia</title>
+<style>
+  body { padding: 24px 24px 32px; }
+  .col { display: flex; flex-direction: column; gap: 16px; max-width: 760px; }
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+  .log { min-height: 20px; margin: 4px 0 0; color: var(--ink-muted); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Aprndr, h = React.createElement;
+  function Demo() {
+    var st = React.useState(''), msg = st[0], setMsg = st[1];
+    function pick(where) {
+      return function (id) {
+        var a = A.CALLOUT_ACTIONS.filter(function (x) { return x.id === id; })[0];
+        setMsg('Você escolheu "' + a.label + '" no ' + where + '.');
+      };
+    }
+    return h('div', { className: 'col' },
+      h(A.Callout, { onAction: pick('Ideia central') }, 'A derivada é o limite da taxa média quando o intervalo encolhe até zero.'),
+      h(A.Callout, { tone: 'amber', onAction: pick('Atenção') }, 'f′(x) não é f(x) dividido por x: é a inclinação da reta que só encosta na curva naquele ponto.'),
+      h('div', { className: 'two' },
+        h(A.Callout, { tone: 'steel', onAction: pick('Exemplo') }, 'Para f(x) = x², a taxa média entre 3 e 3,001 é 6,001 — quase 6.'),
+        h(A.Callout, { tone: 'cream' }, 'Regra da potência: desce o expoente e tira 1 dele.')
+      ),
+      h('p', { className: 'log body-sm', role: 'status' }, msg || 'Clique nos três pontos de um callout. O Resumo está sem menu (sem onAction).')
+    );
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+</script>
+</body>
+</html>

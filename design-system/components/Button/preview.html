@@ -1,0 +1,36 @@
+<!-- @dsCard group="Ações" height=200 subtitle="Primário âmbar, secundário, fantasma e perigo; três tamanhos" -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Button — prévia</title>
+<style>
+  body { padding: 24px; }
+  .col { display: flex; flex-direction: column; gap: 20px; }
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Aprndr, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', { className: 'col' },
+      h('div', { className: 'row' },
+        h(A.Button, { variant: 'primary', icon: 'send' }, 'Enviar resposta'),
+        h(A.Button, { iconRight: 'arrow-right' }, 'Próxima'),
+        h(A.Button, { variant: 'ghost', icon: 'refresh' }, 'Reexplicar'),
+        h(A.Button, { variant: 'danger' }, 'Excluir curso')
+      ),
+      h('div', { className: 'row' },
+        h(A.Button, { variant: 'primary', size: 'lg', iconRight: 'arrow-up-right' }, 'Começar módulo'),
+        h(A.Button, { size: 'sm', icon: 'plus' }, 'Novo caderno'),
+        h(A.Button, { variant: 'primary', iconOnly: true, icon: 'arrow-up', 'aria-label': 'Enviar' }),
+        h(A.Button, { iconOnly: true, icon: 'close', 'aria-label': 'Fechar' }),
+        h(A.Button, { variant: 'primary', disabled: true }, 'Gerar módulo')
+      )
+    )
+  );
+</script>
+</body>
+</html>

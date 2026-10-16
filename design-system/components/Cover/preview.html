@@ -1,0 +1,66 @@
+<!-- @dsCard height=288 -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>APRNDR</title>
+<style>
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--surface-ground); color: var(--ink); font-family: var(--font-sans); overflow: hidden; }
+  .cover { position: relative; width: 960px; height: 288px; overflow: hidden; }
+  /* a composição: caixa de 480px na metade direita do layout de 960, longe do nome */
+  .art { position: absolute; top: 0; left: 480px; width: 480px; height: 288px; overflow: hidden; }
+  .art svg { display: block; width: 480px; height: 288px; }
+  .brick { fill: var(--brick); }
+  .amber { fill: var(--amber); }
+  .sage { fill: var(--sage); }
+  .steel { fill: var(--steel); }
+  .tile { rx: var(--radius-lg); }
+  .bar { fill: none; stroke: var(--ink-inverse); stroke-width: var(--border-control); rx: var(--radius-xs); }
+  .lvl { fill: var(--ink-inverse); }
+  /* nome e tagline no fluxo, presos pela borda de baixo */
+  .words { position: absolute; left: var(--space-6); bottom: var(--space-6); max-width: 440px; }
+  .name { display: flex; align-items: flex-start; margin: 0; font-family: var(--font-display); font-size: 76px; line-height: .92; font-weight: 800; letter-spacing: -0.02em; color: var(--ink); }
+  .dot { flex: none; width: 20px; height: 20px; margin-left: 8px; border-radius: var(--radius-full); background: var(--brick); }
+  .tag { margin: var(--space-3) 0 0 4px; font-size: 14px; line-height: 20px; color: var(--ink-muted); }
+</style>
+</head>
+<body>
+<div class="cover">
+<div class="art" aria-hidden="true">
+<svg viewBox="0 0 480 288" width="480" height="288">
+<!--
+  blocks      brick 128×240 (a laje alta), amber 336×128 sangrando à direita (o maior bloco: a cor da ação), sage 144×96, steel 176×96 sangrando à direita — ~40% de 960×288
+  arrangement bento modular como as telas do sistema: laje alta à esquerda, bloco largo em cima, dois blocos embaixo, vãos de space-4, topo e base a space-6 da borda
+  pattern     barras contornadas do Meter ("painel de máquina antiga", README e usage de border-control): 8 barras de 16×80 a cada space-8 dentro do âmbar, cortadas em ink-inverse, com níveis em passos de 8
+  scales      lados em múltiplos de space-4; vãos space-4; passo space-8; cantos radius-lg nos blocos, radius-xs nas barras; traço border-control
+-->
+<rect class="brick tile" x="16" y="24" width="128" height="240" rx="24"/>
+<rect class="amber tile" x="160" y="24" width="336" height="128" rx="24"/>
+<rect class="sage tile" x="160" y="168" width="144" height="96" rx="24"/>
+<rect class="steel tile" x="320" y="168" width="176" height="96" rx="24"/>
+<rect class="bar" x="184" y="48" width="16" height="80" rx="4"/>
+<rect class="bar" x="216" y="48" width="16" height="80" rx="4"/>
+<rect class="bar" x="248" y="48" width="16" height="80" rx="4"/>
+<rect class="bar" x="280" y="48" width="16" height="80" rx="4"/>
+<rect class="bar" x="312" y="48" width="16" height="80" rx="4"/>
+<rect class="bar" x="344" y="48" width="16" height="80" rx="4"/>
+<rect class="bar" x="376" y="48" width="16" height="80" rx="4"/>
+<rect class="bar" x="408" y="48" width="16" height="80" rx="4"/>
+<rect class="lvl" x="188" y="68" width="8" height="56"/>
+<rect class="lvl" x="220" y="84" width="8" height="40"/>
+<rect class="lvl" x="252" y="60" width="8" height="64"/>
+<rect class="lvl" x="284" y="100" width="8" height="24"/>
+<rect class="lvl" x="316" y="76" width="8" height="48"/>
+<rect class="lvl" x="348" y="52" width="8" height="72"/>
+<rect class="lvl" x="380" y="92" width="8" height="32"/>
+<rect class="lvl" x="412" y="68" width="8" height="56"/>
+</svg>
+</div>
+<div class="words">
+<h1 class="name">APRNDR<span class="dot" aria-hidden="true"></span></h1>
+<p class="tag">Tutor de IA com cor de pôster e letra de painel.</p>
+</div>
+</div>
+</body>
+</html>

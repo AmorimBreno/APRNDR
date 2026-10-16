@@ -1,0 +1,49 @@
+<!-- @dsCard group="Janelas" height=640 subtitle="Guia de criação de curso: faixa âmbar, etapas, campos e rodapé" -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Modal — prévia</title>
+<style>
+  body { padding: 24px; min-height: 592px; }
+  .bg { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .reopen { margin-top: 16px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Aprndr, h = React.createElement;
+  function Demo() {
+    var open = React.useState(true);
+    var lvl = React.useState('inter');
+    var close = function () { open[1](false); };
+    return h('div', null,
+      h('div', { className: 'bg' },
+        h(A.Card, { tone: 'panel', index: '01', label: 'Cursos', title: 'Cálculo I' }),
+        h(A.Card, { tone: 'panel', index: '02', label: 'Cursos', title: 'Ciência de Dados' })
+      ),
+      h(A.Button, { className: 'reopen', icon: 'plus', onClick: function () { open[1](true); } }, 'Novo curso'),
+      h(A.Modal, {
+        open: open[0], onClose: close, portal: false,
+        kicker: 'Novo curso · etapa 2 de 4',
+        title: 'Criar curso',
+        footer: [
+          h(A.Button, { key: 'b', variant: 'ghost', icon: 'arrow-left' }, 'Voltar'),
+          h(A.Button, { key: 'n', variant: 'primary', iconRight: 'arrow-right' }, 'Continuar')
+        ]
+      },
+        h(A.Stepper, { steps: ['Materiais', 'Nível', 'Objetivo', 'Revisão'], current: 1 }),
+        h(A.RadioGroup, {
+          legend: 'Qual é o seu nível nesse assunto?', orientation: 'horizontal',
+          value: lvl[0], onChange: lvl[1],
+          options: [{ value: 'ini', label: 'Iniciante' }, { value: 'inter', label: 'Intermediário' }, { value: 'avan', label: 'Avançado' }]
+        }),
+        h(A.TextArea, { label: 'Por que você quer estudar isso?', rows: 3, placeholder: 'Ex.: passar na P2 e entender a matéria de verdade' })
+      )
+    );
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+</script>
+</body>
+</html>

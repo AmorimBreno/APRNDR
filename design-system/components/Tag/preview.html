@@ -1,0 +1,45 @@
+<!-- @dsCard group="Ações" height=230 subtitle="Pílulas pastel com ícone; a menor é o rótulo dos blocos da aula" -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Tag — prévia</title>
+<style>
+  body { padding: 24px; }
+  .rows { display: flex; flex-direction: column; gap: 20px; }
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .cap { margin: 0 0 10px; color: var(--ink-muted); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Aprndr, h = React.createElement;
+  var blocks = ['Explicação', 'Exemplo', 'Pergunta', 'Resposta', 'Reexplicação', 'Revisão'];
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', { className: 'rows' },
+      h('div', null,
+        h('p', { className: 'cap overline' }, 'Status, tipo e módulo'),
+        h('div', { className: 'row' },
+          h(A.Tag, { tone: 'sage', icon: 'check' }, 'Concluído'),
+          h(A.Tag, { tone: 'amber', icon: 'clock' }, 'Em curso'),
+          h(A.Tag, { tone: 'brick', icon: 'alert' }, 'Revisar'),
+          h(A.Tag, { tone: 'moss', icon: 'book' }, 'Módulo 03'),
+          h(A.Tag, { tone: 'moss', icon: 'checklist' }, 'Questionário'),
+          h(A.Tag, { tone: 'cream', icon: 'file' }, 'PDF'),
+          h(A.Tag, { tone: 'neutral', icon: 'lock' }, 'Desativado'),
+          h(A.Tag, { tone: 'brick', dot: true }, 'Ao vivo'),
+          h(A.Tag, { tone: 'outline' }, 'Opcional')
+        )
+      ),
+      h('div', null,
+        h('p', { className: 'cap overline' }, 'Rótulos dos blocos da aula (size="sm")'),
+        h('div', { className: 'row' },
+          blocks.map(function (b) { return h(A.Tag, { key: b, tone: 'steel', size: 'sm', icon: A.BLOCK_ICONS[b] }, b); })
+        )
+      )
+    )
+  );
+</script>
+</body>
+</html>

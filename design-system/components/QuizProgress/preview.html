@@ -1,0 +1,24 @@
+<!-- @dsCard group="Questionário" height=170 subtitle="Placar com blocos: certa, errada (baixa), parcial, pulada, atual" -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>QuizProgress — prévia</title>
+<style>
+  body { padding: 24px; }
+  .col { display: flex; flex-direction: column; gap: 28px; max-width: 720px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Aprndr, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', { className: 'col' },
+      h(A.QuizProgress, { total: 10, current: 4, results: ['correct', 'correct', 'incorrect'], time: '02:47' }),
+      h(A.QuizProgress, { total: 6, current: 6, label: 'Avaliação do módulo', results: ['correct', 'partial', 'skipped', 'incorrect', 'correct'] })
+    )
+  );
+</script>
+</body>
+</html>

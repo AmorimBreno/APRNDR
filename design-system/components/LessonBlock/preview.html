@@ -1,0 +1,35 @@
+<!-- @dsCard group="Aula" height=640 subtitle="Blocos numerados que o tutor escreve um por vez; o último ainda sendo escrito" -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>LessonBlock — prévia</title>
+<style>
+  body { padding: 28px 24px 28px 88px; }
+  .doc { display: flex; flex-direction: column; gap: 40px; max-width: 680px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Aprndr, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', { className: 'doc' },
+      h(A.LessonBlock, {
+        index: 1, label: 'Explicação',
+        actions: [
+          h(A.Button, { key: 'r', variant: 'ghost', size: 'sm', icon: 'refresh' }, 'Reexplicar'),
+          h(A.Button, { key: 'e', variant: 'ghost', size: 'sm', icon: 'bulb' }, 'Outro exemplo')
+        ]
+      },
+        h('p', null, 'A derivada mede ', h('strong', null, 'quão rápido'), ' uma função muda num ponto. Calcule a taxa média num intervalo e vá encolhendo o intervalo até quase zero.'),
+        h(A.Callout, null, 'A derivada é o limite da taxa média quando o intervalo encolhe até zero.')
+      ),
+      h(A.LessonBlock, { index: 2, label: 'Exemplo', writing: true },
+        h('p', null, 'Para f(x) = x², entre x e x + h a função sobe 2xh + h². Dividindo por h, sobra 2x + h, e quando h vai a zero')
+      )
+    )
+  );
+</script>
+</body>
+</html>

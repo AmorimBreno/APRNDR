@@ -1,0 +1,59 @@
+<!-- @dsCard group="Estrutura" height=584 subtitle="O bento: blocos chapados, ficha técnica de traço grosso, porcentagem grande e adesivo no canto" -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Card — prévia</title>
+<style>
+  body { padding: 28px 28px 20px 16px; }
+  .bento { display: grid; grid-template-columns: minmax(160px, .8fr) 1fr 1fr; grid-template-rows: auto auto; gap: 12px; }
+  .tall { grid-row: 1 / span 2; }
+  .tall .ap-card__body { flex: 1; display: flex; align-items: center; justify-content: center; }
+  .wide { grid-column: 2 / span 2; }
+  .big { display: flex; align-items: flex-start; margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 44px; line-height: 1; letter-spacing: -0.02em; text-transform: uppercase; }
+  .dot { flex: none; width: 11px; height: 11px; margin-left: 6px; border-radius: var(--radius-full); background: var(--brick); }
+  .spec { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: stretch; }
+  .spec .ap-spec__body { flex: 1; justify-content: center; }
+  .small { margin: 0; }
+  .foot-code { font-size: 22px; line-height: 26px; }
+  .foot-mid { flex: 1; padding-left: 4px; }
+  @media (max-width: 640px) { .bento { grid-template-columns: 1fr 1fr; } .tall { grid-row: auto; grid-column: 1 / -1; } .wide { grid-column: 1 / -1; padding-top: 56px; } .big { font-size: 30px; } .spec { grid-template-columns: 1fr; } .foot-mid { display: none; } .foot-code { font-size: 18px; white-space: nowrap; } }
+  @media (max-width: 480px) { .bento { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Aprndr, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', { className: 'bento' },
+      h(A.Card, { tone: 'brick', className: 'tall', index: '01', label: 'Curso 2026' }, h(A.Ornament, { glyph: '学' })),
+      h(A.Card, {
+        tone: 'amber', className: 'wide',
+        footer: [
+          h('span', { key: 'a', className: 'foot-code display-sm' }, '#MÓDULO-03'),
+          h('span', { key: 'b', className: 'foot-mid' }, '4 módulos · 2 concluídos'),
+          h(A.Icon, { key: 'c', name: 'arrow-up-right', size: 52, strokeWidth: 4.5 })
+        ]
+      },
+        h(A.Sticker, { pin: 'top-right', rotate: 6, dot: true, kicker: 'Módulo 03' }, 'Em curso'),
+        h('h3', { className: 'big' }, 'Cálculo I', h('span', { className: 'dot', 'aria-hidden': true })),
+        h('div', { className: 'spec' },
+          h(A.SpecBox, { title: 'Progresso' }, h(A.Stat, { variant: 'figure', value: 62, suffix: '%' })),
+          h(A.SpecBox, { title: 'MOD-03', code: 'Derivadas' },
+            h(A.Readout, { label: 'Questões restantes', value: '12' }),
+            h(A.Readout, { label: 'Tempo por questão', value: '2,47', unit: 'min' })
+          )
+        )
+      ),
+      h(A.Card, { tone: 'sage', index: '02', label: '©2026', title: 'Derivadas', footer: [h('span', { key: 'a' }, 'MOD-03'), h(A.Icon, { key: 'b', name: 'book', size: 20 })] },
+        h('p', { className: 'small body-sm' }, 'Revisar antes da avaliação do módulo.')
+      ),
+      h(A.Card, { tone: 'steel', index: '03', label: 'Tutor' },
+        h(A.Stat, { value: 25, size: 'lg', label: 'Aulas com o tutor' })
+      )
+    )
+  );
+</script>
+</body>
+</html>

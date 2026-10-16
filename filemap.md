@@ -86,6 +86,19 @@ profiles/estudos/extensions/visual-tools/tools/_common.ts — acha o navegador (
 
 referencias/plano-cd.html — artefato de plano de estudo usado antes; referência visual para o design
 
+design-system/ — design system APRNDR (feito no Claude Design), pacote @estudos/design-system do workspace: manual, tokens, componentes React, fontes e ícones
+design-system/ESTUDOS.md — mudanças do estudos-ia sobre a exportação do Claude Design (refazer ao trocar a pasta)
+design-system/package.json, tsconfig.json — o pacote: exports dos componentes (components/src), do tokens.css e do componentes.css (= components/bundle.css)
+design-system/README.md — manual da marca: princípios, voz, cor, tipografia, forma, telas e fluxo, estados, ícones e ornamento
+design-system/tokens.json — os tokens (cores, estilos de texto, espaços, raios, bordas, tamanhos, sombras); a fonte da verdade
+design-system/tokens.css — gerado do tokens.json: variáveis CSS, @font-face (fonts/) e uma classe por estilo de texto; carregar antes do components/bundle.css
+design-system/components/bundle.js, bundle.css — componentes prontos para React 18 (window.Aprndr) e os estilos deles (classes ap-)
+design-system/components/src/ — fonte TypeScript dos componentes (base, nav, forms, lesson, quiz, overlay, data, icons); index.d.ts = os tipos
+design-system/components/<Componente>/ — README.md (quando e como usar) e preview.html (prévia do artefato: precisa do tokens.css, bundle.css, React e bundle.js já carregados)
+design-system/components/StudyFlow/preview.html — a página do fluxo completo (menu de cadernos, aba do curso, aula em coluna única)
+design-system/fonts/, licenses/fonts-OFL.txt — fontes woff2 (Unbounded, Archivo, Sono, IBM Plex Mono 500, Fraunces, Zen Antique recortada) e a licença OFL
+design-system/assets/Icons/ — os 29 ícones em SVG e o README com o uso de cada um
+
 scripts/instalar-pi-global.mjs — copia pi-global/ para ~/.pi/agent (mescla o settings.json)
 scripts/pi-estudos.cmd — abre o pi no terminal com o perfil de estudos, em %LOCALAPPDATA%\estudos-app\pi-teste (fora do repositório)
 scripts/testar-render.mjs — gera PNGs de teste pelo mesmo código das visual-tools (em %TEMP%/estudos-render-teste)

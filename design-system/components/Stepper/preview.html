@@ -1,0 +1,33 @@
+<!-- @dsCard group="Janelas" height=226 subtitle="Etapas numeradas: feita, atual e a fazer" -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Stepper — prévia</title>
+<style>
+  body { padding: 24px; }
+  .col { display: flex; flex-direction: column; gap: 28px; max-width: 720px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Aprndr, h = React.createElement;
+  function Demo() {
+    var s = React.useState(2);
+    return h('div', { className: 'col' },
+      h(A.Stepper, { steps: ['Materiais', 'Nível', 'Objetivo', 'Revisão'], current: s[0], onStepClick: s[1] }),
+      h(A.Stepper, {
+        current: 1,
+        steps: [
+          { label: 'Explicação', description: '12 min de leitura' },
+          { label: 'Exercícios', description: '6 alternativas, 2 dissertativas' },
+          { label: 'Avaliação', description: 'Libera ao fim dos exercícios' }
+        ]
+      })
+    );
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+</script>
+</body>
+</html>

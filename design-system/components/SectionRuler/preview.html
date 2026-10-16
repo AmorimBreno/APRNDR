@@ -1,0 +1,35 @@
+<!-- @dsCard group="Aula" height=280 subtitle="A régua da margem: um traço por bloco, o atual em âmbar" -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>SectionRuler — prévia</title>
+<style>
+  body { padding: 28px; }
+  .row { display: flex; gap: 40px; align-items: flex-start; }
+  .text { max-width: 520px; color: var(--ink-muted); margin: 0; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Aprndr, h = React.createElement;
+  var items = [
+    { id: 'b1', label: 'Explicação' },
+    { id: 'b2', label: 'Pergunta' },
+    { id: 'b3', label: 'Você perguntou' },
+    { id: 'b4', label: 'Exemplo' },
+    { id: 'b5', label: 'Pergunta' },
+    { id: 'b6', label: 'Revisão' }
+  ];
+  function Demo() {
+    var c = React.useState('b4');
+    return h('div', { className: 'row' },
+      h(A.SectionRuler, { items: items, current: c[0], onSelect: c[1] }),
+      h('p', { className: 'text body' }, 'Passe o mouse num traço para ver o nome do bloco; clique para ir até ele. Os traços acima do atual ficam mais claros: são os blocos que você já leu.')
+    );
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+</script>
+</body>
+</html>

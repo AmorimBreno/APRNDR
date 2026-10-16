@@ -1,0 +1,39 @@
+<!-- @dsCard group="Marca" height=372 subtitle="Adesivos de papel (e um holográfico): soltos e presos no canto de um card" -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Sticker — prévia</title>
+<style>
+  body { padding: 32px 32px 24px 24px; }
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 24px; margin-bottom: 36px; }
+  .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; max-width: 760px; }
+  .cards .ap-card { min-height: 112px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Aprndr, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', null,
+      h('div', { className: 'row' },
+        h(A.Sticker, { dot: true, kicker: 'Módulo 03', rotate: -3 }, 'Em curso'),
+        h(A.Sticker, { tone: 'brick', rotate: 4 }, 'Revisar'),
+        h(A.Sticker, { tone: 'moss', kicker: 'Caderno', rotate: -2 }, 'Novo'),
+        h(A.Sticker, { tone: 'amber', shape: 'pill', rotate: 3 }, 'Prova sexta'),
+        h(A.Sticker, { tone: 'holo', kicker: 'Módulo 02', rotate: -4 }, 'Concluído')
+      ),
+      h('div', { className: 'cards' },
+        h(A.Card, { tone: 'amber', title: 'Cálculo I', index: '03' },
+          h(A.Sticker, { pin: 'top-right', rotate: 6, dot: true, kicker: 'Módulo 03' }, 'Em curso')
+        ),
+        h(A.Card, { tone: 'moss', title: 'Ciência de Dados', index: '04' },
+          h(A.Sticker, { pin: 'top-right', rotate: 5, tone: 'brick', kicker: 'Avaliação' }, 'Sexta')
+        )
+      )
+    )
+  );
+</script>
+</body>
+</html>

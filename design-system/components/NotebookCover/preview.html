@@ -1,0 +1,30 @@
+<!-- @dsCard group="Navegação" height=280 subtitle="Capas de caderno: uma por matéria, em três tamanhos" -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>NotebookCover — prévia</title>
+<style>
+  body { padding: 28px; }
+  .sheet { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 28px; padding: 28px 32px; border-radius: var(--radius-xl); background: var(--paper); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Aprndr, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', { className: 'sheet' },
+      h(A.NotebookCover, { size: 'lg', tone: 'moss', glyph: '解', label: 'Cálculo I', number: 3 }),
+      h(A.NotebookCover, { tone: 'amber', glyph: '知', label: 'Dados', number: 4 }),
+      h(A.NotebookCover, { tone: 'steel', glyph: '読', label: 'Mercado', number: 5 }),
+      h(A.NotebookCover, { tone: 'ink', glyph: '考', label: 'Algoritmos', number: 6 }),
+      h(A.NotebookCover, { tone: 'cream', glyph: '書', label: 'Redação', number: 7 }),
+      h(A.NotebookCover, { tone: 'sage', glyph: '学', label: 'Física', number: 8 }),
+      h(A.NotebookCover, { size: 'sm', tone: 'moss', glyph: '解' }),
+      h(A.NotebookCover, { size: 'sm', tone: 'amber', glyph: '知' })
+    )
+  );
+</script>
+</body>
+</html>

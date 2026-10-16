@@ -1,0 +1,38 @@
+<!-- @dsCard group="Dados" height=276 subtitle="Leituras de painel em card âmbar e no painel escuro" -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Readout — prévia</title>
+<style>
+  body { padding: 24px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .reads { display: flex; flex-direction: column; gap: 10px; }
+  @media (max-width: 600px) { .row { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Aprndr, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', { className: 'row' },
+      h(A.Card, { tone: 'amber', index: 'Módulo 03', label: 'Sessão' },
+        h('div', { className: 'reads' },
+          h(A.Readout, { label: 'Questões restantes', value: '12' }),
+          h(A.Readout, { label: 'Tempo por questão', value: '2,47', unit: 'min' }),
+          h(A.Readout, { label: 'Acertos', value: '71', unit: '%' })
+        )
+      ),
+      h(A.Card, { tone: 'panel', index: 'Cálculo I', label: 'Caderno' },
+        h('div', { className: 'reads' },
+          h(A.Readout, { label: 'Anotações', value: '38' }),
+          h(A.Readout, { label: 'Resumos do tutor', value: '9' }),
+          h(A.Readout, { label: 'Última revisão', value: '3', unit: 'dias' })
+        )
+      )
+    )
+  );
+</script>
+</body>
+</html>

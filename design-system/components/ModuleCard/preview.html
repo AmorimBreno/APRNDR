@@ -1,0 +1,43 @@
+<!-- @dsCard group="Navegação" height=804 width=1120 subtitle="Os quatro estados do módulo: concluído holográfico, em curso, próximo e desativado" -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>ModuleCard — prévia</title>
+<style>
+  body { padding: 32px 32px 24px 24px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); gap: 28px 24px; margin: 0; padding: 0; list-style: none; }
+  .note { margin: 20px 0 0; color: var(--ink-muted); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Aprndr, h = React.createElement;
+  function noop() {}
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', null,
+      h('ul', { className: 'grid', 'aria-label': 'Módulos de Cálculo I' },
+        h(A.ModuleCard, {
+          as: 'li', state: 'done', number: 2, title: 'Continuidade', course: 'Cálculo I', onOpen: noop,
+          readings: [{ label: 'Nota do questionário', value: '9,2', unit: '/10' }, { label: 'Aulas', value: '6' }]
+        }),
+        h(A.ModuleCard, {
+          as: 'li', state: 'current', number: 3, title: 'Derivadas', course: 'Cálculo I', progress: 0.62, onOpen: noop,
+          readings: [{ label: 'Questões restantes', value: '12' }, { label: 'Tempo por questão', value: '2,47', unit: 'min' }]
+        }),
+        h(A.ModuleCard, {
+          as: 'li', state: 'next', number: 4, title: 'Integrais', course: 'Cálculo I', onOpen: noop,
+          readings: [{ label: 'Aulas previstas', value: '5' }, { label: 'Tempo estimado', value: '2h10' }]
+        }),
+        h(A.ModuleCard, {
+          as: 'li', state: 'locked', number: 5, title: 'Aplicações da derivada', course: 'Cálculo I',
+          readings: [{ label: 'Aulas previstas', value: '4' }, { label: 'Tempo estimado', value: '1h50' }]
+        })
+      ),
+      h('p', { className: 'note body-sm' }, 'Passe o ponteiro sobre o módulo concluído: o brilho holográfico acompanha.')
+    )
+  );
+</script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+<!-- @dsCard group="Formulários" height=230 subtitle="Marcada, desmarcada, com descrição e desabilitada" -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Checkbox — prévia</title>
+<style>
+  body { padding: 24px; }
+  .col { display: flex; flex-direction: column; gap: 16px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Aprndr, h = React.createElement;
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h('div', { className: 'col' },
+      h(A.Checkbox, { label: 'Incluir questões dissertativas', description: 'O tutor corrige pelos critérios do módulo.', defaultChecked: true }),
+      h(A.Checkbox, { label: 'Gerar resumo ao fim de cada módulo', defaultChecked: true }),
+      h(A.Checkbox, { label: 'Usar exemplos em Python' }),
+      h(A.Checkbox, { label: 'Exercícios de código (em breve)', disabled: true })
+    )
+  );
+</script>
+</body>
+</html>

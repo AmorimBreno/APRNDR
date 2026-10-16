@@ -1,0 +1,39 @@
+<!-- @dsCard group="Formulários" height=300 subtitle="Grupo vertical com descrição e grupo em linha" -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>RadioGroup — prévia</title>
+<style>
+  body { padding: 24px; }
+  .col { display: flex; flex-direction: column; gap: 28px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  var A = window.Aprndr, h = React.createElement;
+  function Demo() {
+    var s = React.useState('aplicado');
+    var n = React.useState('inter');
+    return h('div', { className: 'col' },
+      h(A.RadioGroup, {
+        legend: 'Como você quer aprender?',
+        value: s[0], onChange: s[1],
+        options: [
+          { value: 'teorico', label: 'Teórico', description: 'Definições, demonstrações e o porquê de cada passo.' },
+          { value: 'aplicado', label: 'Aplicado', description: 'Exemplos, exercícios e uso no dia a dia.' },
+          { value: 'misto', label: 'Equilibrado' }
+        ]
+      }),
+      h(A.RadioGroup, {
+        legend: 'Nível', orientation: 'horizontal',
+        value: n[0], onChange: n[1],
+        options: [{ value: 'ini', label: 'Iniciante' }, { value: 'inter', label: 'Intermediário' }, { value: 'avan', label: 'Avançado' }]
+      })
+    );
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(h(Demo));
+</script>
+</body>
+</html>

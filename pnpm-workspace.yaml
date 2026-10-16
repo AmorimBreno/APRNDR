@@ -1,5 +1,7 @@
 # Pacotes do monorepo. A pasta profiles/ fica de fora de propósito: as
 # visual-tools têm package.json próprio, instalado com npm dentro da pasta.
+# design-system/ é o design system APRNDR (@estudos/design-system).
 packages:
   - packages/*
   - apps/*
+  - design-system

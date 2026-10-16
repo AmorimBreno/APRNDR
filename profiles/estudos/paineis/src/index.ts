@@ -3,10 +3,18 @@
 // do profile.json. Estilos em estilo.css ("@estudos/perfil-estudos/estilo.css").
 
 import type { RegistroPaineis } from "@estudos/ui";
-import { PainelQuiz } from "./PainelQuiz.tsx";
+import { ehPergunta, PainelQuiz } from "./PainelQuiz.tsx";
 
 export { PainelQuiz } from "./PainelQuiz.tsx";
 
 export const paineisEstudos: RegistroPaineis = {
-	quiz: { componente: PainelQuiz, titulo: "Questões" },
+	// Só pedidos: cada questão é respondida no modal, pelo botão na conversa,
+	// e o modal continua aberto depois de conferir, com o retorno.
+	quiz: {
+		componente: PainelQuiz,
+		titulo: "Questões",
+		soModal: true,
+		revisarAoResponder: true,
+		resumir: (pedido) => ({ tipo: "Questão", titulo: ehPergunta(pedido) ? pedido.dados.question : "Questão do professor", icone: "checklist" }),
+	},
 };

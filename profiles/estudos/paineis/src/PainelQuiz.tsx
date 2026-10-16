@@ -1,12 +1,13 @@
 // Painel "quiz" do perfil de estudos: a tela da ferramenta quiz web
-// (profiles/estudos/extensions/quiz-web.ts). Cada pedido "perguntar" vira uma
-// questão de alternativas (QuizQuestion, ou teclas marcáveis no multi-select),
-// com "Não sei" e uma nota livre. Cada ação "resultado" mostra o gabarito e o
-// QuizFeedback com a explicação. O pedido nunca traz o gabarito: ele só chega
-// no resultado, depois da resposta.
+// (profiles/estudos/extensions/quiz-web.ts), mostrada no modal do pedido. O
+// pedido "perguntar" vira uma questão de alternativas (QuizQuestion, ou teclas
+// marcáveis no multi-select), com "Não sei" e uma nota livre. Depois de
+// responder, o modal fica aberto na revisão (revisarAoResponder no registro):
+// a ação "resultado" com o mesmo id traz o gabarito e a explicação, mostrados
+// com o QuizFeedback. O pedido nunca traz o gabarito.
 
 import { Button, cx, Icon, letter, QuizFeedback, QuizQuestion, Tag, TextArea } from "@estudos/design-system";
-import { Markdown, type PedidoPendente, type PropsPainel } from "@estudos/ui";
+import { Markdown, type PedidoPendente, type PropsPainel, type RegistroPedido } from "@estudos/ui";
 import { useState } from "react";
 
 interface OpcaoMostrada {
@@ -37,10 +38,7 @@ interface DadosResultado {
 	explanation?: string;
 }
 
-/** Quantos resultados ficam à vista (os mais novos primeiro). */
-const LIMITE_RESULTADOS = 5;
-
-function ehPergunta(pedido: PedidoPendente): pedido is PedidoPendente & { dados: DadosPergunta } {
+export function ehPergunta(pedido: PedidoPendente): pedido is PedidoPendente & { dados: DadosPergunta } {
 	const dados = pedido.dados as Partial<DadosPergunta> | undefined;
 	return pedido.acao === "perguntar" && typeof dados?.question === "string" && Array.isArray(dados.options);
 }
@@ -226,22 +224,37 @@ function Resultado({ dados }: { dados: DadosResultado }) {
 	);
 }
 
+/** Revisão no modal: o resultado da correção, ou o que aconteceu com a questão. */
+function Revisao({ registro, acoes }: { registro: RegistroPedido; acoes: PropsPainel["acoes"] }) {
+	const resultado = acoes.find((acao) => acao.acao === "resultado" && ehResultado(acao.dados) && acao.dados.id === registro.id);
+	if (resultado) return <Resultado dados={resultado.dados as DadosResultado} />;
+	const dados = ehPergunta(registro) ? registro.dados : undefined;
+	return (
+		<div className="quiz__item">
+			{dados ? (
+				<h3 className="ap-quiz__prompt heading">
+					<Enunciado question={dados.question} {...(dados.details ? { details: dados.details } : {})} />
+				</h3>
+			) : null}
+			<p className="body quiz__vazio">
+				{registro.estado === "respondido"
+					? "Corrigindo a sua resposta…"
+					: registro.motivo === "usuario"
+						? "Você pulou esta questão."
+						: "A questão foi cancelada antes da resposta."}
+			</p>
+		</div>
+	);
+}
+
 export function PainelQuiz(props: PropsPainel) {
+	if (props.revisao) return <Revisao registro={props.revisao} acoes={props.acoes} />;
 	const perguntas = props.pedidos.filter(ehPergunta);
-	const resultados = props.acoes
-		.filter((acao) => acao.acao === "resultado" && ehResultado(acao.dados))
-		.slice(-LIMITE_RESULTADOS)
-		.reverse();
-	if (perguntas.length === 0 && resultados.length === 0) {
-		return <p className="body-sm quiz__vazio">Nenhuma questão ainda. Quando o professor fizer uma questão, ela aparece aqui, e o retorno fica embaixo dela.</p>;
-	}
+	if (perguntas.length === 0) return <p className="body-sm quiz__vazio">Nenhuma questão esperando você.</p>;
 	return (
 		<div className="quiz">
 			{perguntas.map((pedido) => (
 				<Pergunta key={pedido.id} pedido={pedido} responder={props.responder} cancelar={props.cancelar} />
-			))}
-			{resultados.map((acao) => (
-				<Resultado key={acao.chave} dados={acao.dados as DadosResultado} />
 			))}
 		</div>
 	);

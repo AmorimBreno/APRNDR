@@ -34,6 +34,25 @@
 .ferramenta__detalhe { display: -webkit-box; margin: 0; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; white-space: pre-wrap; overflow-wrap: anywhere; }
 .ferramenta__detalhe .ap-cursor { width: 7px; height: 12px; }
 
+/* Botão do pedido no lugar da linha da ferramenta: âmbar pulsando enquanto
+ * espera; depois de respondido, só o contorno, e âmbar claro no hover. */
+.botao-pedido { display: flex; align-items: center; gap: var(--space-4); width: 100%; padding: var(--space-4) var(--space-5); border: var(--border-control) solid var(--amber); border-radius: var(--radius-lg); background: var(--amber); color: var(--on-amber); text-align: left; cursor: pointer; transition: background-color .16s ease-out, color .16s ease-out, border-color .16s ease-out; }
+.botao-pedido > .ap-icon { flex: none; }
+.botao-pedido__texto { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.botao-pedido__titulo { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; }
+.botao-pedido--pendente { box-shadow: var(--key-lip); animation: pedido-pulsando 1.6s ease-out infinite; }
+.botao-pedido--pendente:hover { filter: brightness(1.06); }
+.botao-pedido:not(.botao-pedido--pendente) { border-color: var(--line-strong); background: transparent; color: var(--ink-muted); }
+.botao-pedido:not(.botao-pedido--pendente) .botao-pedido__titulo { color: var(--ink); }
+.botao-pedido:not(.botao-pedido--pendente):hover { border-color: var(--amber-line); background: var(--amber-pastel); color: var(--amber-deep); }
+.botao-pedido:not(.botao-pedido--pendente):hover .botao-pedido__titulo { color: var(--amber-deep); }
+.botao-pedido:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+@keyframes pedido-pulsando {
+	0% { box-shadow: var(--key-lip), 0 0 0 0 color-mix(in srgb, var(--amber) 55%, transparent); }
+	70% { box-shadow: var(--key-lip), 0 0 0 12px color-mix(in srgb, var(--amber) 0%, transparent); }
+	100% { box-shadow: var(--key-lip), 0 0 0 0 color-mix(in srgb, var(--amber) 0%, transparent); }
+}
+
 /* ── Barra de pergunta ── */
 
 .barra { display: flex; flex-direction: column; gap: var(--space-2); width: 100%; max-width: var(--measure-read); }
@@ -114,9 +133,14 @@
 .pergunta__varias { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; border: 0; }
 .pergunta__varias legend { margin-bottom: var(--space-2); padding: 0; color: var(--ink-muted); }
 .pergunta__erro { margin: 0; color: var(--brick-text); }
+.pergunta__resposta { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4) var(--space-5); border-left: var(--border-strong) solid var(--amber); border-radius: var(--radius-sm); background: var(--surface-raised); }
+.pergunta__resposta .overline { color: var(--ink-muted); }
+.pergunta__resposta ul { margin: 0; padding-left: var(--space-5); }
+.documento__pedido + .documento__pedido { margin-top: -32px; }
 
 @media (prefers-reduced-motion: reduce) {
-	.historico__item { transition: none; }
+	.historico__item, .botao-pedido { transition: none; }
+	.botao-pedido--pendente { animation: none; }
 }
 
 /* Fórmulas: o KaTeX usa as fontes dele; a de bloco rola se for larga. */

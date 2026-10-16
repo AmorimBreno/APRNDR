@@ -1,13 +1,22 @@
 // Janela do perfil: a barra tijolo no topo (a linha do perfil virou aba),
 // o histórico de conversas à esquerda, a conversa como documento no meio com
 // a barra de pergunta no pé e, à direita, a área de painéis (abre sozinha
-// quando um painel recebe algo). A lógica fica no @estudos/ui.
+// quando um painel dela recebe algo). Os pedidos que esperam resposta viram
+// botões na conversa e são respondidos num modal, que abre sozinho quando o
+// pedido chega e pode ser minimizado. A lógica fica no @estudos/ui.
 
 import { Button, EmptyState, Icon, pad2, Tag } from "@estudos/design-system";
 import {
 	AreaPaineis,
 	BarraPergunta,
+	BotaoPedido,
 	DocumentoConversa,
+	entradaDoPainel,
+	idsDosPaineis,
+	ModalPedido,
+	numerarPedidos,
+	type RegistroPedido,
+	resumoDoPedido,
 	type ErroJanela,
 	Historico,
 	type InfoModelo,
@@ -63,13 +72,42 @@ export function JanelaPerfil({ perfilId }: { perfilId: string }) {
 		if (avisoRecarregado) relerPerfis();
 	}, [avisoRecarregado, relerPerfis]);
 
-	// A área de painéis abre sozinha quando chega uma ação ou um pedido novo.
-	const chegadas = estado.pedidos.length + Object.values(estado.acoesPorPainel).reduce((soma, lista) => soma + lista.length, 0);
+	// A área de painéis abre sozinha quando um painel dela recebe uma ação nova
+	// (os pedidos vão para o modal, não para a área).
+	const idsDaArea = idsDosPaineis(perfil?.paineis ?? [], estado.acoesPorPainel, registroPaineis);
+	const chegadas = idsDaArea.reduce((soma, id) => soma + (estado.acoesPorPainel[id]?.length ?? 0), 0);
 	const chegadasAntes = useRef(chegadas);
 	useEffect(() => {
 		if (chegadas > chegadasAntes.current) setPaineisAbertos(true);
 		chegadasAntes.current = chegadas;
 	}, [chegadas]);
+
+	// Modal do pedido: abre sozinho quando chega um pedido novo. Quando o
+	// aberto deixa de esperar, fecha, menos no painel que revisa ao responder
+	// (o quiz mostra o retorno ali) e só se foi você quem respondeu.
+	const [pedidoAberto, setPedidoAberto] = useState<string>();
+	const registros = estado.registrosPedidos;
+	const vistos = useRef(new Set<string>());
+	useEffect(() => {
+		for (const registro of Object.values(registros).sort((a, b) => a.ordem - b.ordem)) {
+			if (vistos.current.has(registro.id)) continue;
+			vistos.current.add(registro.id);
+			if (registro.estado === "pendente") setPedidoAberto(registro.id);
+		}
+	}, [registros]);
+	const aberto = pedidoAberto ? registros[pedidoAberto] : undefined;
+	const estadoDoAberto = aberto?.estado;
+	const painelDoAberto = aberto?.painel;
+	const anterior = useRef<{ id?: string; estado?: string }>({});
+	useEffect(() => {
+		const antes = anterior.current;
+		anterior.current = { ...(pedidoAberto ? { id: pedidoAberto } : {}), ...(estadoDoAberto ? { estado: estadoDoAberto } : {}) };
+		// Só na passagem de "esperando" para outra coisa com o modal aberto: reabrir para rever não fecha.
+		if (!pedidoAberto || !painelDoAberto || antes.id !== pedidoAberto || antes.estado !== "pendente" || estadoDoAberto === "pendente") return;
+		const revisa = entradaDoPainel(registroPaineis, painelDoAberto).revisarAoResponder;
+		if (!(revisa && estadoDoAberto === "respondido")) setPedidoAberto(undefined);
+	}, [pedidoAberto, estadoDoAberto, painelDoAberto]);
+	const numeros = useMemo(() => numerarPedidos(registroPaineis, registros), [registros]);
 
 	const modelosDoPerfil = useMemo(
 		() => (perfil?.agentes ?? []).map((agente) => agente.modelo).filter((modelo): modelo is string => Boolean(modelo)),
@@ -108,7 +146,20 @@ export function JanelaPerfil({ perfilId }: { perfilId: string }) {
 	const agenteAtual = estado.sessao?.agente ?? "";
 	const ocupado = !aberta || estado.executando;
 	const uso = estado.uso;
-	const pedidosEsperando = estado.pedidos.length;
+
+	const botaoDoPedido = (registro: RegistroPedido) => (
+		<BotaoPedido
+			pedido={registro}
+			resumo={resumoDoPedido(registroPaineis, registro)}
+			numero={numeros[registro.id] ?? 1}
+			abrir={() => setPedidoAberto(registro.id)}
+		/>
+	);
+	// Pedidos sem a chamada de ferramenta na conversa (id diferente do da chamada) vão para o fim.
+	const idsDasChamadas = new Set(estado.conversa.flatMap((item) => (item.tipo === "ferramenta" ? [item.chamada.id] : [])));
+	const soltos = Object.values(registros)
+		.filter((registro) => registro.estado === "pendente" && !idsDasChamadas.has(registro.id))
+		.sort((a, b) => a.ordem - b.ordem);
 
 	return (
 		<div className="janela">
@@ -169,7 +220,6 @@ export function JanelaPerfil({ perfilId }: { perfilId: string }) {
 						onClick={() => setPaineisAbertos((atual) => !atual)}
 					>
 						Painéis
-						{pedidosEsperando ? <span className="topo__contador data">{pad2(pedidosEsperando)}</span> : null}
 					</button>
 				</div>
 			</header>
@@ -230,6 +280,12 @@ export function JanelaPerfil({ perfilId }: { perfilId: string }) {
 
 							<DocumentoConversa
 								conversa={estado.conversa}
+								pedidoDaChamada={(id) => (registros[id] ? botaoDoPedido(registros[id]) : undefined)}
+								depois={soltos.map((registro) => (
+									<div key={registro.id} className="documento__pedido">
+										{botaoDoPedido(registro)}
+									</div>
+								))}
 								vazio={
 									<EmptyState glyph="問" tone="moss" title="Conversa nova">
 										Escreva abaixo para começar. As respostas aparecem aqui como uma página, bloco a bloco, e as ferramentas que o agente usar
@@ -258,7 +314,6 @@ export function JanelaPerfil({ perfilId }: { perfilId: string }) {
 							paineis={perfil?.paineis ?? []}
 							registro={registroPaineis}
 							acoesPorPainel={estado.acoesPorPainel}
-							pedidos={estado.pedidos}
 							cancelados={estado.cancelados}
 							responder={acoes.responderPedido}
 							cancelar={acoes.cancelarPedido}
@@ -267,6 +322,21 @@ export function JanelaPerfil({ perfilId }: { perfilId: string }) {
 					</aside>
 				) : null}
 			</div>
+
+			{aberto ? (
+				<ModalPedido
+					key={aberto.id}
+					pedido={aberto}
+					registro={registroPaineis}
+					numero={numeros[aberto.id] ?? 1}
+					acoes={estado.acoesPorPainel[aberto.painel] ?? []}
+					cancelados={estado.cancelados}
+					responder={acoes.responderPedido}
+					cancelar={acoes.cancelarPedido}
+					acaoDaInterface={acoes.acaoDaInterface}
+					fechar={() => setPedidoAberto(undefined)}
+				/>
+			) : null}
 		</div>
 	);
 }

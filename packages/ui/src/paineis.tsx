@@ -1,23 +1,29 @@
 // Registro de painéis (ESPECIFICACAO 5.4): liga o id de um painel a um
-// componente React. O perfil lista no profile.json os painéis que usa; a
-// AreaPaineis mostra cada um num Card do design system, com as ações
-// (interface:mostrar) e os pedidos (interface:pedido) que chegaram para ele
-// pela ponte de eventos.
+// componente React. O perfil lista no profile.json os painéis que usa.
+//
+// Dois lugares mostram um painel:
+// - a AreaPaineis, à direita, com as ações (interface:mostrar) de cada um num
+//   Card do design system;
+// - o modal do pedido (ModalPedido), aberto pelo botão do pedido na conversa:
+//   todo pedido que espera resposta (interface:pedido), de qualquer painel, é
+//   respondido ali e depois pode ser revisto.
 //
 // Um id sem componente registrado usa o PainelGenerico, que mostra o que
 // chegou em JSON e deixa responder aos pedidos com um texto ou cancelar.
 
-import { Button, Card, pad2, TextArea } from "@estudos/design-system";
+import { Button, Card, type IconName, pad2, TextArea } from "@estudos/design-system";
 import { type ComponentType, useState } from "react";
-import type { AcaoRecebida, PedidoPendente } from "./estado-janela.ts";
+import type { AcaoRecebida, PedidoPendente, RegistroPedido } from "./estado-janela.ts";
 import type { MotivoCancelamento } from "./tipos.ts";
 
 export interface PropsPainel {
 	painel: string;
 	/** Ações recebidas para o painel, da mais antiga para a mais nova. */
 	acoes: AcaoRecebida[];
-	/** Pedidos esperando a resposta do usuário. */
+	/** Pedidos esperando a resposta do usuário (no modal, só o pedido aberto). */
 	pedidos: PedidoPendente[];
+	/** No modal, um pedido já respondido ou cancelado: mostrar só para rever. */
+	revisao?: RegistroPedido;
 	/** Pedidos cancelados pelo núcleo ou pelo usuário, por id, com o motivo. */
 	cancelados: Record<string, MotivoCancelamento>;
 	/** Responde ao pedido `id`. false = ele não esperava mais resposta. */
@@ -30,16 +36,32 @@ export interface PropsPainel {
 
 export type ComponentePainel = ComponentType<PropsPainel>;
 
-/** Um painel com título próprio no Card (sem ele, o título é o id). */
+/** Como um pedido aparece no botão da conversa e no título do modal. */
+export interface ResumoPedido {
+	/** "Pergunta", "Questão". Vira "Pergunta 01". */
+	tipo: string;
+	/** O texto do botão (markdown em linha). */
+	titulo: string;
+	icone?: IconName;
+}
+
+/** Um painel com título, resumo dos pedidos e comportamento próprios. */
 export interface EntradaPainel {
 	componente: ComponentePainel;
+	/** Título no Card e no modal. Sem ele, o id. */
 	titulo?: string;
+	/** Só tem pedidos: não aparece na área de painéis. */
+	soModal?: boolean;
+	/** Resumo do pedido para o botão na conversa. Sem ele, "Pedido" e o título do painel. */
+	resumir?(pedido: PedidoPendente): ResumoPedido;
+	/** Depois de responder, o modal continua aberto na revisão (o quiz mostra o retorno ali). */
+	revisarAoResponder?: boolean;
 }
 
 /** Mapa de id do painel para o componente (ou componente e título). */
 export type RegistroPaineis = Readonly<Record<string, ComponentePainel | EntradaPainel>>;
 
-function entradaDoPainel(registro: RegistroPaineis, id: string): EntradaPainel {
+export function entradaDoPainel(registro: RegistroPaineis, id: string): EntradaPainel {
 	if (!Object.hasOwn(registro, id)) return { componente: PainelGenerico };
 	const valor = registro[id]!;
 	return typeof valor === "object" && "componente" in valor ? valor : { componente: valor };
@@ -105,8 +127,27 @@ function ResponderPedido(props: { pedido: PedidoPendente; responder: PropsPainel
 	);
 }
 
+/** O que aconteceu com o pedido, em palavras, para a revisão e o botão. */
+export function situacaoDoPedido(registro: RegistroPedido): string {
+	if (registro.estado === "respondido") return "Respondido";
+	if (registro.estado === "pendente") return "Esperando você";
+	return registro.motivo === "usuario" ? "Você não respondeu" : "Cancelado";
+}
+
 /** Painel para qualquer id sem componente: mostra o que chegou e responde pedidos com texto. */
 export function PainelGenerico(props: PropsPainel) {
+	if (props.revisao) {
+		return (
+			<div className="painel-generico">
+				<section className="pedido" aria-label={`Pedido ${props.revisao.acao}`}>
+					<span className="overline">Pedido · {props.revisao.acao}</span>
+					<pre className="caixa-json">{emJson(props.revisao.dados)}</pre>
+					<span className="overline">{situacaoDoPedido(props.revisao)}</span>
+					{props.revisao.resposta !== undefined ? <pre className="caixa-json">{emJson(props.revisao.resposta)}</pre> : null}
+				</section>
+			</div>
+		);
+	}
 	return (
 		<div className="painel-generico">
 			{props.pedidos.map((pedido) => (
@@ -137,7 +178,6 @@ export interface PropsAreaPaineis {
 	paineis: string[];
 	registro: RegistroPaineis;
 	acoesPorPainel: Record<string, AcaoRecebida[]>;
-	pedidos: PedidoPendente[];
 	/** Pedidos cancelados, por id, com o motivo. */
 	cancelados?: Record<string, MotivoCancelamento>;
 	responder(id: string, dados?: unknown): Promise<boolean>;
@@ -146,41 +186,34 @@ export interface PropsAreaPaineis {
 }
 
 /**
- * Ids a mostrar: os do perfil e, depois, os que receberam ação ou pedido sem
- * estar na lista. Os que esperam resposta do usuário sobem para o topo, na
- * mesma ordem entre si.
+ * Ids da área de painéis: os do perfil e, depois, os que receberam ação sem
+ * estar na lista. Os só de pedidos (soModal) ficam de fora: os pedidos são
+ * respondidos no modal, pelo botão na conversa.
  */
-export function idsDosPaineis(paineis: string[], acoesPorPainel: Record<string, unknown>, pedidos: PedidoPendente[]): string[] {
+export function idsDosPaineis(paineis: string[], acoesPorPainel: Record<string, unknown>, registro: RegistroPaineis = {}): string[] {
 	const ids = [...paineis];
-	for (const id of [...Object.keys(acoesPorPainel), ...pedidos.map((pedido) => pedido.painel)]) {
+	for (const id of Object.keys(acoesPorPainel)) {
 		if (!ids.includes(id)) ids.push(id);
 	}
-	const esperando = new Set(pedidos.map((pedido) => pedido.painel));
-	return [...ids.filter((id) => esperando.has(id)), ...ids.filter((id) => !esperando.has(id))];
+	return ids.filter((id) => !entradaDoPainel(registro, id).soModal);
 }
 
 const semCancelados: Record<string, MotivoCancelamento> = {};
+const semPedidos: PedidoPendente[] = [];
 
 export function AreaPaineis(props: PropsAreaPaineis) {
-	const ids = idsDosPaineis(props.paineis, props.acoesPorPainel, props.pedidos);
+	const ids = idsDosPaineis(props.paineis, props.acoesPorPainel, props.registro);
 	if (ids.length === 0) return <p className="body-sm paineis__vazio">Este perfil não tem painéis.</p>;
 	return (
 		<div className="paineis">
 			{ids.map((id, indice) => {
 				const { componente: Componente, titulo } = entradaDoPainel(props.registro, id);
-				const pedidos = props.pedidos.filter((pedido) => pedido.painel === id);
 				return (
-					<Card
-						key={id}
-						index={pad2(indice + 1)}
-						label={pedidos.length ? "Esperando você" : "Painel"}
-						title={titulo ?? id}
-						className={`paineis__card${pedidos.length ? " paineis__card--esperando" : ""}`}
-					>
+					<Card key={id} index={pad2(indice + 1)} label="Painel" title={titulo ?? id} className="paineis__card">
 						<Componente
 							painel={id}
 							acoes={props.acoesPorPainel[id] ?? []}
-							pedidos={pedidos}
+							pedidos={semPedidos}
 							cancelados={props.cancelados ?? semCancelados}
 							responder={props.responder}
 							cancelar={props.cancelar}

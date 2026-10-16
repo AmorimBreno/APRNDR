@@ -111,10 +111,17 @@ export interface PropsDocumentoConversa {
 	conversa: ItemConversa[];
 	/** O que mostrar sem nenhum item (normalmente um EmptyState). */
 	vazio?: ReactNode;
+	/**
+	 * O botão do pedido feito pela chamada de ferramenta `id`, se houver: ele
+	 * entra no lugar da linha da ferramenta (Pedidos.tsx).
+	 */
+	pedidoDaChamada?(id: string): ReactNode | undefined;
+	/** Depois do último item (por exemplo, pedidos sem chamada na conversa). */
+	depois?: ReactNode;
 }
 
 /** Coluna da conversa; rola até o fim quando chega algo novo. */
-export function DocumentoConversa({ conversa, vazio }: PropsDocumentoConversa) {
+export function DocumentoConversa({ conversa, vazio, pedidoDaChamada, depois }: PropsDocumentoConversa) {
 	const fim = useRef<HTMLDivElement>(null);
 	useEffect(() => {
 		fim.current?.scrollIntoView({ block: "end" });
@@ -132,11 +139,16 @@ export function DocumentoConversa({ conversa, vazio }: PropsDocumentoConversa) {
 						</StudentNote>
 					);
 				}
-				if (item.tipo === "ferramenta") return <LinhaFerramenta key={item.chave} chamada={item.chamada} />;
+				if (item.tipo === "ferramenta") {
+					const botao = pedidoDaChamada?.(item.chamada.id);
+					if (botao) return <div key={item.chave} className="documento__pedido">{botao}</div>;
+					return <LinhaFerramenta key={item.chave} chamada={item.chamada} />;
+				}
 				if (semConteudo(item)) return null;
 				numero += 1;
 				return <BlocoResposta key={item.chave} item={item} numero={numero} />;
 			})}
+			{depois}
 			<div ref={fim} />
 		</div>
 	);

@@ -44,17 +44,19 @@ No fim, anote o resultado de cada passo e mande para o Claude Code. A Etapa 3 s�
 
 ### Painéis e perguntas
 
-12. Clique na tecla "Painéis" e depois de novo. Por quê: confere a área de painéis. O que você deve ver: à direita (ou por cima da conversa, se a janela for estreita) aparecem os cards "Questões" e "Teste", cada um com o número e "Painel" no topo, e a tecla fica escura enquanto a área está aberta. O segundo clique fecha.
+Os pedidos que esperam a sua resposta (perguntas, questões do quiz, o pedido do painel teste) não ficam mais na área de painéis: cada um vira um botão na conversa, no lugar da linha da ferramenta, e é respondido num modal. Se o app já estava aberto antes desta mudança, aperte F5 uma vez antes do passo 12; a conversa volta igual.
 
-13. Feche a área de painéis e mande: "Use a ferramenta ask_user_question para me perguntar qual matéria eu quero revisar, com as opções Cálculo, Física e Algoritmos." Por quê: confere o ask_user_question no app (núcleo). O que você deve ver: a área de painéis abre sozinha, a tecla mostra "01" em âmbar e, no topo da área, o card "Pergunta" com a borda âmbar e "Esperando você". Nele, a pergunta, "Escolha uma" e as três opções mais "Outra". Escolha "Outra", escreva "Estatística" no campo que aparece e clique em "Enviar resposta". O card some, a linha da ferramenta mostra "User selected: Other: Estatística" e o professor responde a partir disso.
+12. Clique na tecla "Painéis" e depois de novo. Por quê: confere a área de painéis. O que você deve ver: à direita (ou por cima da conversa, se a janela for estreita) aparece só o card "Teste", com o número e "Painel" no topo; "Questões" e "Pergunta" não aparecem mais ali. A tecla fica escura enquanto a área está aberta, e o segundo clique fecha.
 
-14. Mande: "Use a ferramenta ask_user_question, com multiSelect, para eu escolher quais dias da semana posso estudar, com as opções segunda, quarta e sexta." Por quê: confere o modo de várias escolhas. O que você deve ver: "Escolha uma ou mais" com caixas de marcar. Marque duas e envie. A linha da ferramenta mostra as duas escolhidas.
+13. Mande: "Use a ferramenta ask_user_question para me perguntar qual matéria eu quero revisar, com as opções Cálculo, Física e Algoritmos." Por quê: confere o ask_user_question no app e o modal. O que você deve ver: o modal abre sozinho, com a faixa âmbar "PERGUNTA 01" e "Pergunta · Esperando você" em cima, a pergunta, "Escolha uma", as três opções e "Outra". Clique em "Responder depois" (ou no ×, ou aperte Esc): o modal fecha e, na conversa, fica um botão âmbar pulsando com "Pergunta 01 · Esperando você" e o texto da pergunta. Clique nele: o modal volta. Escolha "Outra", escreva "Estatística" e clique em "Enviar resposta". O modal fecha, o botão fica só com o contorno e "Respondido", e o professor responde a partir disso. Passe o mouse no botão: ele fica âmbar claro. Clique: o modal abre só para rever, com "Sua resposta: Outra: Estatística", e o botão de baixo é "Fechar".
 
-15. Mande: "Use a ferramenta quiz com uma questão de 4 alternativas: qual é a derivada de x²? Escreva em LaTeX." Por quê: confere o quiz no app (perfil). O que você deve ver: no card "Questões", com a borda âmbar, a questão com "Uma resposta", a fórmula desenhada e as alternativas em teclas A a D (as letras também escolhem pelo teclado), o campo "Nota (opcional)" e os botões Pular, Não sei e Conferir. Na conversa, a linha da ferramenta quiz diz "Esperando a sua resposta no painel Questões". Escolha uma alternativa errada, escreva uma nota e clique em Conferir. O que você deve ver: a certa fica verde com "Correta", a sua fica tijolo com "Sua resposta", as outras apagam, e embaixo a faixa tijolo "Ainda não" com a explicação e "Sua nota". A linha da ferramenta diz "User answered incorrectly" com a sua nota, e o professor retoma a partir do erro.
+14. Mande: "Use a ferramenta ask_user_question, com multiSelect, para eu escolher quais dias da semana posso estudar, com as opções segunda, quarta e sexta." Por quê: confere o modo de várias escolhas e a numeração. O que você deve ver: o modal "PERGUNTA 02" com "Escolha uma ou mais" e caixas de marcar. Marque duas e envie. Ao rever pelo botão, aparecem as duas.
 
-16. Peça outra questão do quiz e clique em "Não sei". Depois peça mais uma e clique em "Pular". Por quê: confere os outros dois caminhos. O que você deve ver: com Não sei, a faixa creme "Você marcou Não sei", e o professor trata como lacuna, sem dizer que você errou. Com Pular, a questão some sem retorno, a linha da ferramenta diz "User cancelled the quiz" e o professor segue sem erro. Os resultados ficam no card, o mais novo em cima.
+15. Mande: "Use a ferramenta quiz com uma questão de 4 alternativas: qual é a derivada de x²? Escreva em LaTeX." Por quê: confere o quiz no app. O que você deve ver: o modal "QUESTÃO 01" com "Questões · Esperando você", a questão com "Uma resposta", a fórmula desenhada, as alternativas em teclas A a D (as letras também escolhem pelo teclado), o campo "Nota (opcional)" e os botões Pular, Não sei e Conferir. Escolha uma alternativa errada, escreva uma nota e clique em Conferir. O modal continua aberto e mostra o retorno: a certa em verde com "Correta", a sua em tijolo com "Sua resposta", as outras apagadas e a faixa tijolo "Ainda não" com a explicação e "Sua nota". Feche: o botão "Questão 01" fica com o contorno e abre de novo esse mesmo retorno. O professor retoma a partir do erro.
 
-17. Mande: "Use perguntar_no_painel_teste para me perguntar se está tudo certo e repita o resultado da ferramenta." Quando o card "Teste" aparecer, clique em Cancelar. Por quê: confere o cancelamento de verdade (era uma pendência da Etapa 2). O que você deve ver: o card mostra o pedido numa caixa técnica, o campo "Sua resposta" e os botões Cancelar e Responder. Depois de Cancelar, o resultado da ferramenta é "O usuário cancelou ou não respondeu (usuario)." Antes, ele vinha como uma resposta.
+16. Peça outra questão do quiz e clique em "Não sei". Depois peça mais uma e clique em "Pular". Por quê: confere os outros dois caminhos. O que você deve ver: com Não sei, o retorno com a faixa creme "Você marcou Não sei", e o professor trata como lacuna, sem dizer que você errou. Com Pular, o modal fecha, o botão diz "Você não respondeu" e, ao rever, "Você pulou esta questão."; o professor segue sem erro.
+
+17. Mande: "Use perguntar_no_painel_teste para me perguntar se está tudo certo e repita o resultado da ferramenta." Quando o modal "PEDIDO 01" abrir, clique em Cancelar. Por quê: confere o cancelamento de verdade (era uma pendência da Etapa 2) e que qualquer painel usa o modal. O que você deve ver: o pedido numa caixa técnica, o campo "Sua resposta" e os botões Cancelar e Responder. Depois de Cancelar, o botão na conversa diz "Você não respondeu" e o resultado da ferramenta é "O usuário cancelou ou não respondeu (usuario)."
 
 ### Avisos e edição ao vivo
 
@@ -62,7 +64,7 @@ No fim, anote o resultado de cada passo e mande para o Claude Code. A Etapa 3 s�
 
 19. Com a tela de perfis aberta (clique em Perfis no topo), abra no editor apps\web\src\telas\TelaPerfis.tsx, troque "Escolha um perfil" por "Escolha um perfil teste" e salve. Por quê: edição ao vivo da tela. O que você deve ver: o texto muda na hora, sem a página recarregar. Desfaça e salve de novo.
 
-20. Abra o perfil, deixe a área de painéis aberta, abra profiles\estudos\paineis\src\PainelQuiz.tsx, troque "Nenhuma questão ainda." por "Nenhuma questão por enquanto." e salve. Por quê: o código de tela do perfil é recarregado pelo Vite, sem mexer na sessão do pi. O que você deve ver: o texto do card "Questões" muda (se ele já tiver resultados, o texto não aparece; abra uma conversa nova para ver). Não deve aparecer o aviso "Perfil recarregado". Desfaça e salve de novo.
+20. Abra o perfil, peça uma questão do quiz e deixe o modal aberto. Abra profiles\estudos\paineis\src\PainelQuiz.tsx, troque "Nota (opcional)" por "Nota (opcional, teste)" e salve. Por quê: o código de tela do perfil é recarregado pelo Vite, sem mexer na sessão do pi. O que você deve ver: o rótulo do campo muda no modal, e não aparece o aviso "Perfil recarregado". Desfaça, salve de novo e responda a questão.
 
 21. Abra profiles\estudos\extensions\painel-teste.ts, troque "mostrado no painel teste" por "mostrado no painel teste, versão nova" e salve. Por quê: mudança numa extensão recarrega a sessão. O que você deve ver: a faixa "Perfil recarregado" com "Um arquivo do perfil mudou: extensions/painel-teste.ts". Desfaça e salve de novo.
 
@@ -78,7 +80,7 @@ No fim, anote o resultado de cada passo e mande para o Claude Code. A Etapa 3 s�
 
 ## O que ainda não existe ou já se sabe
 
-- As perguntas e as questões ficam só na área de painéis enquanto a conversa está aberta. Ao reabrir uma conversa antiga, aparece só a linha da ferramenta com o resultado em texto. Isso não reprova o teste.
+- Os botões das perguntas e das questões existem só enquanto a conversa está aberta nesta janela. Ao reabrir uma conversa antiga (ou depois de o servidor reiniciar), aparece só a linha da ferramenta com o resultado em texto. Isso não reprova o teste.
 - As imagens dos diagramas na conversa ainda não aparecem. O arquivo vai para estudos-dados\viz.
 - Cadernos, cursos e a aula (as outras telas do design system) são da Etapa 4.
 
@@ -104,12 +106,12 @@ Antes de começar (app parado):
 9. Trocar de agente:
 10. Histórico:
 11. Linhas de ferramenta (researcher):
-12. Área de painéis:
-13. ask_user_question com Outra:
+12. Área de painéis (só o Teste):
+13. ask_user_question: modal, minimizar, botão pulsando, Outra, rever:
 14. ask_user_question com várias escolhas:
 15. quiz com resposta errada e nota:
 16. quiz com Não sei e Pular:
-17. Cancelar no painel teste:
+17. Cancelar no pedido do painel teste:
 18. Perfil recarregado:
 19. Edição ao vivo da tela:
 20. Edição ao vivo do painel do perfil:

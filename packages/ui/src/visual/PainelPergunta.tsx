@@ -1,12 +1,13 @@
 // Painel "pergunta": a versão web do ask_user_question (packages/core/src/
-// pergunta.ts). Mostra cada pergunta que espera resposta: texto livre, uma
-// escolha ou várias, sempre com a opção "Outra" quando há opções. Responde com
+// pergunta.ts), mostrado no modal do pedido. Para responder: texto livre, uma
+// escolha ou várias, sempre com a opção "Outra" quando há opções; responde com
 // { escolhas, outra, texto } ou cancela pelo protocolo (motivo "usuario").
+// Para rever (props.revisao): a pergunta e o que você respondeu.
 
 import { Button, Checkbox, RadioGroup, TextArea, TextField } from "@estudos/design-system";
 import { useState } from "react";
-import type { PedidoPendente } from "../estado-janela.ts";
-import { type PropsPainel, PainelGenerico } from "../paineis.tsx";
+import type { PedidoPendente, RegistroPedido } from "../estado-janela.ts";
+import { type PropsPainel, PainelGenerico, situacaoDoPedido } from "../paineis.tsx";
 import type { DadosPedidoPergunta, RespostaPergunta } from "../tipos.ts";
 import { Markdown } from "./Markdown.tsx";
 
@@ -110,7 +111,48 @@ function Pergunta(props: { id: string; dados: DadosPedidoPergunta; responder: Pr
 	);
 }
 
+/** O que você respondeu, em texto, a partir da resposta guardada. */
+function respostasEmTexto(dados: DadosPedidoPergunta, resposta: unknown): string[] {
+	const { escolhas, outra, texto } = (resposta ?? {}) as RespostaPergunta;
+	if (dados.mode === "text") return [typeof texto === "string" && texto.trim() ? texto.trim() : "(resposta vazia)"];
+	const itens = (Array.isArray(escolhas) ? escolhas : []).map((indice) => dados.options[indice - 1]?.label ?? `opção ${indice}`);
+	if (typeof outra === "string" && outra.trim()) itens.push(`${dados.otherLabel ?? "Outra"}: ${outra.trim()}`);
+	return itens;
+}
+
+function Revisao({ registro }: { registro: RegistroPedido & { dados: DadosPedidoPergunta } }) {
+	const { dados } = registro;
+	const respostas = registro.estado === "respondido" ? respostasEmTexto(dados, registro.resposta) : [];
+	return (
+		<section className="pergunta" aria-label="Pergunta respondida">
+			<div className="pergunta__enunciado heading">
+				<Markdown texto={dados.question} emLinha />
+			</div>
+			{dados.details ? (
+				<div className="pergunta__detalhes ap-prose body">
+					<Markdown texto={dados.details} />
+				</div>
+			) : null}
+			<div className="pergunta__resposta">
+				<span className="overline">{registro.estado === "respondido" ? "Sua resposta" : situacaoDoPedido(registro)}</span>
+				{respostas.length > 0 ? (
+					<ul>
+						{respostas.map((item, indice) => (
+							<li key={indice} className="body-lg">
+								<Markdown texto={item} emLinha />
+							</li>
+						))}
+					</ul>
+				) : null}
+			</div>
+		</section>
+	);
+}
+
 export function PainelPergunta(props: PropsPainel) {
+	if (props.revisao) {
+		return ehPergunta(props.revisao) ? <Revisao registro={props.revisao} /> : <PainelGenerico {...props} />;
+	}
 	const perguntas = props.pedidos.filter(ehPergunta);
 	const outros = props.pedidos.filter((pedido) => !ehPergunta(pedido));
 	return (

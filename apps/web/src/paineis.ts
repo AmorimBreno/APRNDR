@@ -8,5 +8,12 @@ import { PainelGenerico, paineisDoNucleo, type RegistroPaineis } from "@estudos/
 export const registroPaineis: RegistroPaineis = {
 	...paineisDoNucleo,
 	...paineisEstudos,
-	teste: { componente: PainelGenerico, titulo: "Teste" },
+	teste: {
+		componente: PainelGenerico,
+		titulo: "Teste",
+		resumir: (pedido) => {
+			const pergunta = (pedido.dados as { pergunta?: unknown } | undefined)?.pergunta;
+			return { tipo: "Pedido", titulo: typeof pergunta === "string" ? pergunta : "Pedido do painel teste" };
+		},
+	},
 };

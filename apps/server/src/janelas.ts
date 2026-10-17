@@ -40,6 +40,7 @@ export type JanelaDoServidor = Pick<
 	| "recarregar"
 	| "modelosDisponiveis"
 	| "historico"
+	| "historicoPonte"
 	| "responder"
 	| "cancelarPedido"
 	| "acaoDaInterface"
@@ -244,7 +245,7 @@ export class Janelas {
 			try {
 				const estado = await inicio;
 				this.log.info(`[${perfil}] sessão ${estado.sessaoId} aberta (agente ${estado.agente}, modelo ${estado.modelo ?? "padrão"})`);
-				this.transmitir(perfil, { tipo: "historico", perfil, itens: janela.historico() });
+				this.transmitir(perfil, { tipo: "historico", perfil, itens: janela.historico(), ponte: janela.historicoPonte() });
 				return estado;
 			} catch (erro) {
 				// Deixa a próxima abertura tentar de novo.
@@ -267,11 +268,11 @@ export class Janelas {
 			trocou = true;
 		}
 		if (trocou) {
-			this.transmitir(perfil, { tipo: "historico", perfil, itens: janela.historico() });
+			this.transmitir(perfil, { tipo: "historico", perfil, itens: janela.historico(), ponte: janela.historicoPonte() });
 		} else {
 			// Entrou numa conversa já aberta: o estado e o histórico vão só para ela.
 			conexao.enviar({ tipo: "evento", perfil, evento: { tipo: "estado_sessao", estado } });
-			conexao.enviar({ tipo: "historico", perfil, itens: janela.historico() });
+			conexao.enviar({ tipo: "historico", perfil, itens: janela.historico(), ponte: janela.historicoPonte() });
 		}
 		return estado;
 	}
@@ -284,7 +285,7 @@ export class Janelas {
 		const janela = this.janela(perfil);
 		this.transmitir(perfil, { tipo: "carregando", perfil, mensagem });
 		const estado = await operacao(janela);
-		this.transmitir(perfil, { tipo: "historico", perfil, itens: janela.historico() });
+		this.transmitir(perfil, { tipo: "historico", perfil, itens: janela.historico(), ponte: janela.historicoPonte() });
 		return estado;
 	}
 

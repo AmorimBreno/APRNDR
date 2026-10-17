@@ -1,10 +1,11 @@
 // Testes da ponte de eventos sem sessão do pi: o barramento é o createEventBus
 // do próprio pi, o mesmo que o DefaultResourceLoader cria para cada sessão.
 
-import { createEventBus, type ExtensionAPI, type ExtensionFactory } from "@earendil-works/pi-coding-agent";
+import { createEventBus, type ExtensionAPI, type ExtensionFactory, type SessionEntry } from "@earendil-works/pi-coding-agent";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { EventoNucleo } from "./eventos.ts";
 import { EVENTOS_PONTE, PonteSessao, type RespostaInterface } from "./ponte.ts";
+import { registrosDaPonte } from "./sessoes.ts";
 
 let eventos: EventoNucleo[] = [];
 let ponte: PonteSessao;
@@ -132,5 +133,32 @@ describe("PonteSessao", () => {
 		barramento.emit(EVENTOS_PONTE.mostrar, { painel: "teste", acao: "abrir", dados: 1 });
 		pedir("p1");
 		expect(eventos.map((evento) => evento.tipo)).toEqual(["acao_interface", "pedido_interface"]);
+	});
+
+	it("grava na sessão cada pedido, o fim dele e cada ação mostrada (registrosDaPonte lê de volta)", () => {
+		const gravados: unknown[] = [];
+		barramento = createEventBus();
+		ponte = new PonteSessao((evento) => eventos.push(evento));
+		void fabrica()({ events: barramento, appendEntry: (tipo: string, dados: unknown) => gravados.push({ type: "custom", customType: tipo, data: dados }) } as unknown as ExtensionAPI);
+		barramento.emit(EVENTOS_PONTE.mostrar, { painel: "quiz", acao: "resultado", dados: { id: "p1" } });
+		pedir("p1");
+		pedir("p2");
+		ponte.responder("p1", { escolhas: [2] });
+		ponte.cancelarPeloUsuario("p2");
+		pedir("p3");
+		expect(registrosDaPonte(gravados as SessionEntry[])).toEqual([
+			{ tipo: "mostrar", painel: "quiz", acao: "resultado", dados: { id: "p1" } },
+			{ tipo: "pedido", id: "p1", painel: "quiz", acao: "perguntar", dados: { pergunta: "2+2?" } },
+			{ tipo: "pedido", id: "p2", painel: "quiz", acao: "perguntar", dados: { pergunta: "2+2?" } },
+			{ tipo: "fim", id: "p1", estado: "respondido", resposta: { escolhas: [2] } },
+			{ tipo: "fim", id: "p2", estado: "cancelado", motivo: "usuario" },
+			{ tipo: "pedido", id: "p3", painel: "quiz", acao: "perguntar", dados: { pergunta: "2+2?" } },
+		]);
+	});
+
+	it("sem appendEntry (sessão já trocada), gravar não quebra a ponte", () => {
+		const recebidas = pedir("p9");
+		expect(ponte.responder("p9", 1)).toBe(true);
+		expect(recebidas).toEqual([{ id: "p9", dados: 1 }]);
 	});
 });

@@ -8,10 +8,12 @@ import type { DadosResposta, MensagemServidor } from "@estudos/core/protocolo";
 export type {
 	DadosPedidoPergunta,
 	DadosResposta,
+	HistoricoPonte,
 	MensagemCliente,
 	MensagemServidor,
 	ModoPergunta,
 	OpcaoPergunta,
+	RegistroPonte,
 	RespostaPergunta,
 	TipoMensagemCliente,
 } from "@estudos/core/protocolo";

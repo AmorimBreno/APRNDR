@@ -14,7 +14,18 @@
 import { z } from "zod";
 import type { EstadoSessao, EventoNucleo, ItemHistorico } from "./eventos.ts";
 import type { InfoModelo } from "./modelos.ts";
+import type { RegistroPonte } from "./ponte.ts";
 import type { ResumoSessao } from "./sessoes.ts";
+
+export type { RegistroPonte } from "./ponte.ts";
+
+/** Os registros da ponte de uma sessão e os pedidos que ainda esperam ao vivo. */
+export interface HistoricoPonte {
+	/** A sessão dos registros (a interface só os aplica na sessão certa). */
+	sessaoId: string;
+	registros: RegistroPonte[];
+	pendentes: string[];
+}
 
 // Formato do pedido e da resposta do painel "pergunta" (ask_user_question).
 export type { DadosPedidoPergunta, ModoPergunta, OpcaoPergunta, RespostaPergunta } from "./pergunta.ts";
@@ -79,7 +90,8 @@ export type MensagemServidor =
 	/** Evento da janela do perfil, para todas as conexões que abriram o perfil. */
 	| { tipo: "evento"; perfil: string; evento: EventoNucleo }
 	/** Conversa inteira da sessão aberta: depois de abrir o perfil, abrir ou criar sessão, trocar de agente e recarregar. */
-	| { tipo: "historico"; perfil: string; itens: ItemHistorico[] }
+	/** A conversa da sessão aberta e, à parte, o que a ponte gravou (pedidos, fins, ações mostradas). */
+	| { tipo: "historico"; perfil: string; itens: ItemHistorico[]; ponte?: HistoricoPonte }
 	/** A sessão do perfil está sendo montada (a tela de carregamento usa isto). */
 	| { tipo: "carregando"; perfil: string; mensagem: string }
 	/** A sessão foi remontada: por mudança de arquivo (watcher) ou por pedido do usuário. */

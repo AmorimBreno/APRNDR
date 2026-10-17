@@ -16,6 +16,12 @@
 // - "interface:acao" {painel, acao, dados}: o sentido contrário, uma ação feita
 //   na interface (JanelaPerfil.acaoDaInterface) para a extensão do perfil reagir.
 //
+// Gravação: cada pedido, o fim dele (respondido, com a resposta, ou cancelado,
+// com o motivo) e cada ação mostrada viram entradas "nucleo.ponte" na sessão
+// (pi.appendEntry: ficam no arquivo e não vão para o modelo). O histórico as
+// devolve, para a interface reconstruir os pedidos e os painéis ao reabrir a
+// conversa ou depois de o servidor reiniciar (registrosDaPonte, em sessoes.ts).
+//
 // Decisões, com a documentação do pi (1.2.0):
 // - pi.events é o canal entre extensões (extensions.md, tabela "Choose an
 //   integration point": "Communicate with another extension | pi.events"). O
@@ -58,6 +64,16 @@ export interface PedidoInterface extends MensagemInterface {
 	id: string;
 }
 
+/** Tipo da entrada da sessão com os registros da ponte. */
+export const TIPO_ENTRADA_PONTE = "nucleo.ponte";
+
+/** O que a ponte grava na sessão, na ordem em que aconteceu. */
+export type RegistroPonte =
+	| { tipo: "pedido"; id: string; painel: string; acao: string; dados: unknown }
+	| { tipo: "fim"; id: string; estado: "respondido"; resposta?: unknown }
+	| { tipo: "fim"; id: string; estado: "cancelado"; motivo: MotivoCancelamento }
+	| { tipo: "mostrar"; painel: string; acao: string; dados: unknown };
+
 /** Mensagem de "interface:resposta": a resposta do usuário ou o cancelamento do pedido. */
 export type RespostaInterface =
 	| { id: string; dados: unknown }
@@ -85,6 +101,8 @@ function problemaDaMensagem(dados: unknown): string | undefined {
  */
 export class PonteSessao {
 	private barramento?: Barramento;
+	/** Grava um registro na sessão (pi.appendEntry da carga atual da extensão). */
+	private gravarNaSessao?: (registro: RegistroPonte) => void;
 	private assinaturas: Array<() => void> = [];
 	private readonly pendentes = new Map<string, PedidoInterface>();
 	private ativa = true;
@@ -92,7 +110,10 @@ export class PonteSessao {
 	/** Extensão inline que liga a ponte ao barramento da sessão. */
 	readonly extensao: InlineExtension = {
 		name: "nucleo-ponte",
-		factory: (pi) => this.ligar(pi.events),
+		factory: (pi) => {
+			this.gravarNaSessao = (registro) => pi.appendEntry(TIPO_ENTRADA_PONTE, registro);
+			this.ligar(pi.events);
+		},
 	};
 
 	constructor(private readonly emitir: (evento: EventoNucleo) => void) {}
@@ -108,6 +129,7 @@ export class PonteSessao {
 	 */
 	responder(id: string, dados: unknown): boolean {
 		if (!this.ativa || !this.pendentes.delete(id)) return false;
+		this.gravar({ tipo: "fim", id, estado: "respondido", ...(dados === undefined ? {} : { resposta: dados }) });
 		return this.publicar(EVENTOS_PONTE.resposta, { id, dados } satisfies RespostaInterface);
 	}
 
@@ -174,6 +196,7 @@ export class PonteSessao {
 			return;
 		}
 		const mensagem = dados as MensagemInterface;
+		this.gravar({ tipo: "mostrar", painel: mensagem.painel, acao: mensagem.acao, dados: mensagem.dados });
 		this.emitir({ tipo: "acao_interface", painel: mensagem.painel, acao: mensagem.acao, dados: mensagem.dados });
 	}
 
@@ -202,13 +225,25 @@ export class PonteSessao {
 		const mensagem = dados as PedidoInterface;
 		const pedido: PedidoInterface = { id, painel: mensagem.painel, acao: mensagem.acao, dados: mensagem.dados };
 		this.pendentes.set(id, pedido);
+		this.gravar({ tipo: "pedido", ...pedido });
 		this.emitir({ tipo: "pedido_interface", ...pedido });
 	}
 
 	private cancelar(id: string, motivo: MotivoCancelamento): void {
 		if (!this.pendentes.delete(id)) return;
+		this.gravar({ tipo: "fim", id, estado: "cancelado", motivo });
 		this.publicar(EVENTOS_PONTE.resposta, { id, cancelado: true, motivo } satisfies RespostaInterface);
 		this.emitir({ tipo: "pedido_interface_cancelado", id, motivo });
+	}
+
+	/** Grava na sessão; uma sessão que já foi trocada ou descartada não grava mais (sem erro). */
+	private gravar(registro: RegistroPonte): void {
+		try {
+			this.gravarNaSessao?.(registro);
+		} catch {
+			// O runtime da sessão já foi invalidado (troca de sessão): o registro se perde, e o
+			// pedido sem fim aparece como cancelado ao reabrir.
+		}
 	}
 
 	/** Emite no barramento da sessão. Devolve false se o pi já invalidou o runtime da sessão. */

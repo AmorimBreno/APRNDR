@@ -103,6 +103,13 @@ export default function (pi: ExtensionAPI) {
 ```
 
 
+## Gravação na sessão
+
+A ponte grava na sessão do pi (pi.appendEntry, entradas "nucleo.ponte", que não vão para o modelo) cada pedido, o fim dele (respondido, com a resposta do usuário, ou cancelado, com o motivo) e cada "interface:mostrar". O histórico que o servidor manda à interface traz esses registros e os ids dos pedidos que ainda esperam ao vivo, e a interface reconstrói os botões dos pedidos, as revisões e os painéis ao reabrir uma conversa ou depois de o servidor reiniciar. Um pedido sem fim que não espera mais (o servidor reiniciou no meio) aparece como cancelado. Por isso, os `dados` de um pedido ou de uma ação devem ser pequenos e virar JSON: eles ficam no arquivo da sessão.
+
+As conversas de antes desta gravação (2026-10-16) não têm os registros: nelas, os pedidos aparecem só como a linha da ferramenta.
+
+
 ## Ferramentas que já usam a ponte
 
 - ask_user_question (núcleo, packages/core/src/pergunta.ts): pedido "perguntar" no painel "pergunta", com `{ question, details, mode, options, otherLabel }`; a interface responde `{ escolhas, outra, texto }`. O painel é do @estudos/ui e vale para qualquer perfil.

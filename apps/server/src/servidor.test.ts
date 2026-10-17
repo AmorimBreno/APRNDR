@@ -107,6 +107,9 @@ class JanelaFalsa implements JanelaDoServidor {
 	historico() {
 		return this.conversa.map((texto) => ({ papel: "usuario" as const, texto }));
 	}
+	historicoPonte() {
+		return { sessaoId: "s1", registros: [], pendentes: [] };
+	}
 	responder(id: string) {
 		this.chamadas.push(`responder ${id}`);
 		return id === "existe";

@@ -24,7 +24,7 @@ packages/core/src/modelos.ts — nomes provedor/id resolvidos no registro de mod
 packages/core/src/eventos.ts — tipo EventoNucleo (protocolo genérico, inclusive acao_interface e pedido_interface), tradução dos eventos da sessão do pi e do histórico
 packages/core/src/sessoes.ts — opções do DefaultResourceLoader por (perfil, agente) e modo (principal ou subagente), filtros de skills e ferramentas, agente gravado na sessão, lista de sessões em <dados>/.sessoes-pi
 packages/core/src/montagem.ts — criação de uma sessão do pi pelo SDK, ligação das extensões com o filtro de ferramentas e encerramento; comum à sessão principal e às filhas
-packages/core/src/ponte.ts — ponte de eventos: extensão inline que liga pi.events à janela (mostrar, pedido e resposta com cancelamento, inclusive pelo usuário, ação da interface)
+packages/core/src/ponte.ts — ponte de eventos: extensão inline que liga pi.events à janela (mostrar, pedido e resposta com cancelamento, inclusive pelo usuário, ação da interface); grava pedidos, fins e ações na sessão (entradas nucleo.ponte) para o histórico reconstruí-los
 packages/core/src/pergunta.ts — ask_user_question do app: mesmo nome, parâmetros e resultado da versão de terminal, perguntando pela ponte no painel "pergunta"; entra em toda sessão principal
 packages/core/src/pergunta.test.ts — testes da ferramenta com a ponte e o barramento do pi
 packages/core/src/subagentes.ts — ferramenta subagent: sessão filha em <dados>/.sessoes-pi/subagentes, progresso pelo onUpdate, texto final e uso da filha

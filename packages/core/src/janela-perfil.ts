@@ -65,6 +65,7 @@ import {
 	ErroSessao,
 	type FabricaExtensoesNucleo,
 	agentesPorMomento,
+	registrosDaPonte,
 	garantirPastas,
 	listarSessoes,
 	montarOpcoesRecursos,
@@ -73,6 +74,7 @@ import {
 	TIPO_ENTRADA_AGENTE,
 } from "./sessoes.ts";
 import { criarExtensaoPergunta } from "./pergunta.ts";
+import type { HistoricoPonte } from "./protocolo.ts";
 import { criarExtensaoSubagente } from "./subagentes.ts";
 
 export interface OpcoesJanelaPerfil {
@@ -361,6 +363,19 @@ export class JanelaPerfil {
 	historico(): ItemHistorico[] {
 		if (!this.sessao) return [];
 		return converterHistorico(this.sessao.messages, agentesPorMomento(this.sessao.sessionManager.getBranch()));
+	}
+
+	/**
+	 * Os registros da ponte da sessão aberta (para a interface reconstruir os
+	 * pedidos e os painéis) e os ids dos pedidos que ainda esperam ao vivo.
+	 */
+	historicoPonte(): HistoricoPonte {
+		if (!this.sessao) return { sessaoId: "", registros: [], pendentes: [] };
+		return {
+			sessaoId: this.sessao.sessionId,
+			registros: registrosDaPonte(this.sessao.sessionManager.getBranch()),
+			pendentes: this.ponte?.pedidosPendentes ?? [],
+		};
 	}
 
 	/** Encerra a janela: interrompe a resposta, avisa as extensões e descarta a sessão. */

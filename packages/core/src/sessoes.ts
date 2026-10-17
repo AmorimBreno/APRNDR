@@ -25,6 +25,7 @@
 //   CustomEntry: "Extension state persistence. Does NOT participate in LLM
 //   context. Use customType to identify your extension's entries on reload").
 
+import { type RegistroPonte, TIPO_ENTRADA_PONTE } from "./ponte.ts";
 import { mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
@@ -224,6 +225,18 @@ export function agentesPorMomento(entradas: readonly SessionEntry[]): Map<number
 		if (mensagem?.role === "assistant" && typeof mensagem.timestamp === "number") mapa.set(mensagem.timestamp, agente);
 	}
 	return mapa;
+}
+
+/** Os registros da ponte (pedidos, fins e ações mostradas) num caminho de entradas, em ordem. */
+export function registrosDaPonte(entradas: readonly SessionEntry[]): RegistroPonte[] {
+	const registros: RegistroPonte[] = [];
+	for (const entrada of entradas) {
+		const { type, customType, data } = entrada as { type?: unknown; customType?: unknown; data?: unknown };
+		if (type !== "custom" || customType !== TIPO_ENTRADA_PONTE || !data || typeof data !== "object") continue;
+		const tipo = (data as { tipo?: unknown }).tipo;
+		if (tipo === "pedido" || tipo === "fim" || tipo === "mostrar") registros.push(data as RegistroPonte);
+	}
+	return registros;
 }
 
 /** Agente gravado num caminho de entradas da sessão (o último vale). */

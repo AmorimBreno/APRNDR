@@ -12,6 +12,7 @@
 
 import type {
 	DadosResposta,
+	HistoricoPonte,
 	Diagnostico,
 	EstadoSessao,
 	EventoNucleo,
@@ -141,6 +142,8 @@ export interface EstadoJanela {
 	cancelados: Record<string, MotivoCancelamento>;
 	/** Todos os pedidos da sessão aberta, por id, com a situação de cada um. Zera ao trocar de sessão. */
 	registrosPedidos: Record<string, RegistroPedido>;
+	/** A sessão dos registros reconstruídos do histórico (para a resposta do pedido não zerá-los). */
+	sessaoDosPedidos?: string;
 	recarregado?: AvisoRecarregado;
 	/** Contador para as chaves dos itens (o reducer continua puro: vem no estado). */
 	contador: number;
@@ -227,7 +230,9 @@ function comSessao(estado: EstadoJanela, sessao: EstadoSessao): EstadoJanela {
 		...estado,
 		sessao,
 		diagnosticos: [...sessao.diagnosticos, ...extras],
-		...(outraSessao ? { uso: usoZerado, registrosPedidos: {} } : {}),
+		...(outraSessao ? { uso: usoZerado } : {}),
+		// Os registros já reconstruídos do histórico desta sessão ficam (a resposta chega depois dele).
+		...(outraSessao && estado.sessaoDosPedidos !== sessao.sessaoId ? { registrosPedidos: {} } : {}),
 	};
 }
 
@@ -501,6 +506,53 @@ function aplicarEvento(estado: EstadoJanela, evento: EventoNucleo): EstadoJanela
 	}
 }
 
+/**
+ * Pedidos, painéis e cancelamentos a partir do que a ponte gravou na sessão
+ * (o histórico): é assim que os botões dos pedidos e as revisões continuam
+ * iguais depois de recarregar a página ou de o servidor reiniciar. Um pedido
+ * sem fim que não espera mais ao vivo (o servidor reiniciou) fica cancelado.
+ */
+export function estadoDaPonte(
+	ponte: HistoricoPonte,
+	contadorInicial: number,
+): Pick<EstadoJanela, "registrosPedidos" | "pedidos" | "acoesPorPainel" | "cancelados" | "contador" | "sessaoDosPedidos"> {
+	let contador = contadorInicial;
+	const registrosPedidos: Record<string, RegistroPedido> = {};
+	const acoesPorPainel: Record<string, AcaoRecebida[]> = {};
+	const cancelados: Record<string, MotivoCancelamento> = {};
+	for (const registro of ponte.registros) {
+		if (registro.tipo === "pedido") {
+			const { id, painel, acao, dados } = registro;
+			registrosPedidos[id] = { id, painel, acao, dados, estado: "pendente", ordem: ++contador };
+		} else if (registro.tipo === "fim") {
+			const pedido = registrosPedidos[registro.id];
+			if (!pedido) continue;
+			if (registro.estado === "respondido") {
+				registrosPedidos[registro.id] = { ...pedido, estado: "respondido", ...(registro.resposta === undefined ? {} : { resposta: registro.resposta }) };
+			} else {
+				registrosPedidos[registro.id] = { ...pedido, estado: "cancelado", motivo: registro.motivo };
+				cancelados[registro.id] = registro.motivo;
+			}
+		} else {
+			const lista = acoesPorPainel[registro.painel] ?? [];
+			lista.push({ chave: `hm${++contador}`, acao: registro.acao, dados: registro.dados });
+			acoesPorPainel[registro.painel] = lista.slice(-LIMITE_ACOES_POR_PAINEL);
+		}
+	}
+	const vivos = new Set(ponte.pendentes);
+	const pedidos: PedidoPendente[] = [];
+	for (const pedido of Object.values(registrosPedidos)) {
+		if (pedido.estado !== "pendente") continue;
+		if (vivos.has(pedido.id)) {
+			pedidos.push({ id: pedido.id, painel: pedido.painel, acao: pedido.acao, dados: pedido.dados });
+		} else {
+			registrosPedidos[pedido.id] = { ...pedido, estado: "cancelado", motivo: "sessao_encerrada" };
+			cancelados[pedido.id] = "sessao_encerrada";
+		}
+	}
+	return { registrosPedidos, pedidos, acoesPorPainel, cancelados, contador, sessaoDosPedidos: ponte.sessaoId };
+}
+
 /** O reducer da janela de perfil. Ignora mensagens de outros perfis. */
 export function reduzirJanela(estado: EstadoJanela, acao: AcaoJanela): EstadoJanela {
 	switch (acao.tipo) {
@@ -510,7 +562,15 @@ export function reduzirJanela(estado: EstadoJanela, acao: AcaoJanela): EstadoJan
 		case "historico": {
 			if (acao.perfil !== estado.perfil) return estado;
 			const { conversa, contador } = conversaDoHistorico(acao.itens, estado.contador);
-			return { ...estado, conversa, contador, pronto: true, carregando: undefined };
+			const reconstruido = acao.ponte ? estadoDaPonte(acao.ponte, contador) : undefined;
+			return {
+				...estado,
+				conversa,
+				contador,
+				...(reconstruido ?? {}),
+				pronto: true,
+				carregando: undefined,
+			};
 		}
 
 		case "carregando":

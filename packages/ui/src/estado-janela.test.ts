@@ -223,6 +223,34 @@ describe("reduzirJanela", () => {
 		expect(estado.registrosPedidos).toEqual({});
 	});
 
+	it("reconstrói pedidos, painéis e cancelamentos do que a ponte gravou (e a resposta depois não zera)", () => {
+		const ponte = {
+			sessaoId: "s9",
+			registros: [
+				{ tipo: "pedido" as const, id: "a", painel: "pergunta", acao: "perguntar", dados: { question: "?" } },
+				{ tipo: "fim" as const, id: "a", estado: "respondido" as const, resposta: { escolhas: [1] } },
+				{ tipo: "pedido" as const, id: "b", painel: "quiz", acao: "perguntar", dados: {} },
+				{ tipo: "mostrar" as const, painel: "quiz", acao: "resultado", dados: { id: "b" } },
+				{ tipo: "fim" as const, id: "b", estado: "cancelado" as const, motivo: "usuario" as const },
+				{ tipo: "pedido" as const, id: "c", painel: "quiz", acao: "perguntar", dados: {} },
+				{ tipo: "pedido" as const, id: "d", painel: "quiz", acao: "perguntar", dados: {} },
+			],
+			pendentes: ["d"],
+		};
+		let estado = aplicar(estadoInicial(PERFIL), { tipo: "historico", perfil: PERFIL, itens: [], ponte });
+		expect(estado.registrosPedidos.a).toMatchObject({ estado: "respondido", resposta: { escolhas: [1] } });
+		expect(estado.registrosPedidos.b).toMatchObject({ estado: "cancelado", motivo: "usuario" });
+		// "c" esperava, mas não espera mais ao vivo (o servidor reiniciou): fica cancelado.
+		expect(estado.registrosPedidos.c).toMatchObject({ estado: "cancelado", motivo: "sessao_encerrada" });
+		// "d" ainda espera: volta para a lista de pedidos.
+		expect(estado.registrosPedidos.d).toMatchObject({ estado: "pendente" });
+		expect(estado.pedidos.map((pedido) => pedido.id)).toEqual(["d"]);
+		expect(estado.acoesPorPainel.quiz).toMatchObject([{ acao: "resultado", dados: { id: "b" } }]);
+		// A resposta de abrir o perfil chega depois do histórico: não zera os registros desta sessão.
+		estado = aplicar(estado, { tipo: "resposta", pedido: "abrir_perfil", ok: true, dados: sessao({ sessaoId: "s9" }) });
+		expect(Object.keys(estado.registrosPedidos)).toEqual(["a", "b", "c", "d"]);
+	});
+
 	it("limita as ações guardadas por painel", () => {
 		let estado = estadoInicial(PERFIL);
 		for (let i = 0; i < LIMITE_ACOES_POR_PAINEL + 5; i++) {

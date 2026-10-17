@@ -12,9 +12,10 @@ export function Fala({ quem, children }: { quem?: ReactNode; children: ReactNode
 			<span className="fala__quem">{quem}</span>
 			<motion.div
 				className="fala__balao"
-				initial={{ opacity: 0, scale: 0.7, x: -12 }}
-				animate={{ opacity: 1, scale: 1, x: 0 }}
-				transition={{ type: "spring", stiffness: 420, damping: 20, delay: 0.08 }}
+				// Sem passar do tamanho: a passagem da mola vazava do corpo do modal e mostrava a barra de rolagem.
+				initial={{ opacity: 0, scale: 0.8 }}
+				animate={{ opacity: 1, scale: 1 }}
+				transition={{ type: "spring", stiffness: 420, damping: 32, delay: 0.12 }}
 			>
 				{children}
 			</motion.div>

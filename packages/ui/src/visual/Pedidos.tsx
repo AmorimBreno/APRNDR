@@ -12,7 +12,7 @@ import type { AcaoRecebida, RegistroPedido } from "../estado-janela.ts";
 import { entradaDoPainel, type PropsPainel, type RegistroPaineis, type ResumoPedido, situacaoDoPedido } from "../paineis.tsx";
 import type { MotivoCancelamento } from "../tipos.ts";
 import { Markdown } from "./Markdown.tsx";
-import { morfar, removerCascas, semMovimento } from "./movimento.ts";
+import { estadoDoDialogo, estadoDoElemento, morfar, semMovimento } from "./movimento.ts";
 
 /** Resumo do pedido pelo painel dele, ou o genérico. */
 export function resumoDoPedido(registro: RegistroPaineis, pedido: RegistroPedido): ResumoPedido {
@@ -90,9 +90,6 @@ export interface PropsModalPedido {
 	quemPergunta?: ReactNode;
 }
 
-const RAIO_MODAL = 24;
-const RAIO_BOTAO = 24;
-
 function dialogoDoPedido(): HTMLElement | null {
 	return document.querySelector<HTMLElement>(".ap-modal.modal-pedido");
 }
@@ -101,14 +98,28 @@ function botaoDoPedidoNaTela(id: string): HTMLElement | null {
 	return document.querySelector<HTMLElement>(`[data-pedido="${CSS.escape(id)}"]`);
 }
 
+/** O conteúdo do diálogo (some e aparece sozinho; o fundo e a faixa do cabeçalho ficam com a casca). */
+function conteudoDo(dialogo: HTMLElement): HTMLElement[] {
+	return [...dialogo.querySelectorAll<HTMLElement>(".ap-modal__titles, .ap-modal__close, .ap-modal__body, .ap-modal__foot")];
+}
+
+/** Quanto tempo o corpo do modal fica sem barra de rolagem enquanto abre. */
+const ABRINDO_MS = 700;
+
 /**
  * O modal de um pedido: para responder, ou para rever depois.
  *
- * Movimento (FLIP com molas, sem View Transition): abrindo pelo botão, uma
- * casca de cor sai do botão e cresce até o lugar do diálogo, e o diálogo
- * aparece por cima quando ela pousa; abrindo sozinho, o diálogo sobe de baixo
- * com mola. Fechando (ou minimizando), o conteúdo some e a casca encolhe de
- * volta até o botão; só então o modal sai da tela. O véu escurece e clareia.
+ * Movimento (FLIP com molas, sem View Transition), pensando nas duas pontas:
+ * - abrindo pelo botão: uma casca sai do botão exatamente como ele está (o
+ *   âmbar do que espera, ou o fundo e o contorno do respondido) e vira o
+ *   diálogo (o fundo do corpo, o contorno fino e a faixa colorida do
+ *   cabeçalho); quando ela chega, o diálogo toma o lugar dela, idêntico, e o
+ *   conteúdo aparece de cima para baixo;
+ * - abrindo sozinho (o pedido acabou de chegar): o diálogo sobe de baixo;
+ * - fechando ou minimizando: o conteúdo some, o diálogo vira a casca (sem
+ *   salto) e ela encolhe até o botão, terminando igual a ele; só então o
+ *   modal sai da tela.
+ * O véu escurece e clareia junto.
  */
 export function ModalPedido(props: PropsModalPedido) {
 	const { pedido } = props;
@@ -117,77 +128,87 @@ export function ModalPedido(props: PropsModalPedido) {
 	const Componente = entrada.componente;
 	const pendente = pedido.estado === "pendente";
 	const fechando = useRef(false);
-	// A casca: do âmbar do botão esperando (ou do escuro do respondido) até o escuro do diálogo.
-	const corDoBotao = pendente ? "--amber" : "--surface-panel";
 
-	// Abrir: antes de pintar, o diálogo some; a casca cresce do botão; o diálogo aparece quando ela pousa.
 	useLayoutEffect(() => {
 		const dialogo = dialogoDoPedido();
 		if (!dialogo || semMovimento()) return;
 		const veu = dialogo.parentElement?.querySelector<HTMLElement>(".ap-scrim");
+		const conteudo = conteudoDo(dialogo);
 		let cancelado = false;
 		const animacoes: Array<{ stop(): void }> = [];
+		// Sem barra de rolagem enquanto abre (as molas de dentro passam um pouco do tamanho).
+		dialogo.classList.add("modal-pedido--abrindo");
+		const semBarra = setTimeout(() => dialogo.classList.remove("modal-pedido--abrindo"), ABRINDO_MS);
 		// Escondidos já no primeiro quadro (a Motion só aplica o começo no quadro seguinte).
-		dialogo.style.opacity = "0";
+		for (const parte of conteudo) parte.style.opacity = "0";
 		if (veu) {
 			veu.style.opacity = "0";
 			animacoes.push(animate(veu, { opacity: [0, 1] }, { duration: 0.24, ease: "easeOut" }));
 		}
+		const mostrarConteudo = (atraso = 0) =>
+			conteudo.forEach((parte, indice) =>
+				animacoes.push(animate(parte, { opacity: [0, 1], y: [6, 0] }, { duration: 0.22, ease: "easeOut", delay: atraso + indice * 0.04 })),
+			);
 		const botao = props.origem === "botao" ? botaoDoPedidoNaTela(pedido.id) : null;
 		if (botao) {
-			const casca = morfar(botao.getBoundingClientRect(), dialogo.getBoundingClientRect(), {
-				corDe: corDoBotao,
-				corPara: "--surface-panel",
-				raioDe: RAIO_BOTAO,
-				raioPara: RAIO_MODAL,
-				viva: true,
-			});
-			// O diálogo aparece quando a casca chega ao tamanho (uns 280 ms), sem esperar a mola assentar.
-			let mostrou = false;
-			const mostrar = () => {
-				if (cancelado || mostrou) return;
-				mostrou = true;
+			dialogo.style.visibility = "hidden";
+			const casca = morfar(estadoDoElemento(botao), estadoDoDialogo(dialogo), true);
+			void casca.pousou.then(() => {
+				if (cancelado) return;
 				// Fechou antes de a casca chegar: ela some e o diálogo continua escondido.
 				if (fechando.current) return casca.cancelar();
-				animacoes.push(animate(dialogo, { opacity: [0, 1], scale: [0.985, 1] }, { duration: 0.16, ease: "easeOut" }));
-				removerCascas();
-			};
-			const quaseLa = setTimeout(mostrar, 280);
-			void casca.pousou.then(mostrar);
+				dialogo.style.visibility = "";
+				casca.cancelar();
+				mostrarConteudo();
+				// Escondido, ele não recebia o foco do Modal: o foco vai para o primeiro campo agora.
+				const campo = dialogo.querySelector<HTMLElement>(".ap-modal__body :is(input, textarea, select, button, [tabindex='0'])");
+				(campo ?? dialogo).focus({ preventScroll: true });
+			});
 			return () => {
 				cancelado = true;
-				clearTimeout(quaseLa);
+				clearTimeout(semBarra);
 				casca.cancelar();
-				dialogo.style.opacity = "";
+				dialogo.style.visibility = "";
+				for (const parte of conteudo) parte.style.opacity = "";
 				for (const animacao of animacoes) animacao.stop();
 			};
 		}
-		animacoes.push(animate(dialogo, { opacity: [0, 1], y: [48, 0], scale: [0.9, 1] }, { type: "spring", stiffness: 360, damping: 17, mass: 0.9 }));
+		dialogo.style.opacity = "0";
+		animacoes.push(animate(dialogo, { opacity: [0, 1], y: [40, 0], scale: [0.94, 1] }, { type: "spring", stiffness: 380, damping: 24, mass: 0.9 }));
+		mostrarConteudo(0.06);
 		return () => {
 			cancelado = true;
+			clearTimeout(semBarra);
+			dialogo.style.opacity = "";
+			for (const parte of conteudo) parte.style.opacity = "";
 			for (const animacao of animacoes) animacao.stop();
 		};
 		// Só ao abrir.
 	}, []);
 
-	// Fechar: o conteúdo some, a casca volta para o botão (ou o diálogo desce e some), e aí tira da tela.
 	const fechar = () => {
 		if (fechando.current) return;
 		fechando.current = true;
 		const dialogo = dialogoDoPedido();
 		if (!dialogo || semMovimento()) return props.aoFechar();
 		const veu = dialogo.parentElement?.querySelector<HTMLElement>(".ap-scrim");
-		if (veu) void animate(veu, { opacity: 0 }, { duration: 0.26, ease: "easeIn" });
 		const botao = botaoDoPedidoNaTela(pedido.id);
-		if (!botao) {
-			void animate(dialogo, { opacity: 0, y: 28, scale: 0.94 }, { duration: 0.2, ease: "easeIn" }).then(() => props.aoFechar());
-			return;
-		}
-		const de = dialogo.getBoundingClientRect();
-		void animate(dialogo, { opacity: 0 }, { duration: 0.1, ease: "easeIn" }).then(() => {
-			const casca = morfar(de, botao.getBoundingClientRect(), { corDe: "--surface-panel", corPara: corDoBotao, raioDe: RAIO_MODAL, raioPara: RAIO_BOTAO, viva: false });
+		dialogo.classList.add("modal-pedido--abrindo");
+		// 1. O conteúdo some, de baixo para cima; o fundo e a faixa do cabeçalho ficam.
+		const conteudo = conteudoDo(dialogo).reverse();
+		const sumir = conteudo.map((parte, indice) => animate(parte, { opacity: 0, y: -4 }, { duration: 0.12, ease: "easeIn", delay: indice * 0.03 }));
+		void Promise.all(sumir.map((animacao) => animacao.then(() => undefined))).then(() => {
+			if (veu) void animate(veu, { opacity: 0 }, { duration: 0.28, ease: "easeIn" });
+			if (!botao) {
+				void animate(dialogo, { opacity: 0, y: 24, scale: 0.95 }, { duration: 0.2, ease: "easeIn" }).then(() => props.aoFechar());
+				return;
+			}
+			// 2. O diálogo vira a casca (idêntica, sem salto) e ela encolhe até o botão, terminando igual a ele.
+			const casca = morfar(estadoDoDialogo(dialogo), estadoDoElemento(botao), false);
+			dialogo.style.visibility = "hidden";
 			void casca.pousou.then(() => {
-				removerCascas();
+				// 3. Pousou com a cara do botão: some devagar, revelando o texto dele.
+				void animate(casca.elemento, { opacity: 0 }, { duration: 0.14, ease: "easeOut" }).then(() => casca.cancelar());
 				props.aoFechar();
 			});
 		});

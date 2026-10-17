@@ -121,14 +121,65 @@ export function iniciarVoo(texto: string, origem: DOMRect): Voo {
 	return { texto, pousar, cancelar };
 }
 
-export interface OpcoesMorfar {
-	/** Cor da casca no começo e no fim (nomes de tokens do tema, como "--amber"). */
-	corDe: string;
-	corPara: string;
-	raioDe: number;
-	raioPara: number;
-	/** true: mola com um pouco de passagem (abrir); false: chega sem passar (fechar). */
-	viva: boolean;
+/**
+ * Como um retângulo da tela está, para a casca começar ou terminar igual a ele:
+ * posição, cantos, fundo, borda e uma faixa no topo (o cabeçalho colorido do
+ * modal; no botão, a faixa cobre tudo com a cor do próprio botão).
+ */
+export interface EstadoCasca {
+	rect: DOMRect;
+	raio: number;
+	fundo: string;
+	borda: string;
+	larguraBorda: number;
+	/** Altura da faixa do topo, em px da tela. */
+	faixa: number;
+	corFaixa: string;
+}
+
+function transparente(cor: string): boolean {
+	return cor === "transparent" || /rgba\([^)]*,\s*0\)$/.test(cor);
+}
+
+/** O fundo que se vê no elemento: o dele ou, se for transparente, o do primeiro ancestral com fundo. */
+function fundoVisivel(elemento: Element): string {
+	for (let atual: Element | null = elemento; atual; atual = atual.parentElement) {
+		const cor = getComputedStyle(atual).backgroundColor;
+		if (!transparente(cor)) return cor;
+	}
+	return corDoToken("--surface-ground");
+}
+
+/** O estado de um elemento comum (o botão do pedido): a faixa cobre tudo com o fundo dele. */
+export function estadoDoElemento(elemento: HTMLElement): EstadoCasca {
+	const estilo = getComputedStyle(elemento);
+	const rect = elemento.getBoundingClientRect();
+	const fundo = fundoVisivel(elemento);
+	const larguraBorda = parseFloat(estilo.borderTopWidth) || 0;
+	return {
+		rect,
+		raio: parseFloat(estilo.borderTopLeftRadius) || 0,
+		fundo,
+		borda: larguraBorda > 0 ? estilo.borderTopColor : fundo,
+		larguraBorda,
+		faixa: rect.height,
+		corFaixa: fundo,
+	};
+}
+
+/** O estado do diálogo do modal: o fundo do corpo, o contorno fino e a faixa do cabeçalho. */
+export function estadoDoDialogo(dialogo: HTMLElement): EstadoCasca {
+	const estilo = getComputedStyle(dialogo);
+	const cabecalho = dialogo.querySelector<HTMLElement>(".ap-modal__head");
+	return {
+		rect: dialogo.getBoundingClientRect(),
+		raio: parseFloat(estilo.borderTopLeftRadius) || 0,
+		fundo: estilo.backgroundColor,
+		borda: corDoToken("--line"),
+		larguraBorda: 1,
+		faixa: cabecalho?.getBoundingClientRect().height ?? 0,
+		corFaixa: cabecalho ? getComputedStyle(cabecalho).backgroundColor : estilo.backgroundColor,
+	};
 }
 
 /** O valor de um token de cor do tema ("--amber" vira "#e0a15e"), para a Motion interpolar. */
@@ -137,50 +188,57 @@ function corDoToken(token: string): string {
 }
 
 /**
- * Uma casca de cor sai do retângulo `de` e vira o retângulo `para` (posição,
- * tamanho e cantos), com mola; some no fim. Resolve quando ela pousa.
+ * Uma casca sai do estado `de` e vira o estado `para` (posição, tamanho, cantos,
+ * fundo, borda e a faixa do topo), com mola. `viva`: com um pouco de passagem
+ * (abrir); sem ela, chega e para (fechar). Resolve quando ela chega.
  */
-export function morfar(de: DOMRect, para: DOMRect, opcoes: OpcoesMorfar): { pousou: Promise<void>; cancelar(): void } {
+export function morfar(de: EstadoCasca, para: EstadoCasca, viva: boolean): { pousou: Promise<void>; elemento: HTMLElement; cancelar(): void } {
 	const escala = escalaDaTela();
+	const px = (valor: number) => valor / escala;
 	const casca = document.createElement("div");
 	casca.className = "casca-modal";
+	const faixa = document.createElement("div");
+	faixa.className = "casca-modal__faixa";
+	casca.appendChild(faixa);
 	Object.assign(casca.style, {
-		left: `${de.left / escala}px`,
-		top: `${de.top / escala}px`,
-		width: `${de.width / escala}px`,
-		height: `${de.height / escala}px`,
-		borderRadius: `${opcoes.raioDe}px`,
-		backgroundColor: corDoToken(opcoes.corDe),
+		left: `${px(de.rect.left)}px`,
+		top: `${px(de.rect.top)}px`,
+		width: `${px(de.rect.width)}px`,
+		height: `${px(de.rect.height)}px`,
+		borderRadius: `${de.raio}px`,
+		backgroundColor: de.fundo,
+		borderColor: de.borda,
+		borderWidth: `${de.larguraBorda}px`,
 	});
+	Object.assign(faixa.style, { height: `${px(de.faixa)}px`, backgroundColor: de.corFaixa });
 	document.body.appendChild(casca);
-	// restDelta: termina quando está a 2px do destino, sem esperar a mola assentar de vez.
-	const mola = opcoes.viva
-		? { type: "spring" as const, stiffness: 320, damping: 26, mass: 0.85, restDelta: 2, restSpeed: 40 }
-		: { type: "spring" as const, stiffness: 460, damping: 42, mass: 0.8, restDelta: 2, restSpeed: 40 };
-	const animacao = animate(
-		casca,
-		{
-			left: para.left / escala,
-			top: para.top / escala,
-			width: para.width / escala,
-			height: para.height / escala,
-			borderRadius: opcoes.raioPara,
-			backgroundColor: corDoToken(opcoes.corPara),
-		},
-		mola,
-	);
+	// restDelta: termina quando está a 1px do destino, sem esperar a mola assentar de vez.
+	const mola = viva
+		? { type: "spring" as const, stiffness: 340, damping: 28, mass: 0.85, restDelta: 1, restSpeed: 30 }
+		: { type: "spring" as const, stiffness: 480, damping: 44, mass: 0.8, restDelta: 1, restSpeed: 30 };
+	const animacoes = [
+		animate(
+			casca,
+			{
+				left: px(para.rect.left),
+				top: px(para.rect.top),
+				width: px(para.rect.width),
+				height: px(para.rect.height),
+				borderRadius: para.raio,
+				backgroundColor: para.fundo,
+				borderColor: para.borda,
+				borderWidth: para.larguraBorda,
+			},
+			mola,
+		),
+		animate(faixa, { height: px(para.faixa), backgroundColor: para.corFaixa }, mola),
+	];
 	return {
-		pousou: animacao.then(() => undefined),
+		pousou: Promise.all(animacoes.map((animacao) => animacao.then(() => undefined))).then(() => undefined),
+		elemento: casca,
 		cancelar: () => {
-			animacao.stop();
+			for (const animacao of animacoes) animacao.stop();
 			casca.remove();
 		},
 	};
-}
-
-/** Remove a casca que pousou (depois de o elemento de verdade aparecer por cima). */
-export function removerCascas(): void {
-	for (const casca of document.querySelectorAll(".casca-modal")) {
-		void animate(casca, { opacity: 0 }, { duration: 0.12 }).then(() => casca.remove());
-	}
 }

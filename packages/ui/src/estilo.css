@@ -88,11 +88,18 @@ a.linha:hover .linha__texto .overline, a.linha:focus-visible .linha__texto .over
 @keyframes modal-entra { from { opacity: 0; transform: translateY(24px) scale(.92); } }
 @keyframes veu-entra { from { opacity: 0; } }
 .ap-modal.modal-pedido, .ap-modal-root:has(.modal-pedido) { animation: none; }
-.casca-modal { position: fixed; z-index: 1001; box-sizing: border-box; pointer-events: none; }
+.casca-modal { position: fixed; z-index: 1001; box-sizing: border-box; overflow: hidden; border-style: solid; pointer-events: none; }
+.casca-modal__faixa { position: absolute; top: 0; left: 0; right: 0; }
+/* Enquanto abre (e fecha), o corpo não mostra barra; quando a rolagem é de verdade, a barra é fina. */
+.modal-pedido .ap-modal__body { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+.modal-pedido--abrindo .ap-modal__body { overflow-y: hidden; }
 
-/* Trocas de tela (App.tsx): o resto da tela sai e entra num fade curto; os elementos
- * com nome (o card ↔ a tela de cadernos, a faixa ↔ a barra) se transformam com mola. */
-::view-transition-group(*) { animation-duration: .62s; animation-timing-function: var(--mola); }
+/* Trocas de tela (App.tsx): o resto da tela sai e entra num fade curto; o card do perfil e
+ * a folha dos cadernos (classe perfil) se transformam um no outro sem passar do ponto
+ * (amortecimento crítico: chega e para, firme). */
+:root { --firme: linear(0.0, 0.042, 0.136, 0.251, 0.369, 0.478, 0.575, 0.658, 0.728, 0.785, 0.831, 0.868, 0.898, 0.921, 0.939, 0.953, 0.964, 0.973, 0.979, 0.984, 0.988, 0.991, 0.993, 1); }
+::view-transition-group(*) { animation-duration: .5s; animation-timing-function: var(--firme); }
+::view-transition-group(*.perfil) { animation-duration: .55s; animation-timing-function: var(--firme); }
 /* As fotos de cada lado cobrem o retângulo que anima, sem esticar (proporções diferentes). */
 ::view-transition-old(*), ::view-transition-new(*) { width: 100%; height: 100%; object-fit: cover; object-position: top left; }
 ::view-transition-old(root) { animation: tela-sai .2s ease-in both; }

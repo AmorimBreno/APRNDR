@@ -107,6 +107,12 @@ export function LinhaFerramenta({ chamada, vivo = false }: { chamada: ChamadaFer
 
 export type ItemAssistente = Extract<ItemConversa, { tipo: "assistente" }>;
 
+/** true se a última coisa da conversa é uma resposta que está chegando (ela já mostra o agente). */
+function respostaChegando(conversa: ItemConversa[]): boolean {
+	const ultimo = conversa.at(-1);
+	return ultimo?.tipo === "assistente" && ultimo.emAndamento;
+}
+
 /** Mensagem do assistente que só chamou ferramentas: não vira bloco. */
 function semConteudo(item: ItemAssistente): boolean {
 	return !item.emAndamento && !item.texto && !item.raciocinio && !item.erro;
@@ -134,7 +140,7 @@ function BlocoResposta({ item, numero, autor }: { item: ItemAssistente; numero: 
 						<p className="body-sm">{item.raciocinio}</p>
 					</details>
 				) : null}
-				{item.texto ? <Markdown texto={item.texto} aparecendo={item.emAndamento} /> : null}
+				{item.texto ? <Markdown texto={item.texto} aparecendo={aoVivo(item.chave)} /> : null}
 				{item.erro ? (
 					<div className="aviso-erro" role="alert">
 						<span className="overline">Erro do modelo</span>
@@ -142,6 +148,25 @@ function BlocoResposta({ item, numero, autor }: { item: ItemAssistente; numero: 
 					</div>
 				) : null}
 			</div>
+		</section>
+	);
+}
+
+/**
+ * O lugar da próxima resposta, enquanto o agente pensa, pesquisa ou pergunta e
+ * ainda não há texto: o número e o cabeçalho (a foto animada) exatamente onde
+ * o bloco da resposta vai começar. Quando o texto chega, o bloco real entra no
+ * mesmo lugar, com o mesmo cabeçalho.
+ */
+function BlocoEsperando({ numero, autor }: { numero: number; autor: ReactNode }) {
+	return (
+		<section className="ap-block bloco bloco--esperando" aria-busy="true">
+			<span className="bloco__margem">
+				<span className="data" aria-hidden="true">
+					{pad2(numero)}
+				</span>
+			</span>
+			<header className="bloco__autor">{autor}</header>
 		</section>
 	);
 }
@@ -159,6 +184,11 @@ export interface PropsDocumentoConversa {
 	depois?: ReactNode;
 	/** O cabeçalho de cada resposta (a foto e o nome do agente). Sem ele, só o nome do agente. */
 	autorDaResposta?(item: ItemAssistente): ReactNode;
+	/**
+	 * O cabeçalho do agente trabalhando (a foto animada e o que ele faz), para o
+	 * lugar da próxima resposta enquanto ainda não há texto. Sem ele, nada.
+	 */
+	aguardando?: ReactNode;
 	/** A mensagem enviada voando do campo (movimento.ts): pousa na nota com o mesmo texto. */
 	voo?: Voo;
 	/** O voo pousou (ou não tinha para onde ir). */
@@ -172,13 +202,20 @@ function NotaUsuario({ texto, voo, aoPousar }: { texto: string; voo?: Voo; aoPou
 		const elemento = nota.current?.querySelector<HTMLElement>(".ap-note");
 		if (!voo || voo.texto.trim() !== texto.trim() || !elemento) return;
 		elemento.style.opacity = "0";
-		voo.pousar(elemento);
-		aoPousar?.();
+		// A conversa ainda vai rolar até o fim (efeito do DocumentoConversa, depois deste):
+		// o pouso espera dois quadros para medir a nota já no lugar final.
+		let quadro = requestAnimationFrame(() => {
+			quadro = requestAnimationFrame(() => {
+				voo.pousar(elemento);
+				aoPousar?.();
+			});
+		});
+		return () => cancelAnimationFrame(quadro);
 		// Só ao nascer: o voo é da mensagem que acabou de chegar.
 	}, []);
 	return (
 		<div ref={nota} className="nota-usuario">
-			<StudentNote label="Você escreveu">
+			<StudentNote label="" aria-label="Sua mensagem">
 				<p className="nota__texto">{texto}</p>
 			</StudentNote>
 			<AvatarUsuario className="nota-usuario__avatar" />
@@ -187,11 +224,11 @@ function NotaUsuario({ texto, voo, aoPousar }: { texto: string; voo?: Voo; aoPou
 }
 
 /** Invólucro de cada item: os que chegam ao vivo entram subindo com mola. */
-function Item({ chave, tipo, children }: { chave: string; tipo: string; children: ReactNode }) {
+function Item({ chave, tipo, children, entrar = true }: { chave: string; tipo: string; children: ReactNode; entrar?: boolean }) {
 	return (
 		<motion.div
 			className={`documento__item documento__item--${tipo}`}
-			initial={aoVivo(chave) ? { opacity: 0, y: 16, scale: 0.98 } : false}
+			initial={entrar && aoVivo(chave) ? { opacity: 0, y: 16, scale: 0.98 } : false}
 			animate={{ opacity: 1, y: 0, scale: 1 }}
 			transition={MOLA_ENTRADA}
 		>
@@ -201,7 +238,7 @@ function Item({ chave, tipo, children }: { chave: string; tipo: string; children
 }
 
 /** Coluna da conversa; rola até o fim quando chega algo novo. */
-export function DocumentoConversa({ conversa, vazio, pedidoDaChamada, depois, autorDaResposta, voo, aoPousar }: PropsDocumentoConversa) {
+export function DocumentoConversa({ conversa, vazio, pedidoDaChamada, depois, autorDaResposta, aguardando, voo, aoPousar }: PropsDocumentoConversa) {
 	const fim = useRef<HTMLDivElement>(null);
 	useEffect(() => {
 		fim.current?.scrollIntoView({ block: "end" });
@@ -243,11 +280,17 @@ export function DocumentoConversa({ conversa, vazio, pedidoDaChamada, depois, au
 				numero += 1;
 				const autor = autorDaResposta ? autorDaResposta(item) : item.agente ? <span className="bloco__nome body-strong">{item.agente}</span> : undefined;
 				return (
-					<Item key={item.chave} chave={item.chave} tipo="resposta">
+					// Sem entrada: o bloco esperando já estava neste lugar, com o mesmo cabeçalho.
+					<Item key={item.chave} chave={item.chave} tipo="resposta" entrar={false}>
 						<BlocoResposta item={item} numero={numero} autor={autor} />
 					</Item>
 				);
 			})}
+			{aguardando && !respostaChegando(conversa) ? (
+				<Item chave={`esperando-${numero + 1}`} tipo="resposta">
+					<BlocoEsperando numero={numero + 1} autor={aguardando} />
+				</Item>
+			) : null}
 			{depois}
 			<div ref={fim} />
 		</div>

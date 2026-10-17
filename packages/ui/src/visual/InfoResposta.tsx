@@ -1,9 +1,10 @@
 // Botão de informações de uma resposta: fica ao lado do número na margem do
 // bloco e abre um balão com a data e hora, o agente, o modelo, quanto levou,
 // os tokens e o custo. Substitui o nome do modelo no pé de cada resposta.
+// O balão abre à esquerda, na margem vazia, e para cima perto do fim da área.
 
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import type { ItemConversa } from "../estado-janela.ts";
 
 type ItemAssistente = Extract<ItemConversa, { tipo: "assistente" }>;
@@ -41,11 +42,33 @@ export function linhasDaResposta(item: ItemAssistente): Array<[string, string]> 
 	return linhas;
 }
 
+/** Onde o balão abre: à esquerda do botão (a margem vazia) ou à direita; para baixo ou para cima. */
+interface Posicao {
+	lado: "esquerda" | "direita";
+	vertical: "baixo" | "cima";
+}
+
 export function InfoResposta({ item, numero }: { item: ItemAssistente; numero: number }) {
 	const [aberto, setAberto] = useState(false);
+	const [posicao, setPosicao] = useState<Posicao>({ lado: "esquerda", vertical: "baixo" });
 	const raiz = useRef<HTMLSpanElement>(null);
+	const balao = useRef<HTMLDivElement>(null);
 	const id = useId();
 	const linhas = linhasDaResposta(item);
+
+	// Antes de pintar: à esquerda se couber na área que rola (senão, à direita); para cima se,
+	// para baixo, ele passaria do fundo visível (o campo de mensagem cobriria o fim).
+	useLayoutEffect(() => {
+		if (!aberto || !raiz.current) return;
+		const area = (raiz.current.closest(".rolagem") ?? document.documentElement).getBoundingClientRect();
+		const botao = raiz.current.getBoundingClientRect();
+		const largura = balao.current?.offsetWidth ?? 300;
+		const altura = balao.current?.getBoundingClientRect().height ?? 220;
+		const escala = balao.current && balao.current.offsetWidth > 0 ? balao.current.getBoundingClientRect().width / balao.current.offsetWidth : 1;
+		const lado = botao.left - area.left >= largura * escala + 16 ? "esquerda" : "direita";
+		const vertical = botao.bottom + altura + 12 > area.bottom && botao.top - altura - 12 >= area.top ? "cima" : "baixo";
+		setPosicao((atual) => (atual.lado === lado && atual.vertical === vertical ? atual : { lado, vertical }));
+	}, [aberto]);
 
 	useEffect(() => {
 		if (!aberto) return;
@@ -82,7 +105,8 @@ export function InfoResposta({ item, numero }: { item: ItemAssistente; numero: n
 						id={id}
 						role="dialog"
 						aria-label={`Informações da resposta ${numero}`}
-						className="info-resposta__balao"
+						ref={balao}
+						className={`info-resposta__balao info-resposta__balao--${posicao.lado} info-resposta__balao--${posicao.vertical}`}
 						initial={{ opacity: 0, scale: 0.6, y: -6 }}
 						animate={{ opacity: 1, scale: 1, y: 0 }}
 						exit={{ opacity: 0, scale: 0.85, y: -4, transition: { duration: 0.12 } }}

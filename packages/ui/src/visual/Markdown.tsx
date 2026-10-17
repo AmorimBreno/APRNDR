@@ -4,6 +4,7 @@
 // texto não é interpretado: aparece como texto. Os estilos vêm do Prose do
 // design system (ap-prose), aplicado por quem usa.
 
+import { useRef } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
@@ -14,8 +15,31 @@ const pluginsRemark = [remarkGfm, remarkMath];
 // throwOnError false: uma fórmula com erro aparece em vermelho, sem derrubar o resto.
 type PluginsRehype = NonNullable<Parameters<typeof ReactMarkdown>[0]["rehypePlugins"]>;
 const pluginsRehype: PluginsRehype = [[rehypeKatex, { throwOnError: false }]];
-// Enquanto a resposta chega: cada palavra num span, para as novas aparecerem com fade (rehype-palavras.ts).
-const pluginsRehypeAparecendo: PluginsRehype = [...pluginsRehype, rehypePalavras];
+
+/** Intervalo normal entre uma palavra e a seguinte; com fila grande, encurta até o mínimo. */
+const PASSO_MS = 35;
+const PASSO_MINIMO_MS = 6;
+const FILA_MAXIMA_MS = 1200;
+
+/**
+ * A fila das palavras: cada palavra nova ganha a hora de aparecer, logo depois
+ * da anterior. O atraso de uma palavra é decidido uma vez só (e não muda nas
+ * próximas renderizações, para não reiniciar a animação de quem está aparecendo).
+ */
+function useFilaDePalavras() {
+	const fila = useRef<{ atrasos: number[]; proxima: number }>({ atrasos: [], proxima: 0 });
+	return (indice: number): number => {
+		const { atrasos } = fila.current;
+		if (atrasos[indice] !== undefined) return atrasos[indice]!;
+		const agora = performance.now();
+		const quando = Math.max(agora, fila.current.proxima);
+		const atraso = quando - agora;
+		const passo = atraso > FILA_MAXIMA_MS ? PASSO_MINIMO_MS : PASSO_MS * (1 - atraso / (FILA_MAXIMA_MS * 1.2));
+		fila.current.proxima = quando + Math.max(PASSO_MINIMO_MS, passo);
+		atrasos[indice] = atraso;
+		return atraso;
+	};
+}
 
 // Links abrem fora do app (o app roda no Edge em modo app, sem barra de endereço).
 const componentes: Components = {
@@ -27,13 +51,17 @@ const componentesEmLinha: Components = { ...componentes, p: ({ children }) => <>
 
 /**
  * `emLinha`: sem os parágrafos, para caber num rótulo. `aparecendo`: o texto
- * está chegando, e as palavras novas aparecem com fade.
+ * está chegando (ou chegou nesta janela), e as palavras novas aparecem uma a
+ * uma com fade. Fica ligado depois do fim, para as últimas terminarem de aparecer.
  */
 export function Markdown({ texto, emLinha = false, aparecendo = false }: { texto: string; emLinha?: boolean; aparecendo?: boolean }) {
+	const atrasoDe = useFilaDePalavras();
+	// Enquanto a resposta chega: cada palavra num span, e as novas aparecem uma a uma (rehype-palavras.ts).
+	const plugins: PluginsRehype = aparecendo ? [...pluginsRehype, [rehypePalavras, { atrasoDe }]] : pluginsRehype;
 	return (
 		<ReactMarkdown
 			remarkPlugins={pluginsRemark}
-			rehypePlugins={aparecendo ? pluginsRehypeAparecendo : pluginsRehype}
+			rehypePlugins={plugins}
 			components={emLinha ? componentesEmLinha : componentes}
 		>
 			{texto}

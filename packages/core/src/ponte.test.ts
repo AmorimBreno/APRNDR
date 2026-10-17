@@ -141,6 +141,8 @@ describe("PonteSessao", () => {
 		ponte = new PonteSessao((evento) => eventos.push(evento));
 		void fabrica()({ events: barramento, appendEntry: (tipo: string, dados: unknown) => gravados.push({ type: "custom", customType: tipo, data: dados }) } as unknown as ExtensionAPI);
 		barramento.emit(EVENTOS_PONTE.mostrar, { painel: "quiz", acao: "resultado", dados: { id: "p1" } });
+		// Passageiro: chega à interface, mas não fica gravado.
+		barramento.emit(EVENTOS_PONTE.mostrar, { painel: "cadernos", acao: "lista", dados: [], gravar: false });
 		pedir("p1");
 		pedir("p2");
 		ponte.responder("p1", { escolhas: [2] });

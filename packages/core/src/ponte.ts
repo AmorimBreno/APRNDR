@@ -195,8 +195,9 @@ export class PonteSessao {
 			this.emitir({ tipo: "erro", origem: "extensao", mensagem: `${EVENTOS_PONTE.mostrar} ignorado: ${problema}` });
 			return;
 		}
-		const mensagem = dados as MensagemInterface;
-		this.gravar({ tipo: "mostrar", painel: mensagem.painel, acao: mensagem.acao, dados: mensagem.dados });
+		const mensagem = dados as MensagemInterface & { gravar?: unknown };
+		// gravar: false = passageiro (uma lista que se busca de novo): não vai para a sessão.
+		if (mensagem.gravar !== false) this.gravar({ tipo: "mostrar", painel: mensagem.painel, acao: mensagem.acao, dados: mensagem.dados });
 		this.emitir({ tipo: "acao_interface", painel: mensagem.painel, acao: mensagem.acao, dados: mensagem.dados });
 	}
 

@@ -4,8 +4,10 @@
 // nas alternativas; "Não sei" dá um balanço curto. Com reduzir movimento, o
 // carimbo aparece parado e não há confete nem tremido.
 
+import { escalaDaTela } from "@estudos/ui";
 import { animate, motion, useReducedMotion } from "motion/react";
-import { useEffect, useMemo, useRef } from "react";
+import { type Ref, type RefObject, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 const CORES = ["var(--amber)", "var(--brick)", "var(--sage)", "var(--moss)", "var(--cream)", "var(--steel)", "var(--paper)"];
 const PECAS = 28;
@@ -40,11 +42,29 @@ function sortearPecas(): Peca[] {
 	});
 }
 
-/** Confete de papel: sobe, abre e cai com gravidade (a subida é rápida e a queda, mais lenta). */
-export function Confete() {
+/**
+ * Confete de papel: sobe, abre e cai com gravidade (a subida é rápida e a
+ * queda, mais lenta). Voa numa camada fixa sobre a página, ancorada no
+ * elemento `ancora` (o carimbo): dentro do corpo do modal, as peças criavam
+ * rolagem. A camada some quando a última peça termina.
+ */
+export function Confete({ ancora }: { ancora: RefObject<HTMLElement | null> }) {
 	const pecas = useMemo(sortearPecas, []);
-	return (
-		<span className="confete" aria-hidden="true">
+	const [origem, setOrigem] = useState<{ left: number; top: number }>();
+	const [acabou, setAcabou] = useState(false);
+	useLayoutEffect(() => {
+		const elemento = ancora.current;
+		if (!elemento) return;
+		// O body tem zoom (o app roda em 90%): a camada fixa usa px de CSS.
+		const sonda = elemento.getBoundingClientRect();
+		const escala = escalaDaTela();
+		setOrigem({ left: (sonda.left + sonda.width / 2) / escala, top: (sonda.top + sonda.height / 2) / escala });
+		const fim = setTimeout(() => setAcabou(true), 2000);
+		return () => clearTimeout(fim);
+	}, [ancora]);
+	if (!origem || acabou) return null;
+	return createPortal(
+		<span className="confete" style={{ left: origem.left, top: origem.top }} aria-hidden="true">
 			{pecas.map((peca, indice) => (
 				<motion.span
 					key={indice}
@@ -55,15 +75,17 @@ export function Confete() {
 					transition={{ duration: peca.duracao, delay: peca.atraso, times: [0, 0.3, 1], ease: ["easeOut", "easeIn"] }}
 				/>
 			))}
-		</span>
+		</span>,
+		document.body,
 	);
 }
 
 /** O carimbo 完: cai girando e bate (mola viva), como o carimbo do professor. */
-export function Carimbo() {
+export function Carimbo({ ref }: { ref?: Ref<HTMLSpanElement> }) {
 	const reduzir = useReducedMotion();
 	return (
 		<motion.span
+			ref={ref}
 			className="carimbo"
 			lang="ja"
 			aria-hidden="true"

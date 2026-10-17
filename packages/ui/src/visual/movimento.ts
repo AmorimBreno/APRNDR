@@ -189,8 +189,8 @@ function corDoToken(token: string): string {
 
 /**
  * Uma casca sai do estado `de` e vira o estado `para` (posição, tamanho, cantos,
- * fundo, borda e a faixa do topo), com mola. `viva`: com um pouco de passagem
- * (abrir); sem ela, chega e para (fechar). Resolve quando ela chega.
+ * fundo, borda e a faixa do topo), em ease-in-out. `viva`: abrir (um pouco
+ * mais longo); sem ela, fechar. Resolve quando ela chega.
  */
 export function morfar(de: EstadoCasca, para: EstadoCasca, viva: boolean): { pousou: Promise<void>; elemento: HTMLElement; cancelar(): void } {
 	const escala = escalaDaTela();
@@ -212,10 +212,8 @@ export function morfar(de: EstadoCasca, para: EstadoCasca, viva: boolean): { pou
 	});
 	Object.assign(faixa.style, { height: `${px(de.faixa)}px`, backgroundColor: de.corFaixa });
 	document.body.appendChild(casca);
-	// restDelta: termina quando está a 1px do destino, sem esperar a mola assentar de vez.
-	const mola = viva
-		? { type: "spring" as const, stiffness: 340, damping: 28, mass: 0.85, restDelta: 1, restSpeed: 30 }
-		: { type: "spring" as const, stiffness: 480, damping: 44, mass: 0.8, restDelta: 1, restSpeed: 30 };
+	// Ease-in-out curto (o Breno achou a mola lenta): abrir um pouco mais longo que fechar.
+	const mola = { duration: viva ? 0.3 : 0.24, ease: [0.65, 0, 0.35, 1] as const };
 	const animacoes = [
 		animate(
 			casca,

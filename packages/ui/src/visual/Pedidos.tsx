@@ -104,12 +104,12 @@ function conteudoDo(dialogo: HTMLElement): HTMLElement[] {
 }
 
 /** Quanto tempo o corpo do modal fica sem barra de rolagem enquanto abre. */
-const ABRINDO_MS = 700;
+const ABRINDO_MS = 450;
 
 /**
  * O modal de um pedido: para responder, ou para rever depois.
  *
- * Movimento (FLIP com molas, sem View Transition), pensando nas duas pontas:
+ * Movimento (FLIP em ease-in-out curto, sem View Transition), pensando nas duas pontas:
  * - abrindo pelo botão: uma casca sai do botão exatamente como ele está (o
  *   âmbar do que espera, ou o fundo e o contorno do respondido) e vira o
  *   diálogo (o fundo do corpo, o contorno fino e a faixa colorida do
@@ -143,11 +143,11 @@ export function ModalPedido(props: PropsModalPedido) {
 		for (const parte of conteudo) parte.style.opacity = "0";
 		if (veu) {
 			veu.style.opacity = "0";
-			animacoes.push(animate(veu, { opacity: [0, 1] }, { duration: 0.24, ease: "easeOut" }));
+			animacoes.push(animate(veu, { opacity: [0, 1] }, { duration: 0.2, ease: "easeOut" }));
 		}
 		const mostrarConteudo = (atraso = 0) =>
 			conteudo.forEach((parte, indice) =>
-				animacoes.push(animate(parte, { opacity: [0, 1], y: [6, 0] }, { duration: 0.22, ease: "easeOut", delay: atraso + indice * 0.04 })),
+				animacoes.push(animate(parte, { opacity: [0, 1], y: [4, 0] }, { duration: 0.15, ease: "easeOut", delay: atraso + indice * 0.025 })),
 			);
 		const botao = props.origem === "botao" ? botaoDoPedidoNaTela(pedido.id) : null;
 		if (botao) {
@@ -174,8 +174,8 @@ export function ModalPedido(props: PropsModalPedido) {
 			};
 		}
 		dialogo.style.opacity = "0";
-		animacoes.push(animate(dialogo, { opacity: [0, 1], y: [40, 0], scale: [0.94, 1] }, { type: "spring", stiffness: 380, damping: 24, mass: 0.9 }));
-		mostrarConteudo(0.06);
+		animacoes.push(animate(dialogo, { opacity: [0, 1], y: [32, 0], scale: [0.95, 1] }, { duration: 0.28, ease: [0.22, 1, 0.36, 1] }));
+		mostrarConteudo(0.05);
 		return () => {
 			cancelado = true;
 			clearTimeout(semBarra);
@@ -196,11 +196,11 @@ export function ModalPedido(props: PropsModalPedido) {
 		dialogo.classList.add("modal-pedido--abrindo");
 		// 1. O conteúdo some, de baixo para cima; o fundo e a faixa do cabeçalho ficam.
 		const conteudo = conteudoDo(dialogo).reverse();
-		const sumir = conteudo.map((parte, indice) => animate(parte, { opacity: 0, y: -4 }, { duration: 0.12, ease: "easeIn", delay: indice * 0.03 }));
+		const sumir = conteudo.map((parte, indice) => animate(parte, { opacity: 0, y: -3 }, { duration: 0.08, ease: "easeIn", delay: indice * 0.015 }));
 		void Promise.all(sumir.map((animacao) => animacao.then(() => undefined))).then(() => {
-			if (veu) void animate(veu, { opacity: 0 }, { duration: 0.28, ease: "easeIn" });
+			if (veu) void animate(veu, { opacity: 0 }, { duration: 0.22, ease: "easeInOut" });
 			if (!botao) {
-				void animate(dialogo, { opacity: 0, y: 24, scale: 0.95 }, { duration: 0.2, ease: "easeIn" }).then(() => props.aoFechar());
+				void animate(dialogo, { opacity: 0, y: 20, scale: 0.96 }, { duration: 0.18, ease: "easeIn" }).then(() => props.aoFechar());
 				return;
 			}
 			// 2. O diálogo vira a casca (idêntica, sem salto) e ela encolhe até o botão, terminando igual a ele.
@@ -208,7 +208,7 @@ export function ModalPedido(props: PropsModalPedido) {
 			dialogo.style.visibility = "hidden";
 			void casca.pousou.then(() => {
 				// 3. Pousou com a cara do botão: some devagar, revelando o texto dele.
-				void animate(casca.elemento, { opacity: 0 }, { duration: 0.14, ease: "easeOut" }).then(() => casca.cancelar());
+				void animate(casca.elemento, { opacity: 0 }, { duration: 0.08, ease: "easeOut" }).then(() => casca.cancelar());
 				props.aoFechar();
 			});
 		});

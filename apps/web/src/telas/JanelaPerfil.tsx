@@ -220,7 +220,7 @@ export function JanelaPerfil({ perfilId, voltar }: PropsJanelaPerfil) {
 					<AvatarAgente nome={nome} {...(avatar ? { avatar } : {})} />
 				)}
 				<span className="bloco__nome body-strong">{nomeBonito(nome)}</span>
-				{vivo ? <span className="bloco__fazendo overline">{ROTULOS_ATIVIDADE[atividade as Exclude<typeof atividade, "parado">]}</span> : null}
+				{vivo ? <span className="ap-visually-hidden">{ROTULOS_ATIVIDADE[atividade as Exclude<typeof atividade, "parado">]}</span> : null}
 			</>
 		);
 	};
@@ -230,7 +230,7 @@ export function JanelaPerfil({ perfilId, voltar }: PropsJanelaPerfil) {
 			<>
 				<AgenteAnimado nome={agenteAtual} {...(avatarDe(agenteAtual) ? { avatar: avatarDe(agenteAtual)! } : {})} atividade={atividade} />
 				<span className="bloco__nome body-strong">{nomeBonito(agenteAtual)}</span>
-				<span className="bloco__fazendo overline">{ROTULOS_ATIVIDADE[atividade]}</span>
+				<span className="ap-visually-hidden">{ROTULOS_ATIVIDADE[atividade]}</span>
 			</>
 		);
 

@@ -17,5 +17,5 @@
 
 /* A reação ao conferir (Comemoracao.tsx): o carimbo 完 do professor e o confete de papel. */
 .carimbo { position: absolute; z-index: 2; top: -4px; right: 0; display: grid; place-items: center; width: 64px; height: 64px; border: 4px double var(--brick); border-radius: 6px; color: var(--brick); font-family: var(--font-ornament); font-size: 38px; line-height: 1; pointer-events: none; }
-.confete { position: absolute; z-index: 3; top: 28px; right: 32px; width: 0; height: 0; pointer-events: none; }
+.confete { position: fixed; z-index: 1100; width: 0; height: 0; pointer-events: none; }
 .confete__peca { position: absolute; left: 0; top: 0; border-radius: 1px; }

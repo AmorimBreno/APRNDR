@@ -91,7 +91,8 @@ a.linha:hover .linha__texto .overline, a.linha:focus-visible .linha__texto .over
 .casca-modal { position: fixed; z-index: 1001; box-sizing: border-box; overflow: hidden; border-style: solid; pointer-events: none; }
 .casca-modal__faixa { position: absolute; top: 0; left: 0; right: 0; }
 /* Enquanto abre (e fecha), o corpo não mostra barra; quando a rolagem é de verdade, a barra é fina. */
-.modal-pedido .ap-modal__body { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+/* O corpo só rola na vertical (nada que vaze para os lados vira barra). */
+.modal-pedido .ap-modal__body { overflow-x: hidden; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
 .modal-pedido--abrindo .ap-modal__body { overflow-y: hidden; }
 
 /* Trocas de tela (App.tsx): o resto da tela sai e entra num fade curto; o card do perfil e

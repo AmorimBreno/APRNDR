@@ -190,6 +190,7 @@ function Pergunta(props: { pedido: PedidoPendente & { dados: DadosPergunta }; re
 function Resultado({ dados, quem, aoVivo = false }: { dados: DadosResultado; quem?: ReactNode; aoVivo?: boolean }) {
 	const alternativas = useTremido<HTMLDivElement>(aoVivo && !dados.correct && !dados.dontKnow);
 	const comemorar = aoVivo && dados.correct;
+	const carimbo = useRef<HTMLSpanElement>(null);
 	const estado = (indice: number): EstadoOpcao =>
 		dados.correctIndices.includes(indice) ? "correct" : dados.escolhas.includes(indice) ? "incorrect" : "dim";
 	const enunciado = <Enunciado question={dados.question} {...(dados.details ? { details: dados.details } : {})} />;
@@ -214,8 +215,8 @@ function Resultado({ dados, quem, aoVivo = false }: { dados: DadosResultado; que
 	);
 	const reacao = comemorar ? (
 		<>
-			<Carimbo />
-			<Confete />
+			<Carimbo ref={carimbo} />
+			<Confete ancora={carimbo} />
 		</>
 	) : null;
 

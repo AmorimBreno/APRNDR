@@ -19,7 +19,9 @@ Tarefas 3.1 e 3.2 feitas (2026-10-16): design system como pacote do workspace, t
 
 Tarefa 3.6 feita (2026-10-16), um commit por parte: escala, informações da resposta (o núcleo manda momento, duração, uso e agente), fotos, professor animado, modal com o professor, animações da conversa, cards, quiz, detalhes e trocas de tela. Conferido no navegador o que não exige mandar mensagem na conversa aberta do Breno (escala, informações, fotos, histórico, odômetro, cards, trocas de tela); o voo, o professor vivo, o modal nascendo do botão e a reação do quiz ficam para os passos 23 a 30 do roteiro.
 
-Próximo passo: o Breno confere a 3.6 (passos 23 a 30 de docs/teste-etapa-3.md); depois, a aprovação do plano do item 4.1 (pasta de dados, matérias e eventos.jsonl).
+Depois da 3.6, mais ajustes pedidos pelo Breno (modal com FLIP e casca no estilo real do botão, bandeira dos cadernos, pedidos gravados na sessão como entradas nucleo.ponte para voltarem iguais depois de reiniciar). Ele conferiu o quiz voltando igual depois de reiniciar e, em 2026-10-16, aprovou o plano do item 4.1 ("pode continuar").
+
+Em andamento: item 4.1.
 
 Tarefa 2.3 feita (aguarda revisão): ponte de eventos (docs/ponte-de-eventos.md) e ferramenta subagent no núcleo; as ferramentas dos desenhistas vêm do campo novo extensoesSubagentes do profile.json; web_fetch ganhou fresh=true e avisa quando o conteúdo do Tavily pode estar em cache.
 
@@ -94,3 +96,5 @@ Aprovação: o Breno roda docs/teste-etapa-3.md.
 ## Etapa 4: perfil de estudos (Fase 2 da especificação)
 
 Itens 1 a 11 da seção 10 da especificação, nesta ordem, cada um com plano e aprovação próprios. Itens com tela nova passam antes por mockup.
+
+4.1 Pasta de dados, matérias e eventos.jsonl (aprovado em 2026-10-16). Lógica em profiles/estudos/lib/ (caminhos, matérias, eventos), com testes. Extensão profiles/estudos/extensions/materias.ts: ferramentas listar_materias e criar_materia; e, pela ponte (interface:acao no painel "cadernos"), listar e criar para a tela. A pasta de dados é a pastaDados do profile.json; a extensão cria materias/ e aprendiz/ se faltarem e avisa se a pasta não estiver acessível. Cada matéria é materias/<id>/materia.json (id, nome, cor, ideograma, provas, criada em; id = o nome sem acento, minúsculo, com número no fim se repetir); subpastas só quando forem usadas. eventos.jsonl por matéria, no formato da seção 9.2 (id ordenável, data e hora, sessão, verbo, objeto, resultado, contexto), só de acréscimo por uma função única; neste item, criou_materia e alterou_materia; aprendiz/eventos.jsonl só com o formato. Tela de cadernos: lista as matérias com a SubjectWheel e as capas NotebookCover; "Nova matéria" abre um modal (nome, cor, ideograma, data de prova); clicar numa matéria abre a conversa por enquanto (o caderno é o 4.3). Roteiro em docs/teste-etapa-4-1.md.

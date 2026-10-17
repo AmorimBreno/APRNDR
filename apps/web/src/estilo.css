@@ -22,10 +22,12 @@ body { zoom: 0.9; }
 .perfis__carregando { display: flex; align-items: center; gap: var(--space-3); color: var(--ink-muted); }
 /* Até 4 cards numa linha, com a altura toda; --colunas = max(cards, 2), então 1 ou 2 cards têm
  * metade da largura cada (um só fica no meio). Com mais de 4, quebram em linhas na proporção 4:5. */
-.perfis__grade { --colunas: 2; display: flex; justify-content: center; gap: var(--space-4); height: 100%; }
-.perfis__grade > .cartao { flex: 0 0 calc((100% - (var(--colunas) - 1) * var(--space-4)) / var(--colunas)); min-height: 0; }
-.perfis__grade--varias-linhas { flex-wrap: wrap; height: auto; }
-.perfis__grade--varias-linhas > .cartao { aspect-ratio: 4 / 5; }
+/* Os cards ficam com 80% do espaço (largura e altura): sobra folga para a inclinação 3D não
+ * passar da borda e criar barra de rolagem. */
+.perfis__grade { --colunas: 2; display: flex; align-items: center; justify-content: center; gap: var(--space-6); height: 100%; }
+.perfis__grade > .cartao { flex: 0 0 calc(0.8 * (100% - (var(--colunas) - 1) * var(--space-6)) / var(--colunas)); height: 82%; min-height: 0; }
+.perfis__grade--varias-linhas { flex-wrap: wrap; height: auto; padding: var(--space-4) 0; }
+.perfis__grade--varias-linhas > .cartao { height: auto; aspect-ratio: 4 / 5; }
 
 /* O card: a moldura na cor do perfil, a arte no papel, o nome grande (escala com a largura do card),
  * a barra que enche no hover (o "carregando" da tela de boot) e o pé com o lema e o selo. */
@@ -71,7 +73,7 @@ a.cartao:hover .cartao__carregar .overline, a.cartao:focus-visible .cartao__carr
 	.perfis { height: auto; min-height: 100%; padding: var(--space-5) var(--space-4) var(--space-8); }
 	.perfis__corpo { overflow: visible; }
 	.perfis__grade { flex-direction: column; height: auto; }
-	.perfis__grade > .cartao { flex: none; aspect-ratio: 4 / 5; }
+	.perfis__grade > .cartao { flex: none; height: auto; aspect-ratio: 4 / 5; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -123,7 +125,9 @@ a.cartao:hover .cartao__carregar .overline, a.cartao:focus-visible .cartao__carr
 
 .corpo { display: grid; grid-template-columns: 264px minmax(0, 1fr); gap: var(--space-4); min-height: 0; padding: var(--space-4); }
 .corpo--paineis { grid-template-columns: 264px minmax(0, 1fr) 360px; }
-.coluna { min-height: 0; padding: var(--space-5); border-radius: var(--radius-xl); background: var(--surface-panel); overflow-y: auto; }
+/* As colunas rolam sem mostrar a barra (a do navegador ocupava a altura toda, fora das bordas redondas). */
+.coluna { min-height: 0; padding: var(--space-5); border-radius: var(--radius-xl); background: var(--surface-panel); overflow-y: auto; scrollbar-width: none; }
+.coluna::-webkit-scrollbar { display: none; }
 .coluna--paineis { padding: var(--space-3); background: var(--surface-ground); border: var(--border-hair) solid var(--line); }
 
 .centro { display: flex; flex-direction: column; min-width: 0; min-height: 0; }

@@ -4,8 +4,9 @@
 // design system: cor chapada e contorno, sem brilho. A aparência vem do campo
 // aparencia do profile.json (capa, cor, lema, glifo).
 //
-// Tamanho: até 4 perfis ficam numa linha com a altura da tela; com 1 ou 2,
-// cada card tem metade da largura. Com mais de 4, quebram em linhas.
+// Tamanho: até 4 perfis ficam numa linha, com 80% do espaço (folga para a
+// inclinação 3D); com 1 ou 2, cada card tem 80% da metade da largura. Com
+// mais de 4, quebram em linhas.
 
 import { EmptyState, Icon, ORNAMENT_MEANINGS, type OrnamentGlyph, pad2, Wordmark } from "@estudos/design-system";
 import { type ErroPerfil, type ResumoPerfil, usePerfis } from "@estudos/ui";

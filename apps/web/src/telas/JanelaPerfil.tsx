@@ -250,7 +250,7 @@ export function JanelaPerfil({ perfilId, voltar }: PropsJanelaPerfil) {
 
 	return (
 		<div className="janela">
-			<header className="topo" style={{ viewTransitionName: "faixa-marca" }}>
+			<header className="topo">
 				<button type="button" className="topo__voltar button" onClick={() => (window.location.hash = voltar.hash)}>
 					<Icon name="list" size={18} strokeWidth={2.5} />
 					{voltar.rotulo}

@@ -55,9 +55,10 @@ function Rotas() {
 	const [hash, setHash] = useState(() => window.location.hash);
 
 	useEffect(() => {
-		// A troca de tela acontece numa View Transition: os elementos com o mesmo
-		// view-transition-name se transformam um no outro (o card do perfil vira a
-		// tela de cadernos; a faixa da marca vira a barra da conversa).
+		// A troca de tela acontece numa View Transition: o card do perfil e a folha
+		// da tela de cadernos têm o mesmo view-transition-name e se transformam um
+		// no outro; o resto troca com um fade (a faixa dos cadernos tem a própria
+		// entrada e saída, como bandeira).
 		const mudou = () => void comTransicao(() => setHash(window.location.hash));
 		window.addEventListener("hashchange", mudou);
 		return () => window.removeEventListener("hashchange", mudou);

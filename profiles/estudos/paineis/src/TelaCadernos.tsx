@@ -5,23 +5,29 @@
 // com o professor. Na Etapa 4 a lista vira a SubjectWheel do design system.
 
 import { Button, Icon, pad2, Stat } from "@estudos/design-system";
-import { FaixaMarca, type PropsTelaInicial } from "@estudos/ui";
+import { type ControleFaixaMarca, FaixaMarca, type PropsTelaInicial } from "@estudos/ui";
+import { useRef } from "react";
 
 const mesAno = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" });
 
 export function TelaCadernos(props: PropsTelaInicial) {
 	// Os cadernos chegam na Etapa 4; até lá, a lista é vazia.
 	const cadernos: number = 0;
+	// A faixa entra como bandeira; para sair (para os perfis ou para a conversa), ela sobe antes.
+	const faixa = useRef<ControleFaixaMarca>(null);
+	const sairE = (ir: () => void) => () => {
+		void (faixa.current?.sair() ?? Promise.resolve()).then(ir);
+	};
 	return (
-		// O card do perfil, na tela de perfis, tem o mesmo nome: ele cresce até virar esta tela.
-		<div className="tela" style={{ viewTransitionName: `perfil-${props.perfilId}` }}>
-			<FaixaMarca legenda={`${props.perfil?.nome ?? "Estudos"} · ${mesAno.format(new Date())}`} glifo="書">
+		<div className="tela">
+			<FaixaMarca ref={faixa} bandeira legenda={`${props.perfil?.nome ?? "Estudos"} · ${mesAno.format(new Date())}`} glifo="書">
 				<Stat value={pad2(cadernos)} label="Cadernos" size="lg" accent />
-				<Button icon="arrow-left" onClick={props.voltar}>
+				<Button icon="arrow-left" onClick={sairE(props.voltar)}>
 					Perfis
 				</Button>
 			</FaixaMarca>
-			<main className="folha">
+			{/* O card do perfil, na tela de perfis, tem o mesmo nome: ele cresce até virar esta folha. */}
+			<main className="folha" style={{ viewTransitionName: `perfil-${props.perfilId}`, viewTransitionClass: "perfil" }}>
 				<header className="folha__cabeca">
 					<h1 className="overline" style={{ margin: 0 }}>
 						Seus cadernos
@@ -52,7 +58,7 @@ export function TelaCadernos(props: PropsTelaInicial) {
 				</div>
 				<footer className="folha__pe">
 					<span className="overline">Enquanto isso, a conversa com o professor já funciona</span>
-					<button type="button" className="tecla-papel button" onClick={props.abrirConversa}>
+					<button type="button" className="tecla-papel button" onClick={sairE(props.abrirConversa)}>
 						Conversar com o professor
 						<Icon name="arrow-right" size={18} strokeWidth={2.25} />
 					</button>

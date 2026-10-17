@@ -50,7 +50,7 @@ packages/ui/src/visual/BarraPergunta.tsx — AskBar com a fila, o aviso de respo
 packages/ui/src/visual/SeletorModelo.tsx — tecla de papel do modelo atual (abre o modal, por isso não tem cara de campo) e modal com busca no catálogo; os modelos do perfil primeiro
 packages/ui/src/visual/SeletorAgente.tsx — botão do agente na barra do topo com menu próprio no visual do menu do Callout (o select nativo abre com o visual do Windows); teclado completo
 packages/ui/src/visual/Historico.tsx — nova conversa e lista de sessões gravadas (a aberta marcada)
-packages/ui/src/visual/movimento.ts — utilitários de movimento: semMovimento, comTransicao (View Transition do navegador) e iniciarVoo (a mensagem voando do campo até a nota)
+packages/ui/src/visual/movimento.ts — utilitários de movimento: semMovimento, comTransicao (View Transition, nas trocas de tela), iniciarVoo (a mensagem voando do campo até a nota) e morfar (a casca de cor do botão do pedido virando o modal)
 packages/ui/src/visual/rehype-palavras.ts — plugin que põe cada palavra num span enquanto a resposta chega, para as novas aparecerem com fade (código e fórmulas inteiros); e o teste
 packages/ui/src/visual/PainelPergunta.tsx — painel "pergunta" do ask_user_question, mostrado no modal: texto livre, uma escolha ou várias, sempre com Outra; Não responder cancela; revisão com a sua resposta
 packages/ui/src/visual/Fala.tsx — a foto de quem pergunta na frente e o enunciado num balão (o professor perguntando nos modais de pedido)

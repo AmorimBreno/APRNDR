@@ -14,7 +14,6 @@ import {
 	type ItemAssistente,
 	BarraPergunta,
 	BotaoPedido,
-	comTransicao,
 	Contador,
 	DocumentoConversa,
 	entradaDoPainel,
@@ -110,7 +109,11 @@ export function JanelaPerfil({ perfilId, voltar }: PropsJanelaPerfil) {
 		for (const registro of Object.values(registros).sort((a, b) => a.ordem - b.ordem)) {
 			if (vistos.current.has(registro.id)) continue;
 			vistos.current.add(registro.id);
-			if (registro.estado === "pendente") setPedidoAberto(registro.id);
+			if (registro.estado === "pendente") {
+				setOrigemDoModal("sozinho");
+				setFecharAgora(false);
+				setPedidoAberto(registro.id);
+			}
 		}
 	}, [registros]);
 	const aberto = pedidoAberto ? registros[pedidoAberto] : undefined;
@@ -118,31 +121,19 @@ export function JanelaPerfil({ perfilId, voltar }: PropsJanelaPerfil) {
 	const painelDoAberto = aberto?.painel;
 	const anterior = useRef<{ id?: string; estado?: string }>({});
 	// O modal nasce do botão do pedido e, ao fechar ou minimizar, encolhe de
-	// volta para dentro dele (View Transition com o nome pedido-aberto).
-	const botaoDoPedidoNaTela = (id: string) => document.querySelector<HTMLElement>(`[data-pedido="${CSS.escape(id)}"]`);
+	// volta para dentro dele (ModalPedido). Quem fecha é o modal: daqui só se
+	// pede (fecharAgora) e ele avisa quando terminou (aoFechar).
+	const [origemDoModal, setOrigemDoModal] = useState<"botao" | "sozinho">("sozinho");
+	const [fecharAgora, setFecharAgora] = useState(false);
 	const abrirPedido = (id: string) => {
-		const botao = botaoDoPedidoNaTela(id);
-		if (!botao) return setPedidoAberto(id);
-		void comTransicao(
-			() => {
-				botao.style.viewTransitionName = "";
-				setPedidoAberto(id);
-			},
-			{ antes: () => (botao.style.viewTransitionName = "pedido-aberto"), classe: "transicao-pedido" },
-		);
+		setOrigemDoModal("botao");
+		setFecharAgora(false);
+		setPedidoAberto(id);
 	};
-	const fecharPedido = () => {
-		const botao = pedidoAberto ? botaoDoPedidoNaTela(pedidoAberto) : null;
-		if (!botao) return setPedidoAberto(undefined);
-		void comTransicao(
-			() => {
-				setPedidoAberto(undefined);
-				botao.style.viewTransitionName = "pedido-aberto";
-			},
-			{ classe: "transicao-pedido" },
-		).then(() => {
-			botao.style.viewTransitionName = "";
-		});
+	const fecharPedido = () => setFecharAgora(true);
+	const modalFechou = () => {
+		setPedidoAberto(undefined);
+		setFecharAgora(false);
 	};
 	useEffect(() => {
 		const antes = anterior.current;
@@ -233,14 +224,14 @@ export function JanelaPerfil({ perfilId, voltar }: PropsJanelaPerfil) {
 			</>
 		);
 	};
-	const situacao =
+	// O agente trabalhando, no lugar da próxima resposta, enquanto ainda não há texto.
+	const aguardando =
 		atividade === "parado" || !agenteAtual ? undefined : (
-			<span className="barra__situacao" role="status">
-				<AgenteAnimado nome={agenteAtual} {...(avatarDe(agenteAtual) ? { avatar: avatarDe(agenteAtual)! } : {})} atividade={atividade} tamanho={28} />
-				<span className="overline">
-					{nomeBonito(agenteAtual)} · {ROTULOS_ATIVIDADE[atividade]}
-				</span>
-			</span>
+			<>
+				<AgenteAnimado nome={agenteAtual} {...(avatarDe(agenteAtual) ? { avatar: avatarDe(agenteAtual)! } : {})} atividade={atividade} />
+				<span className="bloco__nome body-strong">{nomeBonito(agenteAtual)}</span>
+				<span className="bloco__fazendo overline">{ROTULOS_ATIVIDADE[atividade]}</span>
+			</>
 		);
 
 	const botaoDoPedido = (registro: RegistroPedido) => (
@@ -379,6 +370,7 @@ export function JanelaPerfil({ perfilId, voltar }: PropsJanelaPerfil) {
 								conversa={estado.conversa}
 								pedidoDaChamada={(id) => (registros[id] ? botaoDoPedido(registros[id]) : undefined)}
 								autorDaResposta={autorDaResposta}
+								{...(aguardando ? { aguardando } : {})}
 								{...(voo ? { voo } : {})}
 								aoPousar={() => setVoo(undefined)}
 								depois={soltos.map((registro) => (
@@ -404,7 +396,6 @@ export function JanelaPerfil({ perfilId, voltar }: PropsJanelaPerfil) {
 							fila={estado.fila}
 							enviar={enviar}
 							parar={parar}
-							{...(situacao ? { situacao } : {})}
 						/>
 					</div>
 				</main>
@@ -444,7 +435,9 @@ export function JanelaPerfil({ perfilId, voltar }: PropsJanelaPerfil) {
 					responder={acoes.responderPedido}
 					cancelar={acoes.cancelarPedido}
 					acaoDaInterface={acoes.acaoDaInterface}
-					fechar={fecharPedido}
+					origem={origemDoModal}
+					fecharAgora={fecharAgora}
+					aoFechar={modalFechou}
 					{...(agenteAtual
 						? {
 								quemPergunta:

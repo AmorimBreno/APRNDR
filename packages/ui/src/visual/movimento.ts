@@ -6,6 +6,9 @@
 //   no outro (o botão do pedido virando o modal, a faixa virando a barra).
 // - iniciarVoo: a mensagem que você enviou sai do campo como um "fantasma" e
 //   pousa na nota da conversa quando ela aparece (o eco vem do servidor).
+// - morfar: uma "casca" de cor se transforma de um retângulo em outro (o botão
+//   do pedido virando o modal e voltando), animando posição e tamanho de
+//   verdade, sem escalar o conteúdo.
 
 import { animate } from "motion/react";
 import { flushSync } from "react-dom";
@@ -43,7 +46,7 @@ export function comTransicao(atualizar: () => void, opcoes: { antes?: () => void
  * coordenadas CSS de um elemento fixo dentro do body com zoom (o app roda em
  * 90%): mede uma sonda de 100px.
  */
-function escalaDaTela(): number {
+export function escalaDaTela(): number {
 	const sonda = document.createElement("div");
 	sonda.style.cssText = "position:fixed;left:0;top:0;width:100px;height:1px;visibility:hidden;pointer-events:none";
 	document.body.appendChild(sonda);
@@ -116,4 +119,68 @@ export function iniciarVoo(texto: string, origem: DOMRect): Voo {
 	}
 
 	return { texto, pousar, cancelar };
+}
+
+export interface OpcoesMorfar {
+	/** Cor da casca no começo e no fim (nomes de tokens do tema, como "--amber"). */
+	corDe: string;
+	corPara: string;
+	raioDe: number;
+	raioPara: number;
+	/** true: mola com um pouco de passagem (abrir); false: chega sem passar (fechar). */
+	viva: boolean;
+}
+
+/** O valor de um token de cor do tema ("--amber" vira "#e0a15e"), para a Motion interpolar. */
+function corDoToken(token: string): string {
+	return getComputedStyle(document.documentElement).getPropertyValue(token).trim() || "transparent";
+}
+
+/**
+ * Uma casca de cor sai do retângulo `de` e vira o retângulo `para` (posição,
+ * tamanho e cantos), com mola; some no fim. Resolve quando ela pousa.
+ */
+export function morfar(de: DOMRect, para: DOMRect, opcoes: OpcoesMorfar): { pousou: Promise<void>; cancelar(): void } {
+	const escala = escalaDaTela();
+	const casca = document.createElement("div");
+	casca.className = "casca-modal";
+	Object.assign(casca.style, {
+		left: `${de.left / escala}px`,
+		top: `${de.top / escala}px`,
+		width: `${de.width / escala}px`,
+		height: `${de.height / escala}px`,
+		borderRadius: `${opcoes.raioDe}px`,
+		backgroundColor: corDoToken(opcoes.corDe),
+	});
+	document.body.appendChild(casca);
+	// restDelta: termina quando está a 2px do destino, sem esperar a mola assentar de vez.
+	const mola = opcoes.viva
+		? { type: "spring" as const, stiffness: 320, damping: 26, mass: 0.85, restDelta: 2, restSpeed: 40 }
+		: { type: "spring" as const, stiffness: 460, damping: 42, mass: 0.8, restDelta: 2, restSpeed: 40 };
+	const animacao = animate(
+		casca,
+		{
+			left: para.left / escala,
+			top: para.top / escala,
+			width: para.width / escala,
+			height: para.height / escala,
+			borderRadius: opcoes.raioPara,
+			backgroundColor: corDoToken(opcoes.corPara),
+		},
+		mola,
+	);
+	return {
+		pousou: animacao.then(() => undefined),
+		cancelar: () => {
+			animacao.stop();
+			casca.remove();
+		},
+	};
+}
+
+/** Remove a casca que pousou (depois de o elemento de verdade aparecer por cima). */
+export function removerCascas(): void {
+	for (const casca of document.querySelectorAll(".casca-modal")) {
+		void animate(casca, { opacity: 0 }, { duration: 0.12 }).then(() => casca.remove());
+	}
 }

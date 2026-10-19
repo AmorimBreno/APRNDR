@@ -7,7 +7,7 @@ filemap.md — este mapa; atualizar ao criar ou mover arquivos
 package.json — raiz do monorepo: scripts dev, typecheck e test; versões fixas; builds liberados (pnpm.onlyBuiltDependencies)
 pnpm-workspace.yaml — pacotes do workspace (packages/*, apps/*, design-system e profiles/*/paineis; o resto de profiles/ fica de fora)
 tsconfig.base.json — opções de TypeScript comuns (estrito, ESM, Bundler); cada pacote estende
-vitest.config.ts — testes de packages/*/src, apps/*/src e profiles/*/extensions (com alias do typebox para a cópia do packages/core, como o pi faz)
+vitest.config.ts — testes de packages/*/src, apps/*/src, profiles/*/extensions e profiles/*/lib (com alias do typebox para a cópia do packages/core, como o pi faz)
 
 docs/PLANO.md — etapas, tarefas e estado atual; atualizar ao aceitar uma tarefa
 docs/teste-etapa-N.md — roteiro de teste que o Breno roda no fim de cada etapa

@@ -35,8 +35,9 @@ As linhas alteradas nos arquivos do learn são marcadas com o comentário [estud
 
 - extensions/painel-teste.ts: ferramentas de teste da ponte de eventos (Etapa 2).
 - extensions/quiz-web.ts e quiz-web.test.ts (Etapa 3): a ferramenta quiz no app, com o mesmo nome, os mesmos parâmetros, a mesma correção e o mesmo resultado do quiz.ts, perguntando pela ponte no painel "quiz". O profile.json carrega esta; o quiz.ts continua para o pi no terminal (scripts/pi-estudos.cmd).
-- extensions/materias.ts e materias.test.ts (item 4.1): ferramentas listar_materias e criar_materia e a ponte com a tela de cadernos.
+- extensions/materias.ts e materias.test.ts (item 4.1): ferramentas listar_materias e criar_materia e a ponte com a tela de cadernos; no item 4.2, os avisos do serviço de materiais viram eventos da matéria.
 - lib/ (item 4.1): materias.ts, materia-tipos.ts e eventos.ts, a lógica das matérias e dos eventos, com testes.
+- paineis/src/ModalMateriais.tsx (item 4.2): o modal de materiais da tela de cadernos.
 - paineis/ (Etapa 3): o código de tela do perfil, pacote @estudos/perfil-estudos do workspace (a tela inicial com os cadernos e o painel do quiz).
 - capa.png (Etapa 3): a capa do perfil na tela de perfis (aparencia.capa do profile.json), ilustração escolhida pelo Breno.
 - O ask_user_question do app fica no núcleo (packages/core/src/pergunta.ts), com o mesmo nome, parâmetros e resultado do ask-user-question.ts; este continua só para o pi no terminal.

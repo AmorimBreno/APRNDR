@@ -15,6 +15,8 @@ docs/teste-etapa-1.md — roteiro da Etapa 1: pi no Windows Terminal com o perfi
 docs/teste-etapa-2.md — roteiro da Etapa 2: app pelo atalho, sessão, subagente, ponte de eventos e edição ao vivo
 docs/teste-etapa-3.md — roteiro da Etapa 3: tema APRNDR, tela de perfis e de carregamento, janela do perfil, seletor de modelo, painéis, ask_user_question, quiz, cancelamento e edição ao vivo
 docs/teste-etapa-4-1.md — roteiro do item 4.1: tela de cadernos, modal de matéria nova, arquivos na pasta de dados, ferramentas do professor e reiniciar
+docs/materiais.md — serviço de materiais do núcleo para quem escreve perfil: o campo materiais do profile.json, o .extraido, o índice, as ferramentas, os avisos materiais:pronto e materiais:removido e o envio pelo HTTP
+docs/teste-etapa-4-2.md — roteiro do item 4.2: modal de materiais, PDF com visão, .py e .ipynb, .extraido, eventos, professor buscando e citando, reprocessar, apagar e reiniciar
 docs/ponte-de-eventos.md — protocolo da ponte (interface:mostrar, pedido, resposta, acao) para quem escreve extensão de perfil
 docs/historico/ — documentos do checkpoint 1 (pi no WSL com tmux e Obsidian); só consulta
 
@@ -30,14 +32,26 @@ packages/core/src/pergunta.ts — ask_user_question do app: mesmo nome, parâmet
 packages/core/src/pergunta.test.ts — testes da ferramenta com a ponte e o barramento do pi
 packages/core/src/subagentes.ts — ferramenta subagent: sessão filha em <dados>/.sessoes-pi/subagentes, progresso pelo onUpdate, texto final e uso da filha
 packages/core/src/protocolo.ts — protocolo do WebSocket: mensagens do cliente (esquema zod e validarMensagemCliente), mensagens do servidor e dados de cada resposta; só zod e import type
-packages/core/src/janela-perfil.ts — JanelaPerfil: uma sessão do pi por janela (iniciar, enviar, abortar, trocar modelo e agente, histórico, recarregar, responder e acaoDaInterface da ponte)
+packages/core/src/janela-perfil.ts — JanelaPerfil: uma sessão do pi por janela (iniciar, enviar, abortar, trocar modelo e agente, histórico, recarregar, responder e acaoDaInterface da ponte) e o serviço de materiais do perfil (materiais, adicionarMateriais, reprocessarMaterial)
+packages/core/src/materiais/ — serviço de materiais (ESPECIFICACAO 5.5 e 5.6, docs/materiais.md), genérico
+packages/core/src/materiais/tipos.ts — trechos, extração, pedido de descrição e a situação dos arquivos (só tipos; o front recebe SituacaoMaterial pelo protocolo)
+packages/core/src/materiais/pdf.ts — PDF com o pdfjs-dist: texto por página; página com pouco texto, imagem grande ou muito desenho vira PNG (@napi-rs/canvas) para a visão
+packages/core/src/materiais/python.ts — .py pelo ast do Python (uma parte por função ou classe; sem Python, pedaços de linhas)
+packages/core/src/materiais/notebook.ts — .ipynb: uma parte por célula com as saídas de texto; figuras para a visão
+packages/core/src/materiais/texto.ts — markdown e texto: partes pelos títulos # e ##
+packages/core/src/materiais/extrair.ts — escolhe o extrator pela extensão; hash do arquivo
+packages/core/src/materiais/visao.ts — descreve um PNG com o modelo com visão do registro de modelos do pi (completeSimple)
+packages/core/src/materiais/extraido.ts — o .extraido ao lado da pasta observada: um .md por trecho com cabeçalho e o manifesto.json
+packages/core/src/materiais/indice.ts — índice SQLite (node:sqlite, FTS5 sem acento) em %LOCALAPPDATA%\estudos-app\indice; derivado do .extraido
+packages/core/src/materiais/servico.ts — ServicoMateriais: varredura (ao abrir, a cada 30 s, depois de adicionar), fila de um arquivo por vez, situação, adicionar, reprocessar, buscar e ler
+packages/core/src/materiais/extensao.ts — extensão inline: buscar_material, ler_material, listar_arquivos_de_material e os avisos materiais:pronto e materiais:removido no barramento da sessão
 packages/core/src/*.test.ts — testes vitest do núcleo (sem rede; janela-perfil.test.ts usa perfil e pasta do pi temporários)
 packages/ui/ — @estudos/ui: lógica e peças do front comuns a todos os perfis, com o visual do design system; importa do núcleo só tipos de @estudos/core/protocolo
 packages/ui/src/index.ts — exporta tudo do pacote
 packages/ui/src/tipos.ts — tipos do núcleo derivados do protocolo (EventoNucleo, EstadoSessao, ItemHistorico, InfoModelo, ResumoSessao)
 packages/ui/src/cliente.ts — ClienteConexao: WebSocket em /ws, reconexão com espera crescente, pedir() com pedidoId e promessa da resposta, estado da conexão; obterCliente() = cliente único da página
 packages/ui/src/estado-janela.ts — reducer puro da janela de perfil (sessão, conversa com ferramentas no lugar, execução, fila, uso somado, carregando, erros, pedidos e ações da ponte por painel, registro de cada pedido com a situação e a resposta, aviso de recarregado)
-packages/ui/src/use-janela-perfil.ts — hook useJanelaPerfil(perfilId): abre o perfil, aplica o reducer, ações (enviar, abortar, trocar modelo e agente, sessões, modelos, recarregar, ponte); reabre a sessão ao reconectar
+packages/ui/src/use-janela-perfil.ts — hook useJanelaPerfil(perfilId): abre o perfil, aplica o reducer, ações (enviar, abortar, trocar modelo e agente, sessões, modelos, recarregar, ponte, materiais: listar, enviar pelo HTTP e reprocessar); reabre a sessão ao reconectar
 packages/ui/src/use-perfis.ts — hook usePerfis e buscarPerfis: GET /api/perfis (perfis válidos e erros)
 packages/ui/src/paineis.tsx — registro de painéis (componente, título, soModal, foraDaArea para os de uma tela do perfil, resumir o pedido, revisarAoResponder), AreaPaineis (só ações; os pedidos vão para o modal) e PainelGenerico (ações e pedidos em JSON, responder com texto ou cancelar, revisão)
 packages/ui/src/estilo.css — estilos da tela de faixa e folha (.tela, .faixa, .folha, .linha, .tecla-papel) e das peças da janela (aviso de erro, documento, ferramentas, barra, histórico, seletor de modelo, painéis) e o CSS do KaTeX; exportado como @estudos/ui/estilo.css
@@ -68,7 +82,7 @@ apps/server/ — @estudos/server: Hono (HTTP) + ws (WebSocket) na porta 7431; de
 apps/server/dev.mjs — modo dev: roda src/index.ts com o tsx e reinicia quando apps/server/src ou packages/core/src mudam, pedindo o encerramento pelo IPC (o tsx watch mata o processo na hora no Windows)
 apps/server/src/config.ts — porta, caminhos (raiz, profiles/, %LOCALAPPDATA%\estudos-app\logs), nomes das chaves e espera do watcher
 apps/server/src/index.ts — liga tudo: chaves, janelas, rotas, WebSocket /ws, watcher, log e encerramento limpo (sinais e pedido do dev.mjs)
-apps/server/src/app.ts — rotas HTTP: /api/saude, /api/perfis (válidos e erros à parte), /api/perfis/:id/sessoes
+apps/server/src/app.ts — rotas HTTP: /api/saude, /api/perfis (válidos e erros à parte), /api/perfis/:id/sessoes, a capa e o avatar, POST /api/perfis/:id/materiais (multipart: pasta e arquivos)
 apps/server/src/janelas.ts — Janelas: uma JanelaPerfil por perfil, compartilhada pelas conexões; lista de perfis em cache; registro de modelos compartilhado
 apps/server/src/conexao.ts — trata cada mensagem do WebSocket (validação, chamada à janela, resposta com pedidoId) e o resumo para o log
 apps/server/src/observador.ts — watcher (fs.watch recursivo) de profiles/ (menos node_modules e profiles/<id>/paineis) e ~/.pi/agent/extensions, com filtro por data de modificação e espera de 300 ms
@@ -119,7 +133,8 @@ profiles/estudos/lib/eventos.ts — eventos da seção 9.2: id ordenável, criar
 profiles/estudos/lib/materias.test.ts — testes das matérias e dos eventos numa pasta temporária
 profiles/estudos/paineis/ — @estudos/perfil-estudos: código de tela do perfil (o watcher do servidor ignora esta pasta; quem recarrega é o Vite)
 profiles/estudos/paineis/src/index.ts — tela inicial do perfil (cadernos) e registro dos painéis (cadernos = ponte da tela, fora da área; quiz = Questões: só modal, revisa ao responder, resumo "Questão")
-profiles/estudos/paineis/src/TelaCadernos.tsx — tela inicial do perfil de estudos: abre a sessão do perfil, lista as matérias na SubjectWheel com capas NotebookCover, modal "Nova matéria" (nome, cor, ideograma, prova) e a tecla para a conversa
+profiles/estudos/paineis/src/TelaCadernos.tsx — tela inicial do perfil de estudos: abre a sessão do perfil, lista as matérias na SubjectWheel com capas NotebookCover (com a contagem de materiais), modal "Nova matéria" (nome, cor, ideograma, prova), a tecla Materiais e a tecla para a conversa
+profiles/estudos/paineis/src/ModalMateriais.tsx — modal de materiais da matéria: FileDrop que envia para materias/<id>/materiais e a lista com a situação de cada arquivo (fila, etapa e barra, pronto com trechos e custo, erro, não suportado) e processar de novo
 profiles/estudos/paineis/src/PainelQuiz.tsx — painel do quiz no modal: QuizQuestion (ou teclas marcáveis no multi-select), Não sei, nota, Pular; revisão com o gabarito e o QuizFeedback
 profiles/estudos/paineis/src/Comemoracao.tsx — a reação do quiz ao conferir: Carimbo 完, Confete de papel com gravidade e o tremido do erro
 profiles/estudos/paineis/src/estilo.css — estilos do painel do quiz e da tela de cadernos (modal de matéria nova)

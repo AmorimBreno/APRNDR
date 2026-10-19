@@ -4,7 +4,7 @@
 // etiqueta. Digitar [[Nome]] também vira menção. Abrir a nota mencionada,
 // sugerir nomes e atualizar menções ao renomear ficam para a parte C.
 
-import { Node, nodeInputRule } from "@tiptap/core";
+import { InputRule, Node } from "@tiptap/core";
 
 /** [[Nome]] no começo do texto: o nome sem colchetes nem quebra de linha. */
 const MENCAO = /^\[\[([^[\]\n]+?)\]\]/;
@@ -53,12 +53,18 @@ export const Mencao = Node.create({
 
 	renderMarkdown: (node) => `[[${(node.attrs?.alvo as string | undefined) ?? ""}]]`,
 
+	// Uma regra própria: o nodeInputRule do TipTap troca só o grupo capturado e
+	// deixaria os colchetes em volta da menção.
 	addInputRules() {
+		const tipo = this.type;
 		return [
-			nodeInputRule({
+			new InputRule({
 				find: /\[\[([^[\]\n]+?)\]\]$/,
-				type: this.type,
-				getAttributes: (achado) => ({ alvo: achado[1]!.trim() }),
+				handler: ({ state, range, match }) => {
+					const alvo = match[1]?.trim();
+					if (!alvo) return null;
+					state.tr.replaceWith(range.from, range.to, tipo.create({ alvo }));
+				},
 			}),
 		];
 	},

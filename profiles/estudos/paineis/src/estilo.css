@@ -144,3 +144,51 @@
 @keyframes folha-desce { to { opacity: 0; transform: translateY(32%); } }
 @keyframes folha-sobe { from { opacity: 0; transform: translateY(24%); } }
 .aba-caderno .ap-cbar__next:disabled { cursor: progress; }
+
+/* ── Notas do caderno (SecaoNotas.tsx e EditorNota.tsx, item 4.3, parte B) ── */
+.notas { display: flex; flex-direction: column; gap: var(--space-5); max-width: 880px; }
+.notas__topo { display: flex; justify-content: flex-end; }
+.notas__nova { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-5); border-radius: var(--radius-lg); background: var(--surface-raised); box-shadow: inset 0 0 0 var(--border-hair) var(--line); }
+.notas__nova-botoes { display: flex; justify-content: flex-end; gap: var(--space-2); }
+.notas__lista { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.notas__item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: var(--space-3); width: 100%; padding: var(--space-4); border: var(--border-control) solid transparent; border-radius: var(--radius-md); background: var(--surface-raised); color: var(--ink); font: inherit; text-align: left; cursor: pointer; transition: background-color .16s ease-out, border-color .16s ease-out, transform .3s var(--mola); }
+.notas__item:hover { border-color: var(--line-strong); background: var(--surface-hover); }
+.notas__item:active { transform: translateY(1px); }
+.notas__item:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.notas__item > .ap-icon { margin-top: 2px; color: var(--amber); }
+.notas__texto { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.notas__titulo { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.notas__previa { display: -webkit-box; overflow: hidden; color: var(--ink-muted); -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.notas__quando { padding-top: 2px; color: var(--ink-subtle); white-space: nowrap; }
+
+.nota__cabeca { row-gap: var(--space-2); }
+.nota__voltar { grid-column: 1; justify-self: start; display: inline-flex; align-items: center; gap: 6px; padding: 2px 0; border: 0; background: none; color: var(--ink-muted); cursor: pointer; }
+.nota__voltar:hover { color: var(--amber); }
+.nota__voltar:focus-visible { outline: none; border-radius: 2px; box-shadow: var(--focus-ring); }
+.nota__titulo { grid-column: 1; width: 100%; min-width: 0; margin: 0; padding: 2px 0; border: 0; border-bottom: var(--border-control) dashed transparent; background: none; color: var(--ink); text-overflow: ellipsis; }
+.nota__titulo:hover:not(:disabled) { border-bottom-color: var(--line-strong); }
+.nota__titulo:focus { outline: none; border-bottom-color: var(--amber); }
+.nota__titulo[aria-invalid="true"] { border-bottom-color: var(--brick); }
+.nota__titulo:disabled { color: var(--ink); opacity: 1; }
+.nota__situacao { white-space: nowrap; }
+.nota__erro-titulo { grid-column: 1 / -1; color: var(--brick); }
+.nota__corpo { display: flex; flex-direction: column; gap: var(--space-4); }
+.nota__corpo > .ap-callout { max-width: 760px; margin: 0; }
+.nota__botoes { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
+.nota__folha { flex: 1; max-width: var(--measure-read, 720px); }
+.nota__folha--escondida { display: none; }
+.nota__texto { min-height: 50vh; outline: none; caret-color: var(--amber); }
+.nota__texto h1 { font-size: 26px; line-height: 34px; }
+.nota__texto[contenteditable="false"] { caret-color: transparent; }
+.nota__texto p.is-editor-empty:first-child::before { content: attr(data-placeholder); float: left; height: 0; color: var(--ink-subtle); pointer-events: none; }
+/* Lista de tarefas: a caixa à esquerda, sem o marcador quadrado. */
+.nota__texto ul[data-type="taskList"] { padding-left: 0; list-style: none; }
+.nota__texto ul[data-type="taskList"] li { display: flex; align-items: flex-start; gap: var(--space-2); }
+.nota__texto ul[data-type="taskList"] li::marker { content: none; }
+.nota__texto ul[data-type="taskList"] li > label { flex: none; margin-top: .3em; }
+.nota__texto ul[data-type="taskList"] li > label input { width: 16px; height: 16px; margin: 0; accent-color: var(--amber); }
+.nota__texto ul[data-type="taskList"] li > div { flex: 1; min-width: 0; }
+.nota__texto ul[data-type="taskList"] li[data-checked="true"] > div { color: var(--ink-muted); text-decoration: line-through; }
+.nota__texto .nota-mencao { padding: 0 .3em; border-radius: var(--radius-xs); background: var(--amber-tint); color: var(--ink); font-weight: 600; }
+.nota__texto .ProseMirror-selectednode.nota-mencao, .nota__texto .nota-mencao.ProseMirror-selectednode { box-shadow: var(--focus-ring); }
+.nota__selecao { z-index: 20; }

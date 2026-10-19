@@ -5,10 +5,13 @@
 // Embaixo, o índice das seções à esquerda e a seção aberta à direita:
 // - Linha do tempo: os eventos do eventos.jsonl da matéria, do mais novo ao mais
 //   antigo, por dia (a timeline não é um arquivo à parte, seção 7);
+// - Notas: a lista das notas pessoais (SecaoNotas) e, com um título no
+//   caminho, o editor da nota (EditorNota);
 // - Materiais: a área de soltar e a lista do serviço de materiais;
-// - Notas, Cursos, Aulas, Resumos e Questionários: dizem o que vão ter e em que
-//   item chegam.
-// Caminho: caderno/<matéria>/<seção> (sem a seção, a linha do tempo).
+// - Cursos, Aulas, Resumos e Questionários: dizem o que vão ter e em que item
+//   chegam.
+// Caminho: caderno/<matéria>/<seção> (sem a seção, a linha do tempo);
+// caderno/<matéria>/notas/<título> abre uma nota.
 
 import { Button, EmptyState, Icon, type IconName, NotebookCover, type OrnamentGlyph, pad2 } from "@estudos/design-system";
 import { type JanelaPerfilHook, type PropsTelaInicial, semEsperar } from "@estudos/ui";
@@ -17,8 +20,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Evento } from "../../lib/eventos.ts";
 import { type Materia, pastaMateriaisRelativa } from "../../lib/materia-tipos.ts";
 import { contextoDaMateria, type DadosCaderno, dataCurta, lerAcoes, PAINEL_CADERNOS, prepararConversa, proximaProva, quando, rotuloCapa } from "./comum.ts";
+import { EditorNota } from "./EditorNota.tsx";
 import { ModalMateria } from "./ModalMateria.tsx";
 import { ConteudoMateriais, custoDaVisao, formatarDolar } from "./ModalMateriais.tsx";
+import { SecaoNotas, useListaNotas } from "./SecaoNotas.tsx";
 
 interface Secao {
 	id: string;
@@ -30,16 +35,7 @@ interface Secao {
 
 export const SECOES: readonly Secao[] = [
 	{ id: "linha-do-tempo", nome: "Linha do tempo", icone: "clock" },
-	{
-		id: "notas",
-		nome: "Notas",
-		icone: "book",
-		emBreve: {
-			glifo: "書",
-			titulo: "As suas notas chegam na próxima parte",
-			texto: "Anotações em markdown com capítulos, destaques, blocos especiais e menções entre notas. Ficam em notas/ como arquivos que abrem fora do app. Só você escreve nelas.",
-		},
-	},
+	{ id: "notas", nome: "Notas", icone: "book" },
 	{ id: "materiais", nome: "Materiais", icone: "paperclip" },
 	{
 		id: "cursos",
@@ -93,6 +89,7 @@ const NOMES_CAMPO: Record<string, string> = { nome: "nome", cor: "cor da capa", 
 export function descreverEvento(evento: Evento): { icone: IconName; texto: string; detalhe?: string } {
 	const resultado = (evento.resultado ?? {}) as Record<string, unknown>;
 	const arquivo = typeof evento.objeto.arquivo === "string" ? evento.objeto.arquivo : "um arquivo";
+	const nota = typeof evento.objeto.nota === "string" ? evento.objeto.nota : "uma nota";
 	switch (evento.verbo) {
 		case "criou_materia":
 			return { icone: "notebook", texto: "Caderno criado", ...(typeof resultado.nome === "string" ? { detalhe: resultado.nome } : {}) };
@@ -122,6 +119,16 @@ export function descreverEvento(evento: Evento): { icone: IconName; texto: strin
 		}
 		case "removeu_material":
 			return { icone: "close", texto: `Material removido: ${arquivo}` };
+		case "criou_nota":
+			return { icone: "file", texto: `Nota criada: ${nota}` };
+		case "editou_nota":
+			return { icone: "book", texto: `Nota editada: ${nota}` };
+		case "renomeou_nota":
+			return {
+				icone: "refresh",
+				texto: `Nota renomeada: ${nota}`,
+				...(typeof resultado.de === "string" ? { detalhe: `antes: ${resultado.de}` } : {}),
+			};
 		default:
 			return { icone: "flag", texto: evento.verbo.replaceAll("_", " ") };
 	}
@@ -144,6 +151,8 @@ export interface PropsTelaCaderno extends PropsTelaInicial {
 	materiaId: string;
 	/** Id da seção (SECOES); sem ela, a linha do tempo. */
 	secao?: string;
+	/** Título da nota aberta (na seção Notas). */
+	nota?: string;
 }
 
 export function TelaCaderno(props: PropsTelaCaderno) {
@@ -171,11 +180,13 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 	// A matéria e os eventos dela; de novo quando muda quantos materiais estão
 	// prontos (cada material pronto ou removido vira um evento da linha do tempo).
 	const prontos = (estado.materiais ?? []).filter((material) => material.pasta === pastaMateriaisRelativa(materiaId) && material.estado === "pronto").length;
+	// E de novo ao trocar de seção: as notas também viram eventos, e voltar para a linha do tempo mostra os novos.
+	const secao = SECOES.find((item) => item.id === props.secao) ?? SECOES[0]!;
 	useEffect(() => {
 		if (sessaoId) semEsperar(acoes.acaoDaInterface(PAINEL_CADERNOS, "abrir", { id: materiaId }));
-	}, [prontos, sessaoId, acoes, materiaId]);
+	}, [prontos, sessaoId, acoes, materiaId, secao.id]);
+	const notas = useListaNotas(props.janela, materiaId, `${secao.id}/${props.nota ?? ""}`);
 
-	const secao = SECOES.find((item) => item.id === props.secao) ?? SECOES[0]!;
 	const materia = caderno?.materia ?? lista?.materias.find((item) => item.id === materiaId);
 	const indice = lista?.materias.findIndex((item) => item.id === materiaId) ?? -1;
 	const numero = indice >= 0 ? indice + 1 : undefined;
@@ -183,6 +194,7 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 	const contagem: Record<string, number | undefined> = {
 		"linha-do-tempo": caderno?.eventos.length,
 		materiais: materiais?.length,
+		notas: notas?.notas.length,
 	};
 	const voltar = () => props.navegar("");
 	// A conversa da matéria: a mais recente dela, ou uma nova com o contexto do caderno.
@@ -194,6 +206,9 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 			.catch(() => setAbrindoConversa(false));
 	};
 	const irPara = (id: string) => props.navegar(id === SECOES[0]!.id ? `caderno/${materiaId}` : `caderno/${materiaId}/${id}`);
+	const abrirNota = (titulo: string) => props.navegar(`caderno/${materiaId}/notas/${titulo}`);
+	const tom = materia?.cor === "ink" || !materia ? "brick" : materia.cor;
+	const notaAberta = secao.id === "notas" ? props.nota : undefined;
 
 	return (
 		<div className="tela-caderno">
@@ -244,13 +259,25 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 						</ul>
 					</nav>
 					<motion.section
-						key={secao.id}
+						key={notaAberta ? `${secao.id}/nota` : secao.id}
 						className="caderno__secao"
-						aria-labelledby="secao-titulo"
+						{...(notaAberta ? { "aria-label": `Nota ${notaAberta}` } : { "aria-labelledby": "secao-titulo" })}
 						initial={{ opacity: 0, y: 12 }}
 						animate={{ opacity: 1, y: 0 }}
 						transition={{ type: "spring", stiffness: 380, damping: 32 }}
 					>
+						{notaAberta ? (
+							<EditorNota
+								key={materiaId}
+								janela={props.janela}
+								materiaId={materiaId}
+								{...(materia ? { materiaNome: materia.nome } : {})}
+								titulo={notaAberta}
+								voltar={() => irPara("notas")}
+								renomeada={abrirNota}
+							/>
+						) : (
+						<>
 						<header className="caderno__secao-cabeca">
 							<span className="overline">{materia?.nome ?? "Caderno"}</span>
 							<h2 id="secao-titulo" className="display-sm caderno__secao-titulo">
@@ -262,9 +289,11 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 						</header>
 						<div className="caderno__secao-corpo">
 							{secao.emBreve ? (
-								<EmptyState glyph={secao.emBreve.glifo} tone={materia?.cor === "ink" || !materia ? "brick" : materia.cor} title={secao.emBreve.titulo}>
+								<EmptyState glyph={secao.emBreve.glifo} tone={tom} title={secao.emBreve.titulo}>
 									{secao.emBreve.texto}
 								</EmptyState>
+							) : secao.id === "notas" ? (
+								<SecaoNotas janela={props.janela} materiaId={materiaId} {...(notas ? { lista: notas } : {})} tom={tom} abrirNota={abrirNota} />
 							) : secao.id === "materiais" ? (
 								<ConteudoMateriais
 									{...(materiais ? { materiais } : {})}
@@ -278,6 +307,8 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 								<p className="body caderno__carregando">Abrindo o caderno…</p>
 							)}
 						</div>
+						</>
+						)}
 					</motion.section>
 				</div>
 			)}

@@ -8,7 +8,7 @@
 // HTML (as decorações da parte C) o editor não entende; uma nota com HTML
 // abre só para leitura (temHtml, em lib/nota-tipos.ts).
 
-import type { AnyExtension } from "@tiptap/core";
+import type { AnyExtension, Editor } from "@tiptap/core";
 import { TaskItem, TaskList } from "@tiptap/extension-list";
 import { Placeholder } from "@tiptap/extensions";
 import { Markdown } from "@tiptap/markdown";
@@ -28,6 +28,33 @@ export function extensoesDaNota(opcoes: { textoVazio?: string } = {}): AnyExtens
 		Mencao,
 		Markdown.configure({ indentation: { style: "space", size: 2 } }),
 		EscapeEnxuto,
-		...(opcoes.textoVazio ? [Placeholder.configure({ placeholder: opcoes.textoVazio })] : []),
+		// A ajuda só na nota vazia (não em cada bloco vazio, como um bloco de código novo).
+		...(opcoes.textoVazio ? [Placeholder.configure({ placeholder: ({ editor }) => (editor.isEmpty ? (opcoes.textoVazio ?? "") : "") })] : []),
 	];
+}
+
+/**
+ * O markdown da nota como vai para o arquivo: sem os brancos do fim (o
+ * parágrafo vazio que o editor sempre deixa no fim viraria linhas em branco).
+ * A lib das notas termina o arquivo com uma quebra de linha.
+ */
+export function markdownDaNota(editor: Editor): string {
+	return editor.getMarkdown().replace(/\s+$/, "");
+}
+
+/**
+ * Põe o markdown do arquivo no editor fora do histórico do desfazer: sem isso,
+ * um Ctrl+Z logo depois de abrir desfazia a própria abertura, a nota ficava
+ * vazia e o salvamento automático gravava o arquivo vazio. Não conta como
+ * mudança (não dispara o onUpdate).
+ */
+export function carregarNoEditor(editor: Editor, markdown: string): void {
+	editor
+		.chain()
+		.command(({ tr }) => {
+			tr.setMeta("addToHistory", false);
+			return true;
+		})
+		.setContent(markdown, { contentType: "markdown", emitUpdate: false })
+		.run();
 }

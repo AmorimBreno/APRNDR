@@ -16,10 +16,37 @@ const ehLetraOuNumero = (caractere: string | undefined) => caractere !== undefin
 const PONTUACAO_ASCII = /[!-/:-@[-`{-~]/;
 const ENTIDADE = /^&(#\d+|#x[0-9a-f]+|[a-z][a-z0-9]*);/i;
 
-/** Escapa só o necessário num pedaço de texto comum (fora de código). */
-export function escaparEnxuto(texto: string): string {
+/**
+ * No começo de uma linha, o que viraria bloco ao ler de novo: título (#),
+ * lista (- + * ou 1. 1)), citação (>) e linha divisória (--- *** ___).
+ * Devolve o começo já escapado e quantos caracteres ele cobre.
+ */
+function escaparInicioDeLinha(texto: string): { feito: string; tamanho: number } | undefined {
+	const divisoria = /^(\s*)([-*_])((?:\s*\2){2,}\s*)$/.exec(texto);
+	if (divisoria) return { feito: `${divisoria[1]}\\${divisoria[2]}`, tamanho: divisoria[1]!.length + 1 };
+	const marcador = /^(\s*)(#{1,6}|[-+*]|>)(?=\s|$)/.exec(texto) ?? /^(\s*)(>)/.exec(texto);
+	if (marcador) return { feito: `${marcador[1]}\\${marcador[2]}`, tamanho: marcador[0].length };
+	const numero = /^(\s*\d{1,9})([.)])(?=\s|$)/.exec(texto);
+	if (numero) return { feito: `${numero[1]}\\${numero[2]}`, tamanho: numero[0].length };
+	return undefined;
+}
+
+/**
+ * Escapa só o necessário num pedaço de texto comum (fora de código).
+ * `inicioDeLinha`: o pedaço começa uma linha (o primeiro do parágrafo ou do
+ * título, ou logo depois de uma quebra de linha).
+ */
+export function escaparEnxuto(texto: string, opcoes: { inicioDeLinha?: boolean } = {}): string {
 	let saida = "";
-	for (let indice = 0; indice < texto.length; indice++) {
+	let comeco = 0;
+	if (opcoes.inicioDeLinha) {
+		const inicio = escaparInicioDeLinha(texto);
+		if (inicio) {
+			saida = inicio.feito;
+			comeco = inicio.tamanho;
+		}
+	}
+	for (let indice = comeco; indice < texto.length; indice++) {
 		const caractere = texto[indice]!;
 		const antes = texto[indice - 1];
 		const depois = texto[indice + 1];
@@ -82,7 +109,12 @@ export const EscapeEnxuto = Extension.create({
 		manager.encodeTextForMarkdown = (texto, node, pai) => {
 			const emCodigo =
 				(pai?.type != null && manager.codeTypes.has(pai.type)) || (node.marks ?? []).some((marca) => manager.codeTypes.has(typeof marca === "string" ? marca : marca.type));
-			return emCodigo ? texto : escaparEnxuto(texto);
+			if (emCodigo) return texto;
+			// O começo de linha: o primeiro pedaço do bloco ou o que vem logo depois de uma quebra de linha.
+			const irmaos = pai?.content ?? [];
+			const posicao = irmaos.indexOf(node);
+			const inicioDeLinha = posicao === 0 || (posicao > 0 && irmaos[posicao - 1]?.type === "hardBreak");
+			return escaparEnxuto(texto, { inicioDeLinha });
 		};
 	},
 });

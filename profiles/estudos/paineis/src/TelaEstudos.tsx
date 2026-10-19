@@ -1,6 +1,7 @@
 // A tela inicial do perfil de estudos: guarda a sessão do perfil (um
 // useJanelaPerfil só, para trocar de subtela sem reabrir) e escolhe a subtela
-// pelo caminho: "" = os cadernos; "caderno/<matéria>[/<seção>]" = o caderno.
+// pelo caminho: "" = os cadernos; "caderno/<matéria>[/<seção>]" = o caderno;
+// "caderno/<matéria>/notas/<título>" = o editor de uma nota, dentro do caderno.
 // Um caminho desconhecido cai nos cadernos.
 
 import { type PropsTelaInicial, useJanelaPerfil } from "@estudos/ui";
@@ -10,7 +11,8 @@ import { TelaCadernos } from "./TelaCadernos.tsx";
 
 export function TelaEstudos(props: PropsTelaInicial) {
 	const janela = useJanelaPerfil(props.perfilId);
-	const [tipo, materiaId, secao] = props.caminho.split("/");
+	const [tipo, materiaId, secao, ...resto] = props.caminho.split("/");
+	const nota = secao === "notas" && resto.length ? resto.join("/") : undefined;
 	const noCaderno = tipo === "caderno" && Boolean(materiaId);
 	// A matéria do meio da roda: voltar de um caderno cai nele.
 	const [escolhida, setEscolhida] = useState<string | undefined>(undefined);
@@ -18,6 +20,6 @@ export function TelaEstudos(props: PropsTelaInicial) {
 		if (noCaderno && materiaId) setEscolhida(materiaId);
 	}, [noCaderno, materiaId]);
 
-	if (noCaderno && materiaId) return <TelaCaderno {...props} janela={janela} materiaId={materiaId} {...(secao ? { secao } : {})} />;
+	if (noCaderno && materiaId) return <TelaCaderno {...props} janela={janela} materiaId={materiaId} {...(secao ? { secao } : {})} {...(nota ? { nota } : {})} />;
 	return <TelaCadernos {...props} janela={janela} {...(escolhida ? { escolhida } : {})} escolher={setEscolhida} />;
 }

@@ -6,7 +6,7 @@
 
 import { Editor } from "@tiptap/core";
 import { afterEach, describe, expect, it } from "vitest";
-import { extensoesDaNota } from "./editor-nota.ts";
+import { carregarNoEditor, extensoesDaNota, markdownDaNota } from "./editor-nota.ts";
 
 let editor: Editor | undefined;
 
@@ -44,6 +44,56 @@ describe("ida e volta do markdown", () => {
 	}
 });
 
+describe("abrir a nota", () => {
+	it("o conteúdo do arquivo fica fora do desfazer: Ctrl+Z logo depois de abrir não esvazia a nota", () => {
+		editor = new Editor({ extensions: extensoesDaNota() });
+		let mudancas = 0;
+		editor.on("update", () => mudancas++);
+		carregarNoEditor(editor, "# Limites\n\ntexto do arquivo");
+		expect(mudancas).toBe(0);
+		expect(editor.can().undo()).toBe(false);
+		editor.commands.undo();
+		expect(markdownDaNota(editor)).toBe("# Limites\n\ntexto do arquivo");
+	});
+	it("desfazer volta só o que você mudou depois de abrir", () => {
+		editor = new Editor({ extensions: extensoesDaNota() });
+		carregarNoEditor(editor, "texto do arquivo");
+		editor.chain().focus("end").insertContent(" e o meu").run();
+		expect(markdownDaNota(editor)).toBe("texto do arquivo e o meu");
+		editor.commands.undo();
+		expect(markdownDaNota(editor)).toBe("texto do arquivo");
+		editor.commands.undo();
+		expect(markdownDaNota(editor)).toBe("texto do arquivo");
+	});
+});
+
+describe("atalhos ao digitar", () => {
+	/** Digita letra por letra pelo caminho do teclado (handleTextInput), que é o que dispara as regras do TipTap. */
+	function digitar(texto: string) {
+		const view = editor!.view;
+		for (const letra of texto) {
+			const { from, to } = view.state.selection;
+			const tratou = view.someProp("handleTextInput", (tratar) => tratar(view, from, to, letra, () => view.state.tr.insertText(letra, from, to)));
+			if (!tratou) view.dispatch(view.state.tr.insertText(letra, from, to));
+		}
+	}
+	it("[[Nome]] vira menção, sem sobrar colchete", () => {
+		editor = new Editor({ extensions: extensoesDaNota() });
+		digitar("Ver [[Limites laterais]] e mais.");
+		expect(editor.getMarkdown()).toBe("Ver [[Limites laterais]] e mais.");
+		const paragrafo = editor.getJSON().content?.[0];
+		expect(paragrafo?.content?.map((parte) => parte.type)).toEqual(["text", "mencao", "text"]);
+	});
+	it("## vira título e ** vira negrito", () => {
+		editor = new Editor({ extensions: extensoesDaNota() });
+		digitar("## Título");
+		expect(editor.getJSON().content?.[0]?.type).toBe("heading");
+		editor.commands.enter();
+		digitar("um **forte** aqui");
+		expect(markdownDaNota(editor)).toBe("## Título\n\num **forte** aqui");
+	});
+});
+
 describe("texto digitado ao pé da letra", () => {
 	/** O texto de um parágrafo vira markdown e, lido de novo, tem de dar o mesmo texto (sem virar ênfase, link, tag…). */
 	function textoDeVolta(texto: string): { markdown: string; texto: string } {
@@ -69,12 +119,37 @@ describe("texto digitado ao pé da letra", () => {
 		"2 * 3 = 6 e a < b & c",
 		"snake_case e x_1",
 		"a*b*c",
+		"## não é título",
+		"# nem este",
+		"- não é lista",
+		"* nem esta",
+		"+ nem esta",
+		"1. não é lista numerada",
+		"2) nem esta",
+		"> não é citação",
+		"---",
+		"***",
+		"#hashtag fica",
+		"-5 graus",
 	];
 	for (const literal of literais) {
 		it(literal, () => {
 			expect(textoDeVolta(literal).texto).toBe(literal);
 		});
 	}
+	it("escapa o marcador do começo da linha, também depois de uma quebra de linha", () => {
+		expect(textoDeVolta("## x").markdown).toBe("\\## x");
+		editor = new Editor({
+			extensions: extensoesDaNota(),
+			content: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "a" }, { type: "hardBreak" }, { type: "text", text: "- b" }] }] },
+		});
+		const markdown = editor.getMarkdown();
+		expect(markdown).toContain("\\- b");
+		editor.destroy();
+		editor = new Editor({ extensions: extensoesDaNota(), content: markdown, contentType: "markdown" });
+		expect(editor.getJSON().content).toHaveLength(1);
+		expect(editor.getJSON().content?.[0]?.type).toBe("paragraph");
+	});
 	it("só escapa o necessário", () => {
 		expect(textoDeVolta("\\alpha, snake_case, 2 * 3, a < b & c").markdown).toBe("\\alpha, snake_case, 2 * 3, a < b & c");
 	});

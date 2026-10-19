@@ -4,13 +4,20 @@
 
 import type { EntradaTelaInicial, RegistroPaineis } from "@estudos/ui";
 import { ehPergunta, PainelQuiz } from "./PainelQuiz.tsx";
-import { PAINEL_CADERNOS, TelaCadernos } from "./TelaCadernos.tsx";
+import { PAINEL_CADERNOS } from "./comum.ts";
+import { TelaEstudos } from "./TelaEstudos.tsx";
 
 export { PainelQuiz } from "./PainelQuiz.tsx";
+export { TelaCaderno } from "./TelaCaderno.tsx";
 export { TelaCadernos } from "./TelaCadernos.tsx";
+export { TelaEstudos } from "./TelaEstudos.tsx";
 
-/** O perfil abre nos cadernos; a conversa volta para eles. */
-export const telaInicialEstudos: EntradaTelaInicial = { componente: TelaCadernos, rotuloVoltar: "Cadernos" };
+/** O perfil abre nos cadernos; a conversa volta para eles (ou para o caderno de onde foi aberta). */
+export const telaInicialEstudos: EntradaTelaInicial = {
+	componente: TelaEstudos,
+	rotuloVoltar: "Cadernos",
+	rotuloDoCaminho: (caminho) => (caminho.startsWith("caderno/") ? "Caderno" : undefined),
+};
 
 export const paineisEstudos: RegistroPaineis = {
 	// A ponte da tela de cadernos com a extensão de matérias: as listas são da

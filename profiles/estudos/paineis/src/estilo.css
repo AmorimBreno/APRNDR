@@ -69,3 +69,77 @@
 .material__avisos summary { cursor: pointer; }
 .material__avisos ul { margin: var(--space-1) 0 0; padding-left: var(--space-5); }
 .cadernos__corpo { overflow: hidden; }
+
+/* ── Caderno da matéria (TelaCaderno.tsx): a aba tijolo, o índice das seções e a seção aberta ── */
+.tela-caderno { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: var(--space-4); height: 100%; padding: var(--space-4); box-sizing: border-box; }
+.aba-caderno { overflow: hidden; border-radius: var(--radius-lg); }
+.aba-caderno .ap-cbar__course { max-width: 560px; }
+.aba-caderno__espaco { flex: 1; }
+.aba-caderno__editar:disabled { opacity: var(--opacity-disabled); cursor: not-allowed; }
+.aba-caderno .ap-cbar__next { border-radius: 0; }
+
+.caderno { display: grid; grid-template-columns: var(--menu-rail) minmax(0, 1fr); gap: var(--space-4); min-height: 0; }
+.caderno__erro { display: grid; place-items: center; }
+
+.caderno__indice { overflow-y: auto; padding: var(--space-5) var(--space-3); border-radius: var(--radius-lg); background: var(--surface-panel); scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+.caderno__indice ul { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.caderno__indice-titulo { margin: 0 var(--space-3) var(--space-3); color: var(--ink-muted); }
+.caderno__item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); width: 100%; height: 48px; padding: 0 var(--space-3); border: var(--border-control) solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--ink); font: inherit; text-align: left; cursor: pointer; transition: background-color .16s ease-out, border-color .16s ease-out, transform .3s var(--mola); }
+.caderno__item:hover { background: var(--surface-hover); }
+.caderno__item:active { transform: translateY(1px); }
+.caderno__item:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.caderno__item--atual, .caderno__item--atual:hover { border-color: var(--amber); background: var(--amber-tint); }
+.caderno__item--em-breve { color: var(--ink-muted); }
+.caderno__item-nome { overflow: hidden; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+.caderno__item-conta { color: var(--ink-subtle); }
+.caderno__item--atual .ap-icon { color: var(--amber); }
+
+.caderno__secao { display: flex; flex-direction: column; min-height: 0; overflow: hidden; border-radius: var(--radius-lg); background: var(--surface-panel); }
+.caderno__secao-cabeca { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 4px var(--space-4); padding: var(--space-6) var(--space-8) var(--space-4); border-bottom: var(--border-hair) solid var(--line); }
+.caderno__secao-cabeca .overline { grid-column: 1; color: var(--ink-muted); }
+.caderno__secao-titulo { grid-column: 1; margin: 0; }
+.caderno__secao-meta { grid-column: 2; grid-row: 2; color: var(--ink-muted); }
+.caderno__secao-corpo { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-6) var(--space-8); scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+.caderno__secao-corpo .ap-empty { max-width: 760px; background: var(--surface-raised); }
+.caderno__secao-corpo .materiais { max-width: 880px; }
+.caderno__carregando { margin: 0; color: var(--ink-muted); }
+
+/* A linha do tempo: um fio tracejado com uma marca por evento, os dias como cabeçalhos. */
+.tempo { display: flex; flex-direction: column; gap: var(--space-8); max-width: var(--measure-read); }
+.tempo__data { margin: 0 0 var(--space-4); color: var(--ink-muted); }
+.tempo__lista { position: relative; display: flex; flex-direction: column; gap: var(--space-5); margin: 0; padding: 0; list-style: none; }
+.tempo__lista::before { content: ""; position: absolute; top: 16px; bottom: 16px; left: 15px; border-left: var(--border-strong) dashed var(--line-strong); }
+.tempo__evento { position: relative; display: grid; grid-template-columns: 32px auto minmax(0, 1fr); align-items: start; gap: var(--space-3); }
+.tempo__marca { position: relative; z-index: 1; display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--radius-full); background: var(--surface-raised); color: var(--amber); box-shadow: inset 0 0 0 var(--border-control) var(--line-strong); }
+.tempo__dia:first-child .tempo__evento:first-child .tempo__marca { background: var(--amber); color: var(--on-amber); box-shadow: var(--key-lip); }
+.tempo__hora { padding-top: 6px; color: var(--ink-muted); }
+.tempo__texto { display: flex; flex-direction: column; gap: 2px; padding-top: 4px; overflow-wrap: anywhere; }
+.tempo__detalhe, .tempo__aviso { color: var(--ink-muted); }
+.tempo__aviso { margin: 0; }
+
+@media (max-width: 900px) {
+	.caderno { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+	.caderno__indice { padding: var(--space-2); }
+	.caderno__indice-titulo { display: none; }
+	.caderno__indice ul { flex-direction: row; overflow-x: auto; scrollbar-width: none; }
+	.caderno__indice li { flex: none; }
+	.caderno__item { grid-template-columns: auto auto; width: auto; }
+	.caderno__item-nome { overflow: visible; }
+	.caderno__item-conta { display: none; }
+	.caderno__secao-cabeca, .caderno__secao-corpo { padding-left: var(--space-5); padding-right: var(--space-5); }
+	.aba-caderno__editar { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+	.caderno__item { transition: none; }
+}
+
+/* Entrar no caderno (design-system/README.md, "Telas e fluxo"): a linha tijolo da roda sobe e vira
+ * a aba (560 ms, cubic-bezier(.65, 0, .25, 1)), enquanto a folha desce e some; voltar faz o
+ * caminho inverso, até a mesma linha (a TelaEstudos guarda qual). As duas pontas têm o mesmo nome. */
+.cadernos__roda .ap-wheel__row.is-selected, .aba-caderno { view-transition-name: caderno-aba; }
+::view-transition-group(caderno-aba) { animation-duration: .56s; animation-timing-function: cubic-bezier(.65, 0, .25, 1); }
+/* A folha dos cadernos sem par do outro lado (indo para o caderno ou para a conversa): desce e some; voltando, sobe. */
+::view-transition-old(*.perfil):only-child { animation: folha-desce .42s cubic-bezier(.65, 0, .25, 1) both; }
+::view-transition-new(*.perfil):only-child { animation: folha-sobe .5s .06s cubic-bezier(.65, 0, .25, 1) both; }
+@keyframes folha-desce { to { opacity: 0; transform: translateY(32%); } }
+@keyframes folha-sobe { from { opacity: 0; transform: translateY(24%); } }

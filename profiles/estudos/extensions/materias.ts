@@ -53,7 +53,7 @@ export default function materias(pi: ExtensionAPI) {
 	const aoMaterial = (removido: boolean) => (recebido: unknown) => {
 		if (!pastaDados) return;
 		registrarMaterial(pastaDados, recebido as AvisoMaterial, removido, sessao ? { sessao } : {}).catch((erro: unknown) => {
-			mostrar("erro", { mensagem: `Não consegui gravar o evento do material: ${(erro as Error).message}` });
+			mostrar("erro", { mensagem: `Não consegui gravar o evento do material: ${(erro as Error).message}`, ao: "material" });
 		});
 	};
 	pi.events.on("materiais:pronto", aoMaterial(false));

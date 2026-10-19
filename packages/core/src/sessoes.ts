@@ -47,6 +47,25 @@ export const PASTA_SUBAGENTES = "subagentes";
 /** customType da entrada de sessão que diz qual agente a sessão usa. */
 export const TIPO_ENTRADA_AGENTE = "nucleo.agente";
 
+/** customType da entrada com o contexto da sessão (ContextoSessao); vale a última. */
+export const TIPO_ENTRADA_CONTEXTO = "nucleo.contexto";
+
+/**
+ * O assunto de uma sessão principal, escolhido pela interface do perfil ao
+ * criar a sessão (no perfil de estudos, a matéria do caderno). Fica gravado
+ * na sessão e volta ao reabri-la. O núcleo não interpreta a chave nem o rótulo.
+ */
+export interface ContextoSessao {
+	/** Identifica o assunto ("materia:calculo-i"); a interface acha as sessões dele por ela. */
+	chave: string;
+	/** Nome para mostrar ("Cálculo I"). */
+	rotulo: string;
+	/** Texto a mais no prompt de sistema, escrito pelo perfil. */
+	instrucoes?: string;
+	/** Pasta da pasta de dados que limita a busca nos materiais ("materias/calculo-i"). */
+	escopoMateriais?: string;
+}
+
 /** customType da entrada que liga uma sessão filha à sessão e à chamada subagent que a criaram. */
 export const TIPO_ENTRADA_SUBAGENTE = "nucleo.subagente";
 
@@ -87,6 +106,8 @@ export interface ResumoSessao {
 	titulo: string;
 	/** Agente gravado na sessão (o último, se houve troca). */
 	agente?: string;
+	/** O assunto da sessão, se ela tiver um (sem as instruções). */
+	contexto?: { chave: string; rotulo: string };
 	mensagens: number;
 }
 
@@ -181,6 +202,8 @@ export function montarOpcoesRecursos(
 	extensoesNucleo: InlineExtension[],
 	diagnosticos: Diagnostico[],
 	modo: ModoSessao = "principal",
+	/** Textos a mais no fim do prompt de sistema (as instruções do contexto da sessão). */
+	instrucoesExtras: readonly string[] = [],
 ): OpcoesRecursos {
 	return {
 		additionalExtensionPaths: modo === "principal" ? [...perfil.extensoes] : [...perfil.extensoes, ...perfil.extensoesSubagentes],
@@ -190,7 +213,7 @@ export function montarOpcoesRecursos(
 		// Nenhum AGENTS.md ou CLAUDE.md descoberto no cwd e acima.
 		noContextFiles: true,
 		// Caminho do AGENTS.md do perfil (o loader lê o arquivo) e o prompt do agente (texto).
-		appendSystemPrompt: [perfil.instrucoes, agente.definicao.prompt].filter((parte) => parte.trim().length > 0),
+		appendSystemPrompt: [perfil.instrucoes, agente.definicao.prompt, ...instrucoesExtras].filter((parte) => parte.trim().length > 0),
 		extensionFactories: extensoesNucleo,
 		skillsOverride: (base) => {
 			const { skills, faltando } = filtrarSkills(base.skills, agente.definicao.skills, semDeclaracaoDo(modo));
@@ -246,24 +269,51 @@ export function agenteGravado(entradas: readonly SessionEntry[]): string | undef
 	return agente;
 }
 
-/** Agente gravado num arquivo de sessão, lendo o JSONL sem abrir a sessão. */
-export async function lerAgenteDoArquivo(arquivo: string): Promise<string | undefined> {
+function contextoDaEntrada(entrada: { type?: unknown; customType?: unknown; data?: unknown }): ContextoSessao | undefined {
+	if (entrada.type !== "custom" || entrada.customType !== TIPO_ENTRADA_CONTEXTO) return undefined;
+	const dados = entrada.data as Partial<ContextoSessao> | undefined;
+	if (typeof dados?.chave !== "string" || typeof dados.rotulo !== "string") return undefined;
+	return {
+		chave: dados.chave,
+		rotulo: dados.rotulo,
+		...(typeof dados.instrucoes === "string" ? { instrucoes: dados.instrucoes } : {}),
+		...(typeof dados.escopoMateriais === "string" ? { escopoMateriais: dados.escopoMateriais } : {}),
+	};
+}
+
+/** Contexto gravado num caminho de entradas da sessão (o último vale). */
+export function contextoGravado(entradas: readonly SessionEntry[]): ContextoSessao | undefined {
+	let contexto: ContextoSessao | undefined;
+	for (const entrada of entradas) contexto = contextoDaEntrada(entrada) ?? contexto;
+	return contexto;
+}
+
+/** Agente e contexto gravados num arquivo de sessão, lendo o JSONL sem abrir a sessão. */
+export async function lerGravadosDoArquivo(arquivo: string): Promise<{ agente?: string; contexto?: ContextoSessao }> {
 	let texto: string;
 	try {
 		texto = await readFile(arquivo, "utf8");
 	} catch {
-		return undefined;
+		return {};
 	}
 	let agente: string | undefined;
+	let contexto: ContextoSessao | undefined;
 	for (const linha of texto.split("\n")) {
-		if (!linha.includes(TIPO_ENTRADA_AGENTE)) continue;
+		if (!linha.includes(TIPO_ENTRADA_AGENTE) && !linha.includes(TIPO_ENTRADA_CONTEXTO)) continue;
 		try {
-			agente = nomeDaEntradaAgente(JSON.parse(linha)) ?? agente;
+			const entrada = JSON.parse(linha) as Parameters<typeof nomeDaEntradaAgente>[0];
+			agente = nomeDaEntradaAgente(entrada) ?? agente;
+			contexto = contextoDaEntrada(entrada) ?? contexto;
 		} catch {
 			// Linha incompleta (por exemplo, gravação em andamento): ignora.
 		}
 	}
-	return agente;
+	return { ...(agente ? { agente } : {}), ...(contexto ? { contexto } : {}) };
+}
+
+/** Agente gravado num arquivo de sessão, lendo o JSONL sem abrir a sessão. */
+export async function lerAgenteDoArquivo(arquivo: string): Promise<string | undefined> {
+	return (await lerGravadosDoArquivo(arquivo)).agente;
 }
 
 /** Acha o arquivo de uma sessão do perfil pelo id. */
@@ -279,7 +329,7 @@ export async function listarSessoes(perfil: Pick<Perfil, "pastaDados">): Promise
 			const primeira = info.firstMessage.replace(/\s+/g, " ").trim();
 			const titulo =
 				info.name ?? (primeira.length > LIMITE_TITULO ? `${primeira.slice(0, LIMITE_TITULO - 1)}…` : primeira);
-			const agente = await lerAgenteDoArquivo(info.path);
+			const { agente, contexto } = await lerGravadosDoArquivo(info.path);
 			return {
 				id: info.id,
 				arquivo: info.path,
@@ -287,6 +337,7 @@ export async function listarSessoes(perfil: Pick<Perfil, "pastaDados">): Promise
 				modificadaEm: info.modified.toISOString(),
 				titulo: titulo || "(sem mensagens)",
 				...(agente ? { agente } : {}),
+				...(contexto ? { contexto: { chave: contexto.chave, rotulo: contexto.rotulo } } : {}),
 				mensagens: info.messageCount,
 			};
 		}),

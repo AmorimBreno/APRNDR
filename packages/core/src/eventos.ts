@@ -41,6 +41,8 @@ export interface EstadoSessao {
 	ferramentas: string[];
 	skills: string[];
 	diagnosticos: Diagnostico[];
+	/** O assunto da sessão (ContextoSessao), se ela tiver um. */
+	contexto?: { chave: string; rotulo: string };
 }
 
 /**

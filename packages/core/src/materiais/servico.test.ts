@@ -10,7 +10,7 @@ import { join } from "node:path";
 import type { ExtensionAPI, InlineExtension } from "@earendil-works/pi-coding-agent";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { criarExtensaoMateriais } from "./extensao.ts";
+import { criarExtensaoMateriais, pastaDaBusca } from "./extensao.ts";
 import { consultaFts } from "./indice.ts";
 import { type EventoMateriais, seguePadrao, ServicoMateriais } from "./servico.ts";
 import type { RegistroVisao } from "./visao.ts";
@@ -228,7 +228,7 @@ describe("serviço de materiais", () => {
 describe("ferramentas de materiais", () => {
 	type Ferramenta = { execute(id: string, params: unknown): Promise<{ content: Array<{ text: string }>; isError?: boolean }> };
 
-	function ligar(servico: ServicoMateriais) {
+	function ligar(servico: ServicoMateriais, escopo?: string) {
 		const ferramentas: Record<string, Ferramenta> = {};
 		const barramento = new EventEmitter();
 		const emitidos: Array<[string, unknown]> = [];
@@ -238,9 +238,38 @@ describe("ferramentas de materiais", () => {
 			events: { emit: (canal: string, dados: unknown) => emitidos.push([canal, dados]), on: barramento.on.bind(barramento) },
 			on: (evento: string, tratador: () => void) => (ao[evento] = tratador),
 		} as unknown as ExtensionAPI;
-		(criarExtensaoMateriais(servico) as InlineExtension & { factory(pi: ExtensionAPI): void }).factory(pi);
+		(criarExtensaoMateriais(servico, escopo) as InlineExtension & { factory(pi: ExtensionAPI): void }).factory(pi);
 		return { ferramentas, emitidos, ao };
 	}
+
+	it("a pasta da busca fica no escopo, a não ser que peça todas", () => {
+		expect(pastaDaBusca(undefined, undefined, undefined)).toBeUndefined();
+		expect(pastaDaBusca(undefined, "materias/x/", undefined)).toBe("materias/x");
+		expect(pastaDaBusca("materias/calculo", undefined, undefined)).toBe("materias/calculo");
+		expect(pastaDaBusca("materias/calculo", "materias/calculo/materiais", undefined)).toBe("materias/calculo/materiais");
+		expect(pastaDaBusca("materias/calculo", "materias/fisica", undefined)).toBe("materias/calculo");
+		expect(pastaDaBusca("materias/calculo", "materias/calculo-ii", undefined)).toBe("materias/calculo");
+		expect(pastaDaBusca("materias/calculo", undefined, true)).toBeUndefined();
+		expect(pastaDaBusca("materias/calculo", "materias/fisica", true)).toBe("materias/fisica");
+	});
+
+	it("numa conversa de caderno, buscar e listar ficam na matéria; todas: true sai dela", async () => {
+		const servico = novoServico();
+		const { ferramentas } = ligar(servico, "materias/calculo");
+		await escrever(`${pastaCalc}/derivadas.md`, "# Derivadas\nA média da variação.");
+		await escrever("materias/estatistica/materiais/media.md", "# Média\nA média aritmética.");
+		await servico.varrer();
+		await servico.ocioso();
+		const naMateria = await ferramentas.buscar_material!.execute("1", { consulta: "média" });
+		expect(naMateria.content[0]!.text).toMatch(/^1 trechos para "média" \(em materias\/calculo\):/);
+		expect(naMateria.content[0]!.text).not.toContain("estatistica");
+		const fora = await ferramentas.buscar_material!.execute("2", { consulta: "média", pasta: "materias/estatistica" });
+		expect(fora.content[0]!.text).not.toContain("estatistica");
+		const emTudo = await ferramentas.buscar_material!.execute("3", { consulta: "média", todas: true });
+		expect(emTudo.content[0]!.text).toMatch(/^2 trechos/);
+		const lista = await ferramentas.listar_arquivos_de_material!.execute("4", {});
+		expect(lista.content[0]!.text).toBe(`- ${pastaCalc}/derivadas.md [texto; pronto, 1 trechos]`);
+	});
 
 	it("buscar, ler por página e listar; os avisos de pronto e removido vão para o barramento da sessão", async () => {
 		const servico = novoServico();

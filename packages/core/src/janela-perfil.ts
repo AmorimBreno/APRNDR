@@ -64,6 +64,8 @@ import {
 	acharArquivoSessao,
 	adicionarDiagnostico,
 	agenteGravado,
+	type ContextoSessao,
+	contextoGravado,
 	ErroSessao,
 	type FabricaExtensoesNucleo,
 	agentesPorMomento,
@@ -74,6 +76,7 @@ import {
 	pastaSessoes,
 	type ResumoSessao,
 	TIPO_ENTRADA_AGENTE,
+	TIPO_ENTRADA_CONTEXTO,
 } from "./sessoes.ts";
 import { criarExtensaoMateriais } from "./materiais/extensao.ts";
 import { ServicoMateriais } from "./materiais/servico.ts";
@@ -112,6 +115,11 @@ interface PedidoMontagem {
 	modelo: EscolhaModelo;
 	/** Recarrega o código das extensões do disco (o pi guarda as fábricas em cache). */
 	relerCodigo?: boolean;
+	/**
+	 * Contexto da sessão: um objeto grava este (se for diferente do gravado);
+	 * null = sessão sem contexto; indefinido = o gravado na sessão.
+	 */
+	contexto?: ContextoSessao | null;
 }
 
 /** Motivo da troca de sessão, no vocabulário dos eventos session_start/session_shutdown do pi. */
@@ -136,6 +144,8 @@ export class JanelaPerfil {
 	private registro?: ModelRuntime;
 	private sessao?: AgentSession;
 	private agenteAtual?: AgenteDoPerfil;
+	/** Contexto da sessão atual (o assunto, como a matéria de um caderno). */
+	private contextoAtual?: ContextoSessao;
 	/** Ponte de eventos da sessão atual. */
 	private ponte?: PonteSessao;
 	private diagnosticos: Diagnostico[] = [];
@@ -311,7 +321,7 @@ export class JanelaPerfil {
 	trocarAgente(nome: string): Promise<EstadoSessao> {
 		return this.emOrdem(async () => {
 			const sessao = this.exigirSessao();
-			const pedido = await this.pedidoComAgente(nome);
+			const pedido: PedidoMontagem = { ...(await this.pedidoComAgente(nome)), contexto: this.contextoAtual ?? null };
 			await sessao.waitForIdle();
 			return this.trocarSessao(this.gerenteDaSessaoAtual(), pedido, "reload");
 		});
@@ -330,12 +340,19 @@ export class JanelaPerfil {
 		});
 	}
 
-	/** Começa uma sessão nova. Agente padrão: o atual. Interrompe a resposta em andamento. */
-	novaSessao(agente?: string): Promise<EstadoSessao> {
+	/**
+	 * Começa uma sessão nova. Agente padrão: o atual. Contexto: o dado; null =
+	 * sem contexto; indefinido = o da sessão atual (uma conversa nova dentro de
+	 * um caderno continua no caderno). Interrompe a resposta em andamento.
+	 */
+	novaSessao(agente?: string, contexto?: ContextoSessao | null): Promise<EstadoSessao> {
 		return this.emOrdem(async () => {
 			const perfil = this.perfilAtual;
 			await garantirPastas(perfil);
-			const pedido = await this.pedidoComAgente(agente ?? this.agenteAtual?.nome ?? perfil.agentePadrao);
+			const pedido: PedidoMontagem = {
+				...(await this.pedidoComAgente(agente ?? this.agenteAtual?.nome ?? perfil.agentePadrao)),
+				contexto: contexto === undefined ? (this.contextoAtual ?? null) : contexto,
+			};
 			const gerente = SessionManager.create(perfil.pastaDados, pastaSessoes(perfil));
 			return this.trocarSessao(gerente, pedido, this.sessao ? "new" : "startup");
 		});
@@ -358,6 +375,7 @@ export class JanelaPerfil {
 				agente,
 				modelo: { modelo: sessao.model, raciocinio: sessao.thinkingLevel },
 				relerCodigo: true,
+				contexto: this.contextoAtual ?? null,
 			};
 			this.perfilAtual = perfil;
 			try {
@@ -566,6 +584,7 @@ export class JanelaPerfil {
 		this.sessao = montada.sessao;
 		this.ponte = montada.ponte;
 		this.agenteAtual = montada.agente;
+		this.contextoAtual = montada.contexto;
 		this.diagnosticos = montada.diagnosticos;
 		this.execucao = undefined;
 		this.iniciando = false;
@@ -580,7 +599,7 @@ export class JanelaPerfil {
 		gerente: SessionManager,
 		pedido: PedidoMontagem,
 		inicio: SessionStartEvent,
-	): Promise<{ sessao: AgentSession; agente: AgenteDoPerfil; diagnosticos: Diagnostico[]; ponte: PonteSessao }> {
+	): Promise<{ sessao: AgentSession; agente: AgenteDoPerfil; diagnosticos: Diagnostico[]; ponte: PonteSessao; contexto?: ContextoSessao }> {
 		const perfil = this.perfilAtual;
 		const diagnosticos: Diagnostico[] = [];
 		const registro = await this.obterRegistro();
@@ -597,12 +616,14 @@ export class JanelaPerfil {
 		}
 
 		const escolha = this.escolherModelo(pedido.modelo, agente, gerente, registro, diagnosticos);
+		const contextoNaSessao = contextoGravado(gerente.getBranch());
+		const contexto = pedido.contexto === undefined ? contextoNaSessao : (pedido.contexto ?? undefined);
 
 		const ponte = new PonteSessao((evento) => this.emitir(evento));
 		const extensoesNucleo = [
 			ponte.extensao,
 			criarExtensaoPergunta(),
-			...(this.servicoMateriais ? [criarExtensaoMateriais(this.servicoMateriais)] : []),
+			...(this.servicoMateriais ? [criarExtensaoMateriais(this.servicoMateriais, contexto?.escopoMateriais)] : []),
 			criarExtensaoSubagente({
 				perfil,
 				pastaPi: this.pastaPi,
@@ -623,6 +644,7 @@ export class JanelaPerfil {
 			modelo: escolha.modelo,
 			raciocinio: escolha.raciocinio,
 			extensoesNucleo,
+			...(contexto?.instrucoes ? { instrucoesExtras: [contexto.instrucoes] } : {}),
 			relerCodigo: pedido.relerCodigo,
 			diagnosticos,
 		});
@@ -643,7 +665,8 @@ export class JanelaPerfil {
 			}
 		}
 		if (gravado !== agente.nome) gerente.appendCustomEntry(TIPO_ENTRADA_AGENTE, { agente: agente.nome });
-		return { sessao, agente, diagnosticos, ponte };
+		if (contexto && JSON.stringify(contexto) !== JSON.stringify(contextoNaSessao)) gerente.appendCustomEntry(TIPO_ENTRADA_CONTEXTO, contexto);
+		return { sessao, agente, diagnosticos, ponte, ...(contexto ? { contexto } : {}) };
 	}
 
 	private escolherModelo(
@@ -703,6 +726,7 @@ export class JanelaPerfil {
 			ferramentas: sessao.getActiveToolNames(),
 			skills: sessao.resourceLoader.getSkills().skills.map((skill) => skill.name),
 			diagnosticos: [...this.diagnosticos],
+			...(this.contextoAtual ? { contexto: { chave: this.contextoAtual.chave, rotulo: this.contextoAtual.rotulo } } : {}),
 		};
 		this.estadoAtual = estado;
 		this.emitir({ tipo: "estado_sessao", estado });

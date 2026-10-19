@@ -41,6 +41,8 @@ export interface PedidoSessaoPi {
 	modelo?: ModeloPi;
 	raciocinio?: NivelRaciocinio;
 	extensoesNucleo: InlineExtension[];
+	/** Textos a mais no fim do prompt de sistema (as instruções do contexto da sessão). */
+	instrucoesExtras?: readonly string[];
 	/** Recarrega o código das extensões do disco (o pi guarda as fábricas em cache). */
 	relerCodigo?: boolean;
 	/** Recebe os diagnósticos da montagem. */
@@ -67,7 +69,7 @@ export async function criarSessaoPi(pedido: PedidoSessaoPi): Promise<AgentSessio
 		agentDir: pedido.pastaPi,
 		settingsManager,
 		modelRuntime: pedido.registro,
-		resourceLoaderOptions: montarOpcoesRecursos(perfil, agente, pedido.extensoesNucleo, diagnosticos, pedido.modo),
+		resourceLoaderOptions: montarOpcoesRecursos(perfil, agente, pedido.extensoesNucleo, diagnosticos, pedido.modo, pedido.instrucoesExtras),
 	});
 	// O pi guarda as fábricas das extensões em cache por caminho; um loader novo
 	// reusaria o código antigo. Um segundo reload() limpa o cache e relê do disco.

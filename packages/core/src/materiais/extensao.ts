@@ -4,6 +4,10 @@
 // - "materiais:pronto" {caminho, pasta, nome, tipo, trechos, custo, novo};
 // - "materiais:removido" {caminho, pasta, nome}.
 // Entra em toda sessão principal de um perfil com "materiais" no profile.json.
+//
+// Escopo: numa sessão com contexto (a conversa de um caderno), a busca e a
+// lista ficam na pasta do contexto (escopoMateriais, "materias/calculo-i"). O
+// agente só sai dela com todas: true, quando o usuário pede.
 
 import type { InlineExtension } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
@@ -34,7 +38,23 @@ function linhaSituacao(situacao: SituacaoMaterial): string {
 	return `- ${situacao.caminho} [${situacao.tipo ?? "?"}; ${estado}]`;
 }
 
-export function criarExtensaoMateriais(servico: ServicoMateriais): InlineExtension {
+/** A pasta da busca: dentro do escopo (a pedida, se estiver nele; senão o escopo), ou a pedida se for em tudo. */
+export function pastaDaBusca(escopo: string | undefined, pedida: string | undefined, todas: boolean | undefined): string | undefined {
+	const limpa = (pasta: string) => pasta.replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+	if (!escopo || todas) return pedida ? limpa(pedida) : undefined;
+	const raiz = limpa(escopo);
+	const dentro = pedida ? limpa(pedida) : "";
+	return dentro === raiz || dentro.startsWith(`${raiz}/`) ? dentro : raiz;
+}
+
+export function criarExtensaoMateriais(servico: ServicoMateriais, escopo?: string): InlineExtension {
+	const parametroTodas = Type.Optional(
+		Type.Boolean({
+			description: escopo
+				? `This conversation is scoped to ${escopo}; searches stay there. Set true only when the user explicitly asks to look in all subjects.`
+				: "No effect: this conversation has no scope.",
+		}),
+	);
 	return {
 		name: "nucleo-materiais",
 		factory: (pi) => {
@@ -53,13 +73,16 @@ export function criarExtensaoMateriais(servico: ServicoMateriais): InlineExtensi
 					consulta: Type.String({ description: "Words to search for (Portuguese or the material's language). Use the key terms, not a whole sentence." }),
 					pasta: Type.Optional(Type.String({ description: 'Limit to a folder of the data folder, e.g. "materias/calculo-i".' })),
 					limite: Type.Optional(Type.Integer({ minimum: 1, maximum: 30, description: "How many passages (default 8)." })),
+					todas: parametroTodas,
 				}),
 				async execute(_id, params) {
-					const resultados = servico.buscar(params.consulta, { ...(params.pasta ? { pasta: params.pasta } : {}), limite: params.limite ?? 8 });
+					const pasta = pastaDaBusca(escopo, params.pasta, params.todas);
+					const resultados = servico.buscar(params.consulta, { ...(pasta ? { pasta } : {}), limite: params.limite ?? 8 });
+					const onde = pasta ? ` (em ${pasta})` : "";
 					if (resultados.length === 0) {
 						const prontos = servico.situacao().filter((situacao) => situacao.estado === "pronto").length;
 						return {
-							content: [{ type: "text", text: prontos ? `Nada encontrado para "${params.consulta}".` : "Ainda não há material processado." }],
+							content: [{ type: "text", text: prontos ? `Nada encontrado para "${params.consulta}"${onde}.` : "Ainda não há material processado." }],
 							details: { resultados },
 						};
 					}
@@ -70,7 +93,7 @@ export function criarExtensaoMateriais(servico: ServicoMateriais): InlineExtensi
 						content: [
 							{
 								type: "text",
-								text: `${resultados.length} trechos para "${params.consulta}":\n${linhas.join("\n")}\n\nPara ler o trecho inteiro, use ler_material com o caminho e o número da página ou da célula.`,
+								text: `${resultados.length} trechos para "${params.consulta}"${onde}:\n${linhas.join("\n")}\n\nPara ler o trecho inteiro, use ler_material com o caminho e o número da página ou da célula.`,
 							},
 						],
 						details: { resultados },
@@ -123,9 +146,11 @@ export function criarExtensaoMateriais(servico: ServicoMateriais): InlineExtensi
 				description: "List the material files the app knows (processed or not), with type and status. Optionally limited to a folder of the data folder.",
 				parameters: Type.Object({
 					pasta: Type.Optional(Type.String({ description: 'Folder of the data folder, e.g. "materias/calculo-i".' })),
+					todas: parametroTodas,
 				}),
 				async execute(_id, params) {
-					const prefixo = params.pasta ? `${params.pasta.replace(/\\/g, "/").replace(/^\/+|\/+$/g, "")}/` : "";
+					const pasta = pastaDaBusca(escopo, params.pasta, params.todas);
+					const prefixo = pasta ? `${pasta}/` : "";
 					const lista = servico.situacao().filter((situacao) => situacao.caminho.startsWith(prefixo));
 					return {
 						content: [{ type: "text", text: lista.length ? lista.map(linhaSituacao).join("\n") : "Nenhum arquivo de material." }],

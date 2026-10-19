@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { EventoNucleo } from "./eventos.ts";
 import { JanelaPerfil } from "./janela-perfil.ts";
 import { lerPerfil } from "./perfis.ts";
-import { pastaSessoes, TIPO_ENTRADA_AGENTE } from "./sessoes.ts";
+import { pastaSessoes, TIPO_ENTRADA_AGENTE, TIPO_ENTRADA_CONTEXTO } from "./sessoes.ts";
 
 let raiz = "";
 let pastaPerfil = "";
@@ -83,15 +83,16 @@ afterEach(async () => {
 	await rm(raiz, { recursive: true, force: true });
 });
 
-/** Escreve uma sessão com uma pergunta e uma resposta, gravada com o agente `agente`. */
-async function gravarSessao(id: string, agente: string): Promise<string> {
+/** Escreve uma sessão com uma pergunta e uma resposta, gravada com o agente `agente` (e o contexto, se vier). */
+async function gravarSessao(id: string, agente: string, contexto?: Record<string, string>): Promise<string> {
 	const pasta = pastaSessoes({ pastaDados });
 	await mkdir(pasta, { recursive: true });
 	const usoZero = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
 	const linhas = [
 		{ type: "session", version: 3, id, timestamp: "2026-10-15T10:00:00.000Z", cwd: pastaDados },
 		{ type: "custom", id: "e1", parentId: null, timestamp: "2026-10-15T10:00:00.000Z", customType: TIPO_ENTRADA_AGENTE, data: { agente } },
-		{ type: "message", id: "e2", parentId: "e1", timestamp: "2026-10-15T10:00:01.000Z", message: { role: "user", content: "Pergunta antiga", timestamp: 1760522401000 } },
+		...(contexto ? [{ type: "custom", id: "e1b", parentId: "e1", timestamp: "2026-10-15T10:00:00.500Z", customType: TIPO_ENTRADA_CONTEXTO, data: contexto }] : []),
+		{ type: "message", id: "e2", parentId: contexto ? "e1b" : "e1", timestamp: "2026-10-15T10:00:01.000Z", message: { role: "user", content: "Pergunta antiga", timestamp: 1760522401000 } },
 		{
 			type: "message",
 			id: "e3",
@@ -214,6 +215,34 @@ describe("JanelaPerfil sem rede", () => {
 		const reaberta = await janela.abrirSessao(id);
 		expect(reaberta).toMatchObject({ sessaoId: id, agente: "geral" });
 		expect(janela.historico()).toHaveLength(2);
+	});
+
+	it("contexto da sessão: vai para o prompt, é herdado pela conversa nova e pela troca de agente, e volta ao reabrir", async () => {
+		janela = new JanelaPerfil(await lerPerfil(pastaPerfil), { pastaPi });
+		const geral = await janela.iniciar();
+		expect(geral.contexto).toBeUndefined();
+
+		const contexto = { chave: "materia:calculo", rotulo: "Cálculo", instrucoes: "Esta conversa é do caderno de Cálculo.", escopoMateriais: "materias/calculo" };
+		const doCaderno = await janela.novaSessao(undefined, contexto);
+		expect(doCaderno.contexto).toEqual({ chave: "materia:calculo", rotulo: "Cálculo" });
+		expect(janela.promptSistema).toContain("Esta conversa é do caderno de Cálculo.");
+
+		// Conversa nova dentro do caderno continua no caderno; trocar de agente também.
+		expect((await janela.novaSessao()).contexto).toEqual({ chave: "materia:calculo", rotulo: "Cálculo" });
+		expect((await janela.trocarAgente("outro")).contexto).toEqual({ chave: "materia:calculo", rotulo: "Cálculo" });
+		expect(janela.promptSistema).toContain("Esta conversa é do caderno de Cálculo.");
+
+		// null = conversa geral.
+		const semContexto = await janela.novaSessao(undefined, null);
+		expect(semContexto.contexto).toBeUndefined();
+		expect(janela.promptSistema).not.toContain("caderno de Cálculo");
+
+		// Gravado na sessão: volta ao reabrir e aparece na lista.
+		const id = "01a10000-0000-7000-8000-0000000000bb";
+		await gravarSessao(id, "geral", contexto);
+		expect((await janela.abrirSessao(id)).contexto).toEqual({ chave: "materia:calculo", rotulo: "Cálculo" });
+		expect(janela.promptSistema).toContain("Esta conversa é do caderno de Cálculo.");
+		expect((await janela.listarSessoes()).find((sessao) => sessao.id === id)?.contexto).toEqual({ chave: "materia:calculo", rotulo: "Cálculo" });
 	});
 
 	it("ponte: mostrar, pedido e resposta, cancelamento e ação da interface", async () => {

@@ -75,8 +75,13 @@ export default function notas(pi: ExtensionAPI) {
 		sessao = ctx.sessionManager.getSessionId();
 	});
 
+	/** Espera o que está na fila das notas da matéria (a lista logo depois de sair do editor vem com o último salvamento). */
+	const filaDaMateria = (materia: string) =>
+		Promise.all([...filas.entries()].filter(([chave]) => chave.startsWith(`${materia}/`)).map(([, tarefa]) => tarefa.catch(() => undefined)));
+
 	const mostrarLista = async (dados: string, materia: string) => {
 		try {
+			await filaDaMateria(materia);
 			mostrar("lista", await listarNotas(dados, materia));
 		} catch (erro) {
 			mostrar("erro", { mensagem: mensagemDe(erro, "listar"), ao: "listar", materia });
@@ -89,11 +94,12 @@ export default function notas(pi: ExtensionAPI) {
 		const dadosAcao = (bruto ?? {}) as DadosAcao;
 		const { materia } = dadosAcao;
 		if (typeof materia !== "string") return;
+		// Sem session_start, esta cópia não é a da sessão: ao recarregar o código, o
+		// núcleo carrega as extensões uma vez a mais (montagem.ts), e essa carga
+		// continua ouvindo o barramento (ver packages/core/src/ponte.ts). Ela fica
+		// calada; quem responde é a cópia da sessão.
 		const dados = pastaDados;
-		if (!dados) {
-			mostrar("erro", { mensagem: "A sessão ainda não abriu a pasta de dados. Tente de novo.", ao: acao, materia, ...(dadosAcao.pedido ? { pedido: dadosAcao.pedido } : {}) });
-			return;
-		}
+		if (!dados) return;
 		const daSessao = sessao ? { sessao } : {};
 
 		if (acao === "listar") {
@@ -145,7 +151,8 @@ export default function notas(pi: ExtensionAPI) {
 				try {
 					const { titulo } = await renomearNota(dados, materia, de, para, daSessao);
 					mostrar("renomeada", { materia, de, para: titulo });
-					await mostrarLista(dados, materia);
+					// Sem esperar: a lista espera a fila, e esta tarefa ainda está nela.
+					void mostrarLista(dados, materia);
 				} catch (erro) {
 					mostrar("erro", { mensagem: mensagemDe(erro, "renomear"), ao: "renomear", materia, titulo: de });
 				}

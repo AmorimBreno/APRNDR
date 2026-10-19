@@ -72,6 +72,9 @@ export default function materias(pi: ExtensionAPI) {
 	pi.events.on("interface:acao", (recebido) => {
 		const { painel, acao, dados } = recebido as { painel?: string; acao?: string; dados?: unknown };
 		if (painel !== PAINEL) return;
+		// Sem session_start (pastaDados), esta cópia não é a da sessão: ao recarregar o
+		// código, o núcleo carrega as extensões uma vez a mais e essa carga continua
+		// ouvindo o barramento (packages/core/src/ponte.ts). Ela fica calada.
 		const { id, mudancas } = (dados ?? {}) as { id?: string; mudancas?: Partial<EntradaMateria> };
 		if (acao === "listar") {
 			void mostrarLista();
@@ -79,7 +82,7 @@ export default function materias(pi: ExtensionAPI) {
 			void mostrarCaderno(id);
 		} else if (acao === "alterar" && typeof id === "string") {
 			void (async () => {
-				if (!pastaDados) return mostrar("erro", { mensagem: "A sessão ainda não abriu a pasta de dados. Tente de novo.", ao: "alterar" });
+				if (!pastaDados) return;
 				try {
 					await alterarMateria(pastaDados, id, mudancas ?? {}, sessao ? { sessao } : {});
 					mostrar("alterada", { id });
@@ -91,7 +94,7 @@ export default function materias(pi: ExtensionAPI) {
 			})();
 		} else if (acao === "criar") {
 			void (async () => {
-				if (!pastaDados) return mostrar("erro", { mensagem: "A sessão ainda não abriu a pasta de dados. Tente de novo." });
+				if (!pastaDados) return;
 				try {
 					const materia = await criarMateria(pastaDados, dados as EntradaMateria, sessao ? { sessao } : {});
 					mostrar("criada", { id: materia.id });

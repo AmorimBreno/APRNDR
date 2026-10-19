@@ -120,6 +120,35 @@ describe("ponte das notas", () => {
 		expect(await readFile(arquivoNota(dados, materia, "Limites"), "utf8")).toBe("meu\n");
 	});
 
+	it("a lista pedida logo depois de salvar espera o salvamento", async () => {
+		await criarNota(dados, materia, "Limites");
+		acao("salvar", { titulo: "Limites", conteudo: "texto novo", versao: versaoDe(""), edicao: "e1", pedido: "p1" });
+		acao("listar", {});
+		await esperar(() => recebidas("lista").length > 0);
+		expect((recebidas("lista")[0]!.dados as { notas: Array<{ previa: string }> }).notas[0]!.previa).toBe("texto novo");
+		expect(mostrados.map((mensagem) => mensagem.acao)).toEqual(["salva", "lista"]);
+	});
+
+	it("uma cópia sem sessão no mesmo barramento (a carga a mais ao recarregar) fica calada", async () => {
+		const copia = {
+			events: {
+				on: (canal: string, ouvinte: (dados: unknown) => void) => {
+					barramento.on(canal, ouvinte);
+					return () => barramento.off(canal, ouvinte);
+				},
+				emit: (canal: string, dados: unknown) => barramento.emit(canal, dados),
+			},
+			on: () => undefined,
+			registerTool: () => undefined,
+		} as unknown as ExtensionAPI;
+		notas(copia);
+		await criarNota(dados, materia, "Limites");
+		acao("salvar", { titulo: "Limites", conteudo: "um", versao: versaoDe(""), edicao: "e1", pedido: "p1" });
+		await esperar(() => recebidas("salva").length > 0);
+		await new Promise((resolver) => setTimeout(resolver, 30));
+		expect(mostrados.map((mensagem) => mensagem.acao)).toEqual(["salva"]);
+	});
+
 	it("renomeia, avisa e manda a lista", async () => {
 		await criarNota(dados, materia, "Limites");
 		acao("renomear", { de: "Limites", para: "Limites laterais" });

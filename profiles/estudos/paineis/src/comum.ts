@@ -92,6 +92,7 @@ export function contextoDaMateria(materia: Materia): ContextoSessao {
 			`Esta conversa é do caderno da matéria ${materia.nome} (pasta materias/${materia.id} da pasta de dados).`,
 			"Quando o Breno falar da matéria, da aula, dos slides ou da prova, é desta.",
 			"A busca nos materiais (buscar_material e listar_arquivos_de_material) já fica nesta matéria; só use todas: true se ele pedir para procurar em outras matérias.",
+			"As notas pessoais dele neste caderno você lê com listar_notas e ler_nota; elas são dele, então nunca escreva nem mude uma nota.",
 		].join(" "),
 		escopoMateriais: `materias/${materia.id}`,
 	};

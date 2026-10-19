@@ -54,6 +54,8 @@ export interface EntradaPainel {
 	titulo?: string;
 	/** Só tem pedidos: não aparece na área de painéis. */
 	soModal?: boolean;
+	/** É de uma tela do perfil (a tela inicial), não da área: as ações dele não viram um card na área de painéis. */
+	foraDaArea?: boolean;
 	/** Resumo do pedido para o botão na conversa. Sem ele, "Pedido" e o título do painel. */
 	resumir?(pedido: PedidoPendente): ResumoPedido;
 	/** Depois de responder, o modal continua aberto na revisão (o quiz mostra o retorno ali). */
@@ -190,14 +192,18 @@ export interface PropsAreaPaineis {
 /**
  * Ids da área de painéis: os do perfil e, depois, os que receberam ação sem
  * estar na lista. Os só de pedidos (soModal) ficam de fora: os pedidos são
- * respondidos no modal, pelo botão na conversa.
+ * respondidos no modal, pelo botão na conversa. Os de uma tela do perfil
+ * (foraDaArea) também.
  */
 export function idsDosPaineis(paineis: string[], acoesPorPainel: Record<string, unknown>, registro: RegistroPaineis = {}): string[] {
 	const ids = [...paineis];
 	for (const id of Object.keys(acoesPorPainel)) {
 		if (!ids.includes(id)) ids.push(id);
 	}
-	return ids.filter((id) => !entradaDoPainel(registro, id).soModal);
+	return ids.filter((id) => {
+		const entrada = entradaDoPainel(registro, id);
+		return !entrada.soModal && !entrada.foraDaArea;
+	});
 }
 
 const semCancelados: Record<string, MotivoCancelamento> = {};

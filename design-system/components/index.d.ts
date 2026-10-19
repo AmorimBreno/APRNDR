@@ -203,6 +203,8 @@ export interface SubjectWheelProps {
     /** Rótulo da linha extra no fim; false esconde. Padrão "Novo plano de estudos". */
     createLabel?: string | false;
     onCreate?: () => void;
+    /** Linha pequena acima do rótulo da linha extra. Padrão "Criar com o tutor". [estudos-ia] */
+    createKicker?: React.ReactNode;
     /** Linhas visíveis (ímpar). Padrão 5. */
     visibleRows?: number;
     /** Nome acessível da lista. Padrão "Cadernos". */

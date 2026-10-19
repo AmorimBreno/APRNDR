@@ -10,6 +10,7 @@ Arquivos novos:
 Mudanças no código (o TypeScript do projeto é estrito e usa verbatimModuleSyntax):
 - components/src/base.tsx, forms.tsx, lesson.tsx, nav.tsx, overlay.tsx: imports só de tipo marcados com `type` (Tone, IconName, OrnamentGlyph, FileItem).
 - components/src/util.ts: `cx` aceita também `0n`, porque o `error` dos campos é ReactNode e `error && ...` pode dar bigint. Linha marcada com [estudos-ia].
+- components/src/nav.tsx e components/index.d.ts: a SubjectWheel ganhou `createKicker`, a linha pequena acima do rótulo da linha de criar (o padrão continua "Criar com o tutor"). Na tela de cadernos a matéria nova é criada num modal, não com o tutor. Linhas marcadas com [estudos-ia]. O components/bundle.js não foi refeito: o app usa o src.
 
 Fora do pacote, também do estudos-ia: pnpm-workspace.yaml lista design-system.
 

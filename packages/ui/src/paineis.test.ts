@@ -11,4 +11,8 @@ describe("idsDosPaineis", () => {
 		const registro = { quiz: { componente: PainelGenerico, soModal: true } };
 		expect(idsDosPaineis(["quiz", "teste"], { quiz: [] }, registro)).toEqual(["teste"]);
 	});
+	it("os de uma tela do perfil também ficam de fora", () => {
+		const registro = { cadernos: { componente: PainelGenerico, foraDaArea: true } };
+		expect(idsDosPaineis(["teste"], { cadernos: [] }, registro)).toEqual(["teste"]);
+	});
 });

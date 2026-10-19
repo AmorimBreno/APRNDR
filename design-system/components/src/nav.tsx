@@ -60,6 +60,8 @@ export interface SubjectWheelProps {
   /** Rótulo da linha extra no fim; false esconde. Padrão "Novo plano de estudos". */
   createLabel?: string | false;
   onCreate?: () => void;
+  /** Linha pequena acima do rótulo da linha extra. Padrão "Criar com o tutor". [estudos-ia] */
+  createKicker?: React.ReactNode;
   /** Linhas visíveis (ímpar). Padrão 5. */
   visibleRows?: number;
   /** Nome acessível da lista. Padrão "Cadernos". */
@@ -82,13 +84,14 @@ export function SubjectWheel({
   onOpen,
   createLabel,
   onCreate,
+  createKicker = 'Criar com o tutor', // [estudos-ia]
   visibleRows = 5,
   label = 'Cadernos',
   openLabel = 'Abrir',
   className,
 }: SubjectWheelProps) {
   const all: SubjectItem[] =
-    createLabel === false ? items : [...items, { id: CREATE_ID, title: createLabel ?? 'Novo plano de estudos', kicker: 'Criar com o tutor' }];
+    createLabel === false ? items : [...items, { id: CREATE_ID, title: createLabel ?? 'Novo plano de estudos', kicker: createKicker }];
   const [inner, setInner] = React.useState<string | undefined>(defaultValue ?? all[0]?.id);
   const current = value ?? inner;
   const index = Math.max(0, all.findIndex((it) => it.id === current));

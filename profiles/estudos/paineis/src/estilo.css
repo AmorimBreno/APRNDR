@@ -19,3 +19,33 @@
 .carimbo { position: absolute; z-index: 2; top: -4px; right: 0; display: grid; place-items: center; width: 64px; height: 64px; border: 4px double var(--brick); border-radius: 6px; color: var(--brick); font-family: var(--font-ornament); font-size: 38px; line-height: 1; pointer-events: none; }
 .confete { position: fixed; z-index: 1100; width: 0; height: 0; pointer-events: none; }
 .confete__peca { position: absolute; left: 0; top: 0; border-radius: 1px; }
+
+/* ── Tela de cadernos (TelaCadernos.tsx): a roda de matérias na folha e o modal de matéria nova ── */
+.cadernos__abrindo { margin: 0; color: var(--on-paper-muted); }
+
+.nova-materia { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-6); }
+.nova-materia__campos { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
+.nova-materia__grupo { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; margin: 0; padding: 0; border: 0; }
+.nova-materia__grupo legend { margin-bottom: var(--space-2); padding: 0; color: var(--ink-muted); }
+.nova-materia__cores { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.nova-materia__cor { display: grid; place-items: center; padding: 6px; border: var(--border-control) solid transparent; border-radius: var(--radius-sm); background: transparent; cursor: pointer; transition: transform .36s var(--mola-viva, ease-out), border-color .16s ease-out; }
+.nova-materia__cor:hover { transform: translateY(-2px) rotate(-3deg); }
+.nova-materia__cor[aria-checked="true"] { border-color: var(--amber); }
+.nova-materia__glifos { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 4px; }
+.nova-materia__glifo { height: 40px; padding: 0; border: var(--border-hair) solid var(--line); border-radius: var(--radius-sm); background: transparent; color: var(--ink); font-family: var(--font-ornament); font-size: 18px; line-height: 1; cursor: pointer; transition: background-color .16s ease-out, color .16s ease-out, border-color .16s ease-out; }
+.nova-materia__glifo:hover { border-color: var(--ink-muted); }
+.nova-materia__glifo[aria-checked="true"] { border-color: var(--amber); background: var(--amber); color: var(--on-amber); }
+.nova-materia__cor:focus-visible, .nova-materia__glifo:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.nova-materia__prova { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: var(--space-3); align-items: start; }
+.nova-materia__capa { align-self: start; padding: var(--space-6) var(--space-2) 0; }
+.nova-materia__capa .ap-nb { transform: rotate(-5deg); }
+.nova-materia__erro { grid-column: 1 / -1; margin: 0; color: var(--brick-text); }
+
+@media (max-width: 640px) {
+	.nova-materia { grid-template-columns: minmax(0, 1fr); }
+	.nova-materia__capa { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+	.nova-materia__cor, .nova-materia__glifo { transition: none; }
+	.nova-materia__cor:hover { transform: none; }
+}

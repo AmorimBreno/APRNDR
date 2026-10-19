@@ -7,40 +7,9 @@
 import { mkdir, readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { acrescentarEvento, criarEvento } from "./eventos.ts";
+import { CORES_MATERIA, type CorMateria, type EntradaMateria, GLIFOS_MATERIA, type ListaMaterias, type Materia, type Prova } from "./materia-tipos.ts";
 
-/** Cores de capa (tokens do tema). Brick fica de fora: na lista, a linha escolhida já é tijolo. */
-export const CORES_MATERIA = ["moss", "amber", "steel", "ink", "cream", "sage"] as const;
-export type CorMateria = (typeof CORES_MATERIA)[number];
-
-/** Ideogramas da fonte de ornamento do design system (os únicos que ela tem). */
-export const GLIFOS_MATERIA = [
-	"学", "習", "学習", "知", "問", "答", "考", "解", "読", "書", "復習", "試験", "完", "独創", "新", "始", "終",
-	"一", "二", "三", "四", "五", "六", "七", "八", "九", "十",
-] as const;
-
-export interface Prova {
-	nome: string;
-	/** AAAA-MM-DD. */
-	data: string;
-}
-
-/** O materia.json. */
-export interface Materia {
-	id: string;
-	nome: string;
-	cor: CorMateria;
-	glifo: string;
-	provas: Prova[];
-	/** ISO 8601. */
-	criadaEm: string;
-}
-
-export interface EntradaMateria {
-	nome: string;
-	cor?: string;
-	glifo?: string;
-	provas?: Array<{ nome?: string; data?: string }>;
-}
+export { CORES_MATERIA, type CorMateria, type EntradaMateria, GLIFOS_MATERIA, type ListaMaterias, type Materia, type Prova } from "./materia-tipos.ts";
 
 export class ErroMaterias extends Error {
 	constructor(mensagem: string) {
@@ -121,12 +90,6 @@ export function validarEntrada(entrada: EntradaMateria): Omit<Materia, "id" | "c
 function ehMateria(valor: unknown): valor is Materia {
 	const materia = valor as Partial<Materia> | null;
 	return typeof materia?.id === "string" && typeof materia.nome === "string" && Array.isArray(materia.provas);
-}
-
-export interface ListaMaterias {
-	materias: Materia[];
-	/** Pastas em materias/ com materia.json faltando ou ilegível. */
-	erros: Array<{ pasta: string; mensagem: string }>;
 }
 
 /** As matérias da pasta de dados, na ordem de criação. */

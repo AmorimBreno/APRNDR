@@ -17,6 +17,7 @@ docs/teste-etapa-3.md — roteiro da Etapa 3: tema APRNDR, tela de perfis e de c
 docs/teste-etapa-4-1.md — roteiro do item 4.1: tela de cadernos, modal de matéria nova, arquivos na pasta de dados, ferramentas do professor e reiniciar
 docs/materiais.md — serviço de materiais do núcleo para quem escreve perfil: o campo materiais do profile.json, o .extraido, o índice, as ferramentas, os avisos materiais:pronto e materiais:removido e o envio pelo HTTP
 docs/teste-etapa-4-2.md — roteiro do item 4.2: modal de materiais, PDF com visão, .py e .ipynb, .extraido, eventos, professor buscando e citando, reprocessar, apagar e reiniciar
+docs/teste-etapa-4-3a.md — roteiro do item 4.3, parte A: entrar no caderno, índice, linha do tempo, seções em breve, materiais, editar, conversar e voltar
 docs/ponte-de-eventos.md — protocolo da ponte (interface:mostrar, pedido, resposta, acao) para quem escreve extensão de perfil
 docs/historico/ — documentos do checkpoint 1 (pi no WSL com tmux e Obsidian); só consulta
 
@@ -132,9 +133,13 @@ profiles/estudos/lib/materia-tipos.ts — tipos e listas de cor e ideograma das 
 profiles/estudos/lib/eventos.ts — eventos da seção 9.2: id ordenável, criarEvento e acrescentarEvento, a única função que escreve nos eventos.jsonl (só acrescenta)
 profiles/estudos/lib/materias.test.ts — testes das matérias e dos eventos numa pasta temporária
 profiles/estudos/paineis/ — @estudos/perfil-estudos: código de tela do perfil (o watcher do servidor ignora esta pasta; quem recarrega é o Vite)
-profiles/estudos/paineis/src/index.ts — tela inicial do perfil (cadernos) e registro dos painéis (cadernos = ponte da tela, fora da área; quiz = Questões: só modal, revisa ao responder, resumo "Questão")
-profiles/estudos/paineis/src/TelaCadernos.tsx — tela inicial do perfil de estudos: abre a sessão do perfil, lista as matérias na SubjectWheel com capas NotebookCover (com a contagem de materiais), modal "Nova matéria" (nome, cor, ideograma, prova), a tecla Materiais e a tecla para a conversa
-profiles/estudos/paineis/src/ModalMateriais.tsx — modal de materiais da matéria: FileDrop que envia para materias/<id>/materiais e a lista com a situação de cada arquivo (fila, etapa e barra, pronto com trechos e custo, erro, não suportado) e processar de novo
+profiles/estudos/paineis/src/TelaEstudos.tsx — tela inicial do perfil: guarda a sessão (um useJanelaPerfil) e escolhe a subtela pelo caminho ("" = cadernos, "caderno/<id>/<seção>" = caderno)
+profiles/estudos/paineis/src/TelaCaderno.tsx — caderno da matéria: aba tijolo (classes da CourseBar), índice das seções, linha do tempo dos eventos, seção Materiais e as seções que ainda não existem
+profiles/estudos/paineis/src/ModalMateria.tsx — modal de criar ou editar a matéria (nome, cor, ideograma, prova, capa de amostra)
+profiles/estudos/paineis/src/comum.ts — o painel "cadernos" da ponte, a leitura das ações da extensão e as contas de prova
+profiles/estudos/paineis/src/index.ts — tela inicial do perfil (TelaEstudos) e registro dos painéis (cadernos = ponte da tela, fora da área; quiz = Questões: só modal, revisa ao responder, resumo "Questão")
+profiles/estudos/paineis/src/TelaCadernos.tsx — tela inicial do perfil de estudos: abre a sessão do perfil, lista as matérias na SubjectWheel com capas NotebookCover (com a contagem de materiais), "Abrir" leva ao caderno, "Nova matéria" abre o ModalMateria, a tecla Materiais e a tecla para a conversa
+profiles/estudos/paineis/src/ModalMateriais.tsx — modal de materiais da matéria e o ConteudoMateriais (o mesmo conteúdo na seção Materiais do caderno): FileDrop que envia para materias/<id>/materiais e a lista com a situação de cada arquivo (fila, etapa e barra, pronto com trechos e custo, erro, não suportado) e processar de novo
 profiles/estudos/paineis/src/PainelQuiz.tsx — painel do quiz no modal: QuizQuestion (ou teclas marcáveis no multi-select), Não sei, nota, Pular; revisão com o gabarito e o QuizFeedback
 profiles/estudos/paineis/src/Comemoracao.tsx — a reação do quiz ao conferir: Carimbo 完, Confete de papel com gravidade e o tremido do erro
 profiles/estudos/paineis/src/estilo.css — estilos do painel do quiz e da tela de cadernos (modal de matéria nova)

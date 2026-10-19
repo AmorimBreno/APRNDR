@@ -22,6 +22,8 @@ export interface Manifesto {
 	arquivo: string;
 	hash: string;
 	tamanho: number;
+	/** Data de modificação do arquivo (ms): igual a esta e ao tamanho, o arquivo não mudou e nem precisa do hash. */
+	mtimeMs?: number;
 	tipo: TipoMaterial;
 	/** ISO 8601. */
 	extraidoEm: string;
@@ -55,7 +57,7 @@ export function corpoDoTrecho(conteudo: string): string {
  */
 export async function gravarExtraido(
 	pasta: string,
-	dados: { arquivo: string; hash: string; tamanho: number; extracao: Extracao; agora?: Date },
+	dados: { arquivo: string; hash: string; tamanho: number; mtimeMs?: number; extracao: Extracao; agora?: Date },
 ): Promise<Manifesto> {
 	await mkdir(pasta, { recursive: true });
 	const nomes = new Set<string>();
@@ -72,17 +74,23 @@ export async function gravarExtraido(
 		arquivo: dados.arquivo,
 		hash: dados.hash,
 		tamanho: dados.tamanho,
+		...(dados.mtimeMs === undefined ? {} : { mtimeMs: dados.mtimeMs }),
 		tipo: dados.extracao.tipo,
 		extraidoEm: (dados.agora ?? new Date()).toISOString(),
 		custo: dados.extracao.custo,
 		avisos: dados.extracao.avisos,
 		trechos: dados.extracao.trechos.map(({ texto: _texto, ...resto }) => resto),
 	};
+	await gravarManifesto(pasta, manifesto);
+	return manifesto;
+}
+
+/** Grava o manifesto de uma vez (escrito ao lado e renomeado). */
+export async function gravarManifesto(pasta: string, manifesto: Manifesto): Promise<void> {
 	const destino = join(pasta, ARQUIVO_MANIFESTO);
 	const temporario = `${destino}.${process.pid}.tmp`;
 	await writeFile(temporario, `${JSON.stringify(manifesto, null, "\t")}\n`, "utf8");
 	await rename(temporario, destino);
-	return manifesto;
 }
 
 /** O manifesto, ou undefined se não houver (ou estiver ilegível: o arquivo é processado de novo). */

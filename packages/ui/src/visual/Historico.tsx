@@ -2,13 +2,15 @@
 // gravadas, da mais recente para a mais antiga. A aberta fica marcada.
 //
 // Numa conversa com contexto (a de um caderno), a lista mostra só as conversas
-// daquele contexto; "Todas as conversas" mostra as outras também. Na lista com
-// tudo, cada conversa com contexto tem uma etiqueta com o rótulo dele (a matéria).
+// daquele contexto; o menu no topo da lista troca para "Todas as conversas" e
+// volta. Na lista com tudo, cada conversa com contexto tem uma etiqueta com o
+// rótulo dele (a matéria).
 
 import { Button, Tag } from "@estudos/design-system";
 import { motion } from "motion/react";
 import { useState } from "react";
 import type { ResumoSessao } from "../tipos.ts";
+import { MenuSuspenso } from "./MenuSuspenso.tsx";
 
 const dataHora = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
@@ -33,13 +35,35 @@ export function Historico(props: PropsHistorico) {
 	const { contexto } = props;
 	const filtrar = Boolean(contexto) && !todas;
 	const sessoes = filtrar ? props.sessoes.filter((sessao) => sessao.contexto?.chave === contexto?.chave) : props.sessoes;
-	const outras = props.sessoes.length - sessoes.length;
+	const doContexto = contexto ? props.sessoes.filter((sessao) => sessao.contexto?.chave === contexto.chave).length : 0;
+	const quantas = (numero: number) => `${numero} ${numero === 1 ? "conversa" : "conversas"}`;
 	return (
 		<nav className="historico" aria-label="Conversas">
 			<Button icon="plus" block onClick={props.novaSessao} disabled={props.desabilitado}>
 				Nova conversa
 			</Button>
-			<p className="historico__secao overline">{filtrar && contexto ? `Conversas de ${contexto.rotulo}` : "Conversas"}</p>
+			{contexto ? (
+				<MenuSuspenso
+					className="historico__menu"
+					classeBotao="historico__filtro"
+					opcoes={[
+						{ id: "contexto", titulo: contexto.rotulo, detalhe: quantas(doContexto) },
+						{ id: "todas", titulo: "Todas as conversas", detalhe: quantas(props.sessoes.length) },
+					]}
+					atual={todas ? "todas" : "contexto"}
+					escolher={(id) => setTodas(id === "todas")}
+					rotulo={`Mostrando ${todas ? "todas as conversas" : `as conversas de ${contexto.rotulo}`}. Trocar`}
+					rotuloMenu="Quais conversas mostrar"
+					conteudoBotao={
+						<>
+							<span className="overline">{todas ? "Conversas" : "Conversas de"}</span>
+							<span className="historico__filtro-valor body-strong">{todas ? "Todas" : contexto.rotulo}</span>
+						</>
+					}
+				/>
+			) : (
+				<p className="historico__secao overline">Conversas</p>
+			)}
 			{sessoes.length === 0 ? (
 				<p className="historico__vazio body-sm">
 					{filtrar && contexto
@@ -90,11 +114,6 @@ export function Historico(props: PropsHistorico) {
 					})}
 				</ul>
 			)}
-			{contexto && (todas || outras > 0) ? (
-				<button type="button" className="historico__alternar body-sm" onClick={() => setTodas((valor) => !valor)}>
-					{todas ? `Só as de ${contexto.rotulo}` : `Todas as conversas (mais ${outras})`}
-				</button>
-			) : null}
 		</nav>
 	);
 }

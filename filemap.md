@@ -65,7 +65,8 @@ packages/ui/src/visual/Avatares.tsx — AvatarAgente (a foto do profile.json rec
 packages/ui/src/visual/BarraPergunta.tsx — AskBar com a fila, o aviso de respondendo e o Parar (Enter durante a resposta põe na fila)
 packages/ui/src/visual/SeletorModelo.tsx — tecla de papel do modelo atual (abre o modal, por isso não tem cara de campo) e modal com busca no catálogo; os modelos do perfil primeiro
 packages/ui/src/visual/SeletorAgente.tsx — botão do agente na barra do topo com menu próprio no visual do menu do Callout (o select nativo abre com o visual do Windows); teclado completo
-packages/ui/src/visual/Historico.tsx — nova conversa e lista de sessões gravadas (a aberta marcada); numa conversa com contexto, só as do contexto, com "Todas as conversas" mostrando as outras com a etiqueta do contexto
+packages/ui/src/visual/Historico.tsx — nova conversa e lista de sessões gravadas (a aberta marcada); numa conversa com contexto, só as do contexto, e um menu no topo para mostrar todas (as outras com a etiqueta do contexto)
+packages/ui/src/visual/MenuSuspenso.tsx — menu suspenso de escolha única (botão e menu próprio no visual do Callout, com teclado); usado pelo seletor de agente e pelo filtro do histórico
 packages/ui/src/visual/movimento.ts — utilitários de movimento: semMovimento, comTransicao (View Transition, nas trocas de tela), iniciarVoo (a mensagem voando do campo até a nota) e morfar (a casca de cor do botão do pedido virando o modal)
 packages/ui/src/visual/rehype-palavras.ts — plugin que põe cada palavra num span enquanto a resposta chega, para as novas aparecerem com fade (código e fórmulas inteiros); e o teste
 packages/ui/src/visual/PainelPergunta.tsx — painel "pergunta" do ask_user_question, mostrado no modal: texto livre, uma escolha ou várias, sempre com Outra; Não responder cancela; revisão com a sua resposta

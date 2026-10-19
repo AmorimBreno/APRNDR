@@ -1,13 +1,12 @@
 // Histórico de sessões do perfil: a nova conversa no topo e as sessões
 // gravadas, da mais recente para a mais antiga, em duas seções que abrem e
 // fecham pela linha do título:
-// - "Outras conversas", em cima e fechada: as de outros contextos (numa
-//   conversa de caderno, as das outras matérias e as gerais; na conversa geral,
-//   as dos cadernos), cada uma com uma etiqueta com o rótulo do contexto;
-// - a seção da conversa aberta, aberta: as do mesmo contexto (as do caderno,
-//   ou as gerais).
-// A seção de outras fica em cima para a linha dela estar sempre à mão, sem
-// rolar a lista. A aberta fica marcada.
+// - primeiro, aberta, a da conversa aberta: as do mesmo contexto (as do
+//   caderno, ou as gerais), que são o foco;
+// - depois, fechada, "Outras conversas": as de outros contextos (numa conversa
+//   de caderno, as das outras matérias e as gerais; na conversa geral, as dos
+//   cadernos), cada uma com uma etiqueta com o rótulo do contexto.
+// A aberta fica marcada.
 
 import { Button, Icon, Tag } from "@estudos/design-system";
 import { AnimatePresence, motion } from "motion/react";
@@ -44,16 +43,6 @@ export function Historico(props: PropsHistorico) {
 			<Button icon="plus" block onClick={props.novaSessao} disabled={props.desabilitado}>
 				Nova conversa
 			</Button>
-			{outras.length > 0 ? (
-				<SecaoHistorico
-					{...props}
-					titulo="Outras conversas"
-					sessoes={outras}
-					aberta={verOutras}
-					alternar={() => setVerOutras((valor) => !valor)}
-					comEtiqueta
-				/>
-			) : null}
 			<SecaoHistorico
 				{...props}
 				titulo={contexto ? `Conversas de ${contexto.rotulo}` : "Conversas"}
@@ -66,6 +55,16 @@ export function Historico(props: PropsHistorico) {
 						: "Nenhuma conversa gravada ainda. Ela aparece aqui depois da primeira mensagem."
 				}
 			/>
+			{outras.length > 0 ? (
+				<SecaoHistorico
+					{...props}
+					titulo="Outras conversas"
+					sessoes={outras}
+					aberta={verOutras}
+					alternar={() => setVerOutras((valor) => !valor)}
+					comEtiqueta
+				/>
+			) : null}
 		</nav>
 	);
 }

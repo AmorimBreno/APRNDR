@@ -60,10 +60,24 @@ export interface ContextoSessao {
 	chave: string;
 	/** Nome para mostrar ("Cálculo I"). */
 	rotulo: string;
+	/** Cor do tema para mostrar o contexto (um token: moss, amber, steel, ink…); a interface pinta a etiqueta com ela. */
+	cor?: string;
 	/** Texto a mais no prompt de sistema, escrito pelo perfil. */
 	instrucoes?: string;
 	/** Pasta da pasta de dados que limita a busca nos materiais ("materias/calculo-i"). */
 	escopoMateriais?: string;
+}
+
+/** O que a interface mostra do contexto (sem as instruções e o escopo). */
+export interface ResumoContexto {
+	chave: string;
+	rotulo: string;
+	cor?: string;
+}
+
+/** O resumo do contexto para a interface. */
+export function resumirContexto(contexto: ContextoSessao): ResumoContexto {
+	return { chave: contexto.chave, rotulo: contexto.rotulo, ...(contexto.cor ? { cor: contexto.cor } : {}) };
 }
 
 /** customType da entrada que liga uma sessão filha à sessão e à chamada subagent que a criaram. */
@@ -107,7 +121,7 @@ export interface ResumoSessao {
 	/** Agente gravado na sessão (o último, se houve troca). */
 	agente?: string;
 	/** O assunto da sessão, se ela tiver um (sem as instruções). */
-	contexto?: { chave: string; rotulo: string };
+	contexto?: ResumoContexto;
 	mensagens: number;
 }
 
@@ -276,6 +290,7 @@ function contextoDaEntrada(entrada: { type?: unknown; customType?: unknown; data
 	return {
 		chave: dados.chave,
 		rotulo: dados.rotulo,
+		...(typeof dados.cor === "string" ? { cor: dados.cor } : {}),
 		...(typeof dados.instrucoes === "string" ? { instrucoes: dados.instrucoes } : {}),
 		...(typeof dados.escopoMateriais === "string" ? { escopoMateriais: dados.escopoMateriais } : {}),
 	};
@@ -337,7 +352,7 @@ export async function listarSessoes(perfil: Pick<Perfil, "pastaDados">): Promise
 				modificadaEm: info.modified.toISOString(),
 				titulo: titulo || "(sem mensagens)",
 				...(agente ? { agente } : {}),
-				...(contexto ? { contexto: { chave: contexto.chave, rotulo: contexto.rotulo } } : {}),
+				...(contexto ? { contexto: resumirContexto(contexto) } : {}),
 				mensagens: info.messageCount,
 			};
 		}),

@@ -66,6 +66,7 @@ import {
 	agenteGravado,
 	type ContextoSessao,
 	contextoGravado,
+	resumirContexto,
 	ErroSessao,
 	type FabricaExtensoesNucleo,
 	agentesPorMomento,
@@ -332,11 +333,15 @@ export class JanelaPerfil {
 		return listarSessoes(this.perfilAtual);
 	}
 
-	/** Abre uma sessão gravada (com o agente e o modelo dela). Interrompe a resposta em andamento. */
-	abrirSessao(id: string): Promise<EstadoSessao> {
+	/**
+	 * Abre uma sessão gravada (com o agente e o modelo dela). Com `contexto`, ele
+	 * é gravado na sessão se mudou (a matéria ganhou outro nome ou outra cor
+	 * desde a conversa); sem ele, vale o gravado. Interrompe a resposta em andamento.
+	 */
+	abrirSessao(id: string, contexto?: ContextoSessao): Promise<EstadoSessao> {
 		return this.emOrdem(async () => {
 			const gerente = this.abrirGerente(id);
-			return this.trocarSessao(gerente, { modelo: "sessao" }, "resume");
+			return this.trocarSessao(gerente, { modelo: "sessao", ...(contexto ? { contexto } : {}) }, "resume");
 		});
 	}
 
@@ -726,7 +731,7 @@ export class JanelaPerfil {
 			ferramentas: sessao.getActiveToolNames(),
 			skills: sessao.resourceLoader.getSkills().skills.map((skill) => skill.name),
 			diagnosticos: [...this.diagnosticos],
-			...(this.contextoAtual ? { contexto: { chave: this.contextoAtual.chave, rotulo: this.contextoAtual.rotulo } } : {}),
+			...(this.contextoAtual ? { contexto: resumirContexto(this.contextoAtual) } : {}),
 		};
 		this.estadoAtual = estado;
 		this.emitir({ tipo: "estado_sessao", estado });

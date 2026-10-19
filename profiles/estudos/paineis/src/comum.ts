@@ -86,6 +86,7 @@ export function contextoDaMateria(materia: Materia): ContextoSessao {
 	return {
 		chave: `materia:${materia.id}`,
 		rotulo: materia.nome,
+		cor: materia.cor,
 		instrucoes: [
 			`Esta conversa é do caderno da matéria ${materia.nome} (pasta materias/${materia.id} da pasta de dados).`,
 			"Quando o Breno falar da matéria, da aula, dos slides ou da prova, é desta.",
@@ -105,9 +106,11 @@ export function contextoDaMateria(materia: Materia): ContextoSessao {
 export async function prepararConversa(janela: JanelaPerfilHook, perfilId: string, contexto: ContextoSessao | null): Promise<void> {
 	const { estado, acoes } = janela;
 	const chave = contexto?.chave;
-	if (estado.sessao && estado.sessao.contexto?.chave === chave) return;
+	const atual = estado.sessao?.contexto;
+	if (estado.sessao && atual?.chave === chave && atual?.rotulo === contexto?.rotulo && atual?.cor === contexto?.cor) return;
 	const sessoes = await acoes.listarSessoes();
 	const ultima = sessoes.find((sessao) => sessao.contexto?.chave === chave);
-	const aberta = ultima ? await acoes.abrirSessao(ultima.id) : await acoes.novaSessao(undefined, contexto);
+	// Reabrindo, o contexto vai junto: se a matéria mudou de nome ou de cor, a conversa acompanha.
+	const aberta = ultima ? await acoes.abrirSessao(ultima.id, contexto ?? undefined) : await acoes.novaSessao(undefined, contexto);
 	guardarSessaoDoPerfil(perfilId, aberta.sessaoId);
 }

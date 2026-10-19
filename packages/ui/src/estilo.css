@@ -225,8 +225,16 @@ a.linha:hover .linha__texto .overline, a.linha:focus-visible .linha__texto .over
 .historico__item--atual, .historico__item--atual:hover { background: transparent; cursor: default; }
 .historico__marca { position: absolute; inset: calc(var(--border-control) * -1); z-index: 0; border: var(--border-control) solid var(--amber); border-radius: var(--radius-md); background: var(--amber-tint); }
 .historico__titulo, .historico__meta, .historico__etiqueta { position: relative; z-index: 1; }
-/* A matéria (o contexto) da conversa, em cima do título, quando a lista mistura assuntos. */
+/* O contexto da conversa (a matéria), em cima do título: a pílula no fundo da cor do caderno. */
 .historico__etiqueta { align-self: flex-start; max-width: 100%; margin-bottom: 4px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ap-tag.historico__etiqueta--moss { --ap-tag-bg: var(--moss); --ap-tag-line: var(--moss); --ap-tag-ink: var(--on-moss); }
+.ap-tag.historico__etiqueta--amber { --ap-tag-bg: var(--amber); --ap-tag-line: var(--amber); --ap-tag-ink: var(--on-amber); }
+.ap-tag.historico__etiqueta--steel { --ap-tag-bg: var(--steel); --ap-tag-line: var(--steel); --ap-tag-ink: var(--on-steel); }
+.ap-tag.historico__etiqueta--cream { --ap-tag-bg: var(--cream); --ap-tag-line: var(--cream); --ap-tag-ink: var(--on-cream); }
+.ap-tag.historico__etiqueta--sage { --ap-tag-bg: var(--sage); --ap-tag-line: var(--sage); --ap-tag-ink: var(--on-sage); }
+.ap-tag.historico__etiqueta--brick { --ap-tag-bg: var(--brick); --ap-tag-line: var(--brick); --ap-tag-ink: var(--on-brick); }
+/* Tinta é quase o fundo do app: a pílula ganha o contorno forte para não sumir, como a capa tinta tem a faixa tijolo. */
+.ap-tag.historico__etiqueta--ink { --ap-tag-bg: var(--ink-inverse); --ap-tag-line: var(--line-strong); --ap-tag-ink: var(--paper); }
 /* As seções do histórico (outras conversas e as do contexto): a linha do título abre e fecha a lista. */
 .historico__secao-grupo { display: flex; flex-direction: column; }
 .historico__cabeca { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: var(--space-2); width: 100%; margin-top: var(--space-2); padding: 6px var(--space-1) 6px 0; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink-muted); text-align: left; cursor: pointer; transition: color .12s ease-out; }

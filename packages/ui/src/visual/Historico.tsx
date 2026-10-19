@@ -5,8 +5,9 @@
 //   caderno, ou as gerais), que são o foco;
 // - depois, fechada, "Outras conversas": as de outros contextos (numa conversa
 //   de caderno, as das outras matérias e as gerais; na conversa geral, as dos
-//   cadernos), cada uma com uma etiqueta com o rótulo do contexto.
-// A aberta fica marcada.
+//   cadernos).
+// Toda conversa com contexto tem uma pílula com o rótulo dele, no fundo da cor
+// do contexto (a cor do caderno). A aberta fica marcada.
 
 import { Button, Icon, Tag } from "@estudos/design-system";
 import { AnimatePresence, motion } from "motion/react";
@@ -62,7 +63,6 @@ export function Historico(props: PropsHistorico) {
 					sessoes={outras}
 					aberta={verOutras}
 					alternar={() => setVerOutras((valor) => !valor)}
-					comEtiqueta
 				/>
 			) : null}
 		</nav>
@@ -74,8 +74,6 @@ interface PropsSecao extends Omit<PropsHistorico, "sessoes"> {
 	sessoes: ResumoSessao[];
 	aberta: boolean;
 	alternar(): void;
-	/** Mostra a etiqueta do contexto de cada conversa (a seção mistura assuntos). */
-	comEtiqueta?: boolean;
 	/** Texto da seção aberta sem conversas. */
 	vazio?: string;
 }
@@ -109,7 +107,6 @@ function SecaoHistorico(props: PropsSecao) {
 										key={sessao.id}
 										sessao={sessao}
 										indice={indice}
-										comEtiqueta={props.comEtiqueta}
 										{...(props.atual ? { atual: props.atual } : {})}
 										{...(props.desabilitado ? { desabilitado: true } : {})}
 										abrirSessao={props.abrirSessao}
@@ -124,11 +121,15 @@ function SecaoHistorico(props: PropsSecao) {
 	);
 }
 
-function ItemHistorico(props: { sessao: ResumoSessao; indice: number; comEtiqueta?: boolean | undefined } & Pick<PropsHistorico, "atual" | "desabilitado" | "abrirSessao">) {
+/** Cores do tema que a pílula sabe pintar; outra cor vira a pílula só de contorno. */
+const CORES_PILULA = new Set(["moss", "amber", "steel", "ink", "cream", "sage", "brick"]);
+
+function ItemHistorico(props: { sessao: ResumoSessao; indice: number } & Pick<PropsHistorico, "atual" | "desabilitado" | "abrirSessao">) {
 	const { sessao } = props;
 	const atual = sessao.id === props.atual;
 	const meta = [formatarData(sessao.modificadaEm), `${sessao.mensagens} mensagens`, sessao.agente].filter(Boolean).join(" · ");
-	const etiqueta = props.comEtiqueta ? sessao.contexto?.rotulo : undefined;
+	const contexto = sessao.contexto;
+	const cor = contexto?.cor && CORES_PILULA.has(contexto.cor) ? contexto.cor : undefined;
 	return (
 		<motion.li
 			initial={{ opacity: 0, x: -12 }}
@@ -146,9 +147,9 @@ function ItemHistorico(props: { sessao: ResumoSessao; indice: number; comEtiquet
 			>
 				{/* A marca da conversa aberta desliza de um item para o outro (layoutId). */}
 				{atual ? <motion.span layoutId="historico-atual" className="historico__marca" transition={{ type: "spring", stiffness: 420, damping: 32 }} /> : null}
-				{etiqueta ? (
-					<Tag size="sm" tone="outline" icon="notebook" className="historico__etiqueta" title={etiqueta}>
-						{etiqueta}
+				{contexto ? (
+					<Tag size="sm" tone="outline" icon="notebook" className={`historico__etiqueta${cor ? ` historico__etiqueta--${cor}` : ""}`} title={contexto.rotulo}>
+						{contexto.rotulo}
 					</Tag>
 				) : null}
 				<span className="historico__titulo body-strong">{sessao.titulo || "Sem título"}</span>

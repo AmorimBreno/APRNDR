@@ -27,6 +27,7 @@ describe("mensagens válidas do cliente", () => {
 		{ tipo: "listar_materiais", perfil: "estudos" },
 		{ tipo: "nova_sessao", perfil: "estudos", contexto: { chave: "materia:x", rotulo: "X", instrucoes: "Do caderno X.", escopoMateriais: "materias/x" } },
 		{ tipo: "nova_sessao", perfil: "estudos", contexto: null },
+		{ tipo: "abrir_sessao", perfil: "estudos", sessaoId: "s1", contexto: { chave: "materia:x", rotulo: "X", cor: "ink" } },
 		{ tipo: "reprocessar_material", perfil: "estudos", caminho: "materias/x/materiais/a.pdf" },
 	];
 
@@ -68,6 +69,7 @@ describe("mensagens inválidas do cliente", () => {
 			expect(validarMensagemCliente({ tipo: "nova_sessao", perfil: "estudos", contexto: { chave: "a", rotulo: "A", escopoMateriais } }).ok).toBe(false);
 		}
 		expect(validarMensagemCliente({ tipo: "nova_sessao", perfil: "estudos", contexto: { chave: "", rotulo: "A" } }).ok).toBe(false);
+		expect(validarMensagemCliente({ tipo: "nova_sessao", perfil: "estudos", contexto: { chave: "a", rotulo: "A", cor: "#fff" } }).ok).toBe(false);
 	});
 
 	it("recusa o que não é objeto", () => {

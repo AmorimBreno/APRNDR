@@ -222,14 +222,14 @@ describe("JanelaPerfil sem rede", () => {
 		const geral = await janela.iniciar();
 		expect(geral.contexto).toBeUndefined();
 
-		const contexto = { chave: "materia:calculo", rotulo: "Cálculo", instrucoes: "Esta conversa é do caderno de Cálculo.", escopoMateriais: "materias/calculo" };
+		const contexto = { chave: "materia:calculo", rotulo: "Cálculo", cor: "moss", instrucoes: "Esta conversa é do caderno de Cálculo.", escopoMateriais: "materias/calculo" };
 		const doCaderno = await janela.novaSessao(undefined, contexto);
-		expect(doCaderno.contexto).toEqual({ chave: "materia:calculo", rotulo: "Cálculo" });
+		expect(doCaderno.contexto).toEqual({ chave: "materia:calculo", rotulo: "Cálculo", cor: "moss" });
 		expect(janela.promptSistema).toContain("Esta conversa é do caderno de Cálculo.");
 
 		// Conversa nova dentro do caderno continua no caderno; trocar de agente também.
-		expect((await janela.novaSessao()).contexto).toEqual({ chave: "materia:calculo", rotulo: "Cálculo" });
-		expect((await janela.trocarAgente("outro")).contexto).toEqual({ chave: "materia:calculo", rotulo: "Cálculo" });
+		expect((await janela.novaSessao()).contexto).toEqual({ chave: "materia:calculo", rotulo: "Cálculo", cor: "moss" });
+		expect((await janela.trocarAgente("outro")).contexto).toEqual({ chave: "materia:calculo", rotulo: "Cálculo", cor: "moss" });
 		expect(janela.promptSistema).toContain("Esta conversa é do caderno de Cálculo.");
 
 		// null = conversa geral.
@@ -239,10 +239,21 @@ describe("JanelaPerfil sem rede", () => {
 
 		// Gravado na sessão: volta ao reabrir e aparece na lista.
 		const id = "01a10000-0000-7000-8000-0000000000bb";
-		await gravarSessao(id, "geral", contexto);
-		expect((await janela.abrirSessao(id)).contexto).toEqual({ chave: "materia:calculo", rotulo: "Cálculo" });
+		const arquivo = await gravarSessao(id, "geral", contexto);
+		expect((await janela.abrirSessao(id)).contexto).toEqual({ chave: "materia:calculo", rotulo: "Cálculo", cor: "moss" });
 		expect(janela.promptSistema).toContain("Esta conversa é do caderno de Cálculo.");
-		expect((await janela.listarSessoes()).find((sessao) => sessao.id === id)?.contexto).toEqual({ chave: "materia:calculo", rotulo: "Cálculo" });
+		expect((await janela.listarSessoes()).find((sessao) => sessao.id === id)?.contexto).toEqual({ chave: "materia:calculo", rotulo: "Cálculo", cor: "moss" });
+
+		// Reabrir com o contexto de agora (a matéria mudou de nome e de cor) grava o novo na sessão.
+		const mudado = { ...contexto, rotulo: "Cálculo I", cor: "amber", instrucoes: "Esta conversa é do caderno de Cálculo I." };
+		expect((await janela.abrirSessao(id, mudado)).contexto).toEqual({ chave: "materia:calculo", rotulo: "Cálculo I", cor: "amber" });
+		expect(janela.promptSistema).toContain("caderno de Cálculo I.");
+		expect(await readFile(arquivo, "utf8")).toContain('"rotulo":"Cálculo I"');
+		expect((await janela.listarSessoes()).find((sessao) => sessao.id === id)?.contexto).toEqual({ chave: "materia:calculo", rotulo: "Cálculo I", cor: "amber" });
+		// Reabrir com o mesmo contexto não grava outra entrada.
+		const linhas = (await readFile(arquivo, "utf8")).split("nucleo.contexto").length;
+		await janela.abrirSessao(id, mudado);
+		expect((await readFile(arquivo, "utf8")).split("nucleo.contexto").length).toBe(linhas);
 	});
 
 	it("ponte: mostrar, pedido e resposta, cancelamento e ação da interface", async () => {

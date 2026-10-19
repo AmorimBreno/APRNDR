@@ -20,7 +20,8 @@ export interface AcoesJanela {
 	trocarAgente(agente: string): Promise<EstadoSessao>;
 	/** contexto: o assunto da sessão nova; null = sem contexto; sem ele = o da sessão atual. */
 	novaSessao(agente?: string, contexto?: ContextoSessao | null): Promise<EstadoSessao>;
-	abrirSessao(sessaoId: string): Promise<EstadoSessao>;
+	/** contexto: atualiza o gravado na sessão, se mudou. */
+	abrirSessao(sessaoId: string, contexto?: ContextoSessao): Promise<EstadoSessao>;
 	listarSessoes(): Promise<ResumoSessao[]>;
 	listarModelos(): Promise<InfoModelo[]>;
 	recarregarPerfil(): Promise<EstadoSessao>;
@@ -160,7 +161,7 @@ export function useJanelaPerfil(perfilId: string, cliente: ClienteConexao = obte
 			trocarModelo: (modelo) => pedir({ tipo: "trocar_modelo", perfil, modelo }),
 			trocarAgente: (agente) => pedir({ tipo: "trocar_agente", perfil, agente }),
 			novaSessao: (agente, contexto) => pedir({ tipo: "nova_sessao", perfil, ...(agente ? { agente } : {}), ...(contexto === undefined ? {} : { contexto }) }),
-			abrirSessao: (sessaoId) => pedir({ tipo: "abrir_sessao", perfil, sessaoId }),
+			abrirSessao: (sessaoId, contexto) => pedir({ tipo: "abrir_sessao", perfil, sessaoId, ...(contexto ? { contexto } : {}) }),
 			listarSessoes: () => pedir({ tipo: "listar_sessoes", perfil }),
 			listarModelos: () => pedir({ tipo: "listar_modelos", perfil }),
 			recarregarPerfil: () => pedir({ tipo: "recarregar_perfil", perfil }),

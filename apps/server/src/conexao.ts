@@ -77,7 +77,7 @@ async function executar(janelas: Janelas, conexao: Conexao, mensagem: MensagemCl
 		case "nova_sessao":
 			return janelas.remontar(mensagem.perfil, "Criando uma sessão nova...", (janela) => janela.novaSessao(mensagem.agente, mensagem.contexto));
 		case "abrir_sessao":
-			return janelas.remontar(mensagem.perfil, "Abrindo a sessão...", (janela) => janela.abrirSessao(mensagem.sessaoId));
+			return janelas.remontar(mensagem.perfil, "Abrindo a sessão...", (janela) => janela.abrirSessao(mensagem.sessaoId, mensagem.contexto));
 		case "listar_sessoes":
 			return janelas.sessoes(mensagem.perfil);
 		case "listar_modelos":

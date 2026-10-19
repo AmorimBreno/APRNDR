@@ -6,6 +6,7 @@ import { readFile, readdir, stat } from "node:fs/promises";
 import { basename, isAbsolute, join, resolve } from "node:path";
 import { z } from "zod";
 import { lerAgente, type DefinicaoAgente } from "./agentes.ts";
+import type { ConfigMateriais } from "./materiais/tipos.ts";
 
 const caminhoRelativo = z
 	.string()
@@ -49,6 +50,18 @@ export const esquemaAparencia = z.strictObject({
 	glifo: z.string().min(1).max(4).optional(),
 });
 
+/** Uma pasta da pasta de dados, com barras normais e * para um nível ("materias/*\/materiais"). */
+const pastaObservada = z
+	.string()
+	.min(1)
+	.refine((valor) => !isAbsolute(valor) && !valor.includes("\\") && !valor.split("/").includes(".."), "use um caminho relativo à pasta de dados, com barras normais e sem ..");
+
+export const esquemaMateriais = z.strictObject({
+	pastas: z.array(pastaObservada).min(1),
+	/** Modelo com visão (provedor/id) para as páginas visuais. */
+	modeloVisao: z.string().min(1).optional(),
+});
+
 export const esquemaPerfil = z.strictObject({
 	id: z.string().regex(/^[a-z0-9][a-z0-9-]*$/, "use só letras minúsculas, números e hífen"),
 	nome: z.string().min(1),
@@ -69,6 +82,8 @@ export const esquemaPerfil = z.strictObject({
 	/** Identificadores dos painéis que a janela do perfil usa. */
 	paineis: z.array(z.string().min(1)),
 	aparencia: esquemaAparencia.optional(),
+	/** Serviço de materiais (materiais/servico.ts): pastas observadas na pasta de dados e o modelo com visão. */
+	materiais: esquemaMateriais.optional(),
 });
 
 export type ProfileJson = z.infer<typeof esquemaPerfil>;
@@ -104,6 +119,8 @@ export interface Perfil {
 	paineis: string[];
 	/** Aparência na tela de perfis; a capa com caminho absoluto. */
 	aparencia: Aparencia;
+	/** Serviço de materiais; sem ele, o perfil não tem materiais. */
+	materiais?: ConfigMateriais;
 }
 
 export interface Aparencia {
@@ -240,6 +257,7 @@ export async function lerPerfil(pasta: string): Promise<Perfil> {
 		extensoesSubagentes,
 		paineis: json.paineis,
 		aparencia,
+		...(json.materiais ? { materiais: json.materiais } : {}),
 	};
 }
 

@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { type ClienteConexao, type EstadoConexao, ErroPedido, obterCliente, type PedidoCliente } from "./cliente.ts";
 import { type EstadoJanela, estadoInicial, reduzirJanela } from "./estado-janela.ts";
-import type { DadosResposta, EstadoSessao, InfoModelo, ResumoSessao } from "./tipos.ts";
+import type { DadosResposta, EstadoSessao, InfoModelo, ResumoSessao, SituacaoMaterial } from "./tipos.ts";
 
 export interface AcoesJanela {
 	/** "iniciada" ou "enfileirada" (a sessão estava respondendo). */
@@ -29,6 +29,12 @@ export interface AcoesJanela {
 	cancelarPedido(id: string): Promise<boolean>;
 	/** Ação feita num painel; vira "interface:acao" na sessão. */
 	acaoDaInterface(painel: string, acao: string, dados?: unknown): Promise<void>;
+	/** Pede a situação dos materiais (vai para estado.materiais; as mudanças chegam sozinhas depois). */
+	listarMateriais(): Promise<SituacaoMaterial[]>;
+	/** Manda arquivos para uma pasta de materiais do perfil (relativa à pasta de dados). Devolve os caminhos gravados. */
+	enviarMateriais(pasta: string, arquivos: readonly File[]): Promise<string[]>;
+	/** Processa um material de novo do zero. */
+	reprocessarMaterial(caminho: string): Promise<void>;
 	limparErros(): void;
 	fecharAvisoRecarregado(): void;
 }
@@ -160,6 +166,19 @@ export function useJanelaPerfil(perfilId: string, cliente: ClienteConexao = obte
 			},
 			acaoDaInterface: async (painel, acao, dados) => {
 				await pedir({ tipo: "acao_interface", perfil, painel, acao, ...(dados === undefined ? {} : { dados }) });
+			},
+			listarMateriais: () => pedir({ tipo: "listar_materiais", perfil }),
+			enviarMateriais: async (pasta, arquivos) => {
+				const corpo = new FormData();
+				corpo.append("pasta", pasta);
+				for (const arquivo of arquivos) corpo.append("arquivos", arquivo, arquivo.name);
+				const resposta = await fetch(`/api/perfis/${encodeURIComponent(perfil)}/materiais`, { method: "POST", body: corpo });
+				const dados = (await resposta.json().catch(() => ({}))) as { ok?: boolean; gravados?: string[]; erro?: string };
+				if (!resposta.ok || !dados.ok) throw new Error(dados.erro ?? `O servidor respondeu ${resposta.status}.`);
+				return dados.gravados ?? [];
+			},
+			reprocessarMaterial: async (caminho) => {
+				await pedir({ tipo: "reprocessar_material", perfil, caminho });
 			},
 			limparErros: () => despachar({ tipo: "local:limpar_erros" }),
 			fecharAvisoRecarregado: () => despachar({ tipo: "local:fechar_aviso_recarregado" }),

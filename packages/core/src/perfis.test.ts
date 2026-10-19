@@ -36,6 +36,7 @@ describe("perfil estudos real", () => {
 			lema: "Entender antes de decorar",
 			glifo: "学習",
 		});
+		expect(perfil.materiais).toEqual({ pastas: ["materias/*/materiais"], modeloVisao: "openrouter/anthropic/claude-sonnet-5.5" });
 	});
 
 	it("os quatro agentes têm nome, papel e modelo certos", async () => {
@@ -84,6 +85,15 @@ describe("profile.json inválido", () => {
 		expect(validarProfileJson({ ...valido, aparencia: { cor: "moss", lema: "Oi" } }, "x").aparencia).toEqual({ cor: "moss", lema: "Oi" });
 		expect(() => validarProfileJson({ ...valido, aparencia: { capa: "capa.txt" } }, "x")).toThrow(/use uma imagem/);
 		expect(() => validarProfileJson({ ...valido, aparencia: { cor: "roxo" } }, "x")).toThrow(/aparencia/);
+	});
+
+	it("materiais é opcional; as pastas são relativas à pasta de dados, com barras normais e sem ..", () => {
+		expect(validarProfileJson(valido, "x").materiais).toBeUndefined();
+		expect(validarProfileJson({ ...valido, materiais: { pastas: ["materias/*/materiais"] } }, "x").materiais).toEqual({ pastas: ["materias/*/materiais"] });
+		for (const pasta of [resolve("/m"), "materias\\x","materias/../fora"]) {
+			expect(() => validarProfileJson({ ...valido, materiais: { pastas: [pasta] } }, "x")).toThrow(/materiais/);
+		}
+		expect(() => validarProfileJson({ ...valido, materiais: { pastas: [] } }, "x")).toThrow(/materiais/);
 	});
 
 	it("extensoesSubagentes é opcional e aceita só caminhos relativos", () => {

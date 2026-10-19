@@ -121,6 +121,17 @@ class JanelaFalsa implements JanelaDoServidor {
 	acaoDaInterface(painel: string, acao: string) {
 		this.chamadas.push(`acao ${painel} ${acao}`);
 	}
+	materiais() {
+		return [{ caminho: "m/a/materiais/x.md", pasta: "m/a/materiais", nome: "x.md", tipo: "texto" as const, estado: "pronto" as const, tamanho: 3 }];
+	}
+	async adicionarMateriais(pasta: string, arquivos: Array<{ nome: string; dados: Uint8Array }>) {
+		this.chamadas.push(`adicionarMateriais ${pasta} ${arquivos.map((arquivo) => `${arquivo.nome}:${new TextDecoder().decode(arquivo.dados)}`).join(",")}`);
+		if (pasta === "fora") throw new Error("não é uma pasta de materiais");
+		return arquivos.map((arquivo) => `${pasta}/${arquivo.nome}`);
+	}
+	async reprocessarMaterial(caminho: string) {
+		this.chamadas.push(`reprocessar ${caminho}`);
+	}
 	async descartar() {
 		this.chamadas.push("descartar");
 	}
@@ -210,6 +221,26 @@ describe("rotas HTTP", () => {
 		expect(await resposta.text()).toContain("<svg");
 		expect((await app.request("/api/perfis/quebrado/capa")).status).toBe(404);
 		expect((await app.request("/api/perfis/nada/capa")).status).toBe(404);
+	});
+
+	it("POST /api/perfis/:id/materiais grava os arquivos pela janela aberta; sem pasta, sem arquivo ou fora das pastas dá 400", async () => {
+		const app = criarApp(janelas, logMudo, "1");
+		await janelas.abrirPerfil(new ConexaoFalsa(1), { perfil: "teste" });
+		const formulario = (pastaDestino?: string, nomes: string[] = ["a.md", "b.py"]) => {
+			const corpo = new FormData();
+			if (pastaDestino) corpo.append("pasta", pastaDestino);
+			for (const nome of nomes) corpo.append("arquivos", new File([`conteudo de ${nome}`], nome));
+			return { method: "POST", body: corpo };
+		};
+		const resposta = await app.request("/api/perfis/teste/materiais", formulario("m/a/materiais"));
+		expect(resposta.status).toBe(200);
+		expect(await resposta.json()).toEqual({ ok: true, gravados: ["m/a/materiais/a.md", "m/a/materiais/b.py"] });
+		expect(falsas[0]!.chamadas).toContain("adicionarMateriais m/a/materiais a.md:conteudo de a.md,b.py:conteudo de b.py");
+		expect((await app.request("/api/perfis/teste/materiais", formulario())).status).toBe(400);
+		expect((await app.request("/api/perfis/teste/materiais", formulario("m/a/materiais", []))).status).toBe(400);
+		const fora = await app.request("/api/perfis/teste/materiais", formulario("fora"));
+		expect(fora.status).toBe(400);
+		expect(await fora.json()).toEqual({ ok: false, erro: "não é uma pasta de materiais" });
 	});
 
 	it("GET /api/perfis/:id/sessoes lista as sessões (nenhuma) e dá 404 para perfil desconhecido", async () => {
@@ -315,6 +346,11 @@ describe("mensagens do WebSocket", () => {
 		expect(conexao.ultima()).toEqual({ tipo: "resposta", pedido: "acao_interface", ok: true });
 		await enviar(conexao, { tipo: "listar_sessoes", perfil: "teste" });
 		expect(conexao.ultima()).toMatchObject({ ok: true, dados: [] });
+		await enviar(conexao, { tipo: "listar_materiais", perfil: "teste" });
+		expect(conexao.ultima()).toMatchObject({ ok: true, dados: [{ caminho: "m/a/materiais/x.md", estado: "pronto" }] });
+		await enviar(conexao, { tipo: "reprocessar_material", perfil: "teste", caminho: "m/a/materiais/x.md" });
+		expect(conexao.ultima()).toEqual({ tipo: "resposta", pedido: "reprocessar_material", ok: true });
+		expect(falsas[0]?.chamadas.pop()).toBe("reprocessar m/a/materiais/x.md");
 		expect(falsas[0]?.chamadas.slice(-5)).toEqual([
 			"abortar",
 			"trocarModelo openrouter/a/b",

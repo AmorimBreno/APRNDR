@@ -13,11 +13,13 @@
 
 import { z } from "zod";
 import type { EstadoSessao, EventoNucleo, ItemHistorico } from "./eventos.ts";
+import type { SituacaoMaterial } from "./materiais/tipos.ts";
 import type { InfoModelo } from "./modelos.ts";
 import type { RegistroPonte } from "./ponte.ts";
 import type { ResumoSessao } from "./sessoes.ts";
 
 export type { RegistroPonte } from "./ponte.ts";
+export type { EstadoMaterial, SituacaoMaterial } from "./materiais/tipos.ts";
 
 /** Os registros da ponte de uma sessão e os pedidos que ainda esperam ao vivo. */
 export interface HistoricoPonte {
@@ -56,6 +58,10 @@ export const esquemaMensagemCliente = z.discriminatedUnion("tipo", [
 	z.strictObject({ tipo: z.literal("cancelar_pedido"), ...comPerfil, id: texto }),
 	/** Ação feita num painel; vira "interface:acao" na sessão. */
 	z.strictObject({ tipo: z.literal("acao_interface"), ...comPerfil, painel: texto, acao: texto, dados: z.unknown().optional() }),
+	/** Situação dos arquivos de material do perfil (as mudanças chegam pelo evento "materiais"). */
+	z.strictObject({ tipo: z.literal("listar_materiais"), ...comPerfil }),
+	/** Processa um material de novo do zero. Adicionar arquivos é pelo HTTP (POST /api/perfis/:id/materiais). */
+	z.strictObject({ tipo: z.literal("reprocessar_material"), ...comPerfil, caminho: texto }),
 ]);
 
 export type MensagemCliente = z.infer<typeof esquemaMensagemCliente>;
@@ -80,6 +86,8 @@ export interface DadosResposta {
 	/** false = o pedido não espera mais resposta (já respondido ou cancelado). */
 	cancelar_pedido: boolean;
 	acao_interface: undefined;
+	listar_materiais: SituacaoMaterial[];
+	reprocessar_material: undefined;
 }
 
 export type MensagemServidor =

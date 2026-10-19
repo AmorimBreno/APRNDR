@@ -14,5 +14,6 @@
 	"extensoes": ["extensions/painel-teste.ts", "extensions/quiz-web.ts", "extensions/materias.ts"],
 	"extensoesSubagentes": ["extensions/visual-tools/tools/mermaid_tools.ts", "extensions/visual-tools/tools/svg_tools.ts"],
 	"paineis": ["quiz", "teste"],
-	"aparencia": { "capa": "capa.png", "cor": "moss", "lema": "Entender antes de decorar", "glifo": "学習" }
+	"aparencia": { "capa": "capa.png", "cor": "moss", "lema": "Entender antes de decorar", "glifo": "学習" },
+	"materiais": { "pastas": ["materias/*/materiais"], "modeloVisao": "openrouter/anthropic/claude-sonnet-5.5" }
 }

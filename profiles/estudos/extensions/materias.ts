@@ -5,11 +5,23 @@
 // - a ponte com a tela de cadernos (docs/ponte-de-eventos.md): a tela manda
 //   "interface:acao" no painel "cadernos" (listar, criar) e a extensão
 //   responde com "interface:mostrar" (lista, criada, erro). As listas são
-//   passageiras (gravar: false): a tela pede de novo sempre que abre.
+//   passageiras (gravar: false): a tela pede de novo sempre que abre;
+// - os avisos do serviço de materiais do núcleo ("materiais:pronto" e
+//   "materiais:removido", item 4.2), que viram adicionou_material,
+//   atualizou_material e removeu_material no eventos.jsonl da matéria.
 // A pasta de dados é o cwd da sessão (o núcleo cria a sessão nela).
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { CORES_MATERIA, criarMateria, type EntradaMateria, ErroMaterias, GLIFOS_MATERIA, listarMaterias } from "../lib/materias.ts";
+import {
+	type AvisoMaterial,
+	CORES_MATERIA,
+	criarMateria,
+	type EntradaMateria,
+	ErroMaterias,
+	GLIFOS_MATERIA,
+	listarMaterias,
+	registrarMaterial,
+} from "../lib/materias.ts";
 
 const PAINEL = "cadernos";
 
@@ -32,6 +44,17 @@ export default function materias(pi: ExtensionAPI) {
 		pastaDados = ctx.cwd;
 		sessao = ctx.sessionManager.getSessionId();
 	});
+
+	// O serviço de materiais do núcleo avisa quando um arquivo fica pronto ou some;
+	// a matéria dele ganha o evento (a linha do tempo do caderno lê daqui).
+	const aoMaterial = (removido: boolean) => (recebido: unknown) => {
+		if (!pastaDados) return;
+		registrarMaterial(pastaDados, recebido as AvisoMaterial, removido, sessao ? { sessao } : {}).catch((erro: unknown) => {
+			mostrar("erro", { mensagem: `Não consegui gravar o evento do material: ${(erro as Error).message}` });
+		});
+	};
+	pi.events.on("materiais:pronto", aoMaterial(false));
+	pi.events.on("materiais:removido", aoMaterial(true));
 
 	pi.events.on("interface:acao", (recebido) => {
 		const { painel, acao, dados } = recebido as { painel?: string; acao?: string; dados?: unknown };

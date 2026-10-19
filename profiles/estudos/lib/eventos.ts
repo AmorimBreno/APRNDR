@@ -8,10 +8,14 @@ import { randomBytes } from "node:crypto";
 import { appendFile, mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 
-/** Verbos de matéria (este item) e, a partir dos itens 7 e 8, os de aprendizagem. */
+/** Verbos de matéria e de materiais e, a partir dos itens 7 e 8, os de aprendizagem. */
 export type VerboEvento =
 	| "criou_materia"
 	| "alterou_materia"
+	// Materiais (item 4.2): o serviço de materiais do núcleo processou ou perdeu um arquivo.
+	| "adicionou_material"
+	| "atualizou_material"
+	| "removeu_material"
 	// Aprendizagem (seção 9.2), usados a partir dos itens 7 e 8:
 	| "pediu_reexplicacao"
 	| "pediu_outro_jeito"

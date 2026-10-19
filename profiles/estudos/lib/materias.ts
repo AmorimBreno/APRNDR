@@ -140,6 +140,50 @@ export async function criarMateria(dados: string, entrada: EntradaMateria, conte
 	return materia;
 }
 
+/** A pasta de materiais da matéria, relativa à pasta de dados (o serviço de materiais do núcleo observa estas). */
+export const pastaMateriaisRelativa = (id: string) => `materias/${id}/materiais`;
+
+/** O id da matéria de um caminho de material ("materias/calculo-i/materiais/aula.pdf" → "calculo-i"). */
+export function materiaDoMaterial(caminho: string): string | undefined {
+	const partes = caminho.replace(/\\/g, "/").split("/");
+	return partes[0] === "materias" && partes[2] === "materiais" && partes[1] && partes.length > 3 ? partes[1] : undefined;
+}
+
+/** O que o serviço de materiais avisa ("materiais:pronto" e "materiais:removido" no barramento da sessão). */
+export interface AvisoMaterial {
+	caminho: string;
+	nome: string;
+	tipo?: string;
+	trechos?: number;
+	custo?: number;
+	novo?: boolean;
+}
+
+/**
+ * Grava no eventos.jsonl da matéria que um material ficou pronto (adicionou ou
+ * atualizou) ou foi removido. Caminho fora de uma matéria: nada.
+ */
+export async function registrarMaterial(
+	dados: string,
+	aviso: AvisoMaterial,
+	removido: boolean,
+	contexto: { sessao?: string } = {},
+): Promise<string | undefined> {
+	const materia = materiaDoMaterial(aviso.caminho);
+	if (!materia) return undefined;
+	const verbo = removido ? "removeu_material" : aviso.novo === false ? "atualizou_material" : "adicionou_material";
+	await acrescentarEvento(
+		eventosMateria(dados, materia),
+		criarEvento({
+			...(contexto.sessao ? { sessao: contexto.sessao } : {}),
+			verbo,
+			objeto: { materia, arquivo: aviso.nome },
+			...(removido ? {} : { resultado: { tipo: aviso.tipo, trechos: aviso.trechos, custo: aviso.custo } }),
+		}),
+	);
+	return materia;
+}
+
 /** Muda nome, cor, ideograma ou provas (o id e a pasta ficam) e grava o evento alterou_materia com o que mudou. */
 export async function alterarMateria(
 	dados: string,

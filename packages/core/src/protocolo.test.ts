@@ -24,6 +24,8 @@ describe("mensagens válidas do cliente", () => {
 		{ tipo: "responder_pedido", perfil: "estudos", id: "p1" },
 		{ tipo: "cancelar_pedido", perfil: "estudos", id: "p1" },
 		{ tipo: "acao_interface", perfil: "estudos", painel: "teste", acao: "clicou", dados: null },
+		{ tipo: "listar_materiais", perfil: "estudos" },
+		{ tipo: "reprocessar_material", perfil: "estudos", caminho: "materias/x/materiais/a.pdf" },
 	];
 
 	it.each(validas)("aceita %j", (mensagem) => {

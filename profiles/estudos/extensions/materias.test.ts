@@ -100,6 +100,34 @@ describe("extensão de matérias", () => {
 		expect(mostrados).toEqual([]);
 	});
 
+	it("os avisos do serviço de materiais viram eventos da matéria; fora de uma matéria, nada", async () => {
+		aoIniciar?.({}, ctx);
+		barramento.emit("materiais:pronto", { caminho: "materias/calculo/materiais/aula.pdf", nome: "aula.pdf", tipo: "pdf", trechos: 12, custo: 0.03, novo: true });
+		barramento.emit("materiais:pronto", { caminho: "materias/calculo/materiais/aula.pdf", nome: "aula.pdf", tipo: "pdf", trechos: 13, custo: 0, novo: false });
+		barramento.emit("materiais:removido", { caminho: "materias/calculo/materiais/aula.pdf", nome: "aula.pdf" });
+		barramento.emit("materiais:pronto", { caminho: "outra/coisa/x.md", nome: "x.md", novo: true });
+		const arquivo = eventosMateria(dados, "calculo");
+		const ler = async () => {
+			try {
+				return (await readFile(arquivo, "utf8")).split("\n").filter(Boolean).map((linha) => JSON.parse(linha));
+			} catch {
+				return [];
+			}
+		};
+		let eventos: Array<Record<string, unknown>> = [];
+		for (let tentativa = 0; tentativa < 50 && eventos.length < 3; tentativa++) {
+			eventos = await ler();
+			await new Promise((resolver) => setTimeout(resolver, 5));
+		}
+		expect(eventos.map((evento) => evento.verbo).sort()).toEqual(["adicionou_material", "atualizou_material", "removeu_material"]);
+		expect(eventos.find((evento) => evento.verbo === "adicionou_material")).toMatchObject({
+			sessao: "sessao-1",
+			objeto: { materia: "calculo", arquivo: "aula.pdf" },
+			resultado: { tipo: "pdf", trechos: 12, custo: 0.03 },
+		});
+		expect(mostrados).toEqual([]);
+	});
+
 	it("as ferramentas do agente criam e listam; a tela recebe a lista nova", async () => {
 		const criada = await ferramentas.criar_materia!.execute("c1", { nome: "Física", glifo: "考" }, undefined, undefined, ctx);
 		expect(criada.isError).toBeUndefined();

@@ -58,3 +58,52 @@ export interface OpcoesExtracao {
 	aoProgredir?(progresso: { feito: number; total: number; etapa: string }): void;
 	sinal?: AbortSignal;
 }
+
+// --- Serviço (servico.ts): configuração e situação dos arquivos; vão para a interface pelo protocolo ---
+
+export interface ConfigMateriais {
+	/** Pastas observadas, relativas à pasta de dados, com * para um nível qualquer ("materias/*\/materiais"). */
+	pastas: string[];
+	/** Modelo com visão (provedor/id) para as páginas visuais. Sem ele, só o texto. */
+	modeloVisao?: string;
+}
+
+export type EstadoMaterial = "na_fila" | "processando" | "pronto" | "erro" | "nao_suportado";
+
+export interface SituacaoMaterial {
+	/** Caminho relativo à pasta de dados, com barras normais ("materias/calculo/materiais/aula-04.pdf"). */
+	caminho: string;
+	/** A pasta observada ("materias/calculo/materiais"). */
+	pasta: string;
+	/** O caminho dentro da pasta observada ("aula-04.pdf"). */
+	nome: string;
+	tipo?: TipoMaterial;
+	estado: EstadoMaterial;
+	tamanho: number;
+	/** O que está fazendo agora ("descrevendo a página 3 de 20"). */
+	etapa?: string;
+	progresso?: { feito: number; total: number };
+	trechos?: number;
+	/** US$ da visão. */
+	custo?: number;
+	avisos?: string[];
+	erro?: string;
+	/** ISO 8601. */
+	extraidoEm?: string;
+}
+
+/** Um arquivo que acabou de ficar pronto (`novo` = não tinha extraído antes). */
+export interface MaterialPronto {
+	caminho: string;
+	pasta: string;
+	nome: string;
+	tipo: TipoMaterial;
+	trechos: number;
+	custo: number;
+	novo: boolean;
+}
+
+export type EventoMateriais =
+	| { tipo: "situacao"; materiais: SituacaoMaterial[] }
+	| { tipo: "pronto"; material: MaterialPronto }
+	| { tipo: "removido"; caminho: string; pasta: string; nome: string };

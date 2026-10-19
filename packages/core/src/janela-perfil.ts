@@ -29,6 +29,8 @@
 // filhas dos subagentes não recebem nenhuma delas.
 
 import { existsSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import {
 	type AgentSession,
 	getAgentDir,
@@ -73,6 +75,9 @@ import {
 	type ResumoSessao,
 	TIPO_ENTRADA_AGENTE,
 } from "./sessoes.ts";
+import { criarExtensaoMateriais } from "./materiais/extensao.ts";
+import { ServicoMateriais } from "./materiais/servico.ts";
+import type { SituacaoMaterial } from "./materiais/tipos.ts";
 import { criarExtensaoPergunta } from "./pergunta.ts";
 import type { HistoricoPonte } from "./protocolo.ts";
 import { criarExtensaoSubagente } from "./subagentes.ts";
@@ -87,7 +92,12 @@ export interface OpcoesJanelaPerfil {
 	pastaPi?: string;
 	/** Registro de modelos do pi já criado, para compartilhar entre janelas. */
 	registroModelos?: ModelRuntime;
+	/** Pasta dos índices de materiais (fora da pasta de dados). Padrão: %LOCALAPPDATA%\estudos-app\indice. */
+	pastaIndice?: string;
 }
+
+/** Pasta local do app: os índices não podem ficar na pasta de dados (o Drive sincronizaria o SQLite). */
+export const PASTA_INDICE_PADRAO = join(process.env.LOCALAPPDATA ?? join(homedir(), "AppData", "Local"), "estudos-app", "indice");
 
 /**
  * Modelo da sessão montada: "sessao" = o gravado na sessão (o pi restaura; se
@@ -114,6 +124,14 @@ function mensagemDe(erro: unknown): string {
 export class JanelaPerfil {
 	private perfilAtual: Perfil;
 	private readonly pastaPi: string;
+	private readonly pastaIndice: string;
+	/** Serviço de materiais do perfil (se o profile.json tiver "materiais"), um por janela. */
+	private servicoMateriais?: ServicoMateriais;
+	/** Pasta de dados e configuração do serviço atual, para saber se o recarregar mudou algo. */
+	private chaveMateriais?: string;
+	private cancelarMateriais?: () => void;
+	/** O último aviso do serviço, para não repetir o mesmo a cada varredura. */
+	private ultimoAvisoMateriais?: string;
 	private readonly fabricaExtensoes?: FabricaExtensoesNucleo;
 	private registro?: ModelRuntime;
 	private sessao?: AgentSession;
@@ -134,6 +152,7 @@ export class JanelaPerfil {
 	constructor(perfil: Perfil, opcoes: OpcoesJanelaPerfil = {}) {
 		this.perfilAtual = perfil;
 		this.pastaPi = opcoes.pastaPi ?? getAgentDir();
+		this.pastaIndice = opcoes.pastaIndice ?? PASTA_INDICE_PADRAO;
 		this.fabricaExtensoes = opcoes.extensoesNucleo;
 		this.registro = opcoes.registroModelos;
 	}
@@ -177,6 +196,7 @@ export class JanelaPerfil {
 		return this.emOrdem(async () => {
 			const perfil = this.perfilAtual;
 			await garantirPastas(perfil);
+			this.ligarMateriais();
 			const motivoSemSessao: MotivoTroca = "startup";
 			if (opcoes.sessaoId) {
 				const gerente = this.abrirGerente(opcoes.sessaoId);
@@ -342,6 +362,7 @@ export class JanelaPerfil {
 			this.perfilAtual = perfil;
 			try {
 				await garantirPastas(perfil);
+				this.ligarMateriais();
 				const gerente =
 					perfil.pastaDados === anterior.pastaDados
 						? this.gerenteDaSessaoAtual()
@@ -349,6 +370,7 @@ export class JanelaPerfil {
 				return await this.trocarSessao(gerente, pedido, "reload");
 			} catch (erro) {
 				this.perfilAtual = anterior;
+				this.ligarMateriais();
 				throw erro;
 			}
 		});
@@ -392,7 +414,68 @@ export class JanelaPerfil {
 			this.cancelarAssinatura = undefined;
 			if (sessao) await encerrarSessaoPi(sessao, "quit");
 		});
+		await this.desligarMateriais();
 		this.ouvintes.clear();
+	}
+
+	// --- Materiais ---------------------------------------------------------------
+
+	/** A situação dos arquivos de material. Vazio se o perfil não tiver materiais. */
+	materiais(): SituacaoMaterial[] {
+		return this.servicoMateriais?.situacao() ?? [];
+	}
+
+	/** Copia arquivos para uma pasta de materiais do perfil e processa. Devolve os caminhos gravados. */
+	adicionarMateriais(pasta: string, arquivos: Array<{ nome: string; dados: Uint8Array }>): Promise<string[]> {
+		return this.exigirMateriais().adicionar(pasta, arquivos);
+	}
+
+	/** Processa um material de novo do zero (inclusive a visão). */
+	reprocessarMaterial(caminho: string): Promise<void> {
+		return this.exigirMateriais().reprocessar(caminho);
+	}
+
+	private exigirMateriais(): ServicoMateriais {
+		if (!this.servicoMateriais) throw new ErroSessao(`O perfil ${this.perfilAtual.id} não tem materiais (falta "materiais" no profile.json).`);
+		return this.servicoMateriais;
+	}
+
+	/**
+	 * Cria (ou recria, se a pasta de dados ou a configuração mudaram) o serviço
+	 * de materiais do perfil e começa a varredura. Sem "materiais" no perfil, desliga.
+	 */
+	private ligarMateriais(): void {
+		const perfil = this.perfilAtual;
+		const chave = perfil.materiais ? JSON.stringify({ pastaDados: perfil.pastaDados, config: perfil.materiais }) : undefined;
+		if (this.servicoMateriais && chave === this.chaveMateriais) return;
+		if (this.servicoMateriais) void this.desligarMateriais();
+		if (!perfil.materiais || !chave) return;
+		const servico = new ServicoMateriais({
+			pastaDados: perfil.pastaDados,
+			config: perfil.materiais,
+			arquivoIndice: join(this.pastaIndice, `${perfil.id}.sqlite`),
+			registro: () => this.obterRegistro(),
+			aoAvisar: (mensagem) => {
+				if (mensagem === this.ultimoAvisoMateriais) return;
+				this.ultimoAvisoMateriais = mensagem;
+				this.emitir({ tipo: "diagnostico", nivel: "aviso", mensagem });
+			},
+		});
+		this.cancelarMateriais = servico.assinar((evento) => {
+			if (evento.tipo === "situacao") this.emitir({ tipo: "materiais", materiais: evento.materiais });
+		});
+		this.servicoMateriais = servico;
+		this.chaveMateriais = chave;
+		servico.iniciar();
+	}
+
+	private async desligarMateriais(): Promise<void> {
+		const servico = this.servicoMateriais;
+		this.cancelarMateriais?.();
+		this.cancelarMateriais = undefined;
+		this.servicoMateriais = undefined;
+		this.chaveMateriais = undefined;
+		await servico?.parar();
 	}
 
 	// ---------------------------------------------------------------------------
@@ -519,6 +602,7 @@ export class JanelaPerfil {
 		const extensoesNucleo = [
 			ponte.extensao,
 			criarExtensaoPergunta(),
+			...(this.servicoMateriais ? [criarExtensaoMateriais(this.servicoMateriais)] : []),
 			criarExtensaoSubagente({
 				perfil,
 				pastaPi: this.pastaPi,

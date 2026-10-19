@@ -9,6 +9,7 @@
 // "agent_settled" é o fim de verdade, por isso fecha a execução aqui.
 
 import type { AgentSession, AgentSessionEvent } from "@earendil-works/pi-coding-agent";
+import type { SituacaoMaterial } from "./materiais/tipos.ts";
 
 /** Diagnóstico de montagem ou de execução (por exemplo, ferramenta inexistente). */
 export interface Diagnostico {
@@ -90,6 +91,8 @@ export type EventoNucleo =
 	| ({ tipo: "diagnostico" } & Diagnostico)
 	/** Mudou a sessão, o agente, o modelo ou os recursos ativos. */
 	| { tipo: "estado_sessao"; estado: EstadoSessao }
+	/** Serviço de materiais: a situação de todos os arquivos das pastas observadas mudou. */
+	| { tipo: "materiais"; materiais: SituacaoMaterial[] }
 	/** Ponte: uma ferramenta pediu para mostrar algo num painel ("interface:mostrar"). */
 	| { tipo: "acao_interface"; painel: string; acao: string; dados: unknown }
 	/** Ponte: uma ferramenta espera a resposta do usuário ("interface:pedido"); responda com JanelaPerfil.responder. */

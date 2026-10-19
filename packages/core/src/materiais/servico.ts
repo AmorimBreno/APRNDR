@@ -21,55 +21,10 @@ import { basename, extname, join } from "node:path";
 import { apagarExtraido, gravarExtraido, gravarManifesto, lerManifesto, lerTrechos, type Manifesto, PASTA_EXTRAIDO, pastaDoExtraido } from "./extraido.ts";
 import { extrairArquivo, hashDe, tipoDoArquivo } from "./extrair.ts";
 import { IndiceMateriais, type ResultadoBusca } from "./indice.ts";
-import type { Descrever, TipoMaterial, Trecho } from "./tipos.ts";
+import type { ConfigMateriais, Descrever, EventoMateriais, MaterialPronto, SituacaoMaterial, TipoMaterial, Trecho } from "./tipos.ts";
+
+export type { ConfigMateriais, EstadoMaterial, EventoMateriais, MaterialPronto, SituacaoMaterial } from "./tipos.ts";
 import { criarDescrever, type RegistroVisao } from "./visao.ts";
-
-export interface ConfigMateriais {
-	/** Pastas observadas, relativas à pasta de dados, com * para um nível qualquer ("materias/*\/materiais"). */
-	pastas: string[];
-	/** Modelo com visão (provedor/id) para as páginas visuais. Sem ele, só o texto. */
-	modeloVisao?: string;
-}
-
-export type EstadoMaterial = "na_fila" | "processando" | "pronto" | "erro" | "nao_suportado";
-
-export interface SituacaoMaterial {
-	/** Caminho relativo à pasta de dados, com barras normais ("materias/calculo/materiais/aula-04.pdf"). */
-	caminho: string;
-	/** A pasta observada ("materias/calculo/materiais"). */
-	pasta: string;
-	/** O caminho dentro da pasta observada ("aula-04.pdf"). */
-	nome: string;
-	tipo?: TipoMaterial;
-	estado: EstadoMaterial;
-	tamanho: number;
-	/** O que está fazendo agora ("descrevendo a página 3 de 20"). */
-	etapa?: string;
-	progresso?: { feito: number; total: number };
-	trechos?: number;
-	/** US$ da visão. */
-	custo?: number;
-	avisos?: string[];
-	erro?: string;
-	/** ISO 8601. */
-	extraidoEm?: string;
-}
-
-/** Um arquivo que acabou de ficar pronto (`novo` = não tinha extraído antes). */
-export interface MaterialPronto {
-	caminho: string;
-	pasta: string;
-	nome: string;
-	tipo: TipoMaterial;
-	trechos: number;
-	custo: number;
-	novo: boolean;
-}
-
-export type EventoMateriais =
-	| { tipo: "situacao"; materiais: SituacaoMaterial[] }
-	| { tipo: "pronto"; material: MaterialPronto }
-	| { tipo: "removido"; caminho: string; pasta: string; nome: string };
 
 export interface OpcoesServicoMateriais {
 	pastaDados: string;

@@ -19,6 +19,7 @@ import type {
 	ItemHistorico,
 	MensagemServidor,
 	MotivoCancelamento,
+	SituacaoMaterial,
 	TipoMensagemCliente,
 } from "./tipos.ts";
 
@@ -138,6 +139,8 @@ export interface EstadoJanela {
 	pedidos: PedidoPendente[];
 	/** Ações recebidas por painel, em ordem de chegada (as mais antigas saem depois do limite). */
 	acoesPorPainel: Record<string, AcaoRecebida[]>;
+	/** Arquivos de material do perfil (serviço de materiais); undefined até a primeira lista. */
+	materiais?: SituacaoMaterial[];
 	/** Pedidos cancelados pelo núcleo, por id (para o painel saber por quê). */
 	cancelados: Record<string, MotivoCancelamento>;
 	/** Todos os pedidos da sessão aberta, por id, com a situação de cada um. Zera ao trocar de sessão. */
@@ -474,6 +477,9 @@ function aplicarEvento(estado: EstadoJanela, evento: EventoNucleo): EstadoJanela
 		case "estado_sessao":
 			return comSessao(estado, evento.estado);
 
+		case "materiais":
+			return { ...estado, materiais: evento.materiais };
+
 		case "acao_interface": {
 			const [nova, contador] = chave(estado, "i");
 			const anteriores = estado.acoesPorPainel[evento.painel] ?? [];
@@ -594,6 +600,9 @@ export function reduzirJanela(estado: EstadoJanela, acao: AcaoJanela): EstadoJan
 			}
 			if (respostasComEstado.has(acao.pedido) && acao.dados) {
 				return comSessao(estado, acao.dados as DadosResposta["abrir_perfil"]);
+			}
+			if (acao.pedido === "listar_materiais" && Array.isArray(acao.dados)) {
+				return { ...estado, materiais: acao.dados as DadosResposta["listar_materiais"] };
 			}
 			return estado;
 		}

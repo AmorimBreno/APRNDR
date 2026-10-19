@@ -49,6 +49,9 @@ export function resumirMensagem(mensagem: MensagemCliente): string {
 		case "acao_interface":
 			partes.push(`painel=${mensagem.painel}`, `acao=${mensagem.acao}`);
 			break;
+		case "reprocessar_material":
+			partes.push(`caminho=${mensagem.caminho}`);
+			break;
 	}
 	return partes.join(" ");
 }
@@ -86,6 +89,11 @@ async function executar(janelas: Janelas, conexao: Conexao, mensagem: MensagemCl
 			return janelas.janela(mensagem.perfil).cancelarPedido(mensagem.id);
 		case "acao_interface":
 			janelas.janela(mensagem.perfil).acaoDaInterface(mensagem.painel, mensagem.acao, mensagem.dados);
+			return undefined;
+		case "listar_materiais":
+			return janelas.janela(mensagem.perfil).materiais();
+		case "reprocessar_material":
+			await janelas.janela(mensagem.perfil).reprocessarMaterial(mensagem.caminho);
 			return undefined;
 	}
 }

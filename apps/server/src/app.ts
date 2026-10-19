@@ -84,6 +84,25 @@ export function criarApp(janelas: Janelas, log: Log, versao: string): Hono {
 		return c.body(new Uint8Array(await readFile(avatar.arquivo)), 200, { "content-type": tipo, "cache-control": "no-cache" });
 	});
 
+	// Arquivos de material (multipart: "pasta", relativa à pasta de dados, e um ou mais "arquivos").
+	// O perfil precisa estar aberto; o processamento segue em segundo plano e chega pelo evento "materiais".
+	app.post("/api/perfis/:id/materiais", async (c) => {
+		const id = c.req.param("id");
+		const corpo = await c.req.parseBody({ all: true });
+		const pasta = corpo.pasta;
+		if (typeof pasta !== "string" || !pasta) return c.json({ ok: false, erro: 'Falta o campo "pasta".' }, 400);
+		const recebidos = ([] as unknown[]).concat(corpo.arquivos ?? []).filter((item): item is File => item instanceof File);
+		if (recebidos.length === 0) return c.json({ ok: false, erro: 'Nenhum arquivo em "arquivos".' }, 400);
+		const arquivos = await Promise.all(recebidos.map(async (arquivo) => ({ nome: arquivo.name, dados: new Uint8Array(await arquivo.arrayBuffer()) })));
+		try {
+			const gravados = await janelas.janela(id).adicionarMateriais(pasta, arquivos);
+			log.info(`[${id}] materiais adicionados em ${pasta}: ${gravados.length} de ${arquivos.length}`);
+			return c.json({ ok: true, gravados });
+		} catch (erro) {
+			return c.json({ ok: false, erro: (erro as Error).message }, 400);
+		}
+	});
+
 	app.onError((erro, c) => {
 		log.erro(`HTTP ${c.req.method} ${c.req.path}`, erro);
 		return c.json({ ok: false, erro: erro.message }, 500);

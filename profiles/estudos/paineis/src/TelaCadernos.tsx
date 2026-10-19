@@ -143,12 +143,17 @@ export function TelaCadernos(props: PropsTelaInicial) {
 								Não consegui abrir os cadernos
 							</h2>
 							<p className="body-lg">{erro ?? problemaAoAbrir}</p>
+							{erro ? null : (
+								<p className="body-lg">
+									As conversas também ficam na pasta de dados: se ela estiver no Google Drive, confira se ele está aberto e sincronizado e tente de novo.
+								</p>
+							)}
 							<div>
 								<button
 									type="button"
 									className="tecla-papel button"
-									disabled={!sessaoId}
-									onClick={() => semEsperar(acoes.acaoDaInterface(PAINEL_CADERNOS, "listar"))}
+									// Sem sessão (ela não abriu), tentar de novo é abrir o perfil de novo: recarregar a tela.
+									onClick={() => (sessaoId ? semEsperar(acoes.acaoDaInterface(PAINEL_CADERNOS, "listar")) : window.location.reload())}
 								>
 									<Icon name="refresh" size={18} strokeWidth={2.25} />
 									Tentar de novo

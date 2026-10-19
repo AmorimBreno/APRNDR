@@ -21,7 +21,7 @@ Tarefa 3.6 feita (2026-10-16), um commit por parte: escala, informações da res
 
 Depois da 3.6, mais ajustes pedidos pelo Breno (modal com FLIP e casca no estilo real do botão, bandeira dos cadernos, pedidos gravados na sessão como entradas nucleo.ponte para voltarem iguais depois de reiniciar). Ele conferiu o quiz voltando igual depois de reiniciar e, em 2026-10-16, aprovou o plano do item 4.1 ("pode continuar").
 
-Em andamento: item 4.1.
+Item 4.1 feito (2026-10-19, aguarda o roteiro docs/teste-etapa-4-1.md), um commit por parte: lógica em profiles/estudos/lib (matérias, eventos só de acréscimo); a ponte ganhou o "interface:mostrar" passageiro (gravar: false, para a lista de matérias não ir para a sessão); extensão materias.ts com as ferramentas e a ponte da tela; o registro de painéis ganhou foraDaArea (a ponte da tela de cadernos não vira card na conversa); a SubjectWheel ganhou createKicker (design-system/ESTUDOS.md); a tela de cadernos abre a sessão do perfil, lista na roda e cria pelo modal. Conferido no navegador: lista vazia vinda da extensão, modal com a capa de amostra e a conversa sem card de cadernos; não criei matéria pelo navegador para não gravar teste na pasta de dados do Breno (a criação está nos testes).
 
 Tarefa 2.3 feita (aguarda revisão): ponte de eventos (docs/ponte-de-eventos.md) e ferramenta subagent no núcleo; as ferramentas dos desenhistas vêm do campo novo extensoesSubagentes do profile.json; web_fetch ganhou fresh=true e avisa quando o conteúdo do Tavily pode estar em cache.
 

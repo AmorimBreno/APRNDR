@@ -14,6 +14,7 @@ docs/teste-etapa-N.md — roteiro de teste que o Breno roda no fim de cada etapa
 docs/teste-etapa-1.md — roteiro da Etapa 1: pi no Windows Terminal com o perfil de estudos
 docs/teste-etapa-2.md — roteiro da Etapa 2: app pelo atalho, sessão, subagente, ponte de eventos e edição ao vivo
 docs/teste-etapa-3.md — roteiro da Etapa 3: tema APRNDR, tela de perfis e de carregamento, janela do perfil, seletor de modelo, painéis, ask_user_question, quiz, cancelamento e edição ao vivo
+docs/teste-etapa-4-1.md — roteiro do item 4.1: tela de cadernos, modal de matéria nova, arquivos na pasta de dados, ferramentas do professor e reiniciar
 docs/ponte-de-eventos.md — protocolo da ponte (interface:mostrar, pedido, resposta, acao) para quem escreve extensão de perfil
 docs/historico/ — documentos do checkpoint 1 (pi no WSL com tmux e Obsidian); só consulta
 
@@ -38,7 +39,7 @@ packages/ui/src/cliente.ts — ClienteConexao: WebSocket em /ws, reconexão com 
 packages/ui/src/estado-janela.ts — reducer puro da janela de perfil (sessão, conversa com ferramentas no lugar, execução, fila, uso somado, carregando, erros, pedidos e ações da ponte por painel, registro de cada pedido com a situação e a resposta, aviso de recarregado)
 packages/ui/src/use-janela-perfil.ts — hook useJanelaPerfil(perfilId): abre o perfil, aplica o reducer, ações (enviar, abortar, trocar modelo e agente, sessões, modelos, recarregar, ponte); reabre a sessão ao reconectar
 packages/ui/src/use-perfis.ts — hook usePerfis e buscarPerfis: GET /api/perfis (perfis válidos e erros)
-packages/ui/src/paineis.tsx — registro de painéis (componente, título, soModal, resumir o pedido, revisarAoResponder), AreaPaineis (só ações; os pedidos vão para o modal) e PainelGenerico (ações e pedidos em JSON, responder com texto ou cancelar, revisão)
+packages/ui/src/paineis.tsx — registro de painéis (componente, título, soModal, foraDaArea para os de uma tela do perfil, resumir o pedido, revisarAoResponder), AreaPaineis (só ações; os pedidos vão para o modal) e PainelGenerico (ações e pedidos em JSON, responder com texto ou cancelar, revisão)
 packages/ui/src/estilo.css — estilos da tela de faixa e folha (.tela, .faixa, .folha, .linha, .tecla-papel) e das peças da janela (aviso de erro, documento, ferramentas, barra, histórico, seletor de modelo, painéis) e o CSS do KaTeX; exportado como @estudos/ui/estilo.css
 packages/ui/src/visual/Markdown.tsx — markdown das respostas (react-markdown, GFM, LaTeX com remark-math e rehype-katex; sem HTML cru)
 packages/ui/src/visual/Contador.tsx — número que rola até o valor novo como odômetro (custo e tokens da sessão)
@@ -109,12 +110,19 @@ profiles/estudos/skills/visualize/SKILL.md — quando e como pedir um diagrama
 profiles/estudos/extensions/quiz.ts — ferramenta quiz (desenha no terminal; fora do profile.json, só para o pi no terminal)
 profiles/estudos/extensions/quiz-web.ts — ferramenta quiz do app: mesmo nome, parâmetros, correção e resultado do quiz.ts, perguntando pela ponte no painel "quiz" e mandando o resultado depois; arquivo do projeto
 profiles/estudos/extensions/quiz-web.test.ts — testes do quiz web com um barramento falso
+profiles/estudos/extensions/materias.ts — ferramentas listar_materias e criar_materia e a ponte da tela de cadernos (painel "cadernos": listar, criar → lista, criada, erro, passageiros com gravar: false); arquivo do projeto
+profiles/estudos/extensions/materias.test.ts — testes da extensão de matérias com um barramento falso e uma pasta de dados temporária
+profiles/estudos/lib/ — lógica do perfil sem dependências, usada pelas extensões (o pi carrega daqui) e, só materia-tipos.ts, pela tela
+profiles/estudos/lib/materias.ts — matérias na pasta de dados: caminhos, garantir materias/ e aprendiz/, id do nome, validar, listar, criar e alterar (materia.json gravado de uma vez)
+profiles/estudos/lib/materia-tipos.ts — tipos e listas de cor e ideograma das matérias, sem nada do Node (a tela importa daqui)
+profiles/estudos/lib/eventos.ts — eventos da seção 9.2: id ordenável, criarEvento e acrescentarEvento, a única função que escreve nos eventos.jsonl (só acrescenta)
+profiles/estudos/lib/materias.test.ts — testes das matérias e dos eventos numa pasta temporária
 profiles/estudos/paineis/ — @estudos/perfil-estudos: código de tela do perfil (o watcher do servidor ignora esta pasta; quem recarrega é o Vite)
-profiles/estudos/paineis/src/index.ts — tela inicial do perfil (cadernos) e registro dos painéis (quiz = Questões: só modal, revisa ao responder, resumo "Questão")
-profiles/estudos/paineis/src/TelaCadernos.tsx — tela inicial do perfil de estudos: menu de cadernos com faixa e folha (vazio até a Etapa 4) e a tecla para a conversa
+profiles/estudos/paineis/src/index.ts — tela inicial do perfil (cadernos) e registro dos painéis (cadernos = ponte da tela, fora da área; quiz = Questões: só modal, revisa ao responder, resumo "Questão")
+profiles/estudos/paineis/src/TelaCadernos.tsx — tela inicial do perfil de estudos: abre a sessão do perfil, lista as matérias na SubjectWheel com capas NotebookCover, modal "Nova matéria" (nome, cor, ideograma, prova) e a tecla para a conversa
 profiles/estudos/paineis/src/PainelQuiz.tsx — painel do quiz no modal: QuizQuestion (ou teclas marcáveis no multi-select), Não sei, nota, Pular; revisão com o gabarito e o QuizFeedback
 profiles/estudos/paineis/src/Comemoracao.tsx — a reação do quiz ao conferir: Carimbo 完, Confete de papel com gravidade e o tremido do erro
-profiles/estudos/paineis/src/estilo.css — estilos do painel do quiz
+profiles/estudos/paineis/src/estilo.css — estilos do painel do quiz e da tela de cadernos (modal de matéria nova)
 profiles/estudos/extensions/ask-user-question.ts — ferramenta ask_user_question (desenha no terminal; no app vale a do núcleo, packages/core/src/pergunta.ts)
 profiles/estudos/extensions/painel-teste.ts — ferramentas de teste da ponte (mostrar_painel_teste, perguntar_no_painel_teste); arquivo do projeto, não do learn
 profiles/estudos/extensions/visual-tools/ — ferramentas write/edit/render de mermaid e SVG dos desenhistas; npm install dentro da pasta

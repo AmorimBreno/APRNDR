@@ -227,15 +227,17 @@ a.linha:hover .linha__texto .overline, a.linha:focus-visible .linha__texto .over
 .historico__titulo, .historico__meta, .historico__etiqueta { position: relative; z-index: 1; }
 /* A matéria (o contexto) da conversa, em cima do título, quando a lista mistura assuntos. */
 .historico__etiqueta { align-self: flex-start; max-width: 100%; margin-bottom: 4px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-/* O filtro da lista (conversas do caderno ou todas), no topo: um menu suspenso do tamanho da coluna. */
-.historico__menu { display: flex; width: 100%; margin-top: var(--space-2); }
-.historico__menu .menu-agente { box-sizing: border-box; width: 100%; }
-.historico__filtro { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--space-2); align-items: center; width: 100%; padding: 6px var(--space-3); border: var(--border-control) solid var(--line-strong); border-radius: var(--radius-md); background: transparent; color: var(--ink); text-align: left; cursor: pointer; transition: border-color .12s ease-out; }
-.historico__filtro .overline { grid-column: 1; color: var(--ink-muted); }
-.historico__filtro > .ap-icon { grid-column: 2; grid-row: 1 / span 2; }
-.historico__filtro:hover, .historico__filtro[aria-expanded="true"] { border-color: var(--amber); }
-.historico__filtro:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-.historico__filtro-valor { grid-column: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* As seções do histórico (outras conversas e as do contexto): a linha do título abre e fecha a lista. */
+.historico__secao-grupo { display: flex; flex-direction: column; }
+.historico__cabeca { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: var(--space-2); width: 100%; margin-top: var(--space-2); padding: 6px var(--space-1) 6px 0; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink-muted); text-align: left; cursor: pointer; transition: color .12s ease-out; }
+.historico__cabeca .overline { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.historico__cabeca:hover, .historico__cabeca[aria-expanded="true"] { color: var(--ink); }
+.historico__cabeca:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.historico__conta { color: var(--ink-subtle); }
+.historico__seta { display: inline-grid; place-items: center; }
+/* A lista que abre: sem cortar a marca da aberta, que passa um pouco da borda. */
+.historico__dobra { overflow: hidden; margin: 0 calc(var(--border-control) * -1); padding: 0 var(--border-control); }
+.historico__dobra > .historico__lista, .historico__dobra > .historico__vazio { padding: var(--space-1) 0; }
 .historico__item--atual:disabled { opacity: 1; }
 .historico__titulo { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; }
 .historico__meta { color: var(--ink-muted); font-size: 12px; line-height: 16px; }

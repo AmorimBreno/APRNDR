@@ -1,16 +1,18 @@
 // Histórico de sessões do perfil: a nova conversa no topo e as sessões
-// gravadas, da mais recente para a mais antiga. A aberta fica marcada.
-//
-// Numa conversa com contexto (a de um caderno), a lista mostra só as conversas
-// daquele contexto; o menu no topo da lista troca para "Todas as conversas" e
-// volta. Na lista com tudo, cada conversa com contexto tem uma etiqueta com o
-// rótulo dele (a matéria).
+// gravadas, da mais recente para a mais antiga, em duas seções que abrem e
+// fecham pela linha do título:
+// - "Outras conversas", em cima e fechada: as de outros contextos (numa
+//   conversa de caderno, as das outras matérias e as gerais; na conversa geral,
+//   as dos cadernos), cada uma com uma etiqueta com o rótulo do contexto;
+// - a seção da conversa aberta, aberta: as do mesmo contexto (as do caderno,
+//   ou as gerais).
+// A seção de outras fica em cima para a linha dela estar sempre à mão, sem
+// rolar a lista. A aberta fica marcada.
 
-import { Button, Tag } from "@estudos/design-system";
-import { motion } from "motion/react";
+import { Button, Icon, Tag } from "@estudos/design-system";
+import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import type { ResumoSessao } from "../tipos.ts";
-import { MenuSuspenso } from "./MenuSuspenso.tsx";
 
 const dataHora = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
@@ -23,7 +25,7 @@ export interface PropsHistorico {
 	sessoes: ResumoSessao[];
 	/** Sessão aberta agora. */
 	atual?: string;
-	/** Contexto da sessão aberta: com ele, a lista mostra só as conversas dele. */
+	/** Contexto da sessão aberta: a seção dela mostra as conversas do mesmo contexto. */
 	contexto?: { chave: string; rotulo: string };
 	desabilitado?: boolean;
 	novaSessao(): void;
@@ -31,89 +33,128 @@ export interface PropsHistorico {
 }
 
 export function Historico(props: PropsHistorico) {
-	const [todas, setTodas] = useState(false);
 	const { contexto } = props;
-	const filtrar = Boolean(contexto) && !todas;
-	const sessoes = filtrar ? props.sessoes.filter((sessao) => sessao.contexto?.chave === contexto?.chave) : props.sessoes;
-	const doContexto = contexto ? props.sessoes.filter((sessao) => sessao.contexto?.chave === contexto.chave).length : 0;
-	const quantas = (numero: number) => `${numero} ${numero === 1 ? "conversa" : "conversas"}`;
+	const chave = contexto?.chave;
+	const destas = props.sessoes.filter((sessao) => sessao.contexto?.chave === chave);
+	const outras = props.sessoes.filter((sessao) => sessao.contexto?.chave !== chave);
+	const [verOutras, setVerOutras] = useState(false);
+	const [verDestas, setVerDestas] = useState(true);
 	return (
 		<nav className="historico" aria-label="Conversas">
 			<Button icon="plus" block onClick={props.novaSessao} disabled={props.desabilitado}>
 				Nova conversa
 			</Button>
-			{contexto ? (
-				<MenuSuspenso
-					className="historico__menu"
-					classeBotao="historico__filtro"
-					opcoes={[
-						{ id: "contexto", titulo: contexto.rotulo, detalhe: quantas(doContexto) },
-						{ id: "todas", titulo: "Todas as conversas", detalhe: quantas(props.sessoes.length) },
-					]}
-					atual={todas ? "todas" : "contexto"}
-					escolher={(id) => setTodas(id === "todas")}
-					rotulo={`Mostrando ${todas ? "todas as conversas" : `as conversas de ${contexto.rotulo}`}. Trocar`}
-					rotuloMenu="Quais conversas mostrar"
-					conteudoBotao={
-						<>
-							<span className="overline">{todas ? "Conversas" : "Conversas de"}</span>
-							<span className="historico__filtro-valor body-strong">{todas ? "Todas" : contexto.rotulo}</span>
-						</>
-					}
+			{outras.length > 0 ? (
+				<SecaoHistorico
+					{...props}
+					titulo="Outras conversas"
+					sessoes={outras}
+					aberta={verOutras}
+					alternar={() => setVerOutras((valor) => !valor)}
+					comEtiqueta
 				/>
-			) : (
-				<p className="historico__secao overline">Conversas</p>
-			)}
-			{sessoes.length === 0 ? (
-				<p className="historico__vazio body-sm">
-					{filtrar && contexto
+			) : null}
+			<SecaoHistorico
+				{...props}
+				titulo={contexto ? `Conversas de ${contexto.rotulo}` : "Conversas"}
+				sessoes={destas}
+				aberta={verDestas}
+				alternar={() => setVerDestas((valor) => !valor)}
+				vazio={
+					contexto
 						? `Nenhuma conversa de ${contexto.rotulo} gravada ainda. Ela aparece aqui depois da primeira mensagem.`
-						: "Nenhuma conversa gravada ainda. Ela aparece aqui depois da primeira mensagem."}
-				</p>
-			) : (
-				<ul className="historico__lista">
-					{sessoes.map((sessao, indice) => {
-						const atual = sessao.id === props.atual;
-						const meta = [formatarData(sessao.modificadaEm), `${sessao.mensagens} mensagens`, sessao.agente].filter(Boolean).join(" · ");
-						// A etiqueta só faz falta quando a lista mistura assuntos.
-						const etiqueta = !filtrar ? sessao.contexto?.rotulo : undefined;
-						return (
-							<motion.li
-								key={sessao.id}
-								initial={{ opacity: 0, x: -12 }}
-								animate={{ opacity: 1, x: 0 }}
-								transition={{ type: "spring", stiffness: 420, damping: 30, delay: Math.min(indice, 12) * 0.03 }}
-							>
-								<button
-									type="button"
-									className={`historico__item${atual ? " historico__item--atual" : ""}`}
-									aria-current={atual || undefined}
-									disabled={props.desabilitado}
-									onClick={() => {
-										if (!atual) props.abrirSessao(sessao.id);
-									}}
-								>
-									{/* A marca da conversa aberta desliza de um item para o outro (layoutId). */}
-									{atual ? (
-										<motion.span
-											layoutId="historico-atual"
-											className="historico__marca"
-											transition={{ type: "spring", stiffness: 420, damping: 32 }}
-										/>
-									) : null}
-									{etiqueta ? (
-										<Tag size="sm" tone="outline" icon="notebook" className="historico__etiqueta" title={etiqueta}>
-											{etiqueta}
-										</Tag>
-									) : null}
-									<span className="historico__titulo body-strong">{sessao.titulo || "Sem título"}</span>
-									<span className="historico__meta data">{meta}</span>
-								</button>
-							</motion.li>
-						);
-					})}
-				</ul>
-			)}
+						: "Nenhuma conversa gravada ainda. Ela aparece aqui depois da primeira mensagem."
+				}
+			/>
 		</nav>
+	);
+}
+
+interface PropsSecao extends Omit<PropsHistorico, "sessoes"> {
+	titulo: string;
+	sessoes: ResumoSessao[];
+	aberta: boolean;
+	alternar(): void;
+	/** Mostra a etiqueta do contexto de cada conversa (a seção mistura assuntos). */
+	comEtiqueta?: boolean;
+	/** Texto da seção aberta sem conversas. */
+	vazio?: string;
+}
+
+function SecaoHistorico(props: PropsSecao) {
+	return (
+		<section className="historico__secao-grupo">
+			<button type="button" className="historico__cabeca" aria-expanded={props.aberta} onClick={props.alternar}>
+				<span className="overline">{props.titulo}</span>
+				<span className="historico__conta data">{props.sessoes.length}</span>
+				<motion.span className="historico__seta" animate={{ rotate: props.aberta ? 90 : 0 }} transition={{ type: "spring", stiffness: 500, damping: 30 }}>
+					<Icon name="chevron-right" size={16} strokeWidth={2.5} />
+				</motion.span>
+			</button>
+			<AnimatePresence initial={false}>
+				{props.aberta ? (
+					<motion.div
+						key="lista"
+						className="historico__dobra"
+						initial={{ height: 0, opacity: 0 }}
+						animate={{ height: "auto", opacity: 1 }}
+						exit={{ height: 0, opacity: 0 }}
+						transition={{ type: "spring", stiffness: 420, damping: 38 }}
+					>
+						{props.sessoes.length === 0 ? (
+							props.vazio ? <p className="historico__vazio body-sm">{props.vazio}</p> : null
+						) : (
+							<ul className="historico__lista">
+								{props.sessoes.map((sessao, indice) => (
+									<ItemHistorico
+										key={sessao.id}
+										sessao={sessao}
+										indice={indice}
+										comEtiqueta={props.comEtiqueta}
+										{...(props.atual ? { atual: props.atual } : {})}
+										{...(props.desabilitado ? { desabilitado: true } : {})}
+										abrirSessao={props.abrirSessao}
+									/>
+								))}
+							</ul>
+						)}
+					</motion.div>
+				) : null}
+			</AnimatePresence>
+		</section>
+	);
+}
+
+function ItemHistorico(props: { sessao: ResumoSessao; indice: number; comEtiqueta?: boolean | undefined } & Pick<PropsHistorico, "atual" | "desabilitado" | "abrirSessao">) {
+	const { sessao } = props;
+	const atual = sessao.id === props.atual;
+	const meta = [formatarData(sessao.modificadaEm), `${sessao.mensagens} mensagens`, sessao.agente].filter(Boolean).join(" · ");
+	const etiqueta = props.comEtiqueta ? sessao.contexto?.rotulo : undefined;
+	return (
+		<motion.li
+			initial={{ opacity: 0, x: -12 }}
+			animate={{ opacity: 1, x: 0 }}
+			transition={{ type: "spring", stiffness: 420, damping: 30, delay: Math.min(props.indice, 12) * 0.03 }}
+		>
+			<button
+				type="button"
+				className={`historico__item${atual ? " historico__item--atual" : ""}`}
+				aria-current={atual || undefined}
+				disabled={props.desabilitado}
+				onClick={() => {
+					if (!atual) props.abrirSessao(sessao.id);
+				}}
+			>
+				{/* A marca da conversa aberta desliza de um item para o outro (layoutId). */}
+				{atual ? <motion.span layoutId="historico-atual" className="historico__marca" transition={{ type: "spring", stiffness: 420, damping: 32 }} /> : null}
+				{etiqueta ? (
+					<Tag size="sm" tone="outline" icon="notebook" className="historico__etiqueta" title={etiqueta}>
+						{etiqueta}
+					</Tag>
+				) : null}
+				<span className="historico__titulo body-strong">{sessao.titulo || "Sem título"}</span>
+				<span className="historico__meta data">{meta}</span>
+			</button>
+		</motion.li>
 	);
 }

@@ -10,6 +10,8 @@ describe("rotaDoHash", () => {
 		expect(rotaDoHash("#/perfil/estudos")).toEqual({ perfil: "estudos", conversa: false });
 		expect(rotaDoHash("#/perfil/estudos/conversa")).toEqual({ perfil: "estudos", conversa: true });
 		expect(rotaDoHash("#/perfil/meu%20perfil")).toEqual({ perfil: "meu perfil", conversa: false });
-		expect(rotaDoHash("#/perfil/estudos/outra")).toEqual({ conversa: false });
+		expect(rotaDoHash("#/perfil/estudos/outra")).toEqual({ perfil: "estudos", conversa: false, caminho: "outra" });
+		expect(rotaDoHash("#/perfil/estudos/caderno/c%C3%A1lculo/notas/")).toEqual({ perfil: "estudos", conversa: false, caminho: "caderno/cálculo/notas" });
+		expect(rotaDoHash("#/outra")).toEqual({ conversa: false });
 	});
 });

@@ -16,6 +16,10 @@ export type VerboEvento =
 	| "adicionou_material"
 	| "atualizou_material"
 	| "removeu_material"
+	// Notas (item 4.3, parte B): editou_nota é um por abertura da nota em que ela mudou.
+	| "criou_nota"
+	| "renomeou_nota"
+	| "editou_nota"
 	// Aprendizagem (seção 9.2), usados a partir dos itens 7 e 8:
 	| "pediu_reexplicacao"
 	| "pediu_outro_jeito"

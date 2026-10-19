@@ -87,7 +87,10 @@ export function previaDaNota(markdown: string, tamanho = 140): string {
 		.replace(/^\s{0,3}(#{1,6}\s+|>\s?|[-*+]\s+(\[[ xX]\]\s+)?|\d+[.)]\s+)/gm, "")
 		.replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
 		.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
-		.replace(/[*_~`]+/g, "")
+		.replace(/<!--[\s\S]*?-->|<\/?[a-zA-Z][^>]*>/g, "")
+		.replace(/[*~`]+/g, "")
+		// O _ de ênfase sai; o do meio da palavra ("x_1", "snake_case") fica.
+		.replace(/(?<![\p{L}\p{N}])_+|_+(?![\p{L}\p{N}])/gu, "")
 		.replace(/\s+/g, " ")
 		.trim();
 	return texto.length > tamanho ? `${texto.slice(0, tamanho - 1).trimEnd()}…` : texto;

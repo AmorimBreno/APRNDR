@@ -14,6 +14,6 @@ export default defineConfig({
 		alias: { typebox: doNucleo.resolve("typebox") },
 	},
 	test: {
-		include: ["packages/*/src/**/*.test.ts", "apps/*/src/**/*.test.ts", "profiles/*/extensions/*.test.ts", "profiles/*/lib/*.test.ts"],
+		include: ["packages/*/src/**/*.test.ts", "apps/*/src/**/*.test.ts", "profiles/*/extensions/*.test.ts", "profiles/*/lib/*.test.ts", "profiles/*/paineis/src/**/*.test.ts"],
 	},
 });

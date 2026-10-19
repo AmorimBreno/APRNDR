@@ -13,6 +13,14 @@
 	"dependencies": {
 		"@estudos/design-system": "workspace:*",
 		"@estudos/ui": "workspace:*",
+		"@tiptap/core": "3.31.4",
+		"@tiptap/extension-bubble-menu": "3.31.4",
+		"@tiptap/extension-list": "3.31.4",
+		"@tiptap/extensions": "3.31.4",
+		"@tiptap/markdown": "3.31.4",
+		"@tiptap/pm": "3.31.4",
+		"@tiptap/react": "3.31.4",
+		"@tiptap/starter-kit": "3.31.4",
 		"motion": "13.5.1"
 	},
 	"peerDependencies": {

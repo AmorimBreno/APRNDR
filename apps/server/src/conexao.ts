@@ -41,6 +41,7 @@ export function resumirMensagem(mensagem: MensagemCliente): string {
 			break;
 		case "nova_sessao":
 			if (mensagem.agente) partes.push(`agente=${mensagem.agente}`);
+			if (mensagem.contexto !== undefined) partes.push(`contexto=${mensagem.contexto?.chave ?? "nenhum"}`);
 			break;
 		case "responder_pedido":
 		case "cancelar_pedido":
@@ -74,7 +75,7 @@ async function executar(janelas: Janelas, conexao: Conexao, mensagem: MensagemCl
 				janela.trocarAgente(mensagem.agente),
 			);
 		case "nova_sessao":
-			return janelas.remontar(mensagem.perfil, "Criando uma sessão nova...", (janela) => janela.novaSessao(mensagem.agente));
+			return janelas.remontar(mensagem.perfil, "Criando uma sessão nova...", (janela) => janela.novaSessao(mensagem.agente, mensagem.contexto));
 		case "abrir_sessao":
 			return janelas.remontar(mensagem.perfil, "Abrindo a sessão...", (janela) => janela.abrirSessao(mensagem.sessaoId));
 		case "listar_sessoes":

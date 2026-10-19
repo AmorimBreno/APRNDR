@@ -25,6 +25,8 @@ describe("mensagens válidas do cliente", () => {
 		{ tipo: "cancelar_pedido", perfil: "estudos", id: "p1" },
 		{ tipo: "acao_interface", perfil: "estudos", painel: "teste", acao: "clicou", dados: null },
 		{ tipo: "listar_materiais", perfil: "estudos" },
+		{ tipo: "nova_sessao", perfil: "estudos", contexto: { chave: "materia:x", rotulo: "X", instrucoes: "Do caderno X.", escopoMateriais: "materias/x" } },
+		{ tipo: "nova_sessao", perfil: "estudos", contexto: null },
 		{ tipo: "reprocessar_material", perfil: "estudos", caminho: "materias/x/materiais/a.pdf" },
 	];
 
@@ -59,6 +61,13 @@ describe("mensagens inválidas do cliente", () => {
 		expect(validarMensagemCliente({ tipo: "acao_interface", perfil: "estudos", painel: "", acao: "a" }).ok).toBe(false);
 		expect(validarMensagemCliente({ tipo: "abrir_perfil" }).ok).toBe(false);
 		expect(validarMensagemCliente({ tipo: "ping", pedidoId: 7 }).ok).toBe(false);
+	});
+
+	it("recusa contexto com pasta fora da pasta de dados", () => {
+		for (const escopoMateriais of ["../fora", "C:\\x", "/x", "materias\\..\\fora"]) {
+			expect(validarMensagemCliente({ tipo: "nova_sessao", perfil: "estudos", contexto: { chave: "a", rotulo: "A", escopoMateriais } }).ok).toBe(false);
+		}
+		expect(validarMensagemCliente({ tipo: "nova_sessao", perfil: "estudos", contexto: { chave: "", rotulo: "A" } }).ok).toBe(false);
 	});
 
 	it("recusa o que não é objeto", () => {

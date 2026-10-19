@@ -7,6 +7,7 @@ import type { DadosResposta, MensagemServidor } from "@estudos/core/protocolo";
 
 export type {
 	DadosPedidoPergunta,
+	ContextoSessao,
 	DadosResposta,
 	EstadoMaterial,
 	HistoricoPonte,

@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { type ClienteConexao, type EstadoConexao, ErroPedido, obterCliente, type PedidoCliente } from "./cliente.ts";
 import { type EstadoJanela, estadoInicial, reduzirJanela } from "./estado-janela.ts";
-import type { DadosResposta, EstadoSessao, InfoModelo, ResumoSessao, SituacaoMaterial } from "./tipos.ts";
+import type { ContextoSessao, DadosResposta, EstadoSessao, InfoModelo, ResumoSessao, SituacaoMaterial } from "./tipos.ts";
 
 export interface AcoesJanela {
 	/** "iniciada" ou "enfileirada" (a sessão estava respondendo). */
@@ -18,7 +18,8 @@ export interface AcoesJanela {
 	/** modelo no formato provedor/id. */
 	trocarModelo(modelo: string): Promise<EstadoSessao>;
 	trocarAgente(agente: string): Promise<EstadoSessao>;
-	novaSessao(agente?: string): Promise<EstadoSessao>;
+	/** contexto: o assunto da sessão nova; null = sem contexto; sem ele = o da sessão atual. */
+	novaSessao(agente?: string, contexto?: ContextoSessao | null): Promise<EstadoSessao>;
 	abrirSessao(sessaoId: string): Promise<EstadoSessao>;
 	listarSessoes(): Promise<ResumoSessao[]>;
 	listarModelos(): Promise<InfoModelo[]>;
@@ -50,6 +51,15 @@ function lerSessaoGuardada(perfilId: string): string | undefined {
 	} catch {
 		return undefined;
 	}
+}
+
+/**
+ * Guarda na aba a sessão do perfil que a próxima tela deve abrir. Uma tela que
+ * troca a sessão e logo navega para outra (o caderno abrindo a conversa da
+ * matéria) chama isto antes de navegar.
+ */
+export function guardarSessaoDoPerfil(perfilId: string, sessaoId: string): void {
+	guardarSessao(perfilId, sessaoId);
 }
 
 function guardarSessao(perfilId: string, sessaoId: string): void {
@@ -149,7 +159,7 @@ export function useJanelaPerfil(perfilId: string, cliente: ClienteConexao = obte
 			abortar: () => pedir({ tipo: "abortar", perfil }),
 			trocarModelo: (modelo) => pedir({ tipo: "trocar_modelo", perfil, modelo }),
 			trocarAgente: (agente) => pedir({ tipo: "trocar_agente", perfil, agente }),
-			novaSessao: (agente) => pedir({ tipo: "nova_sessao", perfil, ...(agente ? { agente } : {}) }),
+			novaSessao: (agente, contexto) => pedir({ tipo: "nova_sessao", perfil, ...(agente ? { agente } : {}), ...(contexto === undefined ? {} : { contexto }) }),
 			abrirSessao: (sessaoId) => pedir({ tipo: "abrir_sessao", perfil, sessaoId }),
 			listarSessoes: () => pedir({ tipo: "listar_sessoes", perfil }),
 			listarModelos: () => pedir({ tipo: "listar_modelos", perfil }),

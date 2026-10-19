@@ -3,9 +3,10 @@
 // - as ferramentas do agente listar_materias e criar_materia (você pode pedir
 //   ao professor "crie a matéria Cálculo I");
 // - a ponte com a tela de cadernos (docs/ponte-de-eventos.md): a tela manda
-//   "interface:acao" no painel "cadernos" (listar, criar) e a extensão
-//   responde com "interface:mostrar" (lista, criada, erro). As listas são
-//   passageiras (gravar: false): a tela pede de novo sempre que abre;
+//   "interface:acao" no painel "cadernos" (listar, criar, abrir, alterar) e a
+//   extensão responde com "interface:mostrar" (lista, criada, caderno,
+//   alterada, erro; um erro de uma ação leva "ao" com o nome dela). As
+//   respostas são passageiras (gravar: false): a tela pede de novo sempre que abre;
 // - os avisos do serviço de materiais do núcleo ("materiais:pronto" e
 //   "materiais:removido", item 4.2), que viram adicionou_material,
 //   atualizou_material e removeu_material no eventos.jsonl da matéria.
@@ -13,6 +14,8 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import {
+	abrirMateria,
+	alterarMateria,
 	type AvisoMaterial,
 	CORES_MATERIA,
 	criarMateria,
@@ -56,11 +59,36 @@ export default function materias(pi: ExtensionAPI) {
 	pi.events.on("materiais:pronto", aoMaterial(false));
 	pi.events.on("materiais:removido", aoMaterial(true));
 
+	/** O caderno de uma matéria: ela e os eventos (a linha do tempo). */
+	const mostrarCaderno = async (id: string) => {
+		if (!pastaDados) return;
+		try {
+			mostrar("caderno", await abrirMateria(pastaDados, id));
+		} catch (erro) {
+			mostrar("erro", { mensagem: (erro as Error).message, ao: "abrir", id });
+		}
+	};
+
 	pi.events.on("interface:acao", (recebido) => {
 		const { painel, acao, dados } = recebido as { painel?: string; acao?: string; dados?: unknown };
 		if (painel !== PAINEL) return;
+		const { id, mudancas } = (dados ?? {}) as { id?: string; mudancas?: Partial<EntradaMateria> };
 		if (acao === "listar") {
 			void mostrarLista();
+		} else if (acao === "abrir" && typeof id === "string") {
+			void mostrarCaderno(id);
+		} else if (acao === "alterar" && typeof id === "string") {
+			void (async () => {
+				if (!pastaDados) return mostrar("erro", { mensagem: "A sessão ainda não abriu a pasta de dados. Tente de novo.", ao: "alterar" });
+				try {
+					await alterarMateria(pastaDados, id, mudancas ?? {}, sessao ? { sessao } : {});
+					mostrar("alterada", { id });
+					await mostrarLista();
+					await mostrarCaderno(id);
+				} catch (erro) {
+					mostrar("erro", { mensagem: erro instanceof ErroMaterias ? erro.message : `Não consegui alterar a matéria: ${(erro as Error).message}`, ao: "alterar" });
+				}
+			})();
 		} else if (acao === "criar") {
 			void (async () => {
 				if (!pastaDados) return mostrar("erro", { mensagem: "A sessão ainda não abriu a pasta de dados. Tente de novo." });

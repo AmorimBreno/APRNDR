@@ -5,7 +5,7 @@
 // acrescenta uma linha no fim (nunca reescreve nem apaga) — AGENTS.md.
 
 import { randomBytes } from "node:crypto";
-import { appendFile, mkdir } from "node:fs/promises";
+import { appendFile, mkdir, readFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 /** Verbos de matéria e de materiais e, a partir dos itens 7 e 8, os de aprendizagem. */
@@ -61,4 +61,32 @@ export function criarEvento(dados: Omit<Evento, "id" | "ts">, agora: Date = new 
 export async function acrescentarEvento(arquivo: string, evento: Evento): Promise<void> {
 	await mkdir(dirname(arquivo), { recursive: true });
 	await appendFile(arquivo, `${JSON.stringify(evento)}\n`, { encoding: "utf8", flag: "a" });
+}
+
+/**
+ * Lê os eventos do arquivo, na ordem em que foram gravados. Linha que não é
+ * um evento (cortada por uma sincronização no meio, por exemplo) é contada e
+ * pulada; o arquivo nunca é corrigido aqui. Sem arquivo, nenhum evento.
+ */
+export async function lerEventos(arquivo: string): Promise<{ eventos: Evento[]; invalidas: number }> {
+	let conteudo: string;
+	try {
+		conteudo = await readFile(arquivo, "utf8");
+	} catch (erro) {
+		if ((erro as NodeJS.ErrnoException).code === "ENOENT") return { eventos: [], invalidas: 0 };
+		throw erro;
+	}
+	const eventos: Evento[] = [];
+	let invalidas = 0;
+	for (const linha of conteudo.split("\n")) {
+		if (!linha.trim()) continue;
+		try {
+			const evento = JSON.parse(linha) as Evento;
+			if (typeof evento.id === "string" && typeof evento.ts === "string" && typeof evento.verbo === "string") eventos.push(evento);
+			else invalidas++;
+		} catch {
+			invalidas++;
+		}
+	}
+	return { eventos, invalidas };
 }

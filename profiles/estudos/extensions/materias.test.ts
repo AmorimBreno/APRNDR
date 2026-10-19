@@ -100,6 +100,30 @@ describe("extensão de matérias", () => {
 		expect(mostrados).toEqual([]);
 	});
 
+	it("abrir manda a matéria e os eventos; alterar grava, avisa e manda a lista e o caderno de novo", async () => {
+		aoIniciar?.({}, ctx);
+		acao("criar", { nome: "Física" });
+		await esperar(() => mostrados.some((mensagem) => mensagem.acao === "lista"));
+		mostrados.length = 0;
+		acao("abrir", { id: "fisica" });
+		await esperar(() => mostrados.length > 0);
+		expect(mostrados[0]).toMatchObject({ acao: "caderno", gravar: false, dados: { materia: { id: "fisica" }, invalidas: 0 } });
+		expect((mostrados[0]!.dados as { eventos: Array<{ verbo: string }> }).eventos.map((evento) => evento.verbo)).toEqual(["criou_materia"]);
+
+		mostrados.length = 0;
+		acao("alterar", { id: "fisica", mudancas: { cor: "amber", provas: [{ nome: "P1", data: "2026-12-01" }] } });
+		await esperar(() => mostrados.some((mensagem) => mensagem.acao === "caderno"));
+		expect(mostrados.map((mensagem) => mensagem.acao)).toEqual(["alterada", "lista", "caderno"]);
+		const caderno = mostrados[2]!.dados as { materia: { cor: string }; eventos: Array<{ verbo: string; resultado: unknown }> };
+		expect(caderno.materia.cor).toBe("amber");
+		expect(caderno.eventos.at(-1)).toMatchObject({ verbo: "alterou_materia", resultado: { cor: "amber", provas: [{ nome: "P1", data: "2026-12-01" }] } });
+
+		mostrados.length = 0;
+		acao("abrir", { id: "nao-existe" });
+		await esperar(() => mostrados.length > 0);
+		expect(mostrados[0]).toMatchObject({ acao: "erro", dados: { ao: "abrir", id: "nao-existe" } });
+	});
+
 	it("os avisos do serviço de materiais viram eventos da matéria; fora de uma matéria, nada", async () => {
 		aoIniciar?.({}, ctx);
 		barramento.emit("materiais:pronto", { caminho: "materias/calculo/materiais/aula.pdf", nome: "aula.pdf", tipo: "pdf", trechos: 12, custo: 0.03, novo: true });

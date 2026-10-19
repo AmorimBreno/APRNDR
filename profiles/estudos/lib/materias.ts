@@ -6,7 +6,7 @@
 
 import { mkdir, readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { acrescentarEvento, criarEvento } from "./eventos.ts";
+import { acrescentarEvento, criarEvento, type Evento, lerEventos } from "./eventos.ts";
 import { CORES_MATERIA, type CorMateria, type EntradaMateria, GLIFOS_MATERIA, type ListaMaterias, type Materia, type Prova } from "./materia-tipos.ts";
 
 export {
@@ -188,6 +188,14 @@ export async function registrarMaterial(
 		}),
 	);
 	return materia;
+}
+
+/** A matéria e os eventos dela (para o caderno e a linha do tempo). */
+export async function abrirMateria(dados: string, id: string): Promise<{ materia: Materia; eventos: Evento[]; invalidas: number }> {
+	const { materias } = await listarMaterias(dados);
+	const materia = materias.find((item) => item.id === id);
+	if (!materia) throw new ErroMaterias(`Não achei a matéria "${id}".`);
+	return { materia, ...(await lerEventos(eventosMateria(dados, id))) };
 }
 
 /** Muda nome, cor, ideograma ou provas (o id e a pasta ficam) e grava o evento alterou_materia com o que mudou. */

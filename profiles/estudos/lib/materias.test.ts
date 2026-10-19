@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { acrescentarEvento, criarEvento, novoIdEvento } from "./eventos.ts";
+import { acrescentarEvento, criarEvento, lerEventos, novoIdEvento } from "./eventos.ts";
 import {
 	alterarMateria,
 	arquivoMateria,
@@ -116,5 +116,17 @@ describe("eventos", () => {
 		const depois = await readFile(arquivo, "utf8");
 		expect(depois.startsWith(antes)).toBe(true);
 		expect(depois.split("\n").filter(Boolean)).toHaveLength(2);
+	});
+
+	it("ler pula linha quebrada sem mexer no arquivo; sem arquivo, nenhum evento", async () => {
+		const arquivo = join(dados, "materias", "x", "eventos.jsonl");
+		expect(await lerEventos(arquivo)).toEqual({ eventos: [], invalidas: 0 });
+		await acrescentarEvento(arquivo, criarEvento({ verbo: "criou_materia", objeto: { materia: "x" } }));
+		await writeFile(arquivo, `${await readFile(arquivo, "utf8")}{"cortado\n`);
+		const antes = await readFile(arquivo, "utf8");
+		const lidos = await lerEventos(arquivo);
+		expect(lidos.eventos.map((evento) => evento.verbo)).toEqual(["criou_materia"]);
+		expect(lidos.invalidas).toBe(1);
+		expect(await readFile(arquivo, "utf8")).toBe(antes);
 	});
 });

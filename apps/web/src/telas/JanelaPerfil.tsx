@@ -255,9 +255,10 @@ export function JanelaPerfil({ perfilId, voltar }: PropsJanelaPerfil) {
 					<Icon name="list" size={18} strokeWidth={2.5} />
 					{voltar.rotulo}
 				</button>
+				{/* Uma conversa com contexto (a de um caderno) mostra o assunto; a geral, o perfil. */}
 				<div className="topo__titulo">
-					<span className="overline">Perfil</span>
-					<h1 className="display-sm">{nomePerfil}</h1>
+					<span className="overline">{estado.sessao?.contexto ? `${nomePerfil} · conversa de` : "Perfil"}</span>
+					<h1 className="display-sm">{estado.sessao?.contexto?.rotulo ?? nomePerfil}</h1>
 				</div>
 
 				<div className="topo__controles">

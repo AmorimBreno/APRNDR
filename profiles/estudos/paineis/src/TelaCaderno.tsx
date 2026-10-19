@@ -13,10 +13,10 @@
 import { Button, EmptyState, Icon, type IconName, NotebookCover, type OrnamentGlyph, pad2 } from "@estudos/design-system";
 import { type JanelaPerfilHook, type PropsTelaInicial, semEsperar } from "@estudos/ui";
 import { motion } from "motion/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Evento } from "../../lib/eventos.ts";
 import { type Materia, pastaMateriaisRelativa } from "../../lib/materia-tipos.ts";
-import { dataCurta, lerAcoes, PAINEL_CADERNOS, proximaProva, quando, rotuloCapa } from "./comum.ts";
+import { contextoDaMateria, type DadosCaderno, dataCurta, lerAcoes, PAINEL_CADERNOS, prepararConversa, proximaProva, quando, rotuloCapa } from "./comum.ts";
 import { ModalMateria } from "./ModalMateria.tsx";
 import { ConteudoMateriais, custoDaVisao, formatarDolar } from "./ModalMateriais.tsx";
 
@@ -151,9 +151,14 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 	const sessaoId = estado.sessao?.sessaoId;
 	const recebidas = estado.acoesPorPainel[PAINEL_CADERNOS];
 	const { lista, cadernos, errosAbrir } = useMemo(() => lerAcoes(recebidas ?? []), [recebidas]);
-	const caderno = cadernos[props.materiaId];
+	// Trocar de sessão (para abrir a conversa da matéria) zera as ações da ponte;
+	// até sair da tela, vale o último caderno recebido, sem piscar "Abrindo".
+	const ultimo = useRef<DadosCaderno | undefined>(undefined);
+	if (cadernos[props.materiaId]) ultimo.current = cadernos[props.materiaId];
+	const caderno = cadernos[props.materiaId] ?? (ultimo.current?.materia.id === props.materiaId ? ultimo.current : undefined);
 	const erro = errosAbrir[props.materiaId];
 	const [editando, setEditando] = useState(false);
+	const [abrindoConversa, setAbrindoConversa] = useState(false);
 
 	// A lista (para o número do caderno) e os materiais.
 	const { materiaId } = props;
@@ -180,6 +185,14 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 		materiais: materiais?.length,
 	};
 	const voltar = () => props.navegar("");
+	// A conversa da matéria: a mais recente dela, ou uma nova com o contexto do caderno.
+	const conversar = () => {
+		if (!materia || abrindoConversa) return;
+		setAbrindoConversa(true);
+		prepararConversa(props.janela, props.perfilId, contextoDaMateria(materia))
+			.then(() => props.abrirConversa())
+			.catch(() => setAbrindoConversa(false));
+	};
 	const irPara = (id: string) => props.navegar(id === SECOES[0]!.id ? `caderno/${materiaId}` : `caderno/${materiaId}/${id}`);
 
 	return (
@@ -189,7 +202,8 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 				{...(numero ? { numero } : {})}
 				voltar={voltar}
 				editar={() => setEditando(true)}
-				conversar={props.abrirConversa}
+				conversar={conversar}
+				abrindo={abrindoConversa}
 			/>
 			{erro && !materia ? (
 				<div className="caderno__erro">
@@ -288,6 +302,8 @@ interface PropsAbaCaderno {
 	voltar(): void;
 	editar(): void;
 	conversar(): void;
+	/** A conversa da matéria está sendo aberta (a sessão troca no servidor). */
+	abrindo?: boolean;
 }
 
 /** A aba tijolo do caderno, com as classes da CourseBar do design system (sem a trilha: o caderno não é um curso). */
@@ -316,9 +332,9 @@ function AbaCaderno(props: PropsAbaCaderno) {
 			<button type="button" className="ap-cbar__back button aba-caderno__editar" onClick={props.editar} disabled={!materia}>
 				Editar
 			</button>
-			<button type="button" className="ap-cbar__next" onClick={props.conversar}>
-				<span className="ap-cbar__next-kicker overline">Conversar</span>
-				<span className="ap-cbar__next-label body-strong">com o professor</span>
+			<button type="button" className="ap-cbar__next" onClick={props.conversar} disabled={!materia || props.abrindo} aria-busy={props.abrindo}>
+				<span className="ap-cbar__next-kicker overline">{props.abrindo ? "Abrindo" : "Conversar"}</span>
+				<span className="ap-cbar__next-label body-strong">{props.abrindo ? "a conversa…" : "sobre a matéria"}</span>
 				<Icon name="arrow-right" size={20} strokeWidth={2.5} />
 			</button>
 		</header>

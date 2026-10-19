@@ -1,7 +1,8 @@
 // O que a tela de cadernos e a do caderno dividem: o painel da ponte com a
-// extensão de matérias, a leitura do que ela mandou e as contas de prova.
+// extensão de matérias, a leitura do que ela mandou, as contas de prova e a
+// escolha da conversa (a geral ou a da matéria) antes de ir para ela.
 
-import type { AcaoRecebida } from "@estudos/ui";
+import { type AcaoRecebida, type ContextoSessao, guardarSessaoDoPerfil, type JanelaPerfilHook } from "@estudos/ui";
 import type { Evento } from "../../lib/eventos.ts";
 import type { ListaMaterias, Materia } from "../../lib/materia-tipos.ts";
 
@@ -74,4 +75,39 @@ export function lerAcoes(acoes: AcaoRecebida[]): {
 		}
 	}
 	return { ...(lista ? { lista } : {}), ...(erro ? { erro } : {}), cadernos, errosAbrir };
+}
+
+/**
+ * O contexto da conversa de um caderno (ContextoSessao do núcleo): a chave e o
+ * nome da matéria, o que o professor precisa saber e a pasta que limita a
+ * busca nos materiais.
+ */
+export function contextoDaMateria(materia: Materia): ContextoSessao {
+	return {
+		chave: `materia:${materia.id}`,
+		rotulo: materia.nome,
+		instrucoes: [
+			`Esta conversa é do caderno da matéria ${materia.nome} (pasta materias/${materia.id} da pasta de dados).`,
+			"Quando o Breno falar da matéria, da aula, dos slides ou da prova, é desta.",
+			"A busca nos materiais (buscar_material e listar_arquivos_de_material) já fica nesta matéria; só use todas: true se ele pedir para procurar em outras matérias.",
+		].join(" "),
+		escopoMateriais: `materias/${materia.id}`,
+	};
+}
+
+/**
+ * Deixa aberta a conversa certa antes de ir para ela: com um contexto, a
+ * conversa mais recente daquela matéria (ou uma nova, se ainda não houver);
+ * com null, a conversa geral mais recente (sem matéria). Se a sessão aberta
+ * já for a certa, não troca. Guarda a sessão na aba, para a janela de
+ * conversa abrir nela.
+ */
+export async function prepararConversa(janela: JanelaPerfilHook, perfilId: string, contexto: ContextoSessao | null): Promise<void> {
+	const { estado, acoes } = janela;
+	const chave = contexto?.chave;
+	if (estado.sessao && estado.sessao.contexto?.chave === chave) return;
+	const sessoes = await acoes.listarSessoes();
+	const ultima = sessoes.find((sessao) => sessao.contexto?.chave === chave);
+	const aberta = ultima ? await acoes.abrirSessao(ultima.id) : await acoes.novaSessao(undefined, contexto);
+	guardarSessaoDoPerfil(perfilId, aberta.sessaoId);
 }

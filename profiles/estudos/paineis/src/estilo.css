@@ -143,3 +143,4 @@
 ::view-transition-new(*.perfil):only-child { animation: folha-sobe .5s .06s cubic-bezier(.65, 0, .25, 1) both; }
 @keyframes folha-desce { to { opacity: 0; transform: translateY(32%); } }
 @keyframes folha-sobe { from { opacity: 0; transform: translateY(24%); } }
+.aba-caderno .ap-cbar__next:disabled { cursor: progress; }

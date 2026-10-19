@@ -12,7 +12,7 @@ import { Button, Icon, type OrnamentGlyph, pad2, Stat, SubjectWheel, type Subjec
 import { type ControleFaixaMarca, FaixaMarca, type JanelaPerfilHook, type PropsTelaInicial, semEsperar, type SituacaoMaterial } from "@estudos/ui";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { type Materia, pastaMateriaisRelativa } from "../../lib/materia-tipos.ts";
-import { dataCurta, lerAcoes, PAINEL_CADERNOS, proximaProva, quando, rotuloCapa } from "./comum.ts";
+import { dataCurta, lerAcoes, PAINEL_CADERNOS, prepararConversa, proximaProva, quando, rotuloCapa } from "./comum.ts";
 import { ModalMateria } from "./ModalMateria.tsx";
 import { ModalMateriais } from "./ModalMateriais.tsx";
 
@@ -50,7 +50,13 @@ export function TelaCadernos(props: PropsTelaCadernos) {
 	const { estado, acoes } = props.janela;
 	const sessaoId = estado.sessao?.sessaoId;
 	const recebidas = estado.acoesPorPainel[PAINEL_CADERNOS];
-	const { lista, erro } = useMemo(() => lerAcoes(recebidas ?? []), [recebidas]);
+	const lidas = useMemo(() => lerAcoes(recebidas ?? []), [recebidas]);
+	const erro = lidas.erro;
+	// Trocar de sessão (para abrir a conversa geral) zera as ações da ponte;
+	// até sair da tela, vale a última lista recebida, sem piscar "Abrindo".
+	const ultimaLista = useRef(lidas.lista);
+	if (lidas.lista) ultimaLista.current = lidas.lista;
+	const lista = lidas.lista ?? ultimaLista.current;
 
 	// Com a sessão aberta (e de novo se ela mudar, como depois de uma reconexão), pede as listas.
 	useEffect(() => {
@@ -61,6 +67,7 @@ export function TelaCadernos(props: PropsTelaCadernos) {
 
 	const [criando, setCriando] = useState(false);
 	const [vendoMateriais, setVendoMateriais] = useState(false);
+	const [abrindoConversa, setAbrindoConversa] = useState(false);
 
 	// A faixa entra como bandeira; para sair (para os perfis, a conversa ou um caderno), ela sobe antes.
 	const faixa = useRef<ControleFaixaMarca>(null);
@@ -89,6 +96,14 @@ export function TelaCadernos(props: PropsTelaCadernos) {
 	const escolhida = props.escolhida ?? materias[0]?.id;
 	const materiaAtual = materias.find((materia) => materia.id === escolhida);
 	const problemaAoAbrir = !lista && !erro && estado.erros.at(-1)?.mensagem;
+	// A conversa geral (sem matéria): a mais recente, ou uma nova.
+	const conversarGeral = () => {
+		if (abrindoConversa) return;
+		setAbrindoConversa(true);
+		prepararConversa(props.janela, props.perfilId, null)
+			.then(() => sairE(props.abrirConversa)())
+			.catch(() => setAbrindoConversa(false));
+	};
 
 	return (
 		<div className="tela">
@@ -168,8 +183,8 @@ export function TelaCadernos(props: PropsTelaCadernos) {
 							<Icon name="paperclip" size={18} strokeWidth={2.25} />
 							Materiais
 						</button>
-						<button type="button" className="tecla-papel button" onClick={sairE(props.abrirConversa)}>
-							Conversar com o professor
+						<button type="button" className="tecla-papel button" onClick={conversarGeral} disabled={abrindoConversa} aria-busy={abrindoConversa}>
+							{abrindoConversa ? "Abrindo a conversa…" : "Conversa geral"}
 							<Icon name="arrow-right" size={18} strokeWidth={2.25} />
 						</button>
 					</span>

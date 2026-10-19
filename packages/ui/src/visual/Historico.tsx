@@ -34,7 +34,7 @@ export function Historico(props: PropsHistorico) {
 				<ul className="historico__lista">
 					{props.sessoes.map((sessao, indice) => {
 						const atual = sessao.id === props.atual;
-						const meta = [formatarData(sessao.modificadaEm), `${sessao.mensagens} mensagens`, sessao.agente].filter(Boolean).join(" · ");
+						const meta = [sessao.contexto?.rotulo, formatarData(sessao.modificadaEm), `${sessao.mensagens} mensagens`, sessao.agente].filter(Boolean).join(" · ");
 						return (
 							<motion.li
 								key={sessao.id}

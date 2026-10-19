@@ -224,7 +224,12 @@ a.linha:hover .linha__texto .overline, a.linha:focus-visible .linha__texto .over
 .historico__item:disabled { cursor: default; opacity: var(--opacity-disabled); }
 .historico__item--atual, .historico__item--atual:hover { background: transparent; cursor: default; }
 .historico__marca { position: absolute; inset: calc(var(--border-control) * -1); z-index: 0; border: var(--border-control) solid var(--amber); border-radius: var(--radius-md); background: var(--amber-tint); }
-.historico__titulo, .historico__meta { position: relative; z-index: 1; }
+.historico__titulo, .historico__meta, .historico__etiqueta { position: relative; z-index: 1; }
+/* A matéria (o contexto) da conversa, em cima do título, quando a lista mistura assuntos. */
+.historico__etiqueta { align-self: flex-start; max-width: 100%; margin-bottom: 4px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.historico__alternar { align-self: flex-start; padding: 4px 0; border: 0; background: transparent; color: var(--ink-muted); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.historico__alternar:hover { color: var(--ink); }
+.historico__alternar:focus-visible { outline: none; border-radius: 2px; box-shadow: var(--focus-ring); }
 .historico__item--atual:disabled { opacity: 1; }
 .historico__titulo { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; }
 .historico__meta { color: var(--ink-muted); font-size: 12px; line-height: 16px; }

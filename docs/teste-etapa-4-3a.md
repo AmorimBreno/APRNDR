@@ -34,7 +34,7 @@ No fim, anote o resultado de cada passo e mande para o Claude Code.
 
 9. Mande: "Do que trata esta matéria, pelos materiais?". Por quê: o professor sabe de que matéria é a conversa e busca só nela. O que você deve ver: a linha de ferramenta "Buscar no material" e uma resposta sobre os materiais de Ciência de Dados, sem você dizer o nome da matéria. Clique em "Caderno" na barra: volta para o caderno.
 
-10. Clique de novo em "Conversar sobre a matéria". Por quê: a matéria tem a sua conversa, que continua. O que você deve ver: a mesma conversa do passo 9, com a pergunta e a resposta. No histórico (a faixa da esquerda), ela aparece com "Ciência de Dados" antes da data. "Nova conversa" ali cria outra conversa da mesma matéria.
+10. Clique de novo em "Conversar sobre a matéria". Por quê: a matéria tem a sua conversa, que continua. O que você deve ver: a mesma conversa do passo 9, com a pergunta e a resposta. O histórico (a faixa da esquerda) diz "Conversas de Ciência de Dados" e mostra só as conversas da matéria; "Todas as conversas (mais N)", embaixo, mostra as outras também, com uma etiqueta com o nome da matéria nas que são de um caderno, e "Só as de Ciência de Dados" volta. "Nova conversa" ali cria outra conversa da mesma matéria.
 
 11. Volte para as matérias e abra o caderno da segunda matéria. Clique em "Conversar sobre a matéria" e pergunte por algo que só está nos materiais de Ciência de Dados. Por quê: a busca fica presa ao caderno. O que você deve ver: o professor não acha (a busca diz "em materias/<a segunda matéria>"). Peça "procure em todas as matérias": ele busca de novo em todas e acha nos materiais de Ciência de Dados.
 

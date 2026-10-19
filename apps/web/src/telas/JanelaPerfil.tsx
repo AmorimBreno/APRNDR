@@ -318,6 +318,7 @@ export function JanelaPerfil({ perfilId, voltar }: PropsJanelaPerfil) {
 					<Historico
 						sessoes={sessoes}
 						{...(sessaoId ? { atual: sessaoId } : {})}
+						{...(estado.sessao?.contexto ? { contexto: estado.sessao.contexto } : {})}
 						desabilitado={!aberta}
 						novaSessao={() => semEsperar(acoes.novaSessao())}
 						abrirSessao={(id) => semEsperar(acoes.abrirSessao(id))}

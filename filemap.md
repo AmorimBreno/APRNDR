@@ -26,7 +26,7 @@ packages/core/src/perfis.ts — esquema zod do profile.json e leitura da pasta p
 packages/core/src/agentes.ts — leitura dos arquivos de agente (frontmatter pelo parseFrontmatter do pi + prompt)
 packages/core/src/modelos.ts — nomes provedor/id resolvidos no registro de modelos do pi, níveis de raciocínio, modelos disponíveis
 packages/core/src/eventos.ts — tipo EventoNucleo (protocolo genérico, inclusive acao_interface e pedido_interface), tradução dos eventos da sessão do pi e do histórico
-packages/core/src/sessoes.ts — opções do DefaultResourceLoader por (perfil, agente) e modo (principal ou subagente), filtros de skills e ferramentas, agente gravado na sessão, lista de sessões em <dados>/.sessoes-pi
+packages/core/src/sessoes.ts — opções do DefaultResourceLoader por (perfil, agente) e modo (principal ou subagente), filtros de skills e ferramentas, agente e contexto (ContextoSessao: o assunto da sessão, com instruções e escopo de materiais) gravados na sessão, lista de sessões em <dados>/.sessoes-pi
 packages/core/src/montagem.ts — criação de uma sessão do pi pelo SDK, ligação das extensões com o filtro de ferramentas e encerramento; comum à sessão principal e às filhas
 packages/core/src/ponte.ts — ponte de eventos: extensão inline que liga pi.events à janela (mostrar, pedido e resposta com cancelamento, inclusive pelo usuário, ação da interface); grava pedidos, fins e ações na sessão (entradas nucleo.ponte) para o histórico reconstruí-los
 packages/core/src/pergunta.ts — ask_user_question do app: mesmo nome, parâmetros e resultado da versão de terminal, perguntando pela ponte no painel "pergunta"; entra em toda sessão principal
@@ -136,7 +136,7 @@ profiles/estudos/paineis/ — @estudos/perfil-estudos: código de tela do perfil
 profiles/estudos/paineis/src/TelaEstudos.tsx — tela inicial do perfil: guarda a sessão (um useJanelaPerfil) e escolhe a subtela pelo caminho ("" = cadernos, "caderno/<id>/<seção>" = caderno)
 profiles/estudos/paineis/src/TelaCaderno.tsx — caderno da matéria: aba tijolo (classes da CourseBar), índice das seções, linha do tempo dos eventos, seção Materiais e as seções que ainda não existem
 profiles/estudos/paineis/src/ModalMateria.tsx — modal de criar ou editar a matéria (nome, cor, ideograma, prova, capa de amostra)
-profiles/estudos/paineis/src/comum.ts — o painel "cadernos" da ponte, a leitura das ações da extensão e as contas de prova
+profiles/estudos/paineis/src/comum.ts — o painel "cadernos" da ponte, a leitura das ações da extensão, as contas de prova, o contexto da conversa da matéria e prepararConversa (abre a conversa da matéria ou a geral antes de ir para ela)
 profiles/estudos/paineis/src/index.ts — tela inicial do perfil (TelaEstudos) e registro dos painéis (cadernos = ponte da tela, fora da área; quiz = Questões: só modal, revisa ao responder, resumo "Questão")
 profiles/estudos/paineis/src/TelaCadernos.tsx — tela inicial do perfil de estudos: abre a sessão do perfil, lista as matérias na SubjectWheel com capas NotebookCover (com a contagem de materiais), "Abrir" leva ao caderno, "Nova matéria" abre o ModalMateria, a tecla Materiais e a tecla para a conversa
 profiles/estudos/paineis/src/ModalMateriais.tsx — modal de materiais da matéria e o ConteudoMateriais (o mesmo conteúdo na seção Materiais do caderno): FileDrop que envia para materias/<id>/materiais e a lista com a situação de cada arquivo (fila, etapa e barra, pronto com trechos e custo, erro, não suportado) e processar de novo

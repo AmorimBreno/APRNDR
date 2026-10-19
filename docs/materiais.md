@@ -43,6 +43,7 @@ Um arquivo só é processado de novo se o conteúdo mudar (o tamanho e a data po
 ## O que o perfil recebe
 
 - Ferramentas do núcleo, em toda sessão principal do perfil: `buscar_material` (consulta, pasta opcional), `ler_material` (caminho, de e até por página, célula ou seção) e `listar_arquivos_de_material`.
+- Escopo: uma sessão com contexto (`ContextoSessao` do núcleo, criado pela interface do perfil com `nova_sessao`) pode ter `escopoMateriais`, uma pasta da pasta de dados. Nela, `buscar_material` e `listar_arquivos_de_material` ficam dentro dessa pasta; uma `pasta` pedida fora dela é trocada pelo escopo. O agente só sai do escopo com `todas: true`, quando o usuário pede. `ler_material` lê qualquer caminho que ele já tenha. No perfil de estudos, a conversa aberta do caderno tem o escopo `materias/<id>`.
 - No barramento da sessão (`pi.events`), para as extensões do perfil:
 	- `materiais:pronto` com `{caminho, pasta, nome, tipo, trechos, custo, novo}`: `novo` é falso quando o arquivo já tinha extraído e mudou;
 	- `materiais:removido` com `{caminho, pasta, nome}`.

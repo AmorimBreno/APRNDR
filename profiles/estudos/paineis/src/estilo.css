@@ -49,3 +49,23 @@
 	.nova-materia__cor, .nova-materia__glifo { transition: none; }
 	.nova-materia__cor:hover { transform: none; }
 }
+
+/* ── Modal de materiais (ModalMateriais.tsx): FileDrop e as linhas no estilo do FileRow do design system ── */
+.cadernos__teclas { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
+.tecla-papel:disabled { opacity: var(--opacity-disabled); cursor: not-allowed; }
+.materiais { display: flex; flex-direction: column; gap: var(--space-4); }
+.materiais__vazio, .materiais__aviso { margin: 0; color: var(--ink-muted); }
+.materiais__lista { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.materiais__custo { margin-right: auto; color: var(--ink-muted); }
+.material { grid-template-columns: auto minmax(0, 1fr) auto auto; }
+.material__lado { grid-row: 1; grid-column: 3; display: inline-flex; align-items: center; gap: var(--space-3); }
+.material__tamanho { color: var(--ink-muted); white-space: nowrap; }
+.material .ap-file__remove { grid-row: 1; grid-column: 4; }
+.material .ap-file__remove:disabled { opacity: var(--opacity-disabled); cursor: progress; }
+.material__detalhe { grid-row: 2; grid-column: 2 / 5; margin-bottom: 4px; color: var(--ink-muted); overflow-wrap: anywhere; }
+.material__detalhe--erro { color: var(--brick-text); }
+.material__barra { grid-row: 3; grid-column: 2 / 5; }
+.material__avisos { margin-top: var(--space-1); }
+.material__avisos summary { cursor: pointer; }
+.material__avisos ul { margin: var(--space-1) 0 0; padding-left: var(--space-5); }
+.cadernos__corpo { overflow: hidden; }

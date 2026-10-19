@@ -40,3 +40,6 @@ export interface ListaMaterias {
 	/** Pastas em materias/ com materia.json faltando ou ilegível. */
 	erros: Array<{ pasta: string; mensagem: string }>;
 }
+
+/** A pasta de materiais da matéria, relativa à pasta de dados (o serviço de materiais do núcleo observa estas, profile.json). */
+export const pastaMateriaisRelativa = (id: string) => `materias/${id}/materiais`;

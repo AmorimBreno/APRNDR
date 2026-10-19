@@ -8,11 +8,23 @@
 // (extensions/materias.ts) pela ponte: manda "listar" e "criar" ao painel
 // "cadernos" e recebe "lista", "criada" e "erro". Por enquanto, abrir um
 // caderno abre a conversa com o professor (item 4.1 do docs/PLANO.md).
+//
+// A tecla Materiais do pé abre os materiais da matéria do meio da roda
+// (ModalMateriais, item 4.2): a situação vem do serviço de materiais do núcleo.
 
 import { Button, Icon, Modal, NotebookCover, type OrnamentGlyph, pad2, Stat, SubjectWheel, type SubjectItem, TextField } from "@estudos/design-system";
-import { type AcaoRecebida, type ControleFaixaMarca, FaixaMarca, type PropsTelaInicial, semEsperar, useJanelaPerfil } from "@estudos/ui";
+import { type AcaoRecebida, type ControleFaixaMarca, FaixaMarca, type PropsTelaInicial, semEsperar, type SituacaoMaterial, useJanelaPerfil } from "@estudos/ui";
 import { type FormEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { CORES_MATERIA, type CorMateria, type EntradaMateria, GLIFOS_MATERIA, type ListaMaterias, type Materia } from "../../lib/materia-tipos.ts";
+import {
+	CORES_MATERIA,
+	type CorMateria,
+	type EntradaMateria,
+	GLIFOS_MATERIA,
+	type ListaMaterias,
+	type Materia,
+	pastaMateriaisRelativa,
+} from "../../lib/materia-tipos.ts";
+import { ModalMateriais } from "./ModalMateriais.tsx";
 
 /** O painel da ponte que a extensão de matérias atende. */
 export const PAINEL_CADERNOS = "cadernos";
@@ -46,12 +58,13 @@ function quando(dias: number): string {
 /** O nome curto na etiqueta da capa: a primeira palavra. */
 const rotuloCapa = (nome: string) => nome.split(" ")[0] ?? nome;
 
-function itemDaRoda(materia: Materia, indice: number, hoje: Date): SubjectItem {
+function itemDaRoda(materia: Materia, indice: number, hoje: Date, materiais: number): SubjectItem {
 	const prova = proximaProva(materia, hoje);
+	const contagem = materiais ? ` · ${materiais} ${materiais === 1 ? "material" : "materiais"}` : "";
 	return {
 		id: materia.id,
 		title: materia.nome,
-		kicker: `Caderno ${pad2(indice + 1)}${prova ? ` · ${prova.nome} ${quando(prova.dias)}` : ""}`,
+		kicker: `Caderno ${pad2(indice + 1)}${prova ? ` · ${prova.nome} ${quando(prova.dias)}` : ""}${contagem}`,
 		...(prova ? { meta: diaMes.format(dataLocal(prova.data)).replace(".", "") } : {}),
 		cover: { tone: materia.cor, glyph: materia.glifo as OrnamentGlyph, label: rotuloCapa(materia.nome), number: pad2(indice + 1) },
 	};
@@ -72,10 +85,10 @@ function lerAcoes(acoes: AcaoRecebida[]): { lista?: ListaMaterias; erro?: string
 	return { ...(lista ? { lista } : {}), ...(erro ? { erro } : {}) };
 }
 
-/** Linhas visíveis da roda que cabem na altura (ímpar, pelo menos 3). */
+/** Linhas visíveis da roda que cabem na altura (ímpar, pelo menos 1: numa janela baixa, sem barra de rolagem). */
 function linhasQueCabem(altura: number): number {
 	const linhas = Math.floor(altura / LINHA_RODA);
-	return Math.max(3, linhas % 2 === 0 ? linhas - 1 : linhas);
+	return Math.max(1, linhas % 2 === 0 ? linhas - 1 : linhas);
 }
 
 const semAcoes: AcaoRecebida[] = [];
@@ -86,13 +99,16 @@ export function TelaCadernos(props: PropsTelaInicial) {
 	const recebidas = estado.acoesPorPainel[PAINEL_CADERNOS] ?? semAcoes;
 	const { lista, erro } = useMemo(() => lerAcoes(recebidas), [recebidas]);
 
-	// Com a sessão aberta (e de novo se ela mudar, como depois de uma reconexão), pede a lista.
+	// Com a sessão aberta (e de novo se ela mudar, como depois de uma reconexão), pede as listas.
 	useEffect(() => {
-		if (sessaoId) semEsperar(acoes.acaoDaInterface(PAINEL_CADERNOS, "listar"));
+		if (!sessaoId) return;
+		semEsperar(acoes.acaoDaInterface(PAINEL_CADERNOS, "listar"));
+		semEsperar(acoes.listarMateriais());
 	}, [sessaoId, acoes]);
 
 	const [escolhida, setEscolhida] = useState<string | undefined>(undefined);
 	const [criando, setCriando] = useState(false);
+	const [vendoMateriais, setVendoMateriais] = useState(false);
 
 	// A faixa entra como bandeira; para sair (para os perfis ou para a conversa), ela sobe antes.
 	const faixa = useRef<ControleFaixaMarca>(null);
@@ -115,7 +131,10 @@ export function TelaCadernos(props: PropsTelaInicial) {
 
 	const materias = lista?.materias ?? [];
 	const hoje = new Date();
-	const itens = materias.map((materia, indice) => itemDaRoda(materia, indice, hoje));
+	const materiaisDe = (id: string): SituacaoMaterial[] | undefined => estado.materiais?.filter((material) => material.pasta === pastaMateriaisRelativa(id));
+	const itens = materias.map((materia, indice) => itemDaRoda(materia, indice, hoje, materiaisDe(materia.id)?.length ?? 0));
+	// A matéria do meio da roda (a roda começa na primeira; na linha "Nova matéria", nenhuma).
+	const materiaAtual = materias.find((materia) => materia.id === (escolhida ?? materias[0]?.id));
 	const problemaAoAbrir = !lista && !erro && estado.erros.at(-1)?.mensagem;
 
 	return (
@@ -184,12 +203,33 @@ export function TelaCadernos(props: PropsTelaInicial) {
 							? `${lista.erros.length === 1 ? "Uma pasta" : `${lista.erros.length} pastas`} de matéria com problema: ${lista.erros.map((item) => item.pasta).join(", ")}`
 							: "Por enquanto, abrir um caderno leva à conversa com o professor"}
 					</span>
-					<button type="button" className="tecla-papel button" onClick={sairE(props.abrirConversa)}>
-						Conversar com o professor
-						<Icon name="arrow-right" size={18} strokeWidth={2.25} />
-					</button>
+					<span className="cadernos__teclas">
+						<button
+							type="button"
+							className="tecla-papel button"
+							disabled={!materiaAtual}
+							title={materiaAtual ? `Materiais de ${materiaAtual.nome}` : "Escolha uma matéria na roda"}
+							onClick={() => setVendoMateriais(true)}
+						>
+							<Icon name="paperclip" size={18} strokeWidth={2.25} />
+							Materiais
+						</button>
+						<button type="button" className="tecla-papel button" onClick={sairE(props.abrirConversa)}>
+							Conversar com o professor
+							<Icon name="arrow-right" size={18} strokeWidth={2.25} />
+						</button>
+					</span>
 				</footer>
 			</main>
+			<ModalMateriais
+				aberto={vendoMateriais && Boolean(materiaAtual)}
+				fechar={() => setVendoMateriais(false)}
+				{...(materiaAtual ? { materia: materiaAtual } : {})}
+				{...(materiaAtual && estado.materiais ? { materiais: materiaisDe(materiaAtual.id) ?? [] } : {})}
+				pasta={materiaAtual ? pastaMateriaisRelativa(materiaAtual.id) : ""}
+				enviar={(arquivos) => (materiaAtual ? acoes.enviarMateriais(pastaMateriaisRelativa(materiaAtual.id), arquivos) : Promise.resolve([]))}
+				reprocessar={(caminho) => acoes.reprocessarMaterial(caminho)}
+			/>
 			<ModalNovaMateria
 				aberto={criando}
 				fechar={() => setCriando(false)}

@@ -9,7 +9,16 @@ import { join } from "node:path";
 import { acrescentarEvento, criarEvento } from "./eventos.ts";
 import { CORES_MATERIA, type CorMateria, type EntradaMateria, GLIFOS_MATERIA, type ListaMaterias, type Materia, type Prova } from "./materia-tipos.ts";
 
-export { CORES_MATERIA, type CorMateria, type EntradaMateria, GLIFOS_MATERIA, type ListaMaterias, type Materia, type Prova } from "./materia-tipos.ts";
+export {
+	CORES_MATERIA,
+	type CorMateria,
+	type EntradaMateria,
+	GLIFOS_MATERIA,
+	type ListaMaterias,
+	type Materia,
+	pastaMateriaisRelativa,
+	type Prova,
+} from "./materia-tipos.ts";
 
 export class ErroMaterias extends Error {
 	constructor(mensagem: string) {
@@ -139,9 +148,6 @@ export async function criarMateria(dados: string, entrada: EntradaMateria, conte
 	);
 	return materia;
 }
-
-/** A pasta de materiais da matéria, relativa à pasta de dados (o serviço de materiais do núcleo observa estas). */
-export const pastaMateriaisRelativa = (id: string) => `materias/${id}/materiais`;
 
 /** O id da matéria de um caminho de material ("materias/calculo-i/materiais/aula.pdf" → "calculo-i"). */
 export function materiaDoMaterial(caminho: string): string | undefined {

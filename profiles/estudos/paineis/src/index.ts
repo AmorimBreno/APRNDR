@@ -4,7 +4,7 @@
 
 import type { EntradaTelaInicial, RegistroPaineis } from "@estudos/ui";
 import { ehPergunta, PainelQuiz } from "./PainelQuiz.tsx";
-import { PAINEL_CADERNOS } from "./comum.ts";
+import { PAINEL_CADERNOS, usarAparenciaMaterias } from "./comum.ts";
 import { TelaEstudos } from "./TelaEstudos.tsx";
 
 export { PainelQuiz } from "./PainelQuiz.tsx";
@@ -17,6 +17,8 @@ export const telaInicialEstudos: EntradaTelaInicial = {
 	componente: TelaEstudos,
 	rotuloVoltar: "Cadernos",
 	rotuloDoCaminho: (caminho) => (caminho.startsWith("caderno/") ? "Caderno" : undefined),
+	// O nome e a cor de agora de cada matéria, para a pílula do histórico da conversa.
+	usarAparenciaContextos: usarAparenciaMaterias,
 };
 
 export const paineisEstudos: RegistroPaineis = {

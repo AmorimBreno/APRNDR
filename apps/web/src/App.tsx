@@ -96,5 +96,12 @@ function Rotas() {
 		? { rotulo: (ultimo && inicial.rotuloDoCaminho?.(ultimo)) || inicial.rotuloVoltar, hash: hashDoCaminho(perfil, ultimo) }
 		: { rotulo: "Perfis", hash: "#/" };
 	// key: outro perfil começa com o estado zerado.
-	return <JanelaPerfil key={perfil} perfilId={perfil} voltar={voltar} />;
+	return (
+		<JanelaPerfil
+			key={perfil}
+			perfilId={perfil}
+			voltar={voltar}
+			{...(inicial?.usarAparenciaContextos ? { usarAparenciaContextos: inicial.usarAparenciaContextos } : {})}
+		/>
+	);
 }

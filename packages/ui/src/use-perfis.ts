@@ -64,11 +64,29 @@ export async function buscarPerfis(base = ""): Promise<ListaPerfis> {
 	return (await resposta.json()) as ListaPerfis;
 }
 
+/** Espera antes de tentar de novo depois de uma falha (o servidor reiniciando dá 502 por alguns segundos). */
+export function esperaDaTentativa(tentativa: number): number {
+	return Math.min(10_000, 1000 * 2 ** Math.max(0, tentativa - 1));
+}
+
+/**
+ * A lista de perfis. Se a busca falhar (o servidor estava reiniciando, por
+ * exemplo), tenta de novo sozinha, com espera crescente até 10 s: sem isso, a
+ * tela ficava sem as fotos dos agentes até recarregar a página.
+ */
 export function usePerfis(): PerfisHook {
 	const [lista, setLista] = useState<ListaPerfis>();
 	const [erro, setErro] = useState<string>();
 	const [carregando, setCarregando] = useState(true);
 	const [versao, setVersao] = useState(0);
+	const [falhas, setFalhas] = useState(0);
+
+	// Falhou: tenta de novo depois de esperar.
+	useEffect(() => {
+		if (falhas === 0) return;
+		const espera = setTimeout(() => setVersao((anterior) => anterior + 1), esperaDaTentativa(falhas));
+		return () => clearTimeout(espera);
+	}, [falhas]);
 
 	useEffect(() => {
 		let ativo = true;
@@ -79,11 +97,13 @@ export function usePerfis(): PerfisHook {
 				setLista(nova);
 				setErro(undefined);
 				setCarregando(false);
+				setFalhas(0);
 			},
 			(falha: unknown) => {
 				if (!ativo) return;
 				setErro(falha instanceof Error ? falha.message : String(falha));
 				setCarregando(false);
+				setFalhas((anterior) => anterior + 1);
 			},
 		);
 		return () => {

@@ -12,6 +12,7 @@
 import { Button, Icon, Tag } from "@estudos/design-system";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
+import type { AparenciaContextos } from "../telas-iniciais.ts";
 import type { ResumoSessao } from "../tipos.ts";
 
 const dataHora = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -26,7 +27,9 @@ export interface PropsHistorico {
 	/** Sessão aberta agora. */
 	atual?: string;
 	/** Contexto da sessão aberta: a seção dela mostra as conversas do mesmo contexto. */
-	contexto?: { chave: string; rotulo: string };
+	contexto?: { chave: string; rotulo: string; cor?: string };
+	/** Rótulo e cor de agora de cada contexto (o perfil sabe); valem mais que os gravados na sessão. */
+	aparencia?: AparenciaContextos;
 	desabilitado?: boolean;
 	novaSessao(): void;
 	abrirSessao(id: string): void;
@@ -46,7 +49,7 @@ export function Historico(props: PropsHistorico) {
 			</Button>
 			<SecaoHistorico
 				{...props}
-				titulo={contexto ? `Conversas de ${contexto.rotulo}` : "Conversas"}
+				titulo={contexto ? `Conversas de ${props.aparencia?.[contexto.chave]?.rotulo ?? contexto.rotulo}` : "Conversas"}
 				sessoes={destas}
 				aberta={verDestas}
 				alternar={() => setVerDestas((valor) => !valor)}
@@ -109,6 +112,7 @@ function SecaoHistorico(props: PropsSecao) {
 										indice={indice}
 										{...(props.atual ? { atual: props.atual } : {})}
 										{...(props.desabilitado ? { desabilitado: true } : {})}
+										{...(props.aparencia ? { aparencia: props.aparencia } : {})}
 										abrirSessao={props.abrirSessao}
 									/>
 								))}
@@ -124,11 +128,13 @@ function SecaoHistorico(props: PropsSecao) {
 /** Cores do tema que a pílula sabe pintar; outra cor vira a pílula só de contorno. */
 const CORES_PILULA = new Set(["moss", "amber", "steel", "ink", "cream", "sage", "brick"]);
 
-function ItemHistorico(props: { sessao: ResumoSessao; indice: number } & Pick<PropsHistorico, "atual" | "desabilitado" | "abrirSessao">) {
+function ItemHistorico(props: { sessao: ResumoSessao; indice: number } & Pick<PropsHistorico, "atual" | "desabilitado" | "abrirSessao" | "aparencia">) {
 	const { sessao } = props;
 	const atual = sessao.id === props.atual;
 	const meta = [formatarData(sessao.modificadaEm), `${sessao.mensagens} mensagens`, sessao.agente].filter(Boolean).join(" · ");
-	const contexto = sessao.contexto;
+	const gravado = sessao.contexto;
+	const deAgora = gravado ? props.aparencia?.[gravado.chave] : undefined;
+	const contexto = gravado ? { rotulo: deAgora?.rotulo ?? gravado.rotulo, cor: deAgora?.cor ?? gravado.cor } : undefined;
 	const cor = contexto?.cor && CORES_PILULA.has(contexto.cor) ? contexto.cor : undefined;
 	return (
 		<motion.li

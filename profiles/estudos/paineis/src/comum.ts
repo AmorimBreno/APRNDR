@@ -2,7 +2,8 @@
 // extensão de matérias, a leitura do que ela mandou, as contas de prova e a
 // escolha da conversa (a geral ou a da matéria) antes de ir para ela.
 
-import { type AcaoRecebida, type ContextoSessao, guardarSessaoDoPerfil, type JanelaPerfilHook } from "@estudos/ui";
+import { type AcaoRecebida, type AparenciaContextos, type ContextoSessao, guardarSessaoDoPerfil, type JanelaPerfilHook, semEsperar } from "@estudos/ui";
+import { useEffect, useMemo, useRef } from "react";
 import type { Evento } from "../../lib/eventos.ts";
 import type { ListaMaterias, Materia } from "../../lib/materia-tipos.ts";
 
@@ -113,4 +114,28 @@ export async function prepararConversa(janela: JanelaPerfilHook, perfilId: strin
 	// Reabrindo, o contexto vai junto: se a matéria mudou de nome ou de cor, a conversa acompanha.
 	const aberta = ultima ? await acoes.abrirSessao(ultima.id, contexto ?? undefined) : await acoes.novaSessao(undefined, contexto);
 	guardarSessaoDoPerfil(perfilId, aberta.sessaoId);
+}
+
+/**
+ * O nome e a cor de agora de cada matéria, pela chave do contexto
+ * ("materia:<id>"), para a janela de conversa pintar a pílula do histórico
+ * (EntradaTelaInicial.usarAparenciaContextos). Pede a lista à extensão quando
+ * a sessão abre ou troca.
+ */
+export function usarAparenciaMaterias(janela: JanelaPerfilHook): AparenciaContextos {
+	const { estado, acoes } = janela;
+	const sessaoId = estado.sessao?.sessaoId;
+	useEffect(() => {
+		if (sessaoId) semEsperar(acoes.acaoDaInterface(PAINEL_CADERNOS, "listar"));
+	}, [sessaoId, acoes]);
+	const recebidas = estado.acoesPorPainel[PAINEL_CADERNOS];
+	// Trocar de sessão zera as ações da ponte: até a lista nova chegar, vale a última.
+	const ultima = useRef<AparenciaContextos>({});
+	const aparencia = useMemo(() => {
+		const lista = lerAcoes(recebidas ?? []).lista;
+		if (!lista) return undefined;
+		return Object.fromEntries(lista.materias.map((materia) => [`materia:${materia.id}`, { rotulo: materia.nome, cor: materia.cor }]));
+	}, [recebidas]);
+	if (aparencia) ultima.current = aparencia;
+	return aparencia ?? ultima.current;
 }

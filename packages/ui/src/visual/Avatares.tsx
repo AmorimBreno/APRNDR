@@ -3,7 +3,7 @@
 // a do usuário, um desenho próprio no traço dos personagens do Notion
 // (contorno preto grosso, cabelo chapado, traços mínimos).
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { DadosAvatarAgente as DadosAvatar } from "../use-perfis.ts";
 
 export interface PropsAvatarAgente {
@@ -25,11 +25,22 @@ export function estiloDoRecorte(
 	return { width: natural.largura * escala, height: natural.altura * escala, left: -x * escala, top: -y * escala };
 }
 
+/** Quantas vezes a foto é pedida de novo depois de falhar (o servidor reiniciando), antes de ficar na inicial. */
+const TENTATIVAS_FOTO = 5;
+
 export function AvatarAgente({ nome, avatar, tamanho = 36, className }: PropsAvatarAgente) {
 	const [natural, setNatural] = useState<{ largura: number; altura: number }>();
-	const [falhou, setFalhou] = useState(false);
+	const [falhas, setFalhas] = useState(0);
+	// Falhou: mostra a inicial e pede a foto de novo depois de esperar (com outro endereço, para não vir do cache).
+	const [esperando, setEsperando] = useState(false);
+	useEffect(() => {
+		if (falhas === 0 || falhas >= TENTATIVAS_FOTO) return;
+		setEsperando(true);
+		const espera = setTimeout(() => setEsperando(false), Math.min(8000, 1000 * 2 ** (falhas - 1)));
+		return () => clearTimeout(espera);
+	}, [falhas]);
 	const classe = `avatar avatar--agente${className ? ` ${className}` : ""}`;
-	if (!avatar || falhou) {
+	if (!avatar || esperando || falhas >= TENTATIVAS_FOTO) {
 		return (
 			<span className={`${classe} avatar--inicial`} style={{ width: tamanho, height: tamanho, fontSize: tamanho * 0.46 }} aria-hidden="true">
 				{nome.charAt(0).toUpperCase()}
@@ -40,11 +51,11 @@ export function AvatarAgente({ nome, avatar, tamanho = 36, className }: PropsAva
 	return (
 		<span className={classe} style={{ width: tamanho, height: tamanho }} aria-hidden="true">
 			<img
-				src={avatar.url}
+				src={falhas ? `${avatar.url}${avatar.url.includes("?") ? "&" : "?"}tentativa=${falhas}` : avatar.url}
 				alt=""
 				draggable={false}
 				onLoad={(evento) => setNatural({ largura: evento.currentTarget.naturalWidth, altura: evento.currentTarget.naturalHeight })}
-				onError={() => setFalhou(true)}
+				onError={() => setFalhas((anterior) => anterior + 1)}
 				style={
 					avatar.recorte
 						? posicao

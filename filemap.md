@@ -53,7 +53,7 @@ packages/ui/src/tipos.ts — tipos do núcleo derivados do protocolo (EventoNucl
 packages/ui/src/cliente.ts — ClienteConexao: WebSocket em /ws, reconexão com espera crescente, pedir() com pedidoId e promessa da resposta, estado da conexão; obterCliente() = cliente único da página
 packages/ui/src/estado-janela.ts — reducer puro da janela de perfil (sessão, conversa com ferramentas no lugar, execução, fila, uso somado, carregando, erros, pedidos e ações da ponte por painel, registro de cada pedido com a situação e a resposta, aviso de recarregado)
 packages/ui/src/use-janela-perfil.ts — hook useJanelaPerfil(perfilId): abre o perfil, aplica o reducer, ações (enviar, abortar, trocar modelo e agente, sessões, modelos, recarregar, ponte, materiais: listar, enviar pelo HTTP e reprocessar); reabre a sessão ao reconectar
-packages/ui/src/use-perfis.ts — hook usePerfis e buscarPerfis: GET /api/perfis (perfis válidos e erros)
+packages/ui/src/use-perfis.ts — hook usePerfis e buscarPerfis: GET /api/perfis (perfis válidos e erros); se falhar (o servidor reiniciando), tenta de novo sozinho com espera crescente até 10 s
 packages/ui/src/paineis.tsx — registro de painéis (componente, título, soModal, foraDaArea para os de uma tela do perfil, resumir o pedido, revisarAoResponder), AreaPaineis (só ações; os pedidos vão para o modal) e PainelGenerico (ações e pedidos em JSON, responder com texto ou cancelar, revisão)
 packages/ui/src/estilo.css — estilos da tela de faixa e folha (.tela, .faixa, .folha, .linha, .tecla-papel) e das peças da janela (aviso de erro, documento, ferramentas, barra, histórico, seletor de modelo, painéis) e o CSS do KaTeX; exportado como @estudos/ui/estilo.css
 packages/ui/src/visual/Markdown.tsx — markdown das respostas (react-markdown, GFM, LaTeX com remark-math e rehype-katex; sem HTML cru)
@@ -61,7 +61,7 @@ packages/ui/src/visual/Contador.tsx — número que rola até o valor novo como 
 packages/ui/src/visual/Conversa.tsx — DocumentoConversa: respostas como bloco sem etiqueta, com o número e o botão de informações na margem e o autor em cima (raciocínio recolhível), mensagens do usuário em StudentNote, ferramentas em linhas técnicas (status, duração, progresso, resumo)
 packages/ui/src/visual/AgenteAnimado.tsx — o agente vivo: atividadeDoAgente (parado, pensando, escrevendo, pesquisando, perguntando) e a foto que reage a cada uma (Motion, ritmos sorteados, selos de bolhas, lupa e ?)
 packages/ui/src/visual/AgenteAnimado.test.ts — testes da regra das atividades
-packages/ui/src/visual/Avatares.tsx — AvatarAgente (a foto do profile.json recortada no rosto, num círculo de papel; sem foto, a inicial) e AvatarUsuario (desenho próprio no traço do Notion)
+packages/ui/src/visual/Avatares.tsx — AvatarAgente (a foto do profile.json recortada no rosto, num círculo de papel; sem foto, a inicial; se a foto falhar, a inicial e até 5 tentativas) e AvatarUsuario (desenho próprio no traço do Notion)
 packages/ui/src/visual/BarraPergunta.tsx — AskBar com a fila, o aviso de respondendo e o Parar (Enter durante a resposta põe na fila)
 packages/ui/src/visual/SeletorModelo.tsx — tecla de papel do modelo atual (abre o modal, por isso não tem cara de campo) e modal com busca no catálogo; os modelos do perfil primeiro
 packages/ui/src/visual/SeletorAgente.tsx — botão do agente na barra do topo, com o MenuSuspenso (o select nativo abre com o visual do Windows)
@@ -76,7 +76,7 @@ packages/ui/src/visual/InfoResposta.test.ts — testes das linhas do balão
 packages/ui/src/visual/Pedidos.tsx — pedidos na conversa: BotaoPedido (âmbar pulsando enquanto espera, só contorno depois), ModalPedido (responder, minimizar, rever), resumo e numeração por tipo
 packages/ui/src/visual/Pedidos.test.ts — testes da numeração e do resumo
 packages/ui/src/paineis-nucleo.ts — registro dos painéis do núcleo (pergunta), que o front junta com os dos perfis
-packages/ui/src/telas-iniciais.ts — tipos da tela inicial de um perfil (o que abre antes da conversa) e do registro delas
+packages/ui/src/telas-iniciais.ts — tipos da tela inicial de um perfil (o que abre antes da conversa, com caminho e navegar) e do registro delas (rótulo do voltar e o hook usarAparenciaContextos: nome e cor de agora de cada contexto, para a pílula do histórico)
 packages/ui/src/paineis.test.ts — teste dos ids da área de painéis (os só de pedidos ficam de fora)
 packages/ui/src/estado-janela.test.ts, cliente.test.ts — testes vitest do reducer e do cliente (WebSocket falso, sem DOM)
 

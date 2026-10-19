@@ -8,9 +8,11 @@
 import { Button, EmptyState, Icon, pad2, Tag } from "@estudos/design-system";
 import {
 	AgenteAnimado,
+	type AparenciaContextos,
 	AreaPaineis,
 	atividadeDoAgente,
 	AvatarAgente,
+	type EntradaTelaInicial,
 	type ItemAssistente,
 	BarraPergunta,
 	BotaoPedido,
@@ -55,10 +57,17 @@ export interface PropsJanelaPerfil {
 	perfilId: string;
 	/** Para onde o botão da esquerda da barra volta: a tela inicial do perfil ou a de perfis. */
 	voltar: { rotulo: string; hash: string };
+	/** Hook do perfil com o rótulo e a cor de agora de cada contexto (EntradaTelaInicial). Fixo por perfil. */
+	usarAparenciaContextos?: EntradaTelaInicial["usarAparenciaContextos"];
 }
 
-export function JanelaPerfil({ perfilId, voltar }: PropsJanelaPerfil) {
-	const { estado, conexao, acoes } = useJanelaPerfil(perfilId);
+const semAparencia: AparenciaContextos = {};
+
+export function JanelaPerfil({ perfilId, voltar, usarAparenciaContextos }: PropsJanelaPerfil) {
+	const janela = useJanelaPerfil(perfilId);
+	const { estado, conexao, acoes } = janela;
+	// O hook do perfil é o mesmo enquanto a janela existe (a App remonta a janela ao trocar de perfil).
+	const aparencia = usarAparenciaContextos?.(janela) ?? semAparencia;
 	const perfis = usePerfis();
 	const perfil = perfis.lista?.perfis.find((item) => item.id === perfilId);
 
@@ -258,7 +267,9 @@ export function JanelaPerfil({ perfilId, voltar }: PropsJanelaPerfil) {
 				{/* Uma conversa com contexto (a de um caderno) mostra o assunto; a geral, o perfil. */}
 				<div className="topo__titulo">
 					<span className="overline">{estado.sessao?.contexto ? `${nomePerfil} · conversa de` : "Perfil"}</span>
-					<h1 className="display-sm">{estado.sessao?.contexto?.rotulo ?? nomePerfil}</h1>
+					<h1 className="display-sm">
+						{estado.sessao?.contexto ? (aparencia[estado.sessao.contexto.chave]?.rotulo ?? estado.sessao.contexto.rotulo) : nomePerfil}
+					</h1>
 				</div>
 
 				<div className="topo__controles">
@@ -319,6 +330,7 @@ export function JanelaPerfil({ perfilId, voltar }: PropsJanelaPerfil) {
 						sessoes={sessoes}
 						{...(sessaoId ? { atual: sessaoId } : {})}
 						{...(estado.sessao?.contexto ? { contexto: estado.sessao.contexto } : {})}
+						aparencia={aparencia}
 						desabilitado={!aberta}
 						novaSessao={() => semEsperar(acoes.novaSessao())}
 						abrirSessao={(id) => semEsperar(acoes.abrirSessao(id))}

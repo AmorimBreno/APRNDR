@@ -4,6 +4,7 @@
 // inicial abre direto na janela de conversa.
 
 import type { ComponentType } from "react";
+import type { JanelaPerfilHook } from "./use-janela-perfil.ts";
 import type { ResumoPerfil } from "./use-perfis.ts";
 
 export interface PropsTelaInicial {
@@ -26,7 +27,18 @@ export interface EntradaTelaInicial {
 	rotuloVoltar: string;
 	/** Rótulo do voltar quando a conversa foi aberta de uma subtela ("Caderno"). Sem ele, rotuloVoltar. */
 	rotuloDoCaminho?(caminho: string): string | undefined;
+	/**
+	 * Hook do React que a janela de conversa do perfil chama (sempre, a cada
+	 * render): o rótulo e a cor de agora de cada contexto de sessão, pela chave
+	 * (no perfil de estudos, o nome e a cor de cada matéria). O histórico pinta
+	 * a pílula com isto; sem ele (ou para uma chave que ele não conhece), valem
+	 * o rótulo e a cor gravados na sessão.
+	 */
+	usarAparenciaContextos?(janela: JanelaPerfilHook): AparenciaContextos;
 }
+
+/** Rótulo e cor de agora de cada contexto, pela chave. */
+export type AparenciaContextos = Readonly<Record<string, { rotulo?: string; cor?: string }>>;
 
 /** Mapa de id do perfil para a tela inicial dele. */
 export type RegistroTelasIniciais = Readonly<Record<string, EntradaTelaInicial>>;

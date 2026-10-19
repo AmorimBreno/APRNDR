@@ -20,9 +20,9 @@ No fim, anote o resultado de cada passo e mande para o Claude Code.
 
 2. Com Ciência de Dados no meio da roda, clique em "Abrir". Por quê: é a entrada no caderno. O que você deve ver: a faixa da esquerda sobe como bandeira; a linha tijolo sobe e vira a aba do caderno no topo, enquanto a folha desce e some. A aba tem "Matérias" à esquerda, a capa pequena, "Caderno 01" (e a prova, se tiver), o nome grande, "Editar" e, à direita, "Conversar sobre a matéria".
 
-3. Olhe o resto da tela. Por quê: confere o índice e a linha do tempo. O que você deve ver: à esquerda, "Neste caderno" com Linha do tempo (marcada em âmbar, com o número de eventos), Notas, Materiais (com o número de arquivos), Cursos, Aulas, Resumos e Questionários (estes com "em breve"). À direita, "Linha do tempo" com o dia ("segunda-feira, 19 de outubro") e "09:01 Caderno criado", com o nome embaixo; os eventos entram um depois do outro.
+3. Olhe o resto da tela. Por quê: confere o índice e a linha do tempo. O que você deve ver: à esquerda, "Neste caderno" com Linha do tempo (marcada em âmbar, com o número de eventos), Notas (com o número de notas), Materiais (com o número de arquivos), Cursos, Aulas, Resumos e Questionários (estes com "em breve"). À direita, "Linha do tempo" com o dia ("segunda-feira, 19 de outubro") e "09:01 Caderno criado", com o nome embaixo; os eventos entram um depois do outro.
 
-4. Clique em Notas, Cursos, Aulas, Resumos e Questionários. Por quê: as seções que ainda não existem dizem o que vão ter. O que você deve ver: cada uma com um bloco de ideograma na cor da matéria (tijolo para a capa tinta) e um texto do que vai ter e em que item chega.
+4. Clique em Cursos, Aulas, Resumos e Questionários (as Notas chegaram na parte B: roteiro docs/teste-etapa-4-3b.md). Por quê: as seções que ainda não existem dizem o que vão ter. O que você deve ver: cada uma com um bloco de ideograma na cor da matéria (tijolo para a capa tinta) e um texto do que vai ter e em que item chega.
 
 5. Clique em Materiais. Por quê: os materiais agora moram no caderno. O que você deve ver: a mesma área de soltar e a lista do modal da tela de cadernos. Se você já rodou o roteiro do 4.2, os arquivos estão lá. Se mandar um arquivo agora, quando ele ficar pronto a Linha do tempo ganha "Material adicionado: <arquivo>".
 

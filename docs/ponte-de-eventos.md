@@ -39,6 +39,7 @@ A ferramenta deve tratar o cancelamento como "o usuário não respondeu": devolv
 3. Filtre as respostas pelo id e cancele a assinatura quando a sua chegar: a função `pi.events.on` devolve a função que cancela.
 4. Use o pedido só quando a ferramenta fica esperando dentro do execute. Para algo que o usuário faz depois, sem a ferramenta esperar, use "interface:mostrar" e escute "interface:acao": um pedido é cancelado quando a execução termina.
 5. Não ponha no `dados` nada que não vire JSON (funções, classes): eles vão para o front pelo WebSocket.
+6. Uma extensão que escuta "interface:acao" desde a fábrica fica calada até receber o `session_start` (guarde nele o `ctx.cwd`). Ao recarregar o código, o núcleo carrega as extensões uma vez a mais (packages/core/src/montagem.ts), e essa carga continua ouvindo o barramento sem nunca virar sessão nem ser desligada pelo pi; se ela responder, a tela recebe um erro antes da resposta da cópia da sessão. As extensões de matérias e de notas do perfil de estudos fazem assim.
 
 
 ## Exemplo: ferramenta que mostra algo num painel

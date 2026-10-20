@@ -4,10 +4,12 @@
 // marcáveis no multi-select), com "Não sei" e uma nota livre. Depois de
 // responder, o modal fica aberto na revisão (revisarAoResponder no registro):
 // a ação "resultado" com o mesmo id traz o gabarito e a explicação, mostrados
-// com o QuizFeedback. O pedido nunca traz o gabarito.
+// com o QuizFeedback. O pedido nunca traz o gabarito. Com image (o nome de uma
+// imagem da pasta de dados, como o diagrama de que a questão fala), a imagem
+// aparece logo depois do enunciado, na pergunta e na revisão.
 
 import { Button, cx, Icon, letter, QuizFeedback, QuizQuestion, Tag, TextArea } from "@estudos/design-system";
-import { Fala, Markdown, type PedidoPendente, type PropsPainel, type RegistroPedido } from "@estudos/ui";
+import { Fala, ImagemDoPerfil, Markdown, type PedidoPendente, type PropsPainel, type RegistroPedido } from "@estudos/ui";
 import type { ReactNode } from "react";
 import { motion } from "motion/react";
 import { useRef, useState } from "react";
@@ -22,6 +24,7 @@ interface OpcaoMostrada {
 interface DadosPergunta {
 	question: string;
 	details?: string;
+	image?: string;
 	mode: "single-select" | "multi-select";
 	options: OpcaoMostrada[];
 	dontKnowLabel?: string;
@@ -31,6 +34,7 @@ interface DadosResultado {
 	id: string;
 	question: string;
 	details?: string;
+	image?: string;
 	mode: "single-select" | "multi-select";
 	options: OpcaoMostrada[];
 	escolhas: number[];
@@ -49,6 +53,11 @@ export function ehPergunta(pedido: PedidoPendente): pedido is PedidoPendente & {
 function ehResultado(dados: unknown): dados is DadosResultado {
 	const valor = dados as Partial<DadosResultado> | undefined;
 	return typeof valor?.question === "string" && Array.isArray(valor.options) && Array.isArray(valor.correctIndices);
+}
+
+/** A imagem da questão, baixa o bastante para as alternativas continuarem à vista no modal. */
+function Figura({ imagem }: { imagem?: string | undefined }) {
+	return typeof imagem === "string" && imagem ? <ImagemDoPerfil caminho={imagem} alturaMaxima="40vh" /> : null;
 }
 
 function Enunciado({ question, details }: { question: string; details?: string }) {
@@ -134,6 +143,7 @@ function Pergunta(props: { pedido: PedidoPendente & { dados: DadosPergunta }; re
 					<p className="ap-quiz__prompt heading">{enunciado}</p>
 				</Fala>
 			) : null}
+			<Figura imagem={dados.image} />
 			{multipla ? (
 				<section className="ap-quiz" aria-label="Questão">
 					<header className="ap-quiz__head">
@@ -230,6 +240,7 @@ function Resultado({ dados, quem, aoVivo = false }: { dados: DadosResultado; que
 						<p className="ap-quiz__prompt heading">{enunciado}</p>
 					</Fala>
 				) : null}
+				<Figura imagem={dados.image} />
 				<QuizQuestion
 					prompt={enunciado}
 					options={dados.options.map((opcao) => ({ id: String(opcao.index), label: <Markdown texto={opcao.label} emLinha /> }))}
@@ -252,6 +263,7 @@ function Resultado({ dados, quem, aoVivo = false }: { dados: DadosResultado; que
 				) : (
 					<h3 className="ap-quiz__prompt heading">{enunciado}</h3>
 				)}
+				<Figura imagem={dados.image} />
 				<OpcoesMultiplas opcoes={dados.options} rotulo="Alternativas com o gabarito" estado={estado} />
 				{feedback}
 			</section>
@@ -273,6 +285,7 @@ function Revisao({ registro, acoes, quem, aoVivo = false }: { registro: Registro
 					</p>
 				</Fala>
 			) : null}
+			<Figura imagem={dados?.image} />
 			<p className="body quiz__vazio">
 				{registro.estado === "respondido"
 					? "Corrigindo a sua resposta…"

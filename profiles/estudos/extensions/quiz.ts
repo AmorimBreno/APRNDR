@@ -119,6 +119,7 @@ const QuizParams = Type.Object({
 				"Defaults to true: options are randomly reordered before display so the correct answer isn't always in the same position. Set to false only when option order is meaningful (e.g. ordered numeric values, or an 'All/None of the above' option that must stay last).",
 		}),
 	),
+	image: Type.Optional(Type.String({ description: "Optional. The filename of a picture a maker subagent already returned (the same name you embed as ![[...]], e.g. viz-<slug>-<timestamp>.png). It is shown with the question, so the user can look at it while answering. Pass it whenever the question is about that picture." })), // [estudos-ia] parâmetro novo, só usado pelo quiz do app (quiz-web.ts); aqui no terminal é ignorado
 });
 
 function normalizeOptions(

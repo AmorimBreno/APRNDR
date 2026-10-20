@@ -23,7 +23,8 @@ export function textoDoEmbed(caminho: string, largura?: number, altura?: number)
 	return `![[${caminho}${largura ? `|${largura}${altura ? `x${altura}` : ""}` : ""}]]`;
 }
 
-export function ImagemDoPerfil({ caminho, largura, altura }: { caminho: string; largura?: number; altura?: number }) {
+/** `alturaMaxima`: um tamanho CSS ("40vh") para a imagem caber num lugar baixo, como um modal; a largura acompanha. */
+export function ImagemDoPerfil({ caminho, largura, altura, alturaMaxima }: { caminho: string; largura?: number; altura?: number; alturaMaxima?: string }) {
 	const perfilId = useContext(ContextoImagens);
 	const [falhou, setFalhou] = useState<string | null>(null);
 	if (!perfilId) return <>{textoDoEmbed(caminho, largura, altura)}</>;
@@ -31,7 +32,15 @@ export function ImagemDoPerfil({ caminho, largura, altura }: { caminho: string; 
 	if (falhou === url) return <span className="imagem-perfil imagem-perfil--falta body-sm">Imagem não encontrada: {caminho}</span>;
 	return (
 		<span className="imagem-perfil">
-			<img src={url} alt={caminho} width={largura} height={altura} loading="lazy" onError={() => setFalhou(url)} />
+			<img
+				src={url}
+				alt={caminho}
+				width={largura}
+				height={altura}
+				loading="lazy"
+				onError={() => setFalhou(url)}
+				{...(alturaMaxima ? { style: { maxHeight: alturaMaxima, width: "auto" } } : {})}
+			/>
 		</span>
 	);
 }

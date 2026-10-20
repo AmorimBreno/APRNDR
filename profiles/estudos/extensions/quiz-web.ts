@@ -5,8 +5,10 @@
 // livre e o mesmo resultado para o modelo, mas pergunta pela ponte de eventos
 // (docs/ponte-de-eventos.md), no painel "quiz" (profiles/estudos/paineis).
 //
-// - "interface:pedido" acao "perguntar": enunciado, opções na ordem mostrada e
-//   o modo. A resposta certa e a explicação NUNCA vão no pedido.
+// - "interface:pedido" acao "perguntar": enunciado, opções na ordem mostrada,
+//   o modo e, se houver, a imagem (o parâmetro image: o nome de um arquivo da
+//   pasta de dados, mostrado pela rota de imagens do núcleo). A resposta certa e
+//   a explicação NUNCA vão no pedido.
 // - Resposta da interface: { escolhas: number[] (1 em diante, na ordem
 //   mostrada), naoSei?: boolean, nota?: string }.
 // - Depois de corrigir, "interface:mostrar" acao "resultado" com o gabarito e a
@@ -41,6 +43,7 @@ interface OpcaoMostrada {
 interface DadosPedidoQuiz {
 	question: string;
 	details?: string;
+	image?: string;
 	mode: Modo;
 	options: Array<{ index: number; label: string; description?: string }>;
 	dontKnowLabel: string;
@@ -93,6 +96,7 @@ const QuizParams = Type.Object({
 				"Defaults to true: options are randomly reordered before display so the correct answer isn't always in the same position. Set to false only when option order is meaningful (e.g. ordered numeric values, or an 'All/None of the above' option that must stay last).",
 		}),
 	),
+	image: Type.Optional(Type.String({ description: "Optional. The filename of a picture a maker subagent already returned (the same name you embed as ![[...]], e.g. viz-<slug>-<timestamp>.png). It is shown with the question, so the user can look at it while answering. Pass it whenever the question is about that picture." })), // a mais que no learn: o quiz.ts tem o mesmo campo e o ignora no terminal
 });
 
 // ── Correção: as mesmas regras do quiz.ts ──
@@ -276,6 +280,7 @@ export default function quizWeb(pi: ExtensionAPI) {
 
 		async execute(idChamada, params, signal, onUpdate) {
 			const contexto = params.details?.trim() || undefined;
+			const imagem = params.image?.trim() || undefined;
 			const explicacao = params.explanation.trim();
 			const modo: Modo = params.multiSelect ? "multi-select" : "single-select";
 
@@ -299,6 +304,7 @@ export default function quizWeb(pi: ExtensionAPI) {
 			const resposta = await perguntar(pi, idChamada, {
 				question: params.question,
 				...(contexto ? { details: contexto } : {}),
+				...(imagem ? { image: imagem } : {}),
 				mode: modo,
 				options: opcoes.map((opcao, i) => ({ index: i + 1, label: opcao.label, ...(opcao.description ? { description: opcao.description } : {}) })),
 				dontKnowLabel: NAO_SEI,
@@ -320,6 +326,7 @@ export default function quizWeb(pi: ExtensionAPI) {
 					id: idChamada,
 					question: params.question,
 					...(contexto ? { details: contexto } : {}),
+					...(imagem ? { image: imagem } : {}),
 					mode: modo,
 					options: mostradas,
 					escolhas: lida.respostas.map((item) => item.index),

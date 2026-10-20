@@ -91,6 +91,22 @@ describe("quiz web", () => {
 		]);
 	});
 
+	it("com image, o nome do arquivo vai no pedido e no resultado (sem image, nenhum dos dois leva)", async () => {
+		const execucao = ferramenta.execute("c-img", { ...base, image: "  viz-arvore-1.png " });
+		const pedido = await responder({ escolhas: [2] });
+		expect(pedido.dados.image).toBe("viz-arvore-1.png");
+		const resultado = await execucao;
+		expect(resultado.content[0]?.text).toMatch(/^User answered correctly\./);
+		expect(mostrados[0]?.dados.image).toBe("viz-arvore-1.png");
+
+		pedidos.length = 0;
+		mostrados.length = 0;
+		const semImagem = ferramenta.execute("c-sem", { ...base, image: " " });
+		expect((await responder({ escolhas: [2] })).dados).not.toHaveProperty("image");
+		await semImagem;
+		expect(mostrados[0]?.dados).not.toHaveProperty("image");
+	});
+
 	it("embaralhado, a correção segue a ordem mostrada", async () => {
 		// Com random 0, o Fisher-Yates troca sempre com o primeiro: [3, 4, 5] vira [4, 5, 3].
 		vi.spyOn(Math, "random").mockReturnValue(0);

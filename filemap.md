@@ -16,9 +16,11 @@ docs/teste-etapa-2.md — roteiro da Etapa 2: app pelo atalho, sessão, subagent
 docs/teste-etapa-3.md — roteiro da Etapa 3: tema APRNDR, tela de perfis e de carregamento, janela do perfil, seletor de modelo, painéis, ask_user_question, quiz, cancelamento e edição ao vivo
 docs/teste-etapa-4-1.md — roteiro do item 4.1: tela de cadernos, modal de matéria nova, arquivos na pasta de dados, ferramentas do professor e reiniciar
 docs/materiais.md — serviço de materiais do núcleo para quem escreve perfil: o campo materiais do profile.json, o .extraido, o índice, as ferramentas, os avisos materiais:pronto e materiais:removido e o envio pelo HTTP
+docs/notas-formato.md — formato das notas no arquivo: markdown, menções [[Nome]], fórmulas $…$ e $$…$$, e o HTML dos blocos e decorações (caixa, definição, recolhível, pergunta, marca-texto, cores)
 docs/teste-etapa-4-2.md — roteiro do item 4.2: modal de materiais, PDF com visão, .py e .ipynb, .extraido, eventos, professor buscando e citando, reprocessar, apagar e reiniciar
 docs/teste-etapa-4-3a.md — roteiro do item 4.3, parte A: entrar no caderno, índice, linha do tempo, seções em breve, materiais, editar, conversar e voltar
 docs/teste-etapa-4-3b.md — roteiro do item 4.3, parte B: notas do caderno (nota nova, atalhos, salvar sozinho, conflito com o arquivo, trocar o nome, sair salva, HTML só para leitura, o professor lendo as notas)
+docs/teste-etapa-4-3c.md — roteiro do item 4.3, parte C: menu do "/", fórmulas, caixa, definição, pergunta, recolhível, Destaque, menções (lista, criar, renomear) e HTML desconhecido
 docs/ponte-de-eventos.md — protocolo da ponte (interface:mostrar, pedido, resposta, acao) para quem escreve extensão de perfil
 docs/historico/ — documentos do checkpoint 1 (pi no WSL com tmux e Obsidian); só consulta
 
@@ -136,8 +138,8 @@ profiles/estudos/lib/ — lógica do perfil sem dependências, usada pelas exten
 profiles/estudos/lib/materias.ts — matérias na pasta de dados: caminhos, garantir materias/ e aprendiz/, id do nome, validar, listar, criar e alterar (materia.json gravado de uma vez)
 profiles/estudos/lib/materia-tipos.ts — tipos e listas de cor e ideograma das matérias, sem nada do Node (a tela importa daqui)
 profiles/estudos/lib/eventos.ts — eventos da seção 9.2: id ordenável, criarEvento e acrescentarEvento, a única função que escreve nos eventos.jsonl (só acrescenta)
-profiles/estudos/lib/notas.ts — notas na pasta de dados: materias/<id>/notas/<Título>.md; listar, ler, criar, salvar com a versão aberta (ErroConflito se mudou fora) e renomear; eventos criou_nota, editou_nota e renomeou_nota
-profiles/estudos/lib/nota-tipos.ts — tipos e regras das notas sem nada do Node (a tela importa daqui): conferirTitulo, temHtml e previaDaNota
+profiles/estudos/lib/notas.ts — notas na pasta de dados: materias/<id>/notas/<Título>.md; listar, ler, criar, salvar com a versão aberta (ErroConflito se mudou fora) e renomear (atualizarMencoes troca [[Antigo]] por [[Novo]] nas outras notas); eventos criou_nota, editou_nota e renomeou_nota
+profiles/estudos/lib/nota-tipos.ts — tipos e regras das notas sem nada do Node (a tela importa daqui): conferirTitulo, TONS_CAIXA e CORES_TEXTO, temHtmlDesconhecido (HTML fora do formato de docs/notas-formato.md) e previaDaNota
 profiles/estudos/lib/notas.test.ts — testes das notas numa pasta temporária
 profiles/estudos/lib/materias.test.ts — testes das matérias e dos eventos numa pasta temporária
 profiles/estudos/paineis/ — @estudos/perfil-estudos: código de tela do perfil (o watcher do servidor ignora esta pasta; quem recarrega é o Vite)
@@ -149,15 +151,22 @@ profiles/estudos/paineis/src/index.ts — tela inicial do perfil (TelaEstudos) e
 profiles/estudos/paineis/src/TelaCadernos.tsx — tela inicial do perfil de estudos: abre a sessão do perfil, lista as matérias na SubjectWheel com capas NotebookCover (com a contagem de materiais), "Abrir" leva ao caderno, "Nova matéria" abre o ModalMateria, a tecla Materiais e a tecla para a conversa
 profiles/estudos/paineis/src/ModalMateriais.tsx — modal de materiais da matéria e o ConteudoMateriais (o mesmo conteúdo na seção Materiais do caderno): FileDrop que envia para materias/<id>/materiais e a lista com a situação de cada arquivo (fila, etapa e barra, pronto com trechos e custo, erro, não suportado) e processar de novo
 profiles/estudos/paineis/src/SecaoNotas.tsx — seção Notas do caderno: a lista das notas (prévia e "editada há"), Nova nota (cria e abre) e useListaNotas (o índice usa a contagem)
-profiles/estudos/paineis/src/EditorNota.tsx — editor de uma nota (caderno/<id>/notas/<título>): TipTap no estilo Prose, barra da seleção, salvar sozinho (um por vez), conflito com o arquivo, troca de nome pelo título, só leitura com HTML, salvar ao sair
-profiles/estudos/paineis/src/editor-nota.ts — extensões do TipTap das notas (StarterKit sem sublinhado, tarefas, menção, markdown, escape enxuto, ajuda na nota vazia), markdownDaNota e carregarNoEditor (fora do desfazer)
-profiles/estudos/paineis/src/mencao.ts — nó de menção [[Nome]]: preserva no markdown e vira etiqueta ao digitar (abrir e sugerir ficam para a parte C)
+profiles/estudos/paineis/src/EditorNota.tsx — editor de uma nota (caderno/<id>/notas/<título>): TipTap no estilo Prose, barra da seleção com Destaque, salvar sozinho (um por vez), conflito com o arquivo, troca de nome pelo título, só leitura com HTML desconhecido, salvar ao sair, o modal da fórmula e o "Criar esta nota?" da menção
+profiles/estudos/paineis/src/editor-nota.ts — extensões do TipTap das notas (StarterKit sem sublinhado, tarefas, menção, blocos e decorações da parte C, fórmulas, menu do "/", markdown, escape enxuto, ajuda na nota vazia), markdownDaNota e carregarNoEditor (fora do desfazer)
+profiles/estudos/paineis/src/mencao.ts — nó de menção [[Nome]]: preserva no markdown, vira etiqueta ao digitar, lista ao digitar [[ (sugestoesDeMencao), tracejada quando a nota não existe e clique que abre a nota
+profiles/estudos/paineis/src/mencao.test.ts — testes das sugestões do [[, da menção tracejada e do clique
+profiles/estudos/paineis/src/blocos-nota.ts — os blocos e decorações da parte C no formato do arquivo: Caixa, Definicao (TermoDefinicao), Recolhivel (TituloRecolhivel; tipo recolhivel ou pergunta), MarcaTexto, CorDoTexto, FormulaNaLinha (regra estrita do $) e FormulaEmBloco; lerBlocoHtml e inicioDeLinha
+profiles/estudos/paineis/src/VisoesBlocos.tsx — a aparência dos blocos no editor: a caixa no visual do Callout com a troca de tom, o recolhível e a pergunta com a seta e "Mostrar resposta"
+profiles/estudos/paineis/src/EditorFormula.tsx — modal da fórmula: o LaTeX, a prévia ao vivo pelo KaTeX e o erro; salvar vazio remove
+profiles/estudos/paineis/src/comandos-barra.ts — os itens do menu do "/" (nome, dica, ícone ou sigla, o que fazem), inserirBloco e o filtro sem acento
+profiles/estudos/paineis/src/comandos-barra.test.ts — testes do filtro e do que cada item faz na nota
+profiles/estudos/paineis/src/MenuBarra.tsx — o menu do "/" (@tiptap/suggestion e Floating UI): ListaBarra com teclado, desenharMenu (também o do [[) e a extensão MenuBarra
 profiles/estudos/paineis/src/escape-markdown.ts — escape enxuto do texto comum no markdown das notas (troca o método interno do @tiptap/markdown 3.31.4)
 profiles/estudos/paineis/src/notas-ponte.ts — o painel "notas" da ponte: tipos das respostas, a última lista e useNovasRespostas
 profiles/estudos/paineis/src/editor-nota.test.ts — ida e volta do markdown no editor das notas (happy-dom): os dois sentidos, atalhos ao digitar e o desfazer depois de abrir
 profiles/estudos/paineis/src/PainelQuiz.tsx — painel do quiz no modal: QuizQuestion (ou teclas marcáveis no multi-select), Não sei, nota, Pular; revisão com o gabarito e o QuizFeedback
 profiles/estudos/paineis/src/Comemoracao.tsx — a reação do quiz ao conferir: Carimbo 完, Confete de papel com gravidade e o tremido do erro
-profiles/estudos/paineis/src/estilo.css — estilos do painel do quiz, da tela de cadernos (modal de matéria nova), do caderno e das notas (lista e editor)
+profiles/estudos/paineis/src/estilo.css — estilos do painel do quiz, da tela de cadernos (modal de matéria nova), do caderno, das notas (lista e editor), dos blocos e decorações da parte C, do menu do "/", do modal da fórmula e das menções
 profiles/estudos/extensions/ask-user-question.ts — ferramenta ask_user_question (desenha no terminal; no app vale a do núcleo, packages/core/src/pergunta.ts)
 profiles/estudos/extensions/painel-teste.ts — ferramentas de teste da ponte (mostrar_painel_teste, perguntar_no_painel_teste); arquivo do projeto, não do learn
 profiles/estudos/extensions/visual-tools/ — ferramentas write/edit/render de mermaid e SVG dos desenhistas; npm install dentro da pasta

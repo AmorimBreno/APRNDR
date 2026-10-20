@@ -1,10 +1,11 @@
 // A conversa como documento (ESPECIFICACAO 13.11): uma coluna única em que
 // cada resposta é um bloco numerado, cada mensagem do usuário é uma nota
-// colada e cada ferramenta é uma linha técnica pequena entre eles.
+// colada e as chamadas de ferramenta seguidas viram um grupo fechado
+// ("Executou 2 comandos ›") que abre a lista e os detalhes de cada uma.
 
 import { Icon, pad2, StudentNote, Tag } from "@estudos/design-system";
 import { AnimatePresence, animate, motion } from "motion/react";
-import { type ReactNode, useEffect, useLayoutEffect, useRef } from "react";
+import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ChamadaFerramenta, ItemConversa } from "../estado-janela.ts";
 import { AvatarUsuario } from "./Avatares.tsx";
 import { InfoResposta } from "./InfoResposta.tsx";
@@ -30,37 +31,63 @@ export function resumirArgumentos(argumentos: unknown, limite = 160): string {
 	return texto.length > limite ? `${texto.slice(0, limite - 1)}…` : texto;
 }
 
-function StatusFerramenta({ chamada }: { chamada: ChamadaFerramenta }) {
-	switch (chamada.status) {
-		case "executando":
-			return (
-				<Tag tone="amber" size="sm" dot>
-					Executando
-				</Tag>
-			);
-		case "ok":
-			return (
-				<Tag tone="sage" size="sm" icon="check">
-					Concluída
-				</Tag>
-			);
-		case "erro":
-			return (
-				<Tag tone="brick" size="sm" icon="alert">
-					Erro
-				</Tag>
-			);
-		case "sem_resultado":
-			return (
-				<Tag tone="neutral" size="sm">
-					Sem resultado
-				</Tag>
-			);
+/** Os argumentos inteiros, legíveis (JSON com recuo), para os detalhes de uma chamada. */
+export function argumentosLegiveis(argumentos: unknown, limite = 4000): string {
+	if (argumentos === undefined) return "";
+	let texto: string;
+	try {
+		texto = JSON.stringify(argumentos, null, 2) ?? "";
+	} catch {
+		texto = String(argumentos);
 	}
+	return texto.length > limite ? `${texto.slice(0, limite - 1)}…` : texto;
 }
 
+const ROTULO_STATUS: Record<ChamadaFerramenta["status"], string> = {
+	executando: "Executando",
+	ok: "Concluída",
+	erro: "Erro",
+	sem_resultado: "Sem resultado",
+};
+
+/** O sinal pequeno do status: ponto âmbar pulsando, visto, alerta ou traço. */
+function SinalStatus({ chamada }: { chamada: ChamadaFerramenta }) {
+	return (
+		// A troca de status dá um pulo; o visto se desenha (CSS, só ao vivo).
+		<AnimatePresence mode="popLayout" initial={false}>
+			<motion.span
+				key={chamada.status}
+				className={`ferramenta__status ferramenta__status--${chamada.status}`}
+				role="img"
+				aria-label={ROTULO_STATUS[chamada.status]}
+				title={ROTULO_STATUS[chamada.status]}
+				initial={{ scale: 0.4, opacity: 0 }}
+				animate={{ scale: 1, opacity: 1 }}
+				exit={{ scale: 0.4, opacity: 0, transition: { duration: 0.1 } }}
+				transition={MOLA_VIVA}
+			>
+				{chamada.status === "ok" ? (
+					<Icon name="check" size={14} strokeWidth={2.75} />
+				) : chamada.status === "erro" ? (
+					<Icon name="alert" size={14} strokeWidth={2.5} />
+				) : chamada.status === "executando" ? (
+					<span className="ferramenta__ponto" aria-hidden="true" />
+				) : (
+					<span aria-hidden="true">–</span>
+				)}
+			</motion.span>
+		</AnimatePresence>
+	);
+}
+
+/**
+ * Uma chamada dentro do grupo aberto: o nome, os argumentos numa linha, a
+ * duração e o status. Clicando, abre os detalhes: os argumentos inteiros e o
+ * resultado (ou o progresso, enquanto roda).
+ */
 export function LinhaFerramenta({ chamada, vivo = false }: { chamada: ChamadaFerramenta; vivo?: boolean }) {
 	const argumentos = resumirArgumentos(chamada.argumentos);
+	const [aberta, setAberta] = useState(false);
 	const linha = useRef<HTMLDivElement>(null);
 	const statusAntes = useRef(chamada.status);
 	// Erro ao vivo: um tremido curto.
@@ -70,39 +97,133 @@ export function LinhaFerramenta({ chamada, vivo = false }: { chamada: ChamadaFer
 		}
 		statusAntes.current = chamada.status;
 	}, [chamada.status]);
+	const completos = argumentosLegiveis(chamada.argumentos);
 	return (
-		<div ref={linha} className={`ferramenta${chamada.idPai ? " ferramenta--filha" : ""}${vivo ? " ferramenta--viva" : ""}`}>
-			<div className="ferramenta__linha">
-				<Icon name="code" size={16} />
+		<div
+			ref={linha}
+			className={`ferramenta${chamada.idPai ? " ferramenta--filha" : ""}${vivo ? " ferramenta--viva" : ""}${aberta ? " ferramenta--aberta" : ""}`}
+		>
+			<button type="button" className="ferramenta__linha" aria-expanded={aberta} onClick={() => setAberta((valor) => !valor)}>
+				<Icon name="chevron-right" size={14} strokeWidth={2.5} className="ferramenta__seta" />
 				<span className="ferramenta__nome data">{chamada.nome}</span>
-				{argumentos ? <span className="ferramenta__args code">{argumentos}</span> : null}
+				{argumentos ? <span className="ferramenta__args code">{argumentos}</span> : <span className="ferramenta__args" />}
 				<span className="ferramenta__fim">
-					{chamada.duracaoMs !== undefined ? (
-						<span className="data">{decimal.format(chamada.duracaoMs / 1000)} s</span>
-					) : null}
-					{/* A troca de status dá um pulo; o visto se desenha (CSS, só ao vivo). */}
-					<AnimatePresence mode="popLayout" initial={false}>
-						<motion.span
-							key={chamada.status}
-							className={`ferramenta__status ferramenta__status--${chamada.status}`}
-							initial={{ scale: 0.4, opacity: 0 }}
-							animate={{ scale: 1, opacity: 1 }}
-							exit={{ scale: 0.4, opacity: 0, transition: { duration: 0.1 } }}
-							transition={MOLA_VIVA}
-						>
-							<StatusFerramenta chamada={chamada} />
-						</motion.span>
-					</AnimatePresence>
+					{chamada.duracaoMs !== undefined ? <span className="data">{decimal.format(chamada.duracaoMs / 1000)} s</span> : null}
+					<SinalStatus chamada={chamada} />
 				</span>
-			</div>
-			{chamada.status === "executando" && chamada.progresso ? (
-				<p className="ferramenta__detalhe body-sm">
-					<span className="ap-cursor" aria-hidden="true" /> {chamada.progresso}
-				</p>
-			) : null}
-			{chamada.resumo ? <p className="ferramenta__detalhe body-sm">{chamada.resumo}</p> : null}
+			</button>
+			<AnimatePresence initial={false}>
+				{aberta ? (
+					<motion.div
+						className="ferramenta__detalhes"
+						initial={{ height: 0, opacity: 0 }}
+						animate={{ height: "auto", opacity: 1 }}
+						exit={{ height: 0, opacity: 0 }}
+						transition={{ type: "spring", stiffness: 420, damping: 36 }}
+					>
+						{completos ? (
+							<div className="ferramenta__parte">
+								<span className="overline">Argumentos</span>
+								<pre className="ferramenta__codigo code">{completos}</pre>
+							</div>
+						) : null}
+						{chamada.status === "executando" && chamada.progresso ? (
+							<div className="ferramenta__parte">
+								<span className="overline">Andamento</span>
+								<p className="body-sm ferramenta__texto">{chamada.progresso}</p>
+							</div>
+						) : null}
+						{chamada.resumo ? (
+							<div className="ferramenta__parte">
+								<span className="overline">{chamada.status === "erro" ? "Erro" : "Resultado"}</span>
+								<p className="body-sm ferramenta__texto">{chamada.resumo}</p>
+							</div>
+						) : null}
+						{!completos && !chamada.resumo && !(chamada.status === "executando" && chamada.progresso) ? (
+							<p className="body-sm ferramenta__texto">Sem detalhes.</p>
+						) : null}
+					</motion.div>
+				) : null}
+			</AnimatePresence>
 		</div>
 	);
+}
+
+/** "Executou 1 comando", "Executou 3 comandos" ou, enquanto roda, "Executando ler_nota…". */
+export function rotuloGrupo(chamadas: readonly ChamadaFerramenta[]): { texto: string; erros: number } {
+	const erros = chamadas.filter((chamada) => chamada.status === "erro").length;
+	const rodando = [...chamadas].reverse().find((chamada) => chamada.status === "executando");
+	if (rodando) return { texto: `Executando ${rodando.nome}…`, erros };
+	const quantas = chamadas.length;
+	return { texto: `Executou ${quantas} ${quantas === 1 ? "comando" : "comandos"}`, erros };
+}
+
+/**
+ * Chamadas seguidas de ferramentas viram um grupo fechado, como no Claude:
+ * "Executou 2 comandos ›". Clicando, abre a lista das chamadas. Enquanto uma
+ * roda, o resumo diz qual.
+ */
+function GrupoFerramentas({ chamadas, vivo }: { chamadas: ChamadaFerramenta[]; vivo: boolean }) {
+	const [aberto, setAberto] = useState(false);
+	const { texto, erros } = rotuloGrupo(chamadas);
+	const rodando = chamadas.some((chamada) => chamada.status === "executando");
+	return (
+		<div className={`ferramentas${aberto ? " ferramentas--aberto" : ""}`}>
+			<button type="button" className="ferramentas__resumo" aria-expanded={aberto} onClick={() => setAberto((valor) => !valor)}>
+				{rodando ? <span className="ferramenta__ponto" aria-hidden="true" /> : <Icon name="code" size={14} strokeWidth={2.5} />}
+				<span className="body-sm ferramentas__texto">{texto}</span>
+				{erros > 0 ? (
+					<Tag tone="brick" size="sm" icon="alert">
+						{erros === 1 ? "1 com erro" : `${erros} com erro`}
+					</Tag>
+				) : null}
+				<Icon name="chevron-right" size={14} strokeWidth={2.5} className="ferramentas__seta" />
+			</button>
+			<AnimatePresence initial={false}>
+				{aberto ? (
+					<motion.div
+						className="ferramentas__lista"
+						initial={{ height: 0, opacity: 0 }}
+						animate={{ height: "auto", opacity: 1 }}
+						exit={{ height: 0, opacity: 0 }}
+						transition={{ type: "spring", stiffness: 420, damping: 36 }}
+					>
+						{chamadas.map((chamada) => (
+							<LinhaFerramenta key={chamada.id} chamada={chamada} vivo={vivo} />
+						))}
+					</motion.div>
+				) : null}
+			</AnimatePresence>
+		</div>
+	);
+}
+
+/** Um trecho da conversa já agrupado: um item sozinho ou um grupo de chamadas seguidas. */
+export type TrechoConversa = { tipo: "item"; item: ItemConversa } | { tipo: "ferramentas"; chave: string; chamadas: ChamadaFerramenta[] };
+
+/**
+ * Junta as chamadas de ferramenta seguidas num grupo. Uma resposta que só
+ * chamou ferramentas (sem texto) não aparece e não separa o grupo; uma
+ * mensagem, uma resposta com texto ou uma chamada que virou botão de pedido
+ * (`viraPedido`) separa.
+ */
+export function agruparConversa(conversa: readonly ItemConversa[], viraPedido: (id: string) => boolean = () => false): TrechoConversa[] {
+	const trechos: TrechoConversa[] = [];
+	let grupo: Extract<TrechoConversa, { tipo: "ferramentas" }> | undefined;
+	for (const item of conversa) {
+		if (item.tipo === "ferramenta" && !viraPedido(item.chamada.id)) {
+			if (!grupo) {
+				grupo = { tipo: "ferramentas", chave: item.chave, chamadas: [] };
+				trechos.push(grupo);
+			}
+			grupo.chamadas.push(item.chamada);
+			continue;
+		}
+		if (item.tipo === "assistente" && semConteudo(item)) continue;
+		grupo = undefined;
+		trechos.push({ tipo: "item", item });
+	}
+	return trechos;
 }
 
 export type ItemAssistente = Extract<ItemConversa, { tipo: "assistente" }>;
@@ -248,7 +369,15 @@ export function DocumentoConversa({ conversa, vazio, pedidoDaChamada, depois, au
 	return (
 		<div className="documento">
 			{conversa.length === 0 ? vazio : null}
-			{conversa.map((item) => {
+			{agruparConversa(conversa, (id) => Boolean(pedidoDaChamada?.(id))).map((trecho) => {
+				if (trecho.tipo === "ferramentas") {
+					return (
+						<Item key={trecho.chave} chave={trecho.chave} tipo="ferramentas">
+							<GrupoFerramentas chamadas={trecho.chamadas} vivo={aoVivo(trecho.chave)} />
+						</Item>
+					);
+				}
+				const { item } = trecho;
 				if (item.tipo === "usuario") {
 					// A nota não entra subindo: quem traz ela é o voo (ou ela já estava lá).
 					return (
@@ -262,21 +391,13 @@ export function DocumentoConversa({ conversa, vazio, pedidoDaChamada, depois, au
 					);
 				}
 				if (item.tipo === "ferramenta") {
-					const botao = pedidoDaChamada?.(item.chamada.id);
-					if (botao) {
-						return (
-							<Item key={item.chave} chave={item.chave} tipo="pedido">
-								<div className="documento__pedido">{botao}</div>
-							</Item>
-						);
-					}
+					// Só chega aqui a chamada que virou botão de pedido (agruparConversa).
 					return (
-						<Item key={item.chave} chave={item.chave} tipo="ferramenta">
-							<LinhaFerramenta chamada={item.chamada} vivo={aoVivo(item.chave)} />
+						<Item key={item.chave} chave={item.chave} tipo="pedido">
+							<div className="documento__pedido">{pedidoDaChamada?.(item.chamada.id)}</div>
 						</Item>
 					);
 				}
-				if (semConteudo(item)) return null;
 				numero += 1;
 				const autor = autorDaResposta ? autorDaResposta(item) : item.agente ? <span className="bloco__nome body-strong">{item.agente}</span> : undefined;
 				return (

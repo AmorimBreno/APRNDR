@@ -20,12 +20,15 @@ import { StarterKit } from "@tiptap/starter-kit";
 import { Caixa, CorDoTexto, Definicao, FormulaEmBloco, FormulaNaLinha, MarcaTexto, Recolhivel, TermoDefinicao, TituloRecolhivel } from "./blocos-nota.ts";
 import { EscapeEnxuto } from "./escape-markdown.ts";
 import { Mencao } from "./mencao.ts";
+import { MenuBarra } from "./MenuBarra.tsx";
 
 export interface OpcoesEditorNota {
 	/** A ajuda que aparece na nota vazia. */
 	textoVazio?: string;
 	/** Clicaram numa fórmula: a tela abre o editor de LaTeX dela. */
 	editarFormula?(tipo: "linha" | "bloco", no: NoPM, posicao: number): void;
+	/** Uma fórmula acabou de ser criada pelo menu do "/": a tela abre o editor de LaTeX dela. */
+	abrirFormula?(tipo: "linha" | "bloco", posicao: number): void;
 }
 
 export function extensoesDaNota(opcoes: OpcoesEditorNota = {}): AnyExtension[] {
@@ -53,6 +56,7 @@ export function extensoesDaNota(opcoes: OpcoesEditorNota = {}): AnyExtension[] {
 			katexOptions: { ...katexOptions, displayMode: true },
 			...(editar ? { onClick: (no: NoPM, posicao: number) => editar("bloco", no, posicao) } : {}),
 		}),
+		MenuBarra.configure(opcoes.abrirFormula ? { abrirFormula: opcoes.abrirFormula } : {}),
 		Markdown.configure({ indentation: { style: "space", size: 2 } }),
 		EscapeEnxuto,
 		// A ajuda só na nota vazia (não em cada bloco vazio, como um bloco de código novo).

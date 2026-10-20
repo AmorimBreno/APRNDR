@@ -192,3 +192,13 @@
 .editor-nota__texto .nota-mencao { padding: 0 .3em; border-radius: var(--radius-xs); background: var(--amber-tint); color: var(--ink); font-weight: 600; }
 .editor-nota__texto .ProseMirror-selectednode.nota-mencao, .editor-nota__texto .nota-mencao.ProseMirror-selectednode { box-shadow: var(--focus-ring); }
 .editor-nota__selecao { z-index: 20; }
+
+/* ── Menu do "/" das notas (MenuBarra.tsx, parte C): no visual dos menus do app (o do agente) ── */
+.menu-barra { display: flex; flex-direction: column; gap: 2px; width: 300px; max-height: min(360px, 60vh); overflow-y: auto; padding: 6px; border-radius: var(--radius-md); background: var(--ink-inverse); color: var(--ink); box-shadow: 0 0 0 var(--border-control) var(--amber), 0 14px 32px -12px #000000b0; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+.menu-barra__item { display: flex; align-items: center; gap: var(--space-3); width: 100%; padding: 6px var(--space-2); border: 0; border-radius: var(--radius-sm); background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.menu-barra__item--ativo { background: var(--amber-tint); }
+.menu-barra__icone { display: grid; flex: none; place-items: center; width: 32px; height: 32px; border-radius: var(--radius-sm); background: var(--surface-raised); color: var(--amber); box-shadow: inset 0 0 0 var(--border-hair) var(--line); }
+.menu-barra__icone .data { color: var(--ink); font-size: 13px; }
+.menu-barra__texto { display: flex; flex-direction: column; min-width: 0; }
+.menu-barra__dica { overflow: hidden; color: var(--ink-muted); white-space: nowrap; text-overflow: ellipsis; }
+.menu-barra__vazio { margin: 0; padding: var(--space-2) var(--space-3); color: var(--ink-muted); }

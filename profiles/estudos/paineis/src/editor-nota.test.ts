@@ -4,9 +4,10 @@
 // uma nota não mude o que você não mexeu. Usa a mesma lista de extensões do
 // EditorNota, num DOM falso (happy-dom).
 
-import { Editor } from "@tiptap/core";
+import { Editor, type JSONContent } from "@tiptap/core";
+import type { Node as NoPM } from "@tiptap/pm/model";
 import { afterEach, describe, expect, it } from "vitest";
-import { carregarNoEditor, extensoesDaNota, markdownDaNota } from "./editor-nota.ts";
+import { ajudaDoBloco, carregarNoEditor, extensoesDaNota, markdownDaNota } from "./editor-nota.ts";
 
 let editor: Editor | undefined;
 
@@ -97,6 +98,53 @@ describe("blocos e decorações da parte C", () => {
 	it("tom ou classe desconhecida não vira bloco", () => {
 		idaEVolta('<div class="caixa perigo">\n\nx\n\n</div>');
 		expect(editor!.getJSON().content?.[0]?.type).not.toBe("caixa");
+	});
+});
+
+describe("ajuda dos blocos vazios", () => {
+	/** A ajuda de cada bloco de texto vazio, na ordem do documento (o cursor no bloco de índice `cursor`). */
+	function ajudas(conteudo: JSONContent[], cursor?: number): string[] {
+		editor = new Editor({ extensions: extensoesDaNota(), content: { type: "doc", content: conteudo } });
+		const vazios: Array<{ no: NoPM; posicao: number }> = [];
+		editor.state.doc.descendants((no, posicao) => {
+			if (no.isTextblock && no.content.size === 0) vazios.push({ no, posicao });
+		});
+		return vazios.map(({ no, posicao }, indice) => ajudaDoBloco(editor!.state.doc, no, posicao, indice === cursor, "nota vazia"));
+	}
+	const vazio = (tipo: string, attrs?: Record<string, unknown>): JSONContent => ({ type: tipo, ...(attrs ? { attrs } : {}) });
+	const comTexto: JSONContent = { type: "paragraph", content: [{ type: "text", text: "texto" }] };
+
+	it("títulos, listas, tarefas e citação dizem o que são", () => {
+		expect(
+			ajudas([
+				comTexto,
+				vazio("heading", { level: 1 }),
+				vazio("heading", { level: 3 }),
+				{ type: "bulletList", content: [{ type: "listItem", content: [vazio("paragraph")] }] },
+				{ type: "orderedList", content: [{ type: "listItem", content: [vazio("paragraph")] }] },
+				{ type: "taskList", content: [{ type: "taskItem", attrs: { checked: false }, content: [vazio("paragraph")] }] },
+				{ type: "blockquote", content: [vazio("paragraph")] },
+			]),
+		).toEqual(["Título 1", "Título 3", "Lista", "Lista numerada", "Tarefa", "Citação"]);
+	});
+
+	it("parágrafo solto só com o cursor; a nota vazia, a ajuda geral", () => {
+		expect(ajudas([comTexto, vazio("paragraph"), vazio("paragraph")], 0)).toEqual(["Escreva, ou “/” para os blocos", ""]);
+		expect(ajudas([vazio("paragraph")])).toEqual(["nota vazia"]);
+	});
+
+	it("as partes dos blocos da parte C", () => {
+		expect(
+			ajudas(
+				[
+					comTexto,
+					{ type: "recolhivel", attrs: { tipo: "pergunta" }, content: [vazio("tituloRecolhivel"), vazio("paragraph")] },
+					{ type: "recolhivel", attrs: { tipo: "recolhivel" }, content: [vazio("tituloRecolhivel"), vazio("paragraph")] },
+					{ type: "definicao", content: [vazio("termoDefinicao"), vazio("paragraph")] },
+				],
+				1,
+			),
+		).toEqual(["A pergunta", "A resposta", "Título", "", "O termo", ""]);
 	});
 });
 

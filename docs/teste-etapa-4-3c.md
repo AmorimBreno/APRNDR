@@ -37,15 +37,17 @@ No fim, anote o resultado de cada passo e mande para o Claude Code.
 
 10. Selecione um trecho com o mouse. Clique em Destaque, depois no "A" tijolo e em Marca-texto. Clique em Limpar. Por quê: as decorações. O que você deve ver: a barra creme com Negrito, Itálico e Destaque; o Destaque abre embaixo uma faixa com Marca-texto, cinco "A" coloridos e Limpar. O trecho fica tijolo, depois também com marca-texto, e Limpar tira os dois. A barra não aparece com uma fórmula selecionada.
 
-11. Feche e abra a nota de novo e aperte F5. Por quê: tudo volta igual do arquivo. O que você deve ver: os mesmos blocos, nas mesmas cores e tons; a pergunta volta fechada.
+11. Numa linha vazia, digite "# " (cerquilha e espaço), Enter; "## ", Enter; "- ", Enter, Enter; "1. ", Enter, Enter; "[ ] ". Por quê: a ajuda de cada bloco, como no Notion. O que você deve ver: enquanto vazio, cada bloco mostra o próprio nome em cinza e já no estilo dele: "Título 1" grande, "Título 2", "• Lista", "1. Lista numerada", a caixa com "Tarefa"; a citação ("> ") mostra "Citação" em itálico. O nome some na primeira letra. Um parágrafo vazio só mostra "Escreva, ou “/” para os blocos" na linha do cursor; dentro da pergunta, "A pergunta" e "A resposta"; na definição, "O termo" e "A explicação".
 
-12. Numa linha, digite "Ver [[" e depois "Ent". Por quê: a lista das menções. O que você deve ver: um menu com as notas do caderno que batem e, no fim, "Ent" com a dica de nota que ainda não existe. Aperte Esc, apague o "[[Ent" e digite "[[Entropia]]" inteiro: ao fechar os colchetes, vira uma etiqueta tracejada (a nota ainda não existe).
+12. Feche e abra a nota de novo e aperte F5. Por quê: tudo volta igual do arquivo. O que você deve ver: os mesmos blocos, nas mesmas cores e tons; a pergunta volta fechada.
 
-13. Clique na menção tracejada "Entropia" e depois em "Criar e abrir". Por quê: criar a nota pela menção. O que você deve ver: o modal "Criar esta nota?"; depois, a nota Entropia aberta (vazia). Volte para Árvores: a menção não está mais tracejada. Clique nela: abre a nota Entropia.
+13. Numa linha, digite "Ver [[" e depois "Ent". Por quê: a lista das menções. O que você deve ver: um menu com as notas do caderno que batem e, no fim, "Ent" com a dica de nota que ainda não existe. Aperte Esc, apague o "[[Ent" e digite "[[Entropia]]" inteiro: ao fechar os colchetes, vira uma etiqueta tracejada (a nota ainda não existe).
 
-14. Em Entropia, escreva "Ver [[Árvores]]." Abra Árvores e troque o título para "Árvores de decisão". Por quê: renomear atualiza as menções. O que você deve ver: no arquivo de Entropia, "[[Árvores de decisão]]"; na Linha do tempo, "Nota renomeada: Árvores de decisão" com "antes: Árvores · menções atualizadas em Entropia".
+14. Clique na menção tracejada "Entropia" e depois em "Criar e abrir". Por quê: criar a nota pela menção. O que você deve ver: o modal "Criar esta nota?"; depois, a nota Entropia aberta (vazia). Volte para Árvores: a menção não está mais tracejada. Clique nela: abre a nota Entropia.
 
-15. No Explorador, crie uma nota com HTML que o app não conhece, por exemplo "Teste.md" com "<b>negrito em HTML</b>", e abra no app. Por quê: o resto do HTML continua protegido. O que você deve ver: "Só leitura"; o arquivo não muda. Uma nota só com os blocos deste roteiro abre editável.
+15. Em Entropia, escreva "Ver [[Árvores]]." Abra Árvores e troque o título para "Árvores de decisão". Por quê: renomear atualiza as menções. O que você deve ver: no arquivo de Entropia, "[[Árvores de decisão]]"; na Linha do tempo, "Nota renomeada: Árvores de decisão" com "antes: Árvores · menções atualizadas em Entropia".
+
+16. No Explorador, crie uma nota com HTML que o app não conhece, por exemplo "Teste.md" com "<b>negrito em HTML</b>", e abra no app. Por quê: o resto do HTML continua protegido. O que você deve ver: "Só leitura"; o arquivo não muda. Uma nota só com os blocos deste roteiro abre editável.
 
 
 ## Resultado
@@ -62,8 +64,9 @@ Anote "ok" ou o que aconteceu:
 8. Pergunta e resposta:
 9. Recolhível:
 10. Destaque:
-11. Reabrir e F5:
-12. Lista do [[:
-13. Criar pela menção:
-14. Renomear atualiza menções:
-15. HTML desconhecido só para leitura:
+11. Ajuda de cada bloco:
+12. Reabrir e F5:
+13. Lista do [[:
+14. Criar pela menção:
+15. Renomear atualiza menções:
+16. HTML desconhecido só para leitura:

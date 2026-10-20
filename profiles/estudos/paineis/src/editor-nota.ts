@@ -11,11 +11,12 @@
 // entende; uma nota com ele abre só para leitura (temHtmlDesconhecido, em
 // lib/nota-tipos.ts).
 
-import type { AnyExtension, Editor } from "@tiptap/core";
+import { type AnyExtension, type Editor, Extension } from "@tiptap/core";
 import { TaskItem, TaskList } from "@tiptap/extension-list";
-import { Placeholder } from "@tiptap/extensions";
 import { Markdown } from "@tiptap/markdown";
 import type { Node as NoPM } from "@tiptap/pm/model";
+import { Plugin, PluginKey } from "@tiptap/pm/state";
+import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { StarterKit } from "@tiptap/starter-kit";
 import { Caixa, CorDoTexto, Definicao, FormulaEmBloco, FormulaNaLinha, MarcaTexto, Recolhivel, TermoDefinicao, TituloRecolhivel } from "./blocos-nota.ts";
 import { EscapeEnxuto } from "./escape-markdown.ts";
@@ -69,10 +70,98 @@ export function extensoesDaNota(opcoes: OpcoesEditorNota = {}): AnyExtension[] {
 		MenuBarra.configure(opcoes.abrirFormula ? { abrirFormula: opcoes.abrirFormula } : {}),
 		Markdown.configure({ indentation: { style: "space", size: 2 } }),
 		EscapeEnxuto,
-		// A ajuda só na nota vazia (não em cada bloco vazio, como um bloco de código novo).
-		...(opcoes.textoVazio ? [Placeholder.configure({ placeholder: ({ editor }) => (editor.isEmpty ? (opcoes.textoVazio ?? "") : "") })] : []),
+		// A ajuda de cada bloco vazio (ajudaDoBloco): todos os blocos de texto, também dentro de listas e caixas.
+		...(opcoes.textoVazio ? [AjudaDosBlocos.configure({ textoVazio: opcoes.textoVazio })] : []),
 	];
 }
+
+/** A nota vazia: um só parágrafo, sem nada. */
+const notaVazia = (doc: NoPM) => doc.childCount === 1 && doc.firstChild?.type.name === "paragraph" && doc.firstChild.content.size === 0;
+
+/**
+ * A ajuda de um bloco vazio, como no Notion: o nome do bloco em que você está
+ * escrevendo ("Título 1", "Lista", "Tarefa"…), no estilo dele (ela aparece no
+ * ::before do próprio bloco). Some quando o bloco ganha texto. Títulos, itens
+ * de lista, citação e as partes dos blocos da parte C mostram sempre; um
+ * parágrafo solto só na linha do cursor; a nota vazia, a ajuda geral.
+ * `doc` é o documento sendo desenhado, e `posicao`, a do bloco nele.
+ */
+export function ajudaDoBloco(doc: NoPM, no: NoPM, posicao: number, comCursor: boolean, textoVazio = ""): string {
+	if (notaVazia(doc)) return textoVazio;
+	const $no = doc.resolve(posicao);
+	const pai = $no.parent;
+	switch (no.type.name) {
+		case "heading":
+			return `Título ${no.attrs.level as number}`;
+		case "termoDefinicao":
+			return "O termo";
+		case "tituloRecolhivel":
+			return pai.attrs.tipo === "pergunta" ? "A pergunta" : "Título";
+		case "codeBlock":
+			return comCursor ? "Código" : "";
+		case "paragraph":
+			break;
+		default:
+			return "";
+	}
+	// Só o primeiro parágrafo de um item de lista é o item (os outros são continuação).
+	const primeiroDoPai = $no.index() === 0;
+	switch (pai.type.name) {
+		case "listItem":
+			if (!primeiroDoPai) break;
+			return $no.node($no.depth - 1)?.type.name === "orderedList" ? "Lista numerada" : "Lista";
+		case "taskItem":
+			return primeiroDoPai ? "Tarefa" : "";
+		case "blockquote":
+			return "Citação";
+		case "recolhivel":
+			return comCursor ? (pai.attrs.tipo === "pergunta" ? "A resposta" : "O conteúdo") : "";
+		case "definicao":
+			return comCursor ? "A explicação" : "";
+		case "caixa":
+			return comCursor ? "Escreva na caixa, ou “/” para os blocos" : "";
+	}
+	return comCursor ? "Escreva, ou “/” para os blocos" : "";
+}
+
+/**
+ * Põe a ajuda (ajudaDoBloco) em cada bloco de texto vazio: a classe is-empty e
+ * o atributo data-placeholder, que o CSS mostra no ::before. Feito aqui, e não
+ * pelo Placeholder do TipTap, porque ele chama a função com a posição do
+ * documento novo enquanto o editor ainda tem o antigo.
+ */
+const AjudaDosBlocos = Extension.create<{ textoVazio: string }>({
+	name: "ajudaDosBlocos",
+	addOptions() {
+		return { textoVazio: "" };
+	},
+	addProseMirrorPlugins() {
+		const { textoVazio } = this.options;
+		const editor = this.editor;
+		return [
+			new Plugin({
+				key: new PluginKey("ajudaDosBlocos"),
+				props: {
+					decorations(estado) {
+						if (!editor.isEditable) return DecorationSet.empty;
+						const { anchor } = estado.selection;
+						const marcas: Decoration[] = [];
+						estado.doc.descendants((no, posicao) => {
+							if (!no.isTextblock) return true;
+							if (no.content.size === 0) {
+								const comCursor = anchor >= posicao && anchor <= posicao + no.nodeSize;
+								const ajuda = ajudaDoBloco(estado.doc, no, posicao, comCursor, textoVazio);
+								if (ajuda) marcas.push(Decoration.node(posicao, posicao + no.nodeSize, { class: "is-empty", "data-placeholder": ajuda }));
+							}
+							return false;
+						});
+						return DecorationSet.create(estado.doc, marcas);
+					},
+				},
+			}),
+		];
+	},
+});
 
 /**
  * O markdown da nota como vai para o arquivo: sem os brancos do fim (o

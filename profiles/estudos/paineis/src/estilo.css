@@ -180,7 +180,8 @@
 .editor-nota__texto { min-height: 50vh; outline: none; caret-color: var(--amber); }
 .editor-nota__texto h1 { font-size: 26px; line-height: 34px; }
 .editor-nota__texto[contenteditable="false"] { caret-color: transparent; }
-.editor-nota__texto p.is-editor-empty:first-child::before { content: attr(data-placeholder); float: left; height: 0; color: var(--ink-subtle); pointer-events: none; }
+/* A ajuda de cada bloco vazio (ajudaDoBloco, em editor-nota.ts): no estilo do próprio bloco (título grande, item com o marcador), some ao escrever. */
+.editor-nota__texto .is-empty[data-placeholder]:not([data-placeholder=""])::before { content: attr(data-placeholder); float: left; height: 0; color: var(--ink-subtle); font-weight: inherit; pointer-events: none; }
 /* Lista de tarefas: a caixa à esquerda, sem o marcador quadrado. */
 .editor-nota__texto ul[data-type="taskList"] { padding-left: 0; list-style: none; }
 .editor-nota__texto ul[data-type="taskList"] li { display: flex; align-items: flex-start; gap: var(--space-2); }
@@ -232,11 +233,6 @@
 .recolhivel-nota--pergunta.recolhivel-nota--aberto .recolhivel-nota__conteudo > [data-node-view-content-react] > :not(summary) { padding-left: var(--space-3); border-left: var(--border-control) solid var(--sage); }
 .recolhivel-nota__mostrar { margin-top: var(--space-2); padding: 2px 0; border: 0; background: none; color: var(--amber); cursor: pointer; }
 .recolhivel-nota__mostrar:hover { text-decoration: underline; }
-/* Título, pergunta e termo vazios: o que escrever ali. */
-.editor-nota__texto summary:has(> .ProseMirror-trailingBreak:only-child)::before, .editor-nota__texto dfn:has(> .ProseMirror-trailingBreak:only-child)::before { float: left; height: 0; color: var(--ink-subtle); font-weight: 400; pointer-events: none; }
-.editor-nota__texto .recolhivel-nota:not(.recolhivel-nota--pergunta) summary:has(> .ProseMirror-trailingBreak:only-child)::before { content: "Título"; }
-.editor-nota__texto .recolhivel-nota--pergunta summary:has(> .ProseMirror-trailingBreak:only-child)::before { content: "A pergunta"; }
-.editor-nota__texto dfn:has(> .ProseMirror-trailingBreak:only-child)::before { content: "O termo"; }
 /* Fórmulas (KaTeX): clicando, abre o EditorFormula. */
 .editor-nota__texto .tiptap-mathematics-render { cursor: pointer; border-radius: var(--radius-xs); transition: background-color .16s ease-out; }
 .editor-nota__texto .tiptap-mathematics-render:hover { background: var(--surface-hover); }

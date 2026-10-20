@@ -3,6 +3,7 @@
 
 export * from "./agentes.ts";
 export * from "./eventos.ts";
+export * from "./imagens.ts";
 export * from "./janela-perfil.ts";
 export * from "./modelos.ts";
 export * from "./montagem.ts";

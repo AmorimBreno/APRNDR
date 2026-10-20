@@ -62,6 +62,20 @@ export const esquemaMateriais = z.strictObject({
 	modeloVisao: z.string().min(1).optional(),
 });
 
+/** Uma pasta da pasta de dados, com barras normais, sem curingas, sem .. e sem partes que começam com ponto. */
+const pastaDeDados = z
+	.string()
+	.min(1)
+	.refine(
+		(valor) => !isAbsolute(valor) && !/[\\:*]/.test(valor) && valor.split("/").every((parte) => parte !== "" && !parte.startsWith(".")),
+		"use um caminho relativo à pasta de dados, com barras normais, sem * e sem partes vazias ou começando com ponto",
+	);
+
+export const esquemaImagens = z.strictObject({
+	/** Onde procurar uma imagem citada só pelo nome (o embed ![[nome.png]]), em ordem. */
+	pastas: z.array(pastaDeDados).min(1),
+});
+
 export const esquemaPerfil = z.strictObject({
 	id: z.string().regex(/^[a-z0-9][a-z0-9-]*$/, "use só letras minúsculas, números e hífen"),
 	nome: z.string().min(1),
@@ -84,6 +98,8 @@ export const esquemaPerfil = z.strictObject({
 	aparencia: esquemaAparencia.optional(),
 	/** Serviço de materiais (materiais/servico.ts): pastas observadas na pasta de dados e o modelo com visão. */
 	materiais: esquemaMateriais.optional(),
+	/** Imagens da pasta de dados que a interface mostra (imagens.ts). */
+	imagens: esquemaImagens.optional(),
 });
 
 export type ProfileJson = z.infer<typeof esquemaPerfil>;
@@ -121,6 +137,8 @@ export interface Perfil {
 	aparencia: Aparencia;
 	/** Serviço de materiais; sem ele, o perfil não tem materiais. */
 	materiais?: ConfigMateriais;
+	/** Pastas da pasta de dados onde a interface procura uma imagem citada só pelo nome; vazio se o profile.json não declarar. */
+	pastasImagens: string[];
 }
 
 export interface Aparencia {
@@ -258,6 +276,7 @@ export async function lerPerfil(pasta: string): Promise<Perfil> {
 		paineis: json.paineis,
 		aparencia,
 		...(json.materiais ? { materiais: json.materiais } : {}),
+		pastasImagens: json.imagens?.pastas ?? [],
 	};
 }
 

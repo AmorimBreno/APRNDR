@@ -38,6 +38,7 @@ describe("perfil estudos real", () => {
 			glifo: "学習",
 		});
 		expect(perfil.materiais).toEqual({ pastas: ["materias/*/materiais"], modeloVisao: "openrouter/anthropic/claude-sonnet-5.5" });
+		expect(perfil.pastasImagens).toEqual(["viz"]);
 	});
 
 	it("os quatro agentes têm nome, papel e modelo certos", async () => {
@@ -97,6 +98,15 @@ describe("profile.json inválido", () => {
 		expect(() => validarProfileJson({ ...valido, materiais: { pastas: [] } }, "x")).toThrow(/materiais/);
 	});
 
+	it("imagens é opcional; as pastas são relativas, sem *, sem .. e sem partes com ponto", () => {
+		expect(validarProfileJson(valido, "x").imagens).toBeUndefined();
+		expect(validarProfileJson({ ...valido, imagens: { pastas: ["viz", "a/b"] } }, "x").imagens).toEqual({ pastas: ["viz", "a/b"] });
+		for (const pasta of [resolve("/viz"), "a\\b", "a/*", "a/../b", ".sessoes-pi", "a//b", "c:viz"]) {
+			expect(() => validarProfileJson({ ...valido, imagens: { pastas: [pasta] } }, "x")).toThrow(/imagens/);
+		}
+		expect(() => validarProfileJson({ ...valido, imagens: { pastas: [] } }, "x")).toThrow(/imagens/);
+	});
+
 	it("extensoesSubagentes é opcional e aceita só caminhos relativos", () => {
 		expect(validarProfileJson(valido, "x").extensoesSubagentes).toBeUndefined();
 		expect(validarProfileJson({ ...valido, extensoesSubagentes: ["extensions/a.ts"] }, "x").extensoesSubagentes).toEqual([
@@ -128,6 +138,7 @@ describe("profile.json inválido", () => {
 			await writeFile(join(pasta, "agents", "geral.md"), "---\nname: geral\n---\n\nGeral.\n");
 			await writeFile(join(pasta, "profile.json"), JSON.stringify(valido));
 			expect((await lerPerfil(pasta)).extensoesSubagentes).toEqual([]);
+			expect((await lerPerfil(pasta)).pastasImagens).toEqual([]);
 			await writeFile(join(pasta, "profile.json"), JSON.stringify({ ...valido, extensoesSubagentes: ["extensions/nao.ts"] }));
 			await expect(lerPerfil(pasta)).rejects.toThrow(/campo extensoesSubagentes\[0\]: extensions\/nao\.ts não existe/);
 		});

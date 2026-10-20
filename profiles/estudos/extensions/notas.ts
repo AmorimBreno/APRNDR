@@ -149,8 +149,8 @@ export default function notas(pi: ExtensionAPI) {
 			const { de, para } = dadosAcao;
 			naFila(`${materia}/${de.toLowerCase()}`, async () => {
 				try {
-					const { titulo } = await renomearNota(dados, materia, de, para, daSessao);
-					mostrar("renomeada", { materia, de, para: titulo });
+					const { titulo, mencoesAtualizadas } = await renomearNota(dados, materia, de, para, daSessao);
+					mostrar("renomeada", { materia, de, para: titulo, mencoesAtualizadas: mencoesAtualizadas ?? [] });
 					// Sem esperar: a lista espera a fila, e esta tarefa ainda está nela.
 					void mostrarLista(dados, materia);
 				} catch (erro) {

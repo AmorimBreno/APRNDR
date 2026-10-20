@@ -30,6 +30,10 @@ export interface OpcoesEditorNota {
 	editarFormula?(tipo: "linha" | "bloco", no: NoPM, posicao: number): void;
 	/** Uma fórmula acabou de ser criada pelo menu do "/": a tela abre o editor de LaTeX dela. */
 	abrirFormula?(tipo: "linha" | "bloco", posicao: number): void;
+	/** Os títulos das notas da matéria agora: a lista do [[ e a menção tracejada (nota que não existe). */
+	titulosNotas?(): readonly string[] | undefined;
+	/** Clicaram numa menção: a tela abre a nota (ou oferece criar). */
+	abrirMencao?(alvo: string): void;
 	/** Os blocos com a aparência da tela (VisoesBlocos.tsx); os testes de formato não precisam. */
 	naTela?: boolean;
 }
@@ -46,7 +50,10 @@ export function extensoesDaNota(opcoes: OpcoesEditorNota = {}): AnyExtension[] {
 		}),
 		TaskList,
 		TaskItem.configure({ nested: true }),
-		Mencao,
+		Mencao.configure({
+			...(opcoes.titulosNotas ? { titulos: opcoes.titulosNotas } : {}),
+			...(opcoes.abrirMencao ? { abrir: opcoes.abrirMencao } : {}),
+		}),
 		opcoes.naTela ? CaixaNaTela : Caixa,
 		Definicao,
 		TermoDefinicao,

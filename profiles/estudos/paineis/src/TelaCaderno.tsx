@@ -127,7 +127,18 @@ export function descreverEvento(evento: Evento): { icone: IconName; texto: strin
 			return {
 				icone: "refresh",
 				texto: `Nota renomeada: ${nota}`,
-				...(typeof resultado.de === "string" ? { detalhe: `antes: ${resultado.de}` } : {}),
+				...(typeof resultado.de === "string"
+					? {
+							detalhe: [
+								`antes: ${resultado.de}`,
+								Array.isArray(resultado.mencoesAtualizadas) && resultado.mencoesAtualizadas.length
+									? `menções atualizadas em ${(resultado.mencoesAtualizadas as string[]).join(", ")}`
+									: "",
+							]
+								.filter(Boolean)
+								.join(" · "),
+						}
+					: {}),
 			};
 		default:
 			return { icone: "flag", texto: evento.verbo.replaceAll("_", " ") };
@@ -186,6 +197,8 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 		if (sessaoId) semEsperar(acoes.acaoDaInterface(PAINEL_CADERNOS, "abrir", { id: materiaId }));
 	}, [prontos, sessaoId, acoes, materiaId, secao.id]);
 	const notas = useListaNotas(props.janela, materiaId, `${secao.id}/${props.nota ?? ""}`);
+	// Os títulos para as menções do editor (o mesmo array enquanto a lista não muda).
+	const titulosNotas = useMemo(() => notas?.notas.map((nota) => nota.titulo), [notas]);
 
 	const materia = caderno?.materia ?? lista?.materias.find((item) => item.id === materiaId);
 	const indice = lista?.materias.findIndex((item) => item.id === materiaId) ?? -1;
@@ -275,6 +288,8 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 								titulo={notaAberta}
 								voltar={() => irPara("notas")}
 								renomeada={abrirNota}
+								{...(titulosNotas ? { titulos: titulosNotas } : {})}
+								abrirNota={abrirNota}
 							/>
 						) : (
 						<>

@@ -137,7 +137,7 @@ describe("notas", () => {
 
 	it("renomeia, inclusive só as maiúsculas, e grava renomeou_nota", async () => {
 		await criarNota(dados, materia, "limites");
-		expect(await renomearNota(dados, materia, "limites", "Limites")).toEqual({ titulo: "Limites" });
+		expect(await renomearNota(dados, materia, "limites", "Limites")).toMatchObject({ titulo: "Limites" });
 		expect(await readdir(pastaNotas(dados, materia))).toEqual(["Limites.md"]);
 		await renomearNota(dados, materia, "Limites", "Limites laterais", { sessao: "s2" });
 		expect(await readdir(pastaNotas(dados, materia))).toEqual(["Limites laterais.md"]);
@@ -146,6 +146,23 @@ describe("notas", () => {
 		// Mesmo título: nada muda e não grava evento.
 		await renomearNota(dados, materia, "Limites laterais", " Limites laterais ");
 		expect((await verbos()).filter((verbo) => verbo === "renomeou_nota")).toHaveLength(2);
+	});
+
+	it("renomear atualiza as menções nas outras notas e o evento diz quais", async () => {
+		await criarNota(dados, materia, "Limites");
+		await criarNota(dados, materia, "Derivadas");
+		await criarNota(dados, materia, "Sem menção");
+		await writeFile(arquivoNota(dados, materia, "Derivadas"), "Ver [[Limites]], [[ limites ]] e [[Limites laterais]].\n", "utf8");
+		await writeFile(arquivoNota(dados, materia, "Sem menção"), "Nada aqui. Texto \\[[Limites\\]] escapado fica.\n", "utf8");
+		await writeFile(arquivoNota(dados, materia, "Limites"), "Eu mesma: [[Limites]].\n", "utf8");
+		const { mencoesAtualizadas } = await renomearNota(dados, materia, "Limites", "Limites (introdução)");
+		expect(mencoesAtualizadas).toEqual(["Derivadas"]);
+		expect(await readFile(arquivoNota(dados, materia, "Derivadas"), "utf8")).toBe("Ver [[Limites (introdução)]], [[Limites (introdução)]] e [[Limites laterais]].\n");
+		expect(await readFile(arquivoNota(dados, materia, "Sem menção"), "utf8")).toBe("Nada aqui. Texto \\[[Limites\\]] escapado fica.\n");
+		// A própria nota renomeada não é reescrita (ela pode estar aberta no editor).
+		expect(await readFile(arquivoNota(dados, materia, "Limites (introdução)"), "utf8")).toBe("Eu mesma: [[Limites]].\n");
+		const { eventos } = await lerEventos(eventosMateria(dados, materia));
+		expect(eventos.at(-1)).toMatchObject({ verbo: "renomeou_nota", resultado: { de: "Limites", para: "Limites (introdução)", mencoesAtualizadas: ["Derivadas"] } });
 	});
 
 	it("não renomeia por cima de outra nota", async () => {

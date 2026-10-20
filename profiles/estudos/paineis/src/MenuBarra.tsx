@@ -6,8 +6,8 @@
 
 import { Icon } from "@estudos/design-system";
 import { computePosition, flip, offset, shift } from "@floating-ui/dom";
-import { Extension } from "@tiptap/core";
-import { PluginKey } from "@tiptap/pm/state";
+import { Extension, type Range } from "@tiptap/core";
+import { type EditorState, PluginKey } from "@tiptap/pm/state";
 import { ReactRenderer } from "@tiptap/react";
 import { Suggestion, type SuggestionKeyDownProps, type SuggestionProps } from "@tiptap/suggestion";
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
@@ -104,6 +104,50 @@ function posicionar(elemento: HTMLElement, props: SuggestionProps<ItemBarra, Ite
 	});
 }
 
+/**
+ * O desenho de um menu de sugestão (o do "/" e o das menções): a lista
+ * ListaBarra num ReactRenderer, presa ao body e posicionada junto do cursor.
+ */
+export function desenharMenu(
+	opcoes: { esconderVazio?: boolean } = {},
+): ReturnType<NonNullable<Parameters<typeof Suggestion<ItemBarra, ItemBarra>>[0]["render"]>> {
+	let menu: ReactRenderer<ControleMenu, PropsMenu> | undefined;
+	// Nas menções, nada a sugerir esconde o menu (o [[ pode ser só texto); no "/", ele avisa.
+	const mostrar = (elemento: HTMLElement, itens: ItemBarra[]) => {
+		elemento.style.display = opcoes.esconderVazio && itens.length === 0 ? "none" : "";
+	};
+	return {
+		onStart: (props) => {
+			menu = new ReactRenderer(ListaBarra, { editor: props.editor, props: { itens: props.items, escolher: props.command } });
+			Object.assign(menu.element.style, { position: "fixed", zIndex: "60" });
+			mostrar(menu.element, props.items);
+			document.body.appendChild(menu.element);
+			posicionar(menu.element, props);
+		},
+		onUpdate: (props) => {
+			menu?.updateProps({ itens: props.items, escolher: props.command });
+			if (menu) {
+				mostrar(menu.element, props.items);
+				posicionar(menu.element, props);
+			}
+		},
+		// O Esc o próprio plugin trata: ele encerra o menu, e o onExit tira o menu da tela.
+		onKeyDown: (props: SuggestionKeyDownProps) =>
+			props.event.key !== "Escape" && menu?.element.style.display !== "none" && (menu?.ref?.teclar(props.event) ?? false),
+		onExit: () => {
+			menu?.destroy();
+			menu?.element.remove();
+			menu = undefined;
+		},
+	};
+}
+
+/** Fora de código (no bloco de código e no código da linha, "/" e "[[" são só texto). */
+export function foraDeCodigo({ state, range }: { state: EditorState; range: Range }): boolean {
+	const $inicio = state.doc.resolve(range.from);
+	return !$inicio.parent.type.spec.code && !$inicio.marks().some((marca) => marca.type.name === "code");
+}
+
 export const MenuBarra = Extension.create<OpcoesMenuBarra>({
 	name: "menuBarra",
 	addOptions() {
@@ -117,37 +161,12 @@ export const MenuBarra = Extension.create<OpcoesMenuBarra>({
 				pluginKey: new PluginKey("menuBarra"),
 				char: "/",
 				allowedPrefixes: [" "],
-				// Dentro de código o "/" é só uma barra.
-				allow: ({ state, range }) => {
-					const $inicio = state.doc.resolve(range.from);
-					return !$inicio.parent.type.spec.code && !$inicio.marks().some((marca) => marca.type.name === "code");
-				},
+				allow: foraDeCodigo,
 				items: ({ query }) => filtrarItens(query),
 				command: ({ editor, range, props: item }) => {
 					item.executar({ editor, range, ...(opcoes.abrirFormula ? { abrirFormula: opcoes.abrirFormula } : {}) });
 				},
-				render: () => {
-					let menu: ReactRenderer<ControleMenu, PropsMenu> | undefined;
-					return {
-						onStart: (props) => {
-							menu = new ReactRenderer(ListaBarra, { editor: props.editor, props: { itens: props.items, escolher: props.command } });
-							Object.assign(menu.element.style, { position: "fixed", zIndex: "60" });
-							document.body.appendChild(menu.element);
-							posicionar(menu.element, props);
-						},
-						onUpdate: (props) => {
-							menu?.updateProps({ itens: props.items, escolher: props.command });
-							if (menu) posicionar(menu.element, props);
-						},
-						// O Esc o próprio plugin trata: ele encerra o menu, e o onExit tira o menu da tela.
-						onKeyDown: (props: SuggestionKeyDownProps) => props.event.key !== "Escape" && (menu?.ref?.teclar(props.event) ?? false),
-						onExit: () => {
-							menu?.destroy();
-							menu?.element.remove();
-							menu = undefined;
-						},
-					};
-				},
+				render: () => desenharMenu(),
 			}),
 		];
 	},

@@ -165,10 +165,17 @@ export async function salvarNota(dados: string, id: string, bruto: string, conte
 /**
  * Renomeia a nota (o arquivo) e grava renomeou_nota com o título antigo e o
  * novo. Só mudar maiúsculas também vale (passa por um nome temporário, porque
- * o Windows acha que é o mesmo arquivo). As menções [[Título]] em outras notas
- * ficam como estão (a parte C cuida delas).
+ * o Windows acha que é o mesmo arquivo). As menções [[Título antigo]] nas
+ * outras notas da matéria passam a [[Título novo]] (atualizarMencoes), e o
+ * evento diz quais notas mudaram.
  */
-export async function renomearNota(dados: string, id: string, deBruto: string, paraBruto: string, contexto: { sessao?: string } = {}): Promise<{ titulo: string }> {
+export async function renomearNota(
+	dados: string,
+	id: string,
+	deBruto: string,
+	paraBruto: string,
+	contexto: { sessao?: string } = {},
+): Promise<{ titulo: string; mencoesAtualizadas?: string[] }> {
 	await garantirMateria(dados, id);
 	const de = await tituloNoDisco(dados, id, tituloValido(deBruto));
 	if (!de) throw new ErroMaterias(`Não achei a nota "${deBruto.trim()}".`);
@@ -185,14 +192,42 @@ export async function renomearNota(dados: string, id: string, deBruto: string, p
 	} else {
 		await rename(origem, destino);
 	}
+	const mencoesAtualizadas = await atualizarMencoes(dados, id, de, para);
 	await acrescentarEvento(
 		eventosMateria(dados, id),
 		criarEvento({
 			...(contexto.sessao ? { sessao: contexto.sessao } : {}),
 			verbo: "renomeou_nota",
 			objeto: { materia: id, nota: para },
-			resultado: { de, para },
+			resultado: { de, para, ...(mencoesAtualizadas.length ? { mencoesAtualizadas } : {}) },
 		}),
 	);
-	return { titulo: para };
+	return { titulo: para, mencoesAtualizadas };
+}
+
+/** [[Título]] com o título dado (sem diferença de maiúsculas; espaços nas pontas tolerados). */
+const mencaoDe = (titulo: string) => new RegExp(`\\[\\[\\s*${titulo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\]\\]`, "gi");
+
+/**
+ * Troca [[de]] por [[para]] nas outras notas da matéria (a nota renomeada
+ * fica como está: ela pode estar aberta no editor). Cada nota mudada é gravada
+ * de uma vez. Devolve os títulos das notas que mudaram.
+ */
+export async function atualizarMencoes(dados: string, id: string, de: string, para: string): Promise<string[]> {
+	const mudadas: string[] = [];
+	for (const titulo of await titulosNaPasta(dados, id)) {
+		if (titulo.toLowerCase() === para.toLowerCase()) continue;
+		const arquivo = arquivoNota(dados, id, titulo);
+		let conteudo: string;
+		try {
+			conteudo = await readFile(arquivo, "utf8");
+		} catch {
+			continue;
+		}
+		const novo = conteudo.replace(mencaoDe(de), `[[${para}]]`);
+		if (novo === conteudo) continue;
+		await gravarArquivo(arquivo, novo);
+		mudadas.push(titulo);
+	}
+	return mudadas;
 }

@@ -153,7 +153,7 @@ describe("ponte das notas", () => {
 		await criarNota(dados, materia, "Limites");
 		acao("renomear", { de: "Limites", para: "Limites laterais" });
 		await esperar(() => recebidas("lista").length > 0);
-		expect(recebidas("renomeada")[0]!.dados).toEqual({ materia, de: "Limites", para: "Limites laterais" });
+		expect(recebidas("renomeada")[0]!.dados).toEqual({ materia, de: "Limites", para: "Limites laterais", mencoesAtualizadas: [] });
 		expect((recebidas("lista")[0]!.dados as { notas: Array<{ titulo: string }> }).notas.map((nota) => nota.titulo)).toEqual(["Limites laterais"]);
 	});
 });

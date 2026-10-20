@@ -15,7 +15,7 @@ export interface RespostasNotas {
 	criada: { materia: string; titulo: string };
 	salva: { materia: string; titulo: string; versao: string; modificadaEm: string; pedido?: string };
 	conflito: { materia: string; titulo: string; mensagem: string; versaoAtual?: string; pedido?: string };
-	renomeada: { materia: string; de: string; para: string };
+	renomeada: { materia: string; de: string; para: string; mencoesAtualizadas?: string[] };
 	erro: { mensagem: string; ao?: string; materia?: string; titulo?: string; pedido?: string };
 }
 

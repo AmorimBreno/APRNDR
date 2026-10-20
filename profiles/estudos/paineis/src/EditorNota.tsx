@@ -13,7 +13,7 @@
 // O título é o nome do arquivo e se edita no topo; a troca de nome espera o
 // salvamento em andamento, e os salvamentos esperam a troca terminar.
 
-import { Button, Callout, Icon, SelectionMenu } from "@estudos/design-system";
+import { Button, Callout, Icon, Modal, SelectionMenu } from "@estudos/design-system";
 import type { JanelaPerfilHook } from "@estudos/ui";
 import { TextSelection } from "@tiptap/pm/state";
 import { EditorContent, useEditor } from "@tiptap/react";
@@ -22,6 +22,7 @@ import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { CORES_TEXTO, type CorTexto, conferirTitulo, type NotaAberta, TAMANHO_TITULO, temHtmlDesconhecido } from "../../lib/nota-tipos.ts";
 import { carregarNoEditor, extensoesDaNota, markdownDaNota } from "./editor-nota.ts";
 import { EditorFormula } from "./EditorFormula.tsx";
+import { META_TITULOS } from "./mencao.ts";
 
 type TipoFormula = "linha" | "bloco";
 
@@ -48,6 +49,10 @@ export interface PropsEditorNota {
 	voltar(): void;
 	/** A nota mudou de nome: o caminho passa a ser o do título novo. */
 	renomeada(titulo: string): void;
+	/** Os títulos das notas da matéria (para as menções); undefined enquanto a lista não chegou. */
+	titulos?: readonly string[];
+	/** Abre outra nota da matéria (o clique numa menção). */
+	abrirNota(titulo: string): void;
 }
 
 /**
@@ -110,7 +115,13 @@ function EditorDaNota(props: PropsEditorNota) {
 		salvarAgora: (_forcar?: boolean) => {},
 		editarFormula: (_tipo: TipoFormula, _latex: string, _posicao: number) => {},
 		abrirFormula: (_tipo: TipoFormula, _posicao: number) => {},
+		abrirMencao: (_alvo: string) => {},
 	});
+	/** Os títulos das notas agora (a extensão da menção lê daqui). */
+	const titulosAgora = useRef(props.titulos);
+	titulosAgora.current = props.titulos;
+	/** A menção clicada para uma nota que não existe: o modal oferece criar. */
+	const [criarMencao, setCriarMencao] = useState<{ alvo: string; criando: boolean; erro?: string } | undefined>(undefined);
 	/** A fórmula aberta no modal (EditorFormula). */
 	const [formula, setFormula] = useState<{ tipo: TipoFormula; posicao: number; latex: string; nova: boolean } | undefined>(undefined);
 
@@ -120,6 +131,8 @@ function EditorDaNota(props: PropsEditorNota) {
 			naTela: true,
 			editarFormula: (tipo, no, posicao) => logica.current.editarFormula(tipo, no.attrs.latex as string, posicao),
 			abrirFormula: (tipo, posicao) => logica.current.abrirFormula(tipo, posicao),
+			titulosNotas: () => titulosAgora.current,
+			abrirMencao: (alvo) => logica.current.abrirMencao(alvo),
 		}),
 		editable: false,
 		editorProps: { attributes: { class: "ap-prose body-lg editor-nota__texto", "aria-label": "Texto da nota" } },
@@ -177,7 +190,27 @@ function EditorDaNota(props: PropsEditorNota) {
 			if (editor?.isEditable) setFormula({ tipo, posicao, latex, nova: false });
 		},
 		abrirFormula: (tipo, posicao) => setFormula({ tipo, posicao, latex: "", nova: true }),
+		abrirMencao: (alvo) => {
+			const existente = props.titulos?.find((titulo) => mesmoTitulo(titulo, alvo));
+			if (existente) props.abrirNota(existente);
+			else if (props.titulos) setCriarMencao({ alvo, criando: false });
+		},
 	};
+
+	/** Cria a nota da menção e vai para ela (a resposta "criada" chega pela ponte). */
+	const criarNotaDaMencao = () => {
+		if (!criarMencao) return;
+		setCriarMencao({ ...criarMencao, criando: true });
+		acoes.acaoDaInterface(PAINEL_NOTAS, "criar", { materia: materiaId, titulo: criarMencao.alvo }).catch((falha: unknown) => {
+			setCriarMencao({ ...criarMencao, criando: false, erro: `Não consegui criar a nota: ${(falha as Error).message}` });
+		});
+	};
+
+	// A lista de notas mudou: a menção tracejada (nota que não existe) é refeita.
+	useEffect(() => {
+		if (!editor || editor.isDestroyed) return;
+		editor.view.dispatch(editor.state.tr.setMeta(META_TITULOS, true).setMeta("addToHistory", false));
+	}, [editor, props.titulos]);
 
 	/** Tira a fórmula da nota (salvar vazio, Remover, ou cancelar uma fórmula nova). */
 	const removerFormula = () => {
@@ -293,6 +326,12 @@ function EditorDaNota(props: PropsEditorNota) {
 				emConflito.current = true;
 				setSituacao({ tipo: "conflito", mensagem: resposta.dados.mensagem });
 				return;
+			case "criada":
+				if (criarMencao?.criando && mesmoTitulo(resposta.dados.titulo, criarMencao.alvo)) {
+					setCriarMencao(undefined);
+					props.abrirNota(resposta.dados.titulo);
+				}
+				return;
 			case "renomeada":
 				if (!renomeando.current || !mesmoTitulo(resposta.dados.de, tituloAtual.current)) return;
 				renomeando.current = false;
@@ -312,6 +351,8 @@ function EditorDaNota(props: PropsEditorNota) {
 				} else if (ao === "salvar" && pedido && pedido === emVoo.current?.pedido) {
 					emVoo.current = undefined;
 					setSituacao({ tipo: "erro", mensagem });
+				} else if (ao === "criar" && criarMencao?.criando && mesmoTitulo(titulo, criarMencao.alvo)) {
+					setCriarMencao({ ...criarMencao, criando: false, erro: mensagem });
 				} else if (ao === "renomear" && renomeando.current && mesmoTitulo(titulo, tituloAtual.current)) {
 					renomeando.current = false;
 					setErroTitulo(mensagem);
@@ -515,6 +556,28 @@ function EditorDaNota(props: PropsEditorNota) {
 					</BubbleMenu>
 				) : null}
 			</div>
+			<Modal
+				open={Boolean(criarMencao)}
+				onClose={() => setCriarMencao(undefined)}
+				kicker="Menção"
+				title="Criar esta nota?"
+				size="sm"
+				footer={
+					<>
+						<Button variant="secondary" onClick={() => setCriarMencao(undefined)} disabled={criarMencao?.criando}>
+							Agora não
+						</Button>
+						<Button variant="primary" icon="plus" onClick={criarNotaDaMencao} disabled={criarMencao?.criando} aria-busy={criarMencao?.criando}>
+							{criarMencao?.criando ? "Criando…" : "Criar e abrir"}
+						</Button>
+					</>
+				}
+			>
+				<p className="body">
+					Ainda não existe a nota <strong>{criarMencao?.alvo}</strong> neste caderno. Ela é criada vazia em notas/ e abre no lugar desta (o que você escreveu aqui já foi salvo).
+				</p>
+				{criarMencao?.erro ? <p className="body-sm editor-nota__erro-titulo">{criarMencao.erro}</p> : null}
+			</Modal>
 			<EditorFormula
 				{...(formula ? { formula: { tipo: formula.tipo, latex: formula.latex, nova: formula.nova } } : {})}
 				salvar={salvarFormula}

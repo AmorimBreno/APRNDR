@@ -3,17 +3,13 @@
 
 import { readFile } from "node:fs/promises";
 import { extname } from "node:path";
+import { acharImagem, ErroCaminhoImagem, TIPOS_IMAGEM } from "@estudos/core";
 import { Hono } from "hono";
 import type { Janelas } from "./janelas.ts";
 import type { Log } from "./log.ts";
 
-const TIPOS_IMAGEM: Record<string, string> = {
-	".png": "image/png",
-	".jpg": "image/jpeg",
-	".jpeg": "image/jpeg",
-	".webp": "image/webp",
-	".svg": "image/svg+xml",
-};
+// Um SVG aberto direto no navegador não roda script nem busca nada (dentro de <img> o navegador já não roda).
+const POLITICA_SVG = "default-src 'none'; style-src 'unsafe-inline'; img-src data:";
 
 export function criarApp(janelas: Janelas, log: Log, versao: string): Hono {
 	const app = new Hono();
@@ -82,6 +78,41 @@ export function criarApp(janelas: Janelas, log: Log, versao: string): Hono {
 		if (!avatar) return c.json({ ok: false, erro: `O agente "${nome}" do perfil "${id}" não tem foto.` }, 404);
 		const tipo = TIPOS_IMAGEM[extname(avatar.arquivo).toLowerCase()] ?? "application/octet-stream";
 		return c.body(new Uint8Array(await readFile(avatar.arquivo)), 200, { "content-type": tipo, "cache-control": "no-cache" });
+	});
+
+	// Uma imagem da pasta de dados do perfil (imagens.ts do núcleo): /api/perfis/<id>/imagens/<caminho>,
+	// com o caminho relativo à pasta de dados ou só o nome (procurado nas pastas "imagens" do profile.json).
+	app.get("/api/perfis/:id/imagens/*", async (c) => {
+		const id = c.req.param("id");
+		const { perfis } = await janelas.perfis();
+		const perfil = perfis.find((item) => item.id === id);
+		if (!perfil) return c.json({ ok: false, erro: `O perfil "${id}" não existe ou é inválido.` }, 404);
+		const prefixo = `/api/perfis/${encodeURIComponent(id)}/imagens/`;
+		const bruto = new URL(c.req.url).pathname;
+		let caminho: string;
+		try {
+			caminho = decodeURIComponent(bruto.startsWith(prefixo) ? bruto.slice(prefixo.length) : "");
+		} catch {
+			return c.json({ ok: false, erro: "Caminho mal codificado." }, 400);
+		}
+		let imagem;
+		try {
+			imagem = await acharImagem(perfil.pastaDados, perfil.pastasImagens, caminho);
+		} catch (erro) {
+			if (erro instanceof ErroCaminhoImagem) return c.json({ ok: false, erro: erro.message }, 400);
+			throw erro;
+		}
+		if (!imagem) return c.json({ ok: false, erro: `A imagem "${caminho}" não está na pasta de dados do perfil "${id}".` }, 404);
+		const etag = `"${imagem.tamanho}-${Math.trunc(imagem.modificadoEm)}"`;
+		const cabecalhos: Record<string, string> = {
+			"content-type": imagem.tipo,
+			"cache-control": "no-cache",
+			etag,
+			"x-content-type-options": "nosniff",
+			...(imagem.tipo === "image/svg+xml" ? { "content-security-policy": POLITICA_SVG } : {}),
+		};
+		if (c.req.header("if-none-match") === etag) return c.body(null, 304, cabecalhos);
+		return c.body(new Uint8Array(await readFile(imagem.arquivo)), 200, cabecalhos);
 	});
 
 	// Arquivos de material (multipart: "pasta", relativa à pasta de dados, e um ou mais "arquivos").

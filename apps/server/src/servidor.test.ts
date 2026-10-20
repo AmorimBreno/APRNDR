@@ -28,6 +28,7 @@ const profileJson = (id: string, pastaDados: string) => ({
 	extensoes: [],
 	paineis: ["teste"],
 	aparencia: { capa: "capa.svg", cor: "moss", lema: "Lema de teste" },
+	imagens: { pastas: ["viz"] },
 });
 
 async function criarPerfil(pastaPerfis: string, pasta: string, id: string, pastaDados: string): Promise<void> {
@@ -221,6 +222,39 @@ describe("rotas HTTP", () => {
 		expect(await resposta.text()).toContain("<svg");
 		expect((await app.request("/api/perfis/quebrado/capa")).status).toBe(404);
 		expect((await app.request("/api/perfis/nada/capa")).status).toBe(404);
+	});
+
+	it("GET /api/perfis/:id/imagens/... serve imagens da pasta de dados, pelo nome ou pelo caminho, e nada de fora", async () => {
+		const dados = join(pasta, "dados");
+		await mkdir(join(dados, "viz"), { recursive: true });
+		await mkdir(join(dados, "outra pasta"), { recursive: true });
+		await mkdir(join(dados, ".sessoes-pi"), { recursive: true });
+		await writeFile(join(dados, "viz", "viz-a-1.png"), "png");
+		await writeFile(join(dados, "outra pasta", "b ç.svg"), "<svg/>");
+		await writeFile(join(dados, ".sessoes-pi", "c.png"), "segredo");
+		await writeFile(join(pasta, "fora.png"), "fora");
+		const app = criarApp(janelas, logMudo, "1");
+
+		const pelaNome = await app.request("/api/perfis/teste/imagens/viz-a-1.png");
+		expect(pelaNome.status).toBe(200);
+		expect(pelaNome.headers.get("content-type")).toBe("image/png");
+		expect(pelaNome.headers.get("x-content-type-options")).toBe("nosniff");
+		expect(await pelaNome.text()).toBe("png");
+		const etag = pelaNome.headers.get("etag")!;
+		expect((await app.request("/api/perfis/teste/imagens/viz-a-1.png", { headers: { "if-none-match": etag } })).status).toBe(304);
+
+		const svg = await app.request(`/api/perfis/teste/imagens/${encodeURIComponent("outra pasta")}/${encodeURIComponent("b ç.svg")}`);
+		expect(svg.status).toBe(200);
+		expect(svg.headers.get("content-type")).toBe("image/svg+xml");
+		expect(svg.headers.get("content-security-policy")).toContain("default-src 'none'");
+
+		expect((await app.request("/api/perfis/teste/imagens/nao.png")).status).toBe(404);
+		expect((await app.request("/api/perfis/nada/imagens/viz-a-1.png")).status).toBe(404);
+		for (const caminho of [".sessoes-pi/c.png", "viz/..%2F..%2Ffora.png", "viz%5Cviz-a-1.png", "viz/a.txt", "%E0%A4%A"]) {
+			expect((await app.request(`/api/perfis/teste/imagens/${caminho}`)).status, caminho).toBe(400);
+		}
+		// O %2E%2E vira .. na URL, que sobe e sai da rota.
+		expect((await app.request("/api/perfis/teste/imagens/%2E%2E/%2E%2E/fora.png")).status).toBe(404);
 	});
 
 	it("POST /api/perfis/:id/materiais grava os arquivos pela janela aberta; sem pasta, sem arquivo ou fora das pastas dá 400", async () => {

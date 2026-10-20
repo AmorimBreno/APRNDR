@@ -69,6 +69,13 @@ Put the embed directly in your teaching reply, using Obsidian's wikilink embed w
 
 That's all. The `md-log` extension mirrors your reply text verbatim into the linked `.md`, and Obsidian resolves the embed by filename anywhere in the vault (the maker saves into the project's `viz` folder, which is inside the vault) — so it renders inline in the lesson automatically. Width `|500` is a good default; use larger for dense diagrams. Introduce the visual in a sentence, then let it carry the idea — don't narrate every element back in prose.
 
+<!-- [estudos-ia] as três regras abaixo são do app: o embed aparece na conversa, diagrama à mão é proibido e a imagem vai para o quiz -->
+In this app, the conversation itself shows the embed (it finds the file in the `viz` folder of the data folder). Write it exactly as above, on its own line, with the filename the maker returned.
+
+Never draw a diagram yourself in the reply: no ```mermaid block, no SVG, no ASCII drawing. The conversation does not render them, and only the maker's render-and-inspect loop makes a picture correct. If you want a picture, call the maker; if it returns `RESULT: NONE`, teach without the picture.
+
+When a `quiz` question is about a picture, pass its filename in the quiz's `image` parameter (`image: "viz-<slug>-<timestamp>.png"`), so the learner sees it in the question while answering. The picture in the reply stays in the conversation, out of the quiz window.
+
 ## Why this is reliable
 
 - The maker never returns a picture it hasn't **looked at**, so "renders fine but says something false" is caught before it reaches the learner.

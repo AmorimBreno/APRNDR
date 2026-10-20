@@ -30,6 +30,8 @@ As linhas alteradas nos arquivos do learn são marcadas com o comentário [estud
 12. extensions/visual-tools/tools/mermaid_tools.ts e svg_tools.ts: no app, os desenhistas são sessões filhas criadas pelo núcleo dentro do processo do servidor, e não processos separados. Por isso o estado (o arquivo-fonte do desenho) passou do módulo para a função da extensão, com uma pasta de trabalho própria por sessão, e a publicação usa o cwd da sessão (ctx.cwd, a pasta de dados) no lugar do process.cwd(). As ferramentas são carregadas pelo campo extensoesSubagentes do profile.json.
 13. extensions/visual-tools/tools/_common.ts: publish() recebe a pasta base (o ctx.cwd da sessão); sem ela, continua usando o process.cwd().
 14. extensions/visual-tools/index.ts: continua igual, mas saiu do profile.json (extensoes ficou vazio). Ele só registrava as ferramentas no interactive-subagents, que o app não usa.
+15. skills/visualize/SKILL.md: três parágrafos no fim de "Embed it in the lesson". O app mostra o embed na conversa (a rota de imagens do núcleo procura o arquivo nas pastas "imagens" do profile.json, no perfil de estudos a viz/); diagrama nunca é escrito à mão na resposta (bloco mermaid, SVG ou desenho em texto), porque a conversa não desenha e só o desenhista confere; e a questão do quiz sobre um diagrama passa o nome do arquivo no parâmetro image. Em 2026-10-20 o professor escreveu um bloco mermaid à mão e fez um quiz sobre uma árvore que só aparecia na conversa.
+16. extensions/quiz.ts: o esquema ganhou o parâmetro opcional image, igual ao do quiz-web.ts (que mostra a imagem no modal), para os dois continuarem com os mesmos parâmetros. No terminal ele é ignorado.
 
 ## Arquivos do projeto (não vêm do learn)
 

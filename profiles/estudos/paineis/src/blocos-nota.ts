@@ -10,7 +10,7 @@
 //   TipTap, com uma regra mais estrita para o $ na linha: "R$ 10 e R$ 20" é texto).
 // A aparência na tela (as visões dos nós) fica em VisoesBlocos.tsx.
 
-import { type JSONContent, Mark, mergeAttributes, Node } from "@tiptap/core";
+import { type Editor, type JSONContent, Mark, mergeAttributes, Node } from "@tiptap/core";
 import { BlockMath, InlineMath } from "@tiptap/extension-mathematics";
 import { CORES_TEXTO, type CorTexto, TONS_CAIXA, type TomCaixa } from "../../lib/nota-tipos.ts";
 
@@ -90,11 +90,28 @@ export const Caixa = Node.create({
 	renderMarkdown: (node, ajuda) => `<div class="caixa ${(node.attrs?.tom as string | undefined) ?? "ideia"}">${miolo(ajuda.renderChildren(node.content ?? [], "\n\n"))}</div>`,
 });
 
+/**
+ * Enter no fim do título (ou do termo) com o primeiro parágrafo do conteúdo
+ * vazio: vai para ele, em vez de criar outro parágrafo vazio antes dele.
+ */
+function enterParaOConteudo(editor: Editor, nome: string): boolean {
+	const { selection } = editor.state;
+	const $cursor = selection.$from;
+	if (!selection.empty || $cursor.parent.type.name !== nome || $cursor.parentOffset !== $cursor.parent.content.size) return false;
+	const pai = $cursor.node(-1);
+	const proximo = pai.maybeChild($cursor.index(-1) + 1);
+	if (!proximo || proximo.type.name !== "paragraph" || proximo.content.size > 0) return false;
+	return editor.commands.setTextSelection($cursor.after() + 1);
+}
+
 /** O termo da definição (a primeira linha, em <dfn>). */
 export const TermoDefinicao = Node.create({
 	name: "termoDefinicao",
 	content: "inline*",
 	defining: true,
+	addKeyboardShortcuts() {
+		return { Enter: ({ editor }) => enterParaOConteudo(editor, this.name) };
+	},
 	parseHTML() {
 		return [{ tag: "dfn" }];
 	},
@@ -141,6 +158,9 @@ export const TituloRecolhivel = Node.create({
 	name: "tituloRecolhivel",
 	content: "inline*",
 	defining: true,
+	addKeyboardShortcuts() {
+		return { Enter: ({ editor }) => enterParaOConteudo(editor, this.name) };
+	},
 	parseHTML() {
 		return [{ tag: "summary" }];
 	},

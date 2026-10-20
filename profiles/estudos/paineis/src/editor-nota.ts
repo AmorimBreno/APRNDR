@@ -21,6 +21,7 @@ import { Caixa, CorDoTexto, Definicao, FormulaEmBloco, FormulaNaLinha, MarcaText
 import { EscapeEnxuto } from "./escape-markdown.ts";
 import { Mencao } from "./mencao.ts";
 import { MenuBarra } from "./MenuBarra.tsx";
+import { CaixaNaTela, RecolhivelNaTela } from "./VisoesBlocos.tsx";
 
 export interface OpcoesEditorNota {
 	/** A ajuda que aparece na nota vazia. */
@@ -29,6 +30,8 @@ export interface OpcoesEditorNota {
 	editarFormula?(tipo: "linha" | "bloco", no: NoPM, posicao: number): void;
 	/** Uma fórmula acabou de ser criada pelo menu do "/": a tela abre o editor de LaTeX dela. */
 	abrirFormula?(tipo: "linha" | "bloco", posicao: number): void;
+	/** Os blocos com a aparência da tela (VisoesBlocos.tsx); os testes de formato não precisam. */
+	naTela?: boolean;
 }
 
 export function extensoesDaNota(opcoes: OpcoesEditorNota = {}): AnyExtension[] {
@@ -44,10 +47,10 @@ export function extensoesDaNota(opcoes: OpcoesEditorNota = {}): AnyExtension[] {
 		TaskList,
 		TaskItem.configure({ nested: true }),
 		Mencao,
-		Caixa,
+		opcoes.naTela ? CaixaNaTela : Caixa,
 		Definicao,
 		TermoDefinicao,
-		Recolhivel,
+		opcoes.naTela ? RecolhivelNaTela : Recolhivel,
 		TituloRecolhivel,
 		MarcaTexto,
 		CorDoTexto,

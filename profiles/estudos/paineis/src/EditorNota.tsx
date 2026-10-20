@@ -15,11 +15,17 @@
 
 import { Button, Callout, Icon, SelectionMenu } from "@estudos/design-system";
 import type { JanelaPerfilHook } from "@estudos/ui";
+import { TextSelection } from "@tiptap/pm/state";
 import { EditorContent, useEditor } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
-import { conferirTitulo, type NotaAberta, TAMANHO_TITULO, temHtmlDesconhecido } from "../../lib/nota-tipos.ts";
+import { CORES_TEXTO, type CorTexto, conferirTitulo, type NotaAberta, TAMANHO_TITULO, temHtmlDesconhecido } from "../../lib/nota-tipos.ts";
 import { carregarNoEditor, extensoesDaNota, markdownDaNota } from "./editor-nota.ts";
+import { EditorFormula } from "./EditorFormula.tsx";
+
+type TipoFormula = "linha" | "bloco";
+
+const NOMES_COR_TEXTO: Record<CorTexto, string> = { tijolo: "tijolo", ambar: "âmbar", musgo: "musgo", aco: "aço", salvia: "sálvia" };
 import { mesmoTitulo, PAINEL_NOTAS, useNovasRespostas } from "./notas-ponte.ts";
 
 const ESPERA_SALVAR = 1500;
@@ -80,6 +86,8 @@ function EditorDaNota(props: PropsEditorNota) {
 	const [somenteLeitura, setSomenteLeitura] = useState(false);
 	const [tituloCampo, setTituloCampo] = useState(props.titulo);
 	const [erroTitulo, setErroTitulo] = useState<string | undefined>(undefined);
+	/** A paleta do Destaque aberta na barra da seleção. */
+	const [paleta, setPaleta] = useState(false);
 	/** A área que rola (o corpo da seção): a barra da seleção acompanha a rolagem dela. */
 	const [corpo, setCorpo] = useState<HTMLDivElement | null>(null);
 
@@ -97,10 +105,22 @@ function EditorDaNota(props: PropsEditorNota) {
 	const temporizador = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 	const edicao = useRef(crypto.randomUUID());
 	/** As funções do render mais recente: o onUpdate do TipTap e os temporizadores chamam por aqui, para não usar estado velho. */
-	const logica = useRef({ mudou: () => {}, salvarAgora: (_forcar?: boolean) => {} });
+	const logica = useRef({
+		mudou: () => {},
+		salvarAgora: (_forcar?: boolean) => {},
+		editarFormula: (_tipo: TipoFormula, _latex: string, _posicao: number) => {},
+		abrirFormula: (_tipo: TipoFormula, _posicao: number) => {},
+	});
+	/** A fórmula aberta no modal (EditorFormula). */
+	const [formula, setFormula] = useState<{ tipo: TipoFormula; posicao: number; latex: string; nova: boolean } | undefined>(undefined);
 
 	const editor = useEditor({
-		extensions: extensoesDaNota({ textoVazio: "Escreva aqui. “## ” faz um título, “- ” uma lista, “[ ] ” uma tarefa e [[Nome]] uma menção." }),
+		extensions: extensoesDaNota({
+			textoVazio: "Escreva aqui. “/” abre os blocos (fórmula, caixa, definição, pergunta…); “## ” faz um título e [[Nome]] uma menção.",
+			naTela: true,
+			editarFormula: (tipo, no, posicao) => logica.current.editarFormula(tipo, no.attrs.latex as string, posicao),
+			abrirFormula: (tipo, posicao) => logica.current.abrirFormula(tipo, posicao),
+		}),
 		editable: false,
 		editorProps: { attributes: { class: "ap-prose body-lg editor-nota__texto", "aria-label": "Texto da nota" } },
 		onUpdate: () => logica.current.mudou(),
@@ -150,7 +170,40 @@ function EditorDaNota(props: PropsEditorNota) {
 		temporizador.current = setTimeout(() => logica.current.salvarAgora(), ESPERA_SALVAR);
 	}
 
-	logica.current = { mudou, salvarAgora };
+	logica.current = {
+		mudou,
+		salvarAgora,
+		editarFormula: (tipo, latex, posicao) => {
+			if (editor?.isEditable) setFormula({ tipo, posicao, latex, nova: false });
+		},
+		abrirFormula: (tipo, posicao) => setFormula({ tipo, posicao, latex: "", nova: true }),
+	};
+
+	/** Tira a fórmula da nota (salvar vazio, Remover, ou cancelar uma fórmula nova). */
+	const removerFormula = () => {
+		if (editor && formula) {
+			if (formula.tipo === "bloco") editor.chain().focus().deleteBlockMath({ pos: formula.posicao }).run();
+			else editor.chain().focus().deleteInlineMath({ pos: formula.posicao }).run();
+		}
+		setFormula(undefined);
+	};
+	const salvarFormula = (latex: string) => {
+		if (!latex) return removerFormula();
+		if (editor && formula) {
+			// O cursor vai para logo depois da fórmula (e não fica a fórmula selecionada).
+			const depois = formula.posicao + (editor.state.doc.nodeAt(formula.posicao)?.nodeSize ?? 1);
+			if (formula.tipo === "bloco") editor.chain().focus().updateBlockMath({ latex, pos: formula.posicao }).setTextSelection(depois).run();
+			else editor.chain().focus().updateInlineMath({ latex, pos: formula.posicao }).setTextSelection(depois).run();
+		}
+		setFormula(undefined);
+	};
+	const cancelarFormula = () => {
+		if (formula?.nova) removerFormula();
+		else {
+			setFormula(undefined);
+			editor?.commands.focus();
+		}
+	};
 
 	const abrir = () => {
 		esperandoAbrir.current = true;
@@ -406,7 +459,18 @@ function EditorDaNota(props: PropsEditorNota) {
 					<BubbleMenu
 						editor={editor}
 						className="editor-nota__selecao"
-						options={{ placement: "top", offset: 8, flip: true, shift: { padding: 12 }, ...(corpo ? { scrollTarget: corpo } : {}) }}
+						// Só com um trecho de texto selecionado (não com uma fórmula ou outro bloco selecionado inteiro).
+						shouldShow={({ editor: atual, state }) =>
+							atual.isEditable && atual.view.hasFocus() && state.selection instanceof TextSelection && !state.selection.empty && !atual.isActive("codeBlock")
+						}
+						options={{
+							placement: "top",
+							offset: 8,
+							flip: true,
+							shift: { padding: 12 },
+							...(corpo ? { scrollTarget: corpo } : {}),
+							onHide: () => setPaleta(false),
+						}}
 						onMouseDown={(evento) => evento.preventDefault()}
 					>
 						<SelectionMenu
@@ -414,12 +478,49 @@ function EditorDaNota(props: PropsEditorNota) {
 							actions={[
 								{ label: "Negrito", onClick: () => editor.chain().focus().toggleBold().run() },
 								{ label: "Itálico", onClick: () => editor.chain().focus().toggleItalic().run() },
-								{ label: "Título", onClick: () => editor.chain().focus().toggleHeading({ level: 2 }).run() },
+								{ label: "Destaque", onClick: () => setPaleta((aberta) => !aberta) },
 							]}
 						/>
+						{/* Destaque: o marca-texto, as cores do texto e limpar (o Título fica no "/" e no "## "). */}
+						{paleta ? (
+							<div className="paleta-destaque" role="toolbar" aria-label="Destaque do trecho">
+								<button
+									type="button"
+									className={`paleta-destaque__botao paleta-destaque__marca${editor.isActive("marcaTexto") ? " paleta-destaque__botao--ativo" : ""}`}
+									onClick={() => editor.chain().focus().toggleMark("marcaTexto").run()}
+								>
+									<mark>Marca-texto</mark>
+								</button>
+								{CORES_TEXTO.map((cor) => (
+									<button
+										key={cor}
+										type="button"
+										className={`paleta-destaque__botao paleta-destaque__cor cor-${cor}${editor.isActive("corDoTexto", { cor }) ? " paleta-destaque__botao--ativo" : ""}`}
+										aria-label={`Texto ${NOMES_COR_TEXTO[cor]}`}
+										title={NOMES_COR_TEXTO[cor]}
+										onClick={() => editor.chain().focus().setMark("corDoTexto", { cor }).run()}
+									>
+										A
+									</button>
+								))}
+								<button
+									type="button"
+									className="paleta-destaque__botao overline"
+									onClick={() => editor.chain().focus().unsetMark("corDoTexto").unsetMark("marcaTexto").run()}
+								>
+									Limpar
+								</button>
+							</div>
+						) : null}
 					</BubbleMenu>
 				) : null}
 			</div>
+			<EditorFormula
+				{...(formula ? { formula: { tipo: formula.tipo, latex: formula.latex, nova: formula.nova } } : {})}
+				salvar={salvarFormula}
+				remover={removerFormula}
+				cancelar={cancelarFormula}
+			/>
 		</>
 	);
 }

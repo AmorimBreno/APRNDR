@@ -202,3 +202,68 @@
 .menu-barra__texto { display: flex; flex-direction: column; min-width: 0; }
 .menu-barra__dica { overflow: hidden; color: var(--ink-muted); white-space: nowrap; text-overflow: ellipsis; }
 .menu-barra__vazio { margin: 0; padding: var(--space-2) var(--space-3); color: var(--ink-muted); }
+
+/* ── Blocos e decorações das notas (blocos-nota.ts e VisoesBlocos.tsx, parte C) ── */
+/* Caixa de destaque: o Callout do design system; o texto de dentro herda a cor da caixa. */
+.editor-nota__texto .caixa-nota { margin: 1.4em 0 1em; }
+.editor-nota__texto .caixa-nota .caixa-nota__corpo strong, .editor-nota__texto .caixa-nota .caixa-nota__corpo a, .editor-nota__texto .caixa-nota .caixa-nota__corpo h2, .editor-nota__texto .caixa-nota .caixa-nota__corpo h3, .editor-nota__texto .caixa-nota .caixa-nota__corpo blockquote { color: inherit; }
+.editor-nota__texto .caixa-nota .caixa-nota__corpo code { background: transparent; color: inherit; box-shadow: inset 0 0 0 var(--border-hair) currentColor; }
+.editor-nota__texto .caixa-nota .caixa-nota__corpo ul > li::marker { color: currentColor; }
+.editor-nota__texto .caixa-nota .ap-callout__menu { z-index: 30; }
+.caixa-nota__tom--atual { background: var(--amber-tint); }
+/* Definição: o termo em destaque, a explicação embaixo, um fio âmbar à esquerda. */
+.editor-nota__texto .definicao { margin: 1.2em 0; padding: var(--space-3) var(--space-4); border-left: var(--border-strong) solid var(--amber); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; background: var(--surface-raised); }
+.editor-nota__texto .definicao > dfn { display: block; margin: 0 0 .35em; font-family: var(--font-display); font-size: 17px; font-style: normal; font-weight: 700; letter-spacing: .01em; color: var(--ink); }
+.editor-nota__texto .definicao > :last-child { margin-bottom: 0; }
+/* Recolhível e pergunta: a seta à esquerda do título; fechado, só o título aparece. */
+.editor-nota__texto .recolhivel-nota { position: relative; margin: .8em 0; padding: 2px 0 2px 30px; }
+.recolhivel-nota__seta { position: absolute; top: 4px; left: 0; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: var(--radius-sm); background: none; color: var(--amber); cursor: pointer; transition: background-color .16s ease-out; }
+.recolhivel-nota__seta:hover { background: var(--surface-hover); }
+.recolhivel-nota__seta:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.recolhivel-nota:not(.recolhivel-nota--pergunta) .recolhivel-nota__seta .ap-icon { transition: transform .2s var(--mola); }
+.recolhivel-nota--aberto:not(.recolhivel-nota--pergunta) .recolhivel-nota__seta .ap-icon { transform: rotate(90deg); }
+.recolhivel-nota__conteudo > [data-node-view-content-react] > summary { display: block; font-weight: 650; color: var(--ink); list-style: none; }
+.recolhivel-nota__conteudo > [data-node-view-content-react] > summary::-webkit-details-marker { display: none; }
+.recolhivel-nota:not(.recolhivel-nota--aberto) .recolhivel-nota__conteudo > [data-node-view-content-react] > :not(summary) { display: none; }
+.recolhivel-nota--aberto .recolhivel-nota__conteudo > [data-node-view-content-react] > summary { margin-bottom: .5em; }
+.recolhivel-nota--aberto .recolhivel-nota__conteudo { padding-bottom: 2px; }
+.recolhivel-nota--pergunta { border-radius: var(--radius-sm); background: var(--surface-raised); padding: var(--space-3) var(--space-4) var(--space-3) 42px; }
+.recolhivel-nota--pergunta .recolhivel-nota__seta { top: 12px; left: 10px; }
+.recolhivel-nota--pergunta.recolhivel-nota--aberto .recolhivel-nota__conteudo > [data-node-view-content-react] > :not(summary) { padding-left: var(--space-3); border-left: var(--border-control) solid var(--sage); }
+.recolhivel-nota__mostrar { margin-top: var(--space-2); padding: 2px 0; border: 0; background: none; color: var(--amber); cursor: pointer; }
+.recolhivel-nota__mostrar:hover { text-decoration: underline; }
+/* Título, pergunta e termo vazios: o que escrever ali. */
+.editor-nota__texto summary:has(> .ProseMirror-trailingBreak:only-child)::before, .editor-nota__texto dfn:has(> .ProseMirror-trailingBreak:only-child)::before { float: left; height: 0; color: var(--ink-subtle); font-weight: 400; pointer-events: none; }
+.editor-nota__texto .recolhivel-nota:not(.recolhivel-nota--pergunta) summary:has(> .ProseMirror-trailingBreak:only-child)::before { content: "Título"; }
+.editor-nota__texto .recolhivel-nota--pergunta summary:has(> .ProseMirror-trailingBreak:only-child)::before { content: "A pergunta"; }
+.editor-nota__texto dfn:has(> .ProseMirror-trailingBreak:only-child)::before { content: "O termo"; }
+/* Fórmulas (KaTeX): clicando, abre o EditorFormula. */
+.editor-nota__texto .tiptap-mathematics-render { cursor: pointer; border-radius: var(--radius-xs); transition: background-color .16s ease-out; }
+.editor-nota__texto .tiptap-mathematics-render:hover { background: var(--surface-hover); }
+.editor-nota__texto [data-type="block-math"] { margin: 1em 0; padding: var(--space-2) 0; overflow-x: auto; text-align: center; }
+.editor-nota__texto [data-type="block-math"]:empty::before, .editor-nota__texto [data-type="inline-math"]:empty::before { content: "fórmula vazia"; color: var(--ink-subtle); font-style: italic; }
+.editor-nota__texto .inline-math-error, .editor-nota__texto .block-math-error { color: var(--brick-text); font-family: var(--font-mono); font-size: .9em; }
+.editor-nota__texto .ProseMirror-selectednode.tiptap-mathematics-render, .editor-nota__texto .ProseMirror-selectednode > .tiptap-mathematics-render { box-shadow: var(--focus-ring); }
+.editor-formula { display: flex; flex-direction: column; gap: var(--space-4); }
+.editor-formula__campo textarea { font-family: var(--font-mono); font-size: 14px; }
+.editor-formula__previa { display: flex; flex-direction: column; gap: var(--space-2); min-height: 72px; padding: var(--space-3) var(--space-4); border-radius: var(--radius-sm); background: var(--surface-well); box-shadow: inset 0 0 0 var(--border-hair) var(--line); }
+.editor-formula__previa .overline { color: var(--ink-subtle); }
+.editor-formula__bloco { overflow-x: auto; text-align: center; }
+.editor-formula__linha { font-size: 1.15em; }
+.editor-formula__vazia { margin: 0; color: var(--ink-muted); }
+/* Cores do texto (<span class="cor-…">), nos tons do tema que dão leitura no fundo escuro. */
+.cor-tijolo { color: var(--brick-text); }
+.cor-ambar { color: var(--amber); }
+.cor-musgo { color: color-mix(in srgb, var(--moss) 45%, var(--ink)); }
+.cor-aco { color: var(--steel); }
+.cor-salvia { color: var(--sage-text); }
+/* A paleta do Destaque, logo abaixo da barra da seleção. */
+.paleta-destaque { display: flex; align-items: center; gap: 4px; margin-top: 6px; padding: 4px; border-radius: var(--radius-md); background: var(--cream); color: var(--on-cream); box-shadow: 0 8px 18px -8px #00000099; }
+.paleta-destaque__botao { display: grid; place-items: center; min-width: 30px; height: 30px; padding: 0 8px; border: 0; border-radius: var(--radius-sm); background: transparent; font: inherit; cursor: pointer; }
+/* A cor do texto vem da classe cor-… nos botões de cor; nos outros, a da paleta. */
+.paleta-destaque__botao:not(.paleta-destaque__cor) { color: inherit; }
+.paleta-destaque__botao:hover { background: #00000014; }
+.paleta-destaque__botao--ativo { box-shadow: inset 0 0 0 2px var(--on-cream); }
+.paleta-destaque__marca mark { padding: 0 .2em; background: var(--amber-pastel); color: var(--on-cream); box-shadow: inset 0 -2px 0 var(--amber-line); font-size: 13px; }
+.paleta-destaque__cor { width: 30px; padding: 0; background: var(--ink-inverse); font-family: var(--font-display); font-weight: 800; }
+.paleta-destaque__cor:hover { background: var(--ink-inverse); filter: brightness(1.3); }

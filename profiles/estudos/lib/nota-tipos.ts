@@ -118,6 +118,8 @@ export function previaDaNota(markdown: string, tamanho = 140): string {
 		.replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
 		.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
 		.replace(/<!--[\s\S]*?-->|<\/?[a-zA-Z][^>]*>/g, "")
+		// A fórmula fica como o LaTeX, sem os $$.
+		.replace(/\$\$([\s\S]*?)\$\$/g, "$1")
 		.replace(/[*~`]+/g, "")
 		// O _ de ênfase sai; o do meio da palavra ("x_1", "snake_case") fica.
 		.replace(/(?<![\p{L}\p{N}])_+|_+(?![\p{L}\p{N}])/gu, "")

@@ -76,6 +76,7 @@ describe("HTML e prévia", () => {
 		expect(previaDaNota("# Título\n\n- [ ] item **forte** e [link](http://x)\n> citação")).toBe("Título item forte e link citação");
 		expect(previaDaNota("a ".repeat(200)).length).toBeLessThanOrEqual(140);
 		expect(previaDaNota("_ênfase_ em x_1 e snake_case")).toBe("ênfase em x_1 e snake_case");
+		expect(previaDaNota("Antes.\n\n$$\nE = mc^2\n$$\n\nDepois.")).toBe("Antes. E = mc^2 Depois.");
 		expect(previaDaNota('Um <mark>destaque</mark> e <span class="x">cor</span> <!-- nota --> a < b')).toBe("Um destaque e cor a < b");
 	});
 });

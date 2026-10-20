@@ -52,6 +52,12 @@ function escolher(markdown: string, onde: string, id: string, abrirFormula?: (ti
 	return markdownDaNota(editor);
 }
 
+/** Enter entregue ao ProseMirror como o teclado entrega (passa pelos atalhos das extensões). */
+function apertarEnter() {
+	const view = editor!.view;
+	view.someProp("handleKeyDown", (tratar) => tratar(view, new KeyboardEvent("keydown", { key: "Enter", bubbles: true })));
+}
+
 describe("o que cada item faz", () => {
 	it("na linha vazia, o bloco entra no lugar dela e o cursor vai para dentro", () => {
 		expect(escolher("Antes.\n\n/cai", "/cai", "caixa-atencao")).toBe('Antes.\n\n<div class="caixa atencao">\n\n\n\n</div>');
@@ -70,6 +76,19 @@ describe("o que cada item faz", () => {
 		editor!.commands.insertContent("Qual a fórmula?");
 		expect(markdownDaNota(editor!)).toBe('<details class="pergunta">\n<summary>Qual a fórmula?</summary>\n\n\n\n</details>');
 		expect(escolher("/rec", "/rec", "recolhivel")).toBe("<details>\n<summary></summary>\n\n\n\n</details>");
+	});
+
+	it("Enter no fim do título vai para o conteúdo vazio, sem criar outro parágrafo", () => {
+		escolher("/perg", "/perg", "pergunta");
+		editor!.commands.insertContent("Qual?");
+		apertarEnter();
+		editor!.commands.insertContent("Esta.");
+		expect(markdownDaNota(editor!)).toBe('<details class="pergunta">\n<summary>Qual?</summary>\n\nEsta.\n\n</details>');
+		escolher("/def", "/def", "definicao");
+		editor!.commands.insertContent("Termo");
+		apertarEnter();
+		editor!.commands.insertContent("Explicação.");
+		expect(markdownDaNota(editor!)).toBe('<div class="definicao">\n<dfn>Termo</dfn>\n\nExplicação.\n\n</div>');
 	});
 
 	it("dentro de uma caixa, o bloco entra dentro dela", () => {

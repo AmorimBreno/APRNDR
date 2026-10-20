@@ -57,6 +57,7 @@ describe("blocos e decorações da parte C", () => {
 		["aninhados", '<div class="caixa exemplo">\n\nFora.\n\n<details>\n<summary>Dentro</summary>\n\nMiolo.\n\n</details>\n\n</div>', "caixa"],
 		["entre parágrafos", 'Antes.\n\n<div class="caixa resumo">\n\nMeio.\n\n</div>\n\nDepois.', "paragraph"],
 		["marca-texto e cor", 'Um <mark>destaque</mark> e uma <span class="cor-tijolo">cor</span> aqui.', "paragraph"],
+		["marca-texto e cor juntos", 'O <mark><span class="cor-tijolo">total vendido</span></mark> antes.', "paragraph"],
 		["menção dentro da caixa", '<div class="caixa ideia">\n\nVer [[Limites]].\n\n</div>', "caixa"],
 	];
 	for (const [nome, markdown, tipo] of casos) {

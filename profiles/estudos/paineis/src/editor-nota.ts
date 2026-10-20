@@ -1,22 +1,37 @@
-// O que o editor das notas entende (item 4.3, parte B): as extensões do TipTap
-// e o markdown que entra e sai. O EditorNota e os testes de ida e volta
-// (editor-nota.test.ts) usam a mesma lista, para o teste valer o que a tela faz.
+// O que o editor das notas entende: as extensões do TipTap e o markdown que
+// entra e sai. O EditorNota e os testes de ida e volta (editor-nota.test.ts)
+// usam a mesma lista, para o teste valer o que a tela faz.
 //
-// A parte B entende títulos (1 a 4), negrito, itálico, tachado, código (na
-// linha e em bloco), links, listas (com marcador, numeradas e de tarefas),
-// citação e linha divisória. O sublinhado fica de fora: o markdown não tem.
-// HTML (as decorações da parte C) o editor não entende; uma nota com HTML
-// abre só para leitura (temHtml, em lib/nota-tipos.ts).
+// Entende títulos (1 a 4), negrito, itálico, tachado, código (na linha e em
+// bloco), links, listas (com marcador, numeradas e de tarefas), citação, linha
+// divisória e menções (parte B) e, da parte C, as fórmulas, a caixa de
+// destaque, a definição, o recolhível, a pergunta e resposta, o marca-texto e a
+// cor do texto (blocos-nota.ts; o formato está em docs/notas-formato.md). O
+// sublinhado fica de fora: o markdown não tem. Outro HTML o editor não
+// entende; uma nota com ele abre só para leitura (temHtmlDesconhecido, em
+// lib/nota-tipos.ts).
 
 import type { AnyExtension, Editor } from "@tiptap/core";
 import { TaskItem, TaskList } from "@tiptap/extension-list";
 import { Placeholder } from "@tiptap/extensions";
 import { Markdown } from "@tiptap/markdown";
+import type { Node as NoPM } from "@tiptap/pm/model";
 import { StarterKit } from "@tiptap/starter-kit";
+import { Caixa, CorDoTexto, Definicao, FormulaEmBloco, FormulaNaLinha, MarcaTexto, Recolhivel, TermoDefinicao, TituloRecolhivel } from "./blocos-nota.ts";
 import { EscapeEnxuto } from "./escape-markdown.ts";
 import { Mencao } from "./mencao.ts";
 
-export function extensoesDaNota(opcoes: { textoVazio?: string } = {}): AnyExtension[] {
+export interface OpcoesEditorNota {
+	/** A ajuda que aparece na nota vazia. */
+	textoVazio?: string;
+	/** Clicaram numa fórmula: a tela abre o editor de LaTeX dela. */
+	editarFormula?(tipo: "linha" | "bloco", no: NoPM, posicao: number): void;
+}
+
+export function extensoesDaNota(opcoes: OpcoesEditorNota = {}): AnyExtension[] {
+	// Fórmula com erro mostra o LaTeX em vermelho (o KaTeX não lança).
+	const katexOptions = { throwOnError: false };
+	const editar = opcoes.editarFormula;
 	return [
 		StarterKit.configure({
 			heading: { levels: [1, 2, 3, 4] },
@@ -26,6 +41,18 @@ export function extensoesDaNota(opcoes: { textoVazio?: string } = {}): AnyExtens
 		TaskList,
 		TaskItem.configure({ nested: true }),
 		Mencao,
+		Caixa,
+		Definicao,
+		TermoDefinicao,
+		Recolhivel,
+		TituloRecolhivel,
+		MarcaTexto,
+		CorDoTexto,
+		FormulaNaLinha.configure({ katexOptions, ...(editar ? { onClick: (no: NoPM, posicao: number) => editar("linha", no, posicao) } : {}) }),
+		FormulaEmBloco.configure({
+			katexOptions: { ...katexOptions, displayMode: true },
+			...(editar ? { onClick: (no: NoPM, posicao: number) => editar("bloco", no, posicao) } : {}),
+		}),
 		Markdown.configure({ indentation: { style: "space", size: 2 } }),
 		EscapeEnxuto,
 		// A ajuda só na nota vazia (não em cada bloco vazio, como um bloco de código novo).

@@ -10,6 +10,7 @@
 // package.json). Se uma versão nova mudar esse método, os testes acusam.
 
 import { Extension, type JSONContent } from "@tiptap/core";
+import { cifraoAbriria } from "./blocos-nota.ts";
 
 const ehEspaco = (caractere: string | undefined) => caractere === undefined || /\s/.test(caractere);
 const ehLetraOuNumero = (caractere: string | undefined) => caractere !== undefined && /[\p{L}\p{N}]/u.test(caractere);
@@ -85,6 +86,10 @@ export function escaparEnxuto(texto: string, opcoes: { inicioDeLinha?: boolean }
 			case "&":
 				// Só o que pareceria uma entidade ("&amp;", "&#169;").
 				escapar = ENTIDADE.test(texto.slice(indice));
+				break;
+			case "$":
+				// Só o que abriria uma fórmula na linha ("R$ 10" fica como está).
+				escapar = cifraoAbriria(texto, indice);
 				break;
 		}
 		saida += escapar ? `\\${caractere}` : caractere;

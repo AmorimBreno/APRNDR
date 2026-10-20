@@ -55,12 +55,40 @@ export function conferirTitulo(bruto: string): { titulo: string } | { erro: stri
 }
 
 /**
- * Se o markdown tem HTML fora do código. O editor da parte B não conhece
- * HTML e o descartaria ao salvar; uma nota assim abre só para leitura até
- * as decorações (parte C). Código em bloco (``` ou ~~~) e código na linha
- * (`...`) não contam. Um < seguido de letra, / ou ! (comentário) conta.
+ * O HTML que as notas usam (docs/notas-formato.md): os tons da caixa de
+ * destaque e as cores do texto, pelos nomes das classes no arquivo.
  */
-export function temHtml(markdown: string): boolean {
+export const TONS_CAIXA = ["ideia", "atencao", "exemplo", "resumo"] as const;
+export type TomCaixa = (typeof TONS_CAIXA)[number];
+export const CORES_TEXTO = ["tijolo", "ambar", "musgo", "aco", "salvia"] as const;
+export type CorTexto = (typeof CORES_TEXTO)[number];
+
+/** As tags que o editor entende, exatamente como ele as escreve (abertura e fechamento). */
+const TAGS_CONHECIDAS = new Set([
+	"<mark>",
+	"</mark>",
+	...CORES_TEXTO.map((cor) => `<span class="cor-${cor}">`),
+	"</span>",
+	...TONS_CAIXA.map((tom) => `<div class="caixa ${tom}">`),
+	'<div class="definicao">',
+	"</div>",
+	"<dfn>",
+	"</dfn>",
+	"<details>",
+	'<details class="pergunta">',
+	"</details>",
+	"<summary>",
+	"</summary>",
+]);
+
+/**
+ * Se o markdown tem HTML que o editor não conhece (fora do código): ele o
+ * descartaria ao salvar, então uma nota assim abre só para leitura. O HTML
+ * das decorações e dos blocos (TAGS_CONHECIDAS) não conta. Código em bloco
+ * (``` ou ~~~) e código na linha (`...`) também não. Um < seguido de letra,
+ * / ou ! (comentário) que não é uma tag conhecida conta.
+ */
+export function temHtmlDesconhecido(markdown: string): boolean {
 	let cerca: string | undefined;
 	for (const linha of markdown.split(/\r?\n/)) {
 		const abertura = /^ {0,3}(`{3,}|~{3,})/.exec(linha);
@@ -75,7 +103,9 @@ export function temHtml(markdown: string): boolean {
 		// Bloco de código por recuo (4 espaços ou tab) também não conta.
 		if (/^( {4}|\t)/.test(linha)) continue;
 		const semCodigo = linha.replace(/(`+)[^`]*?\1/g, "");
-		if (/<[a-zA-Z/!]/.test(semCodigo)) return true;
+		for (const achado of semCodigo.matchAll(/<[a-zA-Z/!][^>]*>?/g)) {
+			if (!TAGS_CONHECIDAS.has(achado[0])) return true;
+		}
 	}
 	return false;
 }

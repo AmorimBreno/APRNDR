@@ -44,6 +44,61 @@ describe("ida e volta do markdown", () => {
 	}
 });
 
+describe("blocos e decorações da parte C", () => {
+	/** O markdown volta igual e o primeiro bloco é do tipo esperado. */
+	const casos: Array<[string, string, string]> = [
+		["fórmula em bloco", "$$\n\\lim_{x \\to a^+} f(x) = L\n$$", "blockMath"],
+		["fórmula na linha", "A área é $\\pi r^2$ e o raio, $r$.", "paragraph"],
+		["caixa", '<div class="caixa atencao">\n\nTexto **forte** e `código`.\n\n- um\n- dois\n\n</div>', "caixa"],
+		["caixa com fórmula", '<div class="caixa ideia">\n\n$$\nE = mc^2\n$$\n\n</div>', "caixa"],
+		["definição", '<div class="definicao">\n<dfn>Receita bruta</dfn>\n\nPreço de venda **com** impostos vezes a quantidade.\n\n</div>', "definicao"],
+		["recolhível", "<details>\n<summary>Título *itálico*</summary>\n\nConteúdo escondido.\n\n- item\n\n</details>", "recolhivel"],
+		["pergunta e resposta", '<details class="pergunta">\n<summary>Qual a fórmula da receita bruta?</summary>\n\nPreço × quantidade.\n\n</details>', "recolhivel"],
+		["aninhados", '<div class="caixa exemplo">\n\nFora.\n\n<details>\n<summary>Dentro</summary>\n\nMiolo.\n\n</details>\n\n</div>', "caixa"],
+		["entre parágrafos", 'Antes.\n\n<div class="caixa resumo">\n\nMeio.\n\n</div>\n\nDepois.', "paragraph"],
+		["marca-texto e cor", 'Um <mark>destaque</mark> e uma <span class="cor-tijolo">cor</span> aqui.', "paragraph"],
+		["menção dentro da caixa", '<div class="caixa ideia">\n\nVer [[Limites]].\n\n</div>', "caixa"],
+	];
+	for (const [nome, markdown, tipo] of casos) {
+		it(nome, () => {
+			expect(idaEVolta(markdown)).toBe(markdown);
+			expect(editor!.getJSON().content?.[0]?.type).toBe(tipo);
+		});
+	}
+
+	it("cada bloco vira o nó certo, com o tom, o tipo e o termo", () => {
+		idaEVolta('<div class="caixa exemplo">\n\nx\n\n</div>\n\n<details class="pergunta">\n<summary>P?</summary>\n\nR.\n\n</details>\n\n<div class="definicao">\n<dfn>T</dfn>\n\nE.\n\n</div>');
+		const [caixa, pergunta, definicao] = editor!.getJSON().content ?? [];
+		expect(caixa?.attrs).toEqual({ tom: "exemplo" });
+		expect(pergunta?.attrs).toEqual({ tipo: "pergunta" });
+		expect(pergunta?.content?.[0]).toMatchObject({ type: "tituloRecolhivel", content: [{ text: "P?" }] });
+		expect(definicao?.content?.[0]).toMatchObject({ type: "termoDefinicao", content: [{ text: "T" }] });
+	});
+
+	it("fórmula na linha vira o nó da fórmula", () => {
+		idaEVolta("A área é $\\pi r^2$.");
+		expect(editor!.getJSON().content?.[0]?.content?.map((parte) => parte.type)).toEqual(["text", "inlineMath", "text"]);
+	});
+
+	it("cifrão de dinheiro não vira fórmula", () => {
+		for (const texto of ["Custou R$ 10 e depois R$ 20.", "Custou R$10 e depois R$20.", "Entre $5 e $10 por mês."]) {
+			expect(idaEVolta(texto), texto).toBe(texto);
+			expect(editor!.getJSON().content?.[0]?.content?.map((parte) => parte.type), texto).toEqual(["text"]);
+			editor!.destroy();
+		}
+	});
+
+	it("caixa vazia volta com um parágrafo e não quebra", () => {
+		editor = new Editor({ extensions: extensoesDaNota(), content: '<div class="caixa ideia">\n\n</div>', contentType: "markdown" });
+		expect(editor.getJSON().content?.[0]).toMatchObject({ type: "caixa", content: [{ type: "paragraph" }] });
+	});
+
+	it("tom ou classe desconhecida não vira bloco", () => {
+		idaEVolta('<div class="caixa perigo">\n\nx\n\n</div>');
+		expect(editor!.getJSON().content?.[0]?.type).not.toBe("caixa");
+	});
+});
+
 describe("abrir a nota", () => {
 	it("o conteúdo do arquivo fica fora do desfazer: Ctrl+Z logo depois de abrir não esvazia a nota", () => {
 		editor = new Editor({ extensions: extensoesDaNota() });
@@ -131,6 +186,11 @@ describe("texto digitado ao pé da letra", () => {
 		"***",
 		"#hashtag fica",
 		"-5 graus",
+		"a fórmula $x^2$ não é fórmula aqui",
+		"$$não é bloco$$",
+		"R$ 10 e R$ 20",
+		"<mark>não é marca</mark>",
+		'<span class="cor-ambar">nem cor</span>',
 	];
 	for (const literal of literais) {
 		it(literal, () => {

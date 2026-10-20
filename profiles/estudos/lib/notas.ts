@@ -16,7 +16,7 @@ import { acrescentarEvento, criarEvento } from "./eventos.ts";
 import { ErroMaterias, arquivoMateria, eventosMateria, pastaMateria } from "./materias.ts";
 import { conferirTitulo, type ListaNotas, type NotaAberta, previaDaNota, type ResumoNota } from "./nota-tipos.ts";
 
-export { conferirTitulo, type ListaNotas, type NotaAberta, pastaNotasRelativa, previaDaNota, type ResumoNota, temHtml } from "./nota-tipos.ts";
+export { conferirTitulo, type ListaNotas, type NotaAberta, pastaNotasRelativa, previaDaNota, type ResumoNota, temHtmlDesconhecido } from "./nota-tipos.ts";
 
 export const pastaNotas = (dados: string, id: string) => join(pastaMateria(dados, id), "notas");
 export const arquivoNota = (dados: string, id: string, titulo: string) => join(pastaNotas(dados, id), `${titulo}.md`);

@@ -17,7 +17,7 @@ import {
 	previaDaNota,
 	renomearNota,
 	salvarNota,
-	temHtml,
+	temHtmlDesconhecido,
 	versaoDe,
 } from "./notas.ts";
 
@@ -48,17 +48,29 @@ describe("títulos", () => {
 });
 
 describe("HTML e prévia", () => {
-	it("acha HTML fora do código", () => {
-		expect(temHtml("texto <mark>destaque</mark>")).toBe(true);
-		expect(temHtml('<div class="aviso">\noi\n</div>')).toBe(true);
-		expect(temHtml("<!-- comentário -->")).toBe(true);
+	it("acha HTML que o editor não conhece, fora do código", () => {
+		expect(temHtmlDesconhecido('<div class="aviso">\noi\n</div>')).toBe(true);
+		expect(temHtmlDesconhecido("<!-- comentário -->")).toBe(true);
+		expect(temHtmlDesconhecido("um <b>negrito em HTML</b>")).toBe(true);
+		expect(temHtmlDesconhecido('<span class="cor-roxo">x</span>')).toBe(true);
+		expect(temHtmlDesconhecido('<div class="caixa perigo">')).toBe(true);
+	});
+	it("não conta o HTML das decorações e dos blocos", () => {
+		const conhecidos = [
+			'Um <mark>destaque</mark> e <span class="cor-ambar">cor</span>.',
+			'<div class="caixa atencao">\n\ntexto\n\n</div>',
+			'<div class="definicao">\n<dfn>Termo</dfn>\n\nexplicação\n\n</div>',
+			"<details>\n<summary>Título</summary>\n\nmiolo\n\n</details>",
+			'<details class="pergunta">\n<summary>Pergunta?</summary>\n\nresposta\n\n</details>',
+		];
+		for (const markdown of conhecidos) expect(temHtmlDesconhecido(markdown), markdown).toBe(false);
 	});
 	it("não conta código nem comparações", () => {
-		expect(temHtml("use `<div>` no código")).toBe(false);
-		expect(temHtml("```html\n<div>oi</div>\n```\nfim")).toBe(false);
-		expect(temHtml("    <div>recuado</div>")).toBe(false);
-		expect(temHtml("se a < b e 3 > 2")).toBe(false);
-		expect(temHtml("[[Outra nota]] e **negrito**")).toBe(false);
+		expect(temHtmlDesconhecido("use `<div>` no código")).toBe(false);
+		expect(temHtmlDesconhecido("```html\n<div>oi</div>\n```\nfim")).toBe(false);
+		expect(temHtmlDesconhecido("    <div>recuado</div>")).toBe(false);
+		expect(temHtmlDesconhecido("se a < b e 3 > 2")).toBe(false);
+		expect(temHtmlDesconhecido("[[Outra nota]] e **negrito**")).toBe(false);
 	});
 	it("a prévia tira a marcação", () => {
 		expect(previaDaNota("# Título\n\n- [ ] item **forte** e [link](http://x)\n> citação")).toBe("Título item forte e link citação");

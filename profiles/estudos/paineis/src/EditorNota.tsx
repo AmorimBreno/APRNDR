@@ -18,7 +18,7 @@ import type { JanelaPerfilHook } from "@estudos/ui";
 import { EditorContent, useEditor } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
-import { conferirTitulo, type NotaAberta, TAMANHO_TITULO, temHtml } from "../../lib/nota-tipos.ts";
+import { conferirTitulo, type NotaAberta, TAMANHO_TITULO, temHtmlDesconhecido } from "../../lib/nota-tipos.ts";
 import { carregarNoEditor, extensoesDaNota, markdownDaNota } from "./editor-nota.ts";
 import { mesmoTitulo, PAINEL_NOTAS, useNovasRespostas } from "./notas-ponte.ts";
 
@@ -160,7 +160,7 @@ function EditorDaNota(props: PropsEditorNota) {
 	/** Carrega o conteúdo do arquivo no editor (abrir e "Recarregar a do arquivo"). */
 	const carregar = (aberta: NotaAberta) => {
 		if (!editor) return;
-		const soLeitura = temHtml(aberta.conteudo);
+		const soLeitura = temHtmlDesconhecido(aberta.conteudo);
 		carregarNoEditor(editor, aberta.conteudo);
 		editor.setEditable(!soLeitura, false);
 		base.current = markdownDaNota(editor);

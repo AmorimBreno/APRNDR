@@ -1,17 +1,21 @@
 // Markdown das respostas: react-markdown com GFM (tabelas, listas de tarefa,
 // riscado) e matemática em LaTeX ($...$ e $$...$$, desenhada pelo KaTeX; a
-// skill teach do perfil de estudos escreve toda conta assim). HTML cru no
-// texto não é interpretado: aparece como texto. Os estilos vêm do Prose do
-// design system (ap-prose), aplicado por quem usa.
+// skill teach do perfil de estudos escreve toda conta assim). O embed de
+// imagem do Obsidian (![[nome.png|650]]) mostra a imagem da pasta de dados do
+// perfil (remark-embeds.ts e ImagemDoPerfil.tsx). HTML cru no texto não é
+// interpretado: aparece como texto. Os estilos vêm do Prose do design system
+// (ap-prose), aplicado por quem usa.
 
 import { useRef } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
+import { ImagemDoPerfil } from "./ImagemDoPerfil.tsx";
 import rehypePalavras from "./rehype-palavras.ts";
+import remarkEmbeds from "./remark-embeds.ts";
 
-const pluginsRemark = [remarkGfm, remarkMath];
+const pluginsRemark = [remarkGfm, remarkMath, remarkEmbeds];
 // throwOnError false: uma fórmula com erro aparece em vermelho, sem derrubar o resto.
 type PluginsRehype = NonNullable<Parameters<typeof ReactMarkdown>[0]["rehypePlugins"]>;
 const pluginsRehype: PluginsRehype = [[rehypeKatex, { throwOnError: false }]];
@@ -44,6 +48,12 @@ function useFilaDePalavras() {
 // Links abrem fora do app (o app roda no Edge em modo app, sem barra de endereço).
 const componentes: Components = {
 	a: ({ node: _node, ...props }) => <a {...props} target="_blank" rel="noreferrer" />,
+	img: ({ node, ...props }) => {
+		const caminho = node?.properties?.dataEmbed;
+		if (typeof caminho !== "string" || !caminho) return <img {...props} />;
+		const numero = (valor: unknown) => (valor === undefined ? undefined : Number(valor));
+		return <ImagemDoPerfil caminho={caminho} largura={numero(props.width)} altura={numero(props.height)} />;
+	},
 };
 
 // Em linha (rótulos de opção, enunciados curtos): os parágrafos viram texto solto.

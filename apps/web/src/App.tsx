@@ -9,7 +9,7 @@
 //   estudos, "caderno/<matéria>/<seção>"). O caminho é do perfil; o front só o
 //   repassa. A conversa volta para o último caminho aberto.
 
-import { comTransicao, usePerfis } from "@estudos/ui";
+import { comTransicao, ProvedorImagens, usePerfis } from "@estudos/ui";
 import { MotionConfig } from "motion/react";
 import { useEffect, useState } from "react";
 import { telasIniciais } from "./telas-iniciais.ts";
@@ -90,18 +90,27 @@ function Rotas() {
 	if (!perfil) return <TelaPerfis />;
 	const inicial = Object.hasOwn(telasIniciais, perfil) ? telasIniciais[perfil] : undefined;
 	// key só pelo perfil: trocar de subtela não remonta a tela inicial (ela guarda a sessão aberta).
-	if (inicial && !conversa) return <TelaInicial key={perfil} perfilId={perfil} caminho={caminho} />;
+	// As imagens da pasta de dados (embeds da conversa, painéis) vêm do perfil aberto.
+	if (inicial && !conversa) {
+		return (
+			<ProvedorImagens perfilId={perfil}>
+				<TelaInicial key={perfil} perfilId={perfil} caminho={caminho} />
+			</ProvedorImagens>
+		);
+	}
 	const ultimo = ultimosCaminhos.get(perfil) ?? "";
 	const voltar = inicial
 		? { rotulo: (ultimo && inicial.rotuloDoCaminho?.(ultimo)) || inicial.rotuloVoltar, hash: hashDoCaminho(perfil, ultimo) }
 		: { rotulo: "Perfis", hash: "#/" };
 	// key: outro perfil começa com o estado zerado.
 	return (
-		<JanelaPerfil
-			key={perfil}
-			perfilId={perfil}
-			voltar={voltar}
-			{...(inicial?.usarAparenciaContextos ? { usarAparenciaContextos: inicial.usarAparenciaContextos } : {})}
-		/>
+		<ProvedorImagens perfilId={perfil}>
+			<JanelaPerfil
+				key={perfil}
+				perfilId={perfil}
+				voltar={voltar}
+				{...(inicial?.usarAparenciaContextos ? { usarAparenciaContextos: inicial.usarAparenciaContextos } : {})}
+			/>
+		</ProvedorImagens>
 	);
 }

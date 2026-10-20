@@ -20,6 +20,7 @@ export * from "./visual/FaixaMarca.tsx";
 export * from "./visual/Fala.tsx";
 export * from "./visual/InfoResposta.tsx";
 export * from "./visual/Historico.tsx";
+export * from "./visual/ImagemDoPerfil.tsx";
 export * from "./visual/Markdown.tsx";
 export * from "./visual/movimento.ts";
 export * from "./visual/PainelPergunta.tsx";

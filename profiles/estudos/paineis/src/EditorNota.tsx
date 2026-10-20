@@ -102,7 +102,7 @@ function EditorDaNota(props: PropsEditorNota) {
 	const editor = useEditor({
 		extensions: extensoesDaNota({ textoVazio: "Escreva aqui. “## ” faz um título, “- ” uma lista, “[ ] ” uma tarefa e [[Nome]] uma menção." }),
 		editable: false,
-		editorProps: { attributes: { class: "ap-prose body-lg nota__texto", "aria-label": "Texto da nota" } },
+		editorProps: { attributes: { class: "ap-prose body-lg editor-nota__texto", "aria-label": "Texto da nota" } },
 		onUpdate: () => logica.current.mudou(),
 	});
 
@@ -323,13 +323,13 @@ function EditorDaNota(props: PropsEditorNota) {
 
 	return (
 		<>
-			<header className="caderno__secao-cabeca nota__cabeca">
-				<button type="button" className="overline nota__voltar" onClick={props.voltar}>
+			<header className="caderno__secao-cabeca editor-nota__cabeca">
+				<button type="button" className="overline editor-nota__voltar" onClick={props.voltar}>
 					<Icon name="arrow-left" size={14} strokeWidth={2.5} />
 					Notas{props.materiaNome ? ` · ${props.materiaNome}` : ""}
 				</button>
 				<input
-					className="display-sm nota__titulo"
+					className="display-sm editor-nota__titulo"
 					value={tituloCampo}
 					maxLength={TAMANHO_TITULO}
 					aria-label="Título da nota"
@@ -348,16 +348,16 @@ function EditorDaNota(props: PropsEditorNota) {
 						}
 					}}
 				/>
-				<span className="data caderno__secao-meta nota__situacao" aria-live="polite">
+				<span className="data caderno__secao-meta editor-nota__situacao" aria-live="polite">
 					{rotuloSituacao(situacao, somenteLeitura)}
 				</span>
-				{erroTitulo ? <span className="body-sm nota__erro-titulo">{erroTitulo}</span> : null}
+				{erroTitulo ? <span className="body-sm editor-nota__erro-titulo">{erroTitulo}</span> : null}
 			</header>
-			<div ref={setCorpo} className="caderno__secao-corpo nota__corpo" onKeyDown={teclas}>
+			<div ref={setCorpo} className="caderno__secao-corpo editor-nota__corpo" onKeyDown={teclas}>
 				{erroAbrir ? (
 					<Callout tone="amber" label="Não abri a nota">
 						<p>{erroAbrir}</p>
-						<div className="nota__botoes">
+						<div className="editor-nota__botoes">
 							<Button variant="secondary" icon="arrow-left" onClick={props.voltar}>
 								Voltar para as notas
 							</Button>
@@ -370,7 +370,7 @@ function EditorDaNota(props: PropsEditorNota) {
 				{situacao.tipo === "conflito" ? (
 					<Callout tone="amber" label="Mudou fora do app">
 						<p>{situacao.mensagem} Nada foi gravado por cima. Escolha qual versão fica:</p>
-						<div className="nota__botoes">
+						<div className="editor-nota__botoes">
 							<Button variant="secondary" icon="refresh" onClick={abrir}>
 								Recarregar a do arquivo
 							</Button>
@@ -383,7 +383,7 @@ function EditorDaNota(props: PropsEditorNota) {
 				{situacao.tipo === "erro" ? (
 					<Callout tone="amber" label="Não salvei">
 						<p>{situacao.mensagem}</p>
-						<div className="nota__botoes">
+						<div className="editor-nota__botoes">
 							<Button variant="secondary" icon="refresh" onClick={() => salvarAgora()}>
 								Tentar de novo
 							</Button>
@@ -399,13 +399,13 @@ function EditorDaNota(props: PropsEditorNota) {
 					</Callout>
 				) : null}
 				{!nota && !erroAbrir ? <p className="body caderno__carregando">Abrindo a nota…</p> : null}
-				<div className={`nota__folha${nota ? "" : " nota__folha--escondida"}`}>
+				<div className={`editor-nota__folha${nota ? "" : " editor-nota__folha--escondida"}`}>
 					<EditorContent editor={editor} />
 				</div>
 				{editor ? (
 					<BubbleMenu
 						editor={editor}
-						className="nota__selecao"
+						className="editor-nota__selecao"
 						options={{ placement: "top", offset: 8, flip: true, shift: { padding: 12 }, ...(corpo ? { scrollTarget: corpo } : {}) }}
 						onMouseDown={(evento) => evento.preventDefault()}
 					>

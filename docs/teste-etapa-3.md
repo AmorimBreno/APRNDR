@@ -92,6 +92,17 @@ Estes passos conferem o que mudou depois do pedido de 2026-10-16 (escala, respos
 30. Ative "Mostrar animações" desligado no Windows (Configurações > Acessibilidade > Efeitos visuais) e recarregue. Por quê: as animações respeitam o "reduzir movimento". O que você deve ver: nada voa, pula ou inclina; as telas trocam direto; tudo continua funcionando. Depois, ligue de novo.
 
 
+### Diagramas na conversa e no quiz (2026-10-20)
+
+Estes passos conferem as imagens que o professor pede ao desenhista. Se o app já estava aberto, aperte F5 antes.
+
+31. Na tela de cadernos, abra Ciência de Dados, clique em Conversar e, no histórico, abra a conversa de 20/10 sobre árvores de decisão. Desça até a resposta que fala das 20 peças e da temperatura. Por quê: confere que a conversa mostra o embed ![[viz-….png|650]] que o professor escreveu. O que você deve ver: o desenho da árvore (Temperatura > 80 °C, com Sim e Não levando às duas previsões) no meio do texto, com no máximo 650 px de largura e sem passar da coluna; nenhum texto "![[" no lugar.
+
+32. Numa conversa da matéria, peça ao professor um diagrama (por exemplo, "faça um diagrama de como a árvore decide se uma peça tem defeito"). Por quê: confere o caminho inteiro, do desenhista à conversa, e a regra nova da skill. O que você deve ver: o grupo "Executou N comandos ›" com o subagente mermaid-maker (ou svg-maker) e, na resposta, a imagem. Não deve aparecer um bloco de código mermaid escrito à mão.
+
+33. Peça uma questão do quiz sobre esse diagrama. Por quê: confere a imagem no modal da questão. O que você deve ver: no modal, a imagem logo depois do enunciado, inteira e baixa o bastante para as alternativas ficarem à vista; depois de Conferir, a revisão mostra a mesma imagem. Se a imagem não aparecer no modal, o professor não passou o parâmetro image: me conte, porque aí a skill precisa de outro ajuste.
+
+
 ## Fim
 
 1. Feche a janela do app e use o atalho "Parar Estudos". Por quê: fechar a janela não para o servidor.
@@ -102,7 +113,6 @@ Estes passos conferem o que mudou depois do pedido de 2026-10-16 (escala, respos
 ## O que ainda não existe ou já se sabe
 
 - Os botões das perguntas e das questões existem só enquanto a conversa está aberta nesta janela. Ao reabrir uma conversa antiga (ou depois de o servidor reiniciar), aparece só a linha da ferramenta com o resultado em texto. Isso não reprova o teste.
-- As imagens dos diagramas na conversa ainda não aparecem. O arquivo vai para estudos-dados\viz.
 - Cadernos, cursos e a aula (as outras telas do design system) são da Etapa 4.
 
 

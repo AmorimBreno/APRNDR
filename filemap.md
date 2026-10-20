@@ -25,10 +25,11 @@ docs/ponte-de-eventos.md — protocolo da ponte (interface:mostrar, pedido, resp
 docs/historico/ — documentos do checkpoint 1 (pi no WSL com tmux e Obsidian); só consulta
 
 packages/core/ — @estudos/core: núcleo genérico (não conhece estudos); consumido direto do src/index.ts; subcaminho @estudos/core/protocolo = src/protocolo.ts (sem o pi, para o front)
-packages/core/src/perfis.ts — esquema zod do profile.json e leitura da pasta profiles/ (lerPerfis, lerPerfil; lerPerfisComErros separa os inválidos)
+packages/core/src/perfis.ts — esquema zod do profile.json e leitura da pasta profiles/ (lerPerfis, lerPerfil; lerPerfisComErros separa os inválidos); imagens.pastas vira pastasImagens
 packages/core/src/agentes.ts — leitura dos arquivos de agente (frontmatter pelo parseFrontmatter do pi + prompt)
 packages/core/src/modelos.ts — nomes provedor/id resolvidos no registro de modelos do pi, níveis de raciocínio, modelos disponíveis
 packages/core/src/eventos.ts — tipo EventoNucleo (protocolo genérico, inclusive acao_interface e pedido_interface), tradução dos eventos da sessão do pi e do histórico
+packages/core/src/imagens.ts — imagens da pasta de dados para a interface: TIPOS_IMAGEM, conferirCaminhoImagem e acharImagem (nome solto nas pastas "imagens" do profile.json, ou caminho com pasta; nunca fora da pasta de dados); e o teste
 packages/core/src/sessoes.ts — opções do DefaultResourceLoader por (perfil, agente) e modo (principal ou subagente), filtros de skills e ferramentas, agente e contexto (ContextoSessao: o assunto da sessão, com instruções e escopo de materiais) gravados na sessão, lista de sessões em <dados>/.sessoes-pi
 packages/core/src/montagem.ts — criação de uma sessão do pi pelo SDK, ligação das extensões com o filtro de ferramentas e encerramento; comum à sessão principal e às filhas
 packages/core/src/ponte.ts — ponte de eventos: extensão inline que liga pi.events à janela (mostrar, pedido e resposta com cancelamento, inclusive pelo usuário, ação da interface); grava pedidos, fins e ações na sessão (entradas nucleo.ponte) para o histórico reconstruí-los
@@ -59,7 +60,9 @@ packages/ui/src/use-janela-perfil.ts — hook useJanelaPerfil(perfilId): abre o 
 packages/ui/src/use-perfis.ts — hook usePerfis e buscarPerfis: GET /api/perfis (perfis válidos e erros); se falhar (o servidor reiniciando), tenta de novo sozinho com espera crescente até 10 s
 packages/ui/src/paineis.tsx — registro de painéis (componente, título, soModal, foraDaArea para os de uma tela do perfil, resumir o pedido, revisarAoResponder), AreaPaineis (só ações; os pedidos vão para o modal) e PainelGenerico (ações e pedidos em JSON, responder com texto ou cancelar, revisão)
 packages/ui/src/estilo.css — estilos da tela de faixa e folha (.tela, .faixa, .folha, .linha, .tecla-papel) e das peças da janela (aviso de erro, documento, ferramentas, barra, histórico, seletor de modelo, painéis) e o CSS do KaTeX; exportado como @estudos/ui/estilo.css
-packages/ui/src/visual/Markdown.tsx — markdown das respostas (react-markdown, GFM, LaTeX com remark-math e rehype-katex; sem HTML cru)
+packages/ui/src/visual/Markdown.tsx — markdown das respostas (react-markdown, GFM, LaTeX com remark-math e rehype-katex; sem HTML cru; o embed de imagem ![[nome.png|largura]] vira ImagemDoPerfil)
+packages/ui/src/visual/remark-embeds.ts — plugin de remark do embed de imagem do Obsidian (![[nome.png]], |650, |650x300), fora de código; e o teste (remark-embeds.test.ts, com o Markdown inteiro)
+packages/ui/src/visual/ImagemDoPerfil.tsx — ProvedorImagens (o perfil das imagens, posto pelo App), urlDaImagem e ImagemDoPerfil (a imagem pela rota do servidor; "Imagem não encontrada" se falhar; alturaMaxima para modais)
 packages/ui/src/visual/Contador.tsx — número que rola até o valor novo como odômetro (custo e tokens da sessão)
 packages/ui/src/visual/Conversa.tsx — DocumentoConversa: respostas como bloco sem etiqueta, com o número e o botão de informações na margem e o autor em cima (raciocínio recolhível), mensagens do usuário em StudentNote; as chamadas de ferramenta seguidas viram um grupo fechado "Executou N comandos ›" (agruparConversa) que abre a lista, e cada chamada abre os argumentos inteiros e o resultado
 packages/ui/src/visual/Conversa.test.ts — testes do agrupamento das ferramentas e do rótulo do grupo, ferramentas em linhas técnicas (status, duração, progresso, resumo)
@@ -88,7 +91,7 @@ apps/server/ — @estudos/server: Hono (HTTP) + ws (WebSocket) na porta 7431; de
 apps/server/dev.mjs — modo dev: roda src/index.ts com o tsx e reinicia quando apps/server/src ou packages/core/src mudam, pedindo o encerramento pelo IPC (o tsx watch mata o processo na hora no Windows)
 apps/server/src/config.ts — porta, caminhos (raiz, profiles/, %LOCALAPPDATA%\estudos-app\logs), nomes das chaves e espera do watcher
 apps/server/src/index.ts — liga tudo: chaves, janelas, rotas, WebSocket /ws, watcher, log e encerramento limpo (sinais e pedido do dev.mjs)
-apps/server/src/app.ts — rotas HTTP: /api/saude, /api/perfis (válidos e erros à parte), /api/perfis/:id/sessoes, a capa e o avatar, POST /api/perfis/:id/materiais (multipart: pasta e arquivos)
+apps/server/src/app.ts — rotas HTTP: /api/saude, /api/perfis (válidos e erros à parte), /api/perfis/:id/sessoes, a capa e o avatar, GET /api/perfis/:id/imagens/<nome ou caminho> (imagens da pasta de dados), POST /api/perfis/:id/materiais (multipart: pasta e arquivos)
 apps/server/src/janelas.ts — Janelas: uma JanelaPerfil por perfil, compartilhada pelas conexões; lista de perfis em cache; registro de modelos compartilhado
 apps/server/src/conexao.ts — trata cada mensagem do WebSocket (validação, chamada à janela, resposta com pedidoId) e o resumo para o log
 apps/server/src/observador.ts — watcher (fs.watch recursivo) de profiles/ (menos node_modules e profiles/<id>/paineis) e ~/.pi/agent/extensions, com filtro por data de modificação e espera de 300 ms
@@ -104,7 +107,7 @@ packages/ui/src/visual/FaixaMarca.tsx — faixa escura da esquerda (Wordmark, le
 apps/web/src/telas/TelaPerfis.tsx — tela inicial: um card por perfil, até 4 numa linha com a altura da tela (1 ou 2 com metade da largura cada) (capa no papel, nome, ideograma, barra que enche no hover, lema, selo), perfis com erro, servidor fora do ar
 apps/web/src/telas/TelaCarregando.tsx — tela enquanto a sessão do perfil é montada: etapa atual, aviso de conexão e erros
 apps/web/src/telas/JanelaPerfil.tsx — janela do perfil: barra tijolo (Perfis, SeletorAgente, SeletorModelo, custo, recarregar, painéis), histórico, conversa como documento com os botões dos pedidos e a barra de pergunta, modal do pedido (abre sozinho, minimiza, revisa), avisos, erros, diagnósticos e área de painéis (abre sozinha quando um painel dela recebe algo)
-apps/web/src/App.tsx — rotas por hash: #/ = perfis, #/perfil/<id> = tela inicial do perfil (se houver) ou conversa, #/perfil/<id>/conversa = conversa de perfil com tela inicial
+apps/web/src/App.tsx — rotas por hash: #/ = perfis, #/perfil/<id> = tela inicial do perfil (se houver) ou conversa, #/perfil/<id>/conversa = conversa de perfil com tela inicial; as telas de um perfil ficam dentro do ProvedorImagens dele
 apps/web/src/App.test.ts — teste da leitura do hash
 apps/web/src/telas-iniciais.ts — registro das telas iniciais dos perfis (estudos = cadernos)
 apps/web/src/paineis.ts — registro de painéis do front: os do núcleo (pergunta), os do perfil de estudos (quiz) e o teste (PainelGenerico, com resumo do pedido); ids sem componente também usam o genérico
@@ -128,7 +131,7 @@ profiles/estudos/agents/mermaid-maker.md, svg-maker.md — desenhistas (sonnet-5
 profiles/estudos/skills/teach/SKILL.md — método de ensino (base do explicador)
 profiles/estudos/skills/visualize/SKILL.md — quando e como pedir um diagrama
 profiles/estudos/extensions/quiz.ts — ferramenta quiz (desenha no terminal; fora do profile.json, só para o pi no terminal)
-profiles/estudos/extensions/quiz-web.ts — ferramenta quiz do app: mesmo nome, parâmetros, correção e resultado do quiz.ts, perguntando pela ponte no painel "quiz" e mandando o resultado depois; arquivo do projeto
+profiles/estudos/extensions/quiz-web.ts — ferramenta quiz do app: mesmo nome, parâmetros, correção e resultado do quiz.ts, perguntando pela ponte no painel "quiz" e mandando o resultado depois; arquivo do projeto (o parâmetro opcional image vai no pedido e no resultado, para o painel mostrar a imagem)
 profiles/estudos/extensions/quiz-web.test.ts — testes do quiz web com um barramento falso
 profiles/estudos/extensions/materias.ts — ferramentas listar_materias e criar_materia e a ponte da tela de cadernos (painel "cadernos": listar, criar → lista, criada, erro, passageiros com gravar: false); arquivo do projeto
 profiles/estudos/extensions/materias.test.ts — testes da extensão de matérias com um barramento falso e uma pasta de dados temporária
@@ -164,7 +167,7 @@ profiles/estudos/paineis/src/MenuBarra.tsx — o menu do "/" (@tiptap/suggestion
 profiles/estudos/paineis/src/escape-markdown.ts — escape enxuto do texto comum no markdown das notas (troca o método interno do @tiptap/markdown 3.31.4)
 profiles/estudos/paineis/src/notas-ponte.ts — o painel "notas" da ponte: tipos das respostas, a última lista e useNovasRespostas
 profiles/estudos/paineis/src/editor-nota.test.ts — ida e volta do markdown no editor das notas (happy-dom): os dois sentidos, atalhos ao digitar e o desfazer depois de abrir
-profiles/estudos/paineis/src/PainelQuiz.tsx — painel do quiz no modal: QuizQuestion (ou teclas marcáveis no multi-select), Não sei, nota, Pular; revisão com o gabarito e o QuizFeedback
+profiles/estudos/paineis/src/PainelQuiz.tsx — painel do quiz no modal: QuizQuestion (ou teclas marcáveis no multi-select), Não sei, nota, Pular; revisão com o gabarito e o QuizFeedback; a imagem do parâmetro image depois do enunciado
 profiles/estudos/paineis/src/Comemoracao.tsx — a reação do quiz ao conferir: Carimbo 完, Confete de papel com gravidade e o tremido do erro
 profiles/estudos/paineis/src/estilo.css — estilos do painel do quiz, da tela de cadernos (modal de matéria nova), do caderno, das notas (lista e editor), dos blocos e decorações da parte C, do menu do "/", do modal da fórmula e das menções
 profiles/estudos/extensions/ask-user-question.ts — ferramenta ask_user_question (desenha no terminal; no app vale a do núcleo, packages/core/src/pergunta.ts)

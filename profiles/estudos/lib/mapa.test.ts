@@ -102,6 +102,48 @@ describe("fusão", () => {
 		expect(mapa.conceitos[1]!.id).toMatch(/^c-[0-9a-z]{12}-[0-9a-f]{4}$/);
 	});
 
+	it("id null com o nome de um conceito do mapa (sem maiúsculas e acentos) reforça esse conceito", () => {
+		const { mapa, novos, reforcados } = fundir(mapaCom([conceito("c-a", "Função Exponencial", { descricao: "minha" })]), [
+			{ id: null, nome: "funcao exponencial", descricao: "do modelo", locais: ["página 1"] },
+			{ id: "c-nao-existe", nome: "FUNÇÃO EXPONENCIAL", descricao: "", locais: ["página 2"] },
+		]);
+		expect(novos).toBe(0);
+		expect(reforcados).toBe(1);
+		expect(mapa.conceitos).toHaveLength(1);
+		expect(mapa.conceitos[0]).toMatchObject({ nome: "Função Exponencial", descricao: "minha" });
+		expect(mapa.conceitos[0]!.referencias.map((item) => item.local)).toEqual(["página 1", "página 2"]);
+	});
+
+	it("o nome de um conceito que está fora reforça e ele continua fora", () => {
+		const { mapa, novos } = fundir(mapaCom([conceito("c-a", "A"), conceito("c-f", "Fora", { fora: true })]), [{ id: null, nome: "fora", descricao: "", locais: ["página 3"] }]);
+		expect(novos).toBe(0);
+		expect(ids(mapa)).toEqual(["c-a", "c-f"]);
+		expect(mapa.conceitos[1]!.fora).toBe(true);
+		expect(mapa.conceitos[1]!.referencias).toEqual([ref("aula.pdf", "página 3", "pagina-003")]);
+	});
+
+	it("um item que casou pelo nome com outro nome e o mesmo id viram um só", () => {
+		const { mapa, reforcados } = fundir(mapaCom([conceito("c-a", "Média")]), [
+			{ id: "c-a", nome: "Média aritmética", descricao: "", locais: ["página 1"] },
+			{ id: null, nome: "média", descricao: "", locais: ["página 2"] },
+		]);
+		expect(reforcados).toBe(1);
+		expect(mapa.conceitos[0]!.referencias.map((item) => item.local)).toEqual(["página 1", "página 2"]);
+	});
+
+	it("o conceito casado pelo nome serve de anterior e de próximo para os novos", () => {
+		const depois = fundir(mapaCom([conceito("c-a", "A"), conceito("c-b", "B")]), [
+			{ id: null, nome: "a", descricao: "", locais: ["página 1"] },
+			{ id: null, nome: "N", descricao: "", locais: ["página 2"] },
+		]).mapa;
+		expect(nomes(depois)).toEqual(["A", "N", "B"]);
+		const antes = fundir(mapaCom([conceito("c-a", "A"), conceito("c-b", "B")]), [
+			{ id: null, nome: "N", descricao: "", locais: ["página 1"] },
+			{ id: null, nome: "b", descricao: "", locais: ["página 2"] },
+		]).mapa;
+		expect(nomes(antes)).toEqual(["A", "N", "B"]);
+	});
+
 	it("novo entra logo depois do item anterior da resposta", () => {
 		const { mapa } = fundir(mapaCom([conceito("c-a", "A"), conceito("c-b", "B")]), [
 			{ id: "c-a", nome: "A", descricao: "", locais: ["página 1"] },

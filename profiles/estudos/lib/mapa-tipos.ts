@@ -356,13 +356,19 @@ export interface TrechoDoArquivo {
  * - 2: um local só vale se for exatamente o local de um trecho do arquivo; um
  *   conceito sem nenhum local válido é descartado;
  * - 3: um id que existe no mapa só ganha as referências novas (sem repetir);
- *   nome, descrição, prioridade, posição e fora ficam. Id que não existe = null;
+ *   nome, descrição, prioridade, posição e fora ficam. Id que não existe = null.
+ *   Um item com id null (ou desconhecido) cujo chaveDoNome é o de um conceito
+ *   do mapa (inclusive os que estão fora; o primeiro, se houver mais de um)
+ *   vale como aquele conceito: só ganha referências. Isso é resolvido antes da
+ *   regra 5, então dois itens que caem no mesmo conceito existente (pelo id ou
+ *   pelo nome) também viram um só;
  * - 4: id null vira um conceito novo (material, normal, novo se o mapa já tem
  *   aprovadoEm), logo depois do item anterior da resposta; o primeiro da
  *   resposta, logo antes do próximo item da resposta que já existe no mapa; sem
  *   nenhum, no fim;
- * - 5: itens com o mesmo nome (chaveDoNome) viram um só: o nome e a descrição
- *   do primeiro, o primeiro id que existe no mapa, e os locais de todos.
+ * - 5: itens com o mesmo nome (chaveDoNome) ou o mesmo conceito existente
+ *   viram um só: o nome e a descrição do primeiro, o primeiro conceito
+ *   existente, e os locais de todos.
  *
  * A regra 1 (tirar antes as referências do arquivo) é tirarReferenciasDoArquivo
  * e a 6 (arquivos[arquivo]) é marcarArquivoMapeado, porque um arquivo grande é
@@ -381,6 +387,9 @@ export function fundirResultado(
 	const novo = clonar(mapa);
 	const trechoDoLocal = new Map(entrada.trechos.map((trecho) => [trecho.local, trecho.nome]));
 	const porId = new Map(novo.conceitos.map((conceito) => [conceito.id, conceito]));
+	// Regra 3, pelo nome: o primeiro conceito do mapa com cada chaveDoNome.
+	const idDoNome = new Map<string, string>();
+	for (const conceito of novo.conceitos) if (!idDoNome.has(chaveDoNome(conceito.nome))) idDoNome.set(chaveDoNome(conceito.nome), conceito.id);
 
 	interface Item {
 		id: string | undefined;
@@ -390,6 +399,7 @@ export function fundirResultado(
 	}
 	const itens: Item[] = [];
 	const porNome = new Map<string, Item>();
+	const porConceito = new Map<string, Item>();
 	let descartados = 0;
 	const brutos: unknown[] = Array.isArray(entrada.resultado?.conceitos) ? entrada.resultado.conceitos : [];
 	for (const bruto of brutos as Array<Partial<Record<keyof ResultadoMapeador["conceitos"][number], unknown>> | null>) {
@@ -398,19 +408,22 @@ export function fundirResultado(
 			descartados++;
 			continue;
 		}
-		const id = typeof bruto.id === "string" && porId.has(bruto.id) ? bruto.id : undefined;
+		const chave = chaveDoNome(nome);
+		const id = typeof bruto.id === "string" && porId.has(bruto.id) ? bruto.id : idDoNome.get(chave);
 		const descricao = typeof bruto.descricao === "string" ? bruto.descricao.trim() : "";
 		const locais = Array.isArray(bruto.locais) ? bruto.locais.filter((local): local is string => typeof local === "string" && trechoDoLocal.has(local)) : [];
-		const chave = chaveDoNome(nome);
-		const mesmoNome = porNome.get(chave);
-		if (mesmoNome) {
-			mesmoNome.id ??= id;
-			if (!mesmoNome.descricao) mesmoNome.descricao = descricao;
-			for (const local of locais) if (!mesmoNome.locais.includes(local)) mesmoNome.locais.push(local);
+		const junto = (id ? porConceito.get(id) : undefined) ?? porNome.get(chave);
+		if (junto) {
+			junto.id ??= id;
+			if (!junto.descricao) junto.descricao = descricao;
+			for (const local of locais) if (!junto.locais.includes(local)) junto.locais.push(local);
+			if (!porNome.has(chave)) porNome.set(chave, junto);
+			if (junto.id && !porConceito.has(junto.id)) porConceito.set(junto.id, junto);
 			continue;
 		}
 		const item: Item = { id, nome, descricao, locais: [...new Set(locais)] };
 		porNome.set(chave, item);
+		if (id) porConceito.set(id, item);
 		itens.push(item);
 	}
 	const validos = itens.filter((item) => item.locais.length > 0);

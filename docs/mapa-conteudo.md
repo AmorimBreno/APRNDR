@@ -57,7 +57,7 @@ O código, não o modelo, aplica o resultado:
 
 1. Antes de mapear um arquivo que já estava no mapa (ele mudou, ou o mapa está sendo refeito), as referências desse arquivo saem de todos os conceitos.
 2. `locais` só valem se forem exatamente o `local` de um trecho do arquivo; os outros são descartados. Um conceito sem nenhum local válido é descartado (nada de referência inventada).
-3. `id` de um conceito que existe no mapa: o conceito ganha as referências novas (sem repetir). O nome, a descrição, a prioridade, a posição e o `fora` dele não mudam: o que o Breno decidiu nunca é desfeito. Um id que não existe é tratado como `null`.
+3. `id` de um conceito que existe no mapa: o conceito ganha as referências novas (sem repetir). O nome, a descrição, a prioridade, a posição e o `fora` dele não mudam: o que o Breno decidiu nunca é desfeito. Um id que não existe é tratado como `null`. Um item com `id` null (ou desconhecido) cujo nome é igual ao de um conceito do mapa (sem diferença de maiúsculas e acentos, inclusive os que estão fora) vale como aquele conceito.
 4. `id` null: conceito novo, de origem `material`, prioridade `normal`, `novo` se o mapa já tem `aprovadoEm`. Ele entra logo depois do item anterior da resposta; se for o primeiro da resposta, logo antes do próximo item da resposta que já existe no mapa; se não houver nenhum, no fim.
 5. Dois itens da resposta com o mesmo nome (sem diferença de maiúsculas e acentos) viram um só.
 6. `arquivos[arquivo]` é gravado com o hash, a data, o modelo, o custo e quantos conceitos o arquivo tocou. Se o mapa estava `aprovado`, passa a `alterado`.

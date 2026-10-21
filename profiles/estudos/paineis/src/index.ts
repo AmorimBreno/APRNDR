@@ -5,6 +5,7 @@
 import type { EntradaTelaInicial, RegistroPaineis } from "@estudos/ui";
 import { ehPergunta, PainelQuiz } from "./PainelQuiz.tsx";
 import { PAINEL_CADERNOS, usarAparenciaMaterias } from "./comum.ts";
+import { PAINEL_MAPA } from "./mapa-ponte.ts";
 import { PAINEL_NOTAS } from "./notas-ponte.ts";
 import { TelaEstudos } from "./TelaEstudos.tsx";
 
@@ -28,6 +29,8 @@ export const paineisEstudos: RegistroPaineis = {
 	[PAINEL_CADERNOS]: { componente: () => null, titulo: "Cadernos", foraDaArea: true },
 	// A ponte do caderno com a extensão de notas: a lista e as notas abertas são do caderno.
 	[PAINEL_NOTAS]: { componente: () => null, titulo: "Notas", foraDaArea: true },
+	// A ponte do caderno com a extensão do mapa de conteúdo: o mapa é da seção do caderno.
+	[PAINEL_MAPA]: { componente: () => null, titulo: "Mapa de conteúdo", foraDaArea: true },
 	// Só pedidos: cada questão é respondida no modal, pelo botão na conversa,
 	// e o modal continua aberto depois de conferir, com o retorno.
 	quiz: {

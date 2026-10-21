@@ -8,6 +8,8 @@
 // - Notas: a lista das notas pessoais (SecaoNotas) e, com um título no
 //   caminho, o editor da nota (EditorNota);
 // - Materiais: a área de soltar e a lista do serviço de materiais;
+// - Mapa de conteúdo: os conceitos dos materiais, para revisar e aprovar
+//   (SecaoMapa, item 4.4);
 // - Cursos, Aulas, Resumos e Questionários: dizem o que vão ter e em que item
 //   chegam.
 // Caminho: caderno/<matéria>/<seção> (sem a seção, a linha do tempo);
@@ -22,7 +24,10 @@ import { type Materia, pastaMateriaisRelativa } from "../../lib/materia-tipos.ts
 import { contextoDaMateria, type DadosCaderno, dataCurta, lerAcoes, PAINEL_CADERNOS, prepararConversa, proximaProva, quando, rotuloCapa } from "./comum.ts";
 import { EditorNota } from "./EditorNota.tsx";
 import { ModalMateria } from "./ModalMateria.tsx";
+import { contarMapa } from "../../lib/mapa-tipos.ts";
+import { custoDoMapa, useMapa } from "./mapa-ponte.ts";
 import { ConteudoMateriais, custoDaVisao, formatarDolar } from "./ModalMateriais.tsx";
+import { SecaoMapa } from "./SecaoMapa.tsx";
 import { SecaoNotas, useListaNotas } from "./SecaoNotas.tsx";
 
 interface Secao {
@@ -37,6 +42,7 @@ export const SECOES: readonly Secao[] = [
 	{ id: "linha-do-tempo", nome: "Linha do tempo", icone: "clock" },
 	{ id: "notas", nome: "Notas", icone: "book" },
 	{ id: "materiais", nome: "Materiais", icone: "paperclip" },
+	{ id: "mapa", nome: "Mapa de conteúdo", icone: "bulb" },
 	{
 		id: "cursos",
 		nome: "Cursos",
@@ -140,6 +146,37 @@ export function descreverEvento(evento: Evento): { icone: IconName; texto: strin
 						}
 					: {}),
 			};
+		case "mapeou_material": {
+			const novos = typeof resultado.novos === "number" ? resultado.novos : 0;
+			const reforcados = typeof resultado.reforcados === "number" ? resultado.reforcados : 0;
+			const custo = typeof resultado.custo === "number" ? resultado.custo : 0;
+			const detalhe = [
+				novos > 0 ? `${novos} ${novos === 1 ? "conceito novo" : "conceitos novos"}` : "",
+				reforcados > 0 ? `${reforcados} ${reforcados === 1 ? "reforçado" : "reforçados"}` : "",
+				custo > 0 ? formatarDolar(custo) : "",
+			]
+				.filter(Boolean)
+				.join(" · ");
+			return { icone: "bulb", texto: `Mapa atualizado com ${arquivo}`, ...(detalhe ? { detalhe } : {}) };
+		}
+		case "atualizou_mapa": {
+			const semFonte = typeof resultado.semFonte === "number" ? resultado.semFonte : 0;
+			return {
+				icone: "bulb",
+				texto: `Mapa sem ${arquivo}`,
+				...(semFonte > 0 ? { detalhe: semFonte === 1 ? "1 conceito ficou sem fonte" : `${semFonte} conceitos ficaram sem fonte` } : {}),
+			};
+		}
+		case "revisou_mapa":
+			return { icone: "bulb", texto: "Mapa revisado" };
+		case "aprovou_mapa": {
+			const conceitos = typeof resultado.conceitos === "number" ? resultado.conceitos : undefined;
+			return {
+				icone: "check",
+				texto: "Mapa aprovado",
+				...(conceitos !== undefined ? { detalhe: `${conceitos} ${conceitos === 1 ? "conceito" : "conceitos"}` } : {}),
+			};
+		}
 		default:
 			return { icone: "flag", texto: evento.verbo.replaceAll("_", " ") };
 	}
@@ -199,6 +236,8 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 		if (sessaoId) semEsperar(acoes.acaoDaInterface(PAINEL_CADERNOS, "abrir", { id: materiaId }));
 	}, [prontos, sessaoId, acoes, materiaId, secao.id]);
 	const notas = useListaNotas(props.janela, materiaId, `${secao.id}/${props.nota ?? ""}`);
+	// O mapa de conteúdo (a contagem do índice e a seção).
+	const mapa = useMapa(props.janela, materiaId);
 	// Os títulos para as menções do editor (o mesmo array enquanto a lista não muda).
 	const titulosNotas = useMemo(() => notas?.notas.map((nota) => nota.titulo), [notas]);
 	// Os arquivos de material para as menções do editor (só os desta matéria).
@@ -219,6 +258,7 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 		"linha-do-tempo": caderno?.eventos.length,
 		materiais: materiais?.length,
 		notas: notas?.notas.length,
+		mapa: mapa.mapa ? contarMapa(mapa.mapa).dentro : undefined,
 	};
 	const voltar = () => props.navegar("");
 	// A conversa da matéria: a mais recente dela, ou uma nova com o contexto do caderno.
@@ -314,14 +354,25 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 							{secao.id === "materiais" && materiais && custoDaVisao(materiais) > 0 ? (
 								<span className="data caderno__secao-meta">Visão: {formatarDolar(custoDaVisao(materiais))}</span>
 							) : null}
+							{secao.id === "mapa" && mapa.mapa && custoDoMapa(mapa.mapa) > 0 ? (
+								<span className="data caderno__secao-meta">Mapa: {formatarDolar(custoDoMapa(mapa.mapa))}</span>
+							) : null}
 						</header>
-						<div className="caderno__secao-corpo">
+						{/* layoutScroll: o arrasto do mapa de conteúdo (Reorder) mede certo com o corpo rolado. */}
+						<motion.div className="caderno__secao-corpo" layoutScroll>
 							{secao.emBreve ? (
 								<EmptyState glyph={secao.emBreve.glifo} tone={tom} title={secao.emBreve.titulo}>
 									{secao.emBreve.texto}
 								</EmptyState>
 							) : secao.id === "notas" ? (
 								<SecaoNotas janela={props.janela} materiaId={materiaId} {...(notas ? { lista: notas } : {})} tom={tom} abrirNota={abrirNota} />
+							) : secao.id === "mapa" ? (
+								<SecaoMapa
+									mapa={mapa}
+									tom={tom}
+									irParaMateriais={() => irPara("materiais")}
+									abrirMaterial={(arquivo) => props.navegar(`caderno/${materiaId}/materiais/${arquivo}`)}
+								/>
 							) : secao.id === "materiais" ? (
 								<ConteudoMateriais
 									{...(materiais ? { materiais } : {})}
@@ -335,7 +386,7 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 							) : (
 								<p className="body caderno__carregando">Abrindo o caderno…</p>
 							)}
-						</div>
+						</motion.div>
 						</>
 						)}
 					</motion.section>

@@ -360,3 +360,85 @@
 .previa-bloco__pergunta { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--surface-raised); }
 .previa-bloco__pergunta .overline { color: var(--amber); }
 .previa-bloco__caixa { margin: 0; }
+
+/* ── Mapa de conteúdo do caderno (SecaoMapa.tsx, item 4.4): a situação, os avisos, a lista numerada
+ * dos conceitos (no ritmo da lista de notas) e, fechada no começo, a dos que estão fora. ── */
+.mapa { display: flex; flex-direction: column; gap: var(--space-5); max-width: 880px; }
+.mapa .ap-callout { margin: 0; }
+.mapa__erros { display: flex; flex-direction: column; gap: var(--space-3); }
+.mapa__botoes { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
+.mapa__situacao { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.mapa__resumo { color: var(--ink-muted); }
+.mapa__acoes-mapa { display: inline-flex; flex-wrap: wrap; gap: var(--space-2); margin-left: auto; }
+.mapa__fila { opacity: .8; }
+.mapa__pendentes { margin: var(--space-1) 0 0; overflow-wrap: anywhere; opacity: .85; }
+/* A barra do mapeamento, na cor do texto do callout (como a dos materiais, ap-file__bar). */
+.mapa__barra { display: block; height: 6px; margin-top: var(--space-3); overflow: hidden; border-radius: 3px; background: color-mix(in srgb, currentColor 22%, transparent); }
+.mapa__barra > span { display: block; height: 100%; background: currentColor; }
+.mapa__nenhum { margin: 0; color: var(--ink-muted); }
+
+.mapa__lista { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.mapa__conceito { position: relative; display: grid; grid-template-columns: 22px auto minmax(0, 1fr) auto auto; align-items: start; gap: var(--space-3); padding: var(--space-3) var(--space-3) var(--space-3) var(--space-2); border: var(--border-control) solid transparent; border-radius: var(--radius-md); background: var(--surface-raised); transition: border-color .16s ease-out, box-shadow .16s ease-out; }
+.mapa__conceito:hover { border-color: var(--line-strong); }
+/* O menu da prioridade fica por cima das linhas de baixo. */
+.mapa__conceito:focus-within { z-index: 3; }
+.mapa__conceito--arrastando { z-index: 4; border-color: var(--amber); box-shadow: 0 10px 24px -12px color-mix(in srgb, var(--ink) 45%, transparent); }
+/* A grade de seis pontos (a mesma da alça dos blocos da nota, AlcaBlocos.tsx). */
+.mapa__alca { display: grid; place-items: center; width: 22px; height: 24px; border-radius: var(--radius-xs); color: var(--ink-subtle); cursor: grab; touch-action: none; transition: background-color .12s ease-out, color .12s ease-out; }
+.mapa__alca:hover { background: var(--surface-hover); color: var(--ink); }
+.mapa__conceito--arrastando .mapa__alca { cursor: grabbing; color: var(--amber); }
+.mapa__pontos { display: block; width: 10px; height: 16px; background-image: radial-gradient(circle, currentColor 1.5px, transparent 1.7px); background-size: 5px 5.33px; }
+.mapa__numero { padding-top: 2px; color: var(--ink-subtle); }
+.mapa__texto { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.mapa__editavel { display: block; max-width: 100%; margin: 0 -4px; padding: 0 4px; border: 0; border-radius: var(--radius-xs); background: transparent; color: var(--ink); text-align: left; overflow-wrap: anywhere; cursor: text; transition: background-color .12s ease-out; }
+.mapa__editavel:hover { background: var(--surface-hover); }
+.mapa__editavel:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.mapa__descricao { color: var(--ink-muted); }
+.mapa__editavel--vazio { color: var(--ink-subtle); }
+.mapa__campo { display: block; width: 100%; box-sizing: border-box; margin: 0; padding: 1px 5px; border: var(--border-control) solid var(--amber); border-radius: var(--radius-sm); background: var(--surface-panel); color: var(--ink); resize: none; }
+.mapa__texto .mapa__campo { width: calc(100% + 12px); margin: 0 -6px; }
+.mapa__campo:focus { outline: none; box-shadow: var(--focus-ring); }
+.mapa__campo[aria-invalid="true"] { border-color: var(--brick); }
+.mapa__campo::placeholder { color: var(--ink-subtle); }
+.mapa__marcas { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: var(--space-2); }
+.mapa__referencia { display: inline-flex; padding: 0; border: 0; border-radius: var(--radius-full); background: none; cursor: pointer; transition: transform .3s var(--mola); }
+.mapa__referencia:hover { transform: translateY(-1px); }
+.mapa__referencia:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.mapa__prioridade { align-self: start; }
+.mapa__prioridade .menu-agente { left: auto; right: 0; min-width: 160px; }
+.mapa__prioridade-botao { display: inline-flex; align-items: center; gap: 2px; min-height: 28px; padding: 0 2px 0 4px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink-muted); cursor: pointer; transition: background-color .12s ease-out, opacity .12s ease-out; }
+.mapa__prioridade-botao:hover, .mapa__prioridade-botao[aria-expanded="true"] { background: var(--surface-hover); color: var(--ink); }
+.mapa__prioridade-botao:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.mapa__acoes { display: inline-flex; gap: 2px; transition: opacity .12s ease-out; }
+.mapa__descer .ap-icon { transform: rotate(180deg); }
+/* Prioridade normal e as ações só aparecem no hover e no foco da linha (continuam alcançáveis por Tab). */
+.mapa__conceito:not(:hover):not(:focus-within) .mapa__prioridade-botao--normal,
+.mapa__conceito:not(:hover):not(:focus-within) .mapa__acoes { opacity: 0; }
+
+.mapa__novo-botao { display: flex; margin-top: calc(-1 * var(--space-2)); }
+.mapa__novo { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: start; gap: var(--space-3); padding: var(--space-3) var(--space-3) var(--space-3) var(--space-2); border: var(--border-control) dashed var(--line-strong); border-radius: var(--radius-md); background: var(--surface-raised); }
+.mapa__novo > .ap-icon { margin: 4px auto 0; color: var(--amber); }
+.mapa__novo-campos { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.mapa__novo-ajuda { color: var(--ink-subtle); }
+
+.mapa__fora { display: flex; flex-direction: column; }
+.mapa__fora-cabeca { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-2); width: 100%; padding: 6px var(--space-1) 6px 0; border: 0; border-top: var(--border-hair) solid var(--line); border-radius: 0; background: transparent; color: var(--ink-muted); text-align: left; cursor: pointer; transition: color .12s ease-out; }
+.mapa__fora-cabeca:hover, .mapa__fora-cabeca[aria-expanded="true"] { color: var(--ink); }
+.mapa__fora-cabeca:focus-visible { outline: none; border-radius: var(--radius-sm); box-shadow: var(--focus-ring); }
+.mapa__seta { display: inline-grid; place-items: center; }
+.mapa__dobra { overflow: hidden; margin: 0 calc(var(--border-control) * -1); padding: 0 var(--border-control); }
+.mapa__fora-lista { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: var(--space-2) 0; list-style: none; }
+.mapa__fora-item { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface-raised) 55%, transparent); }
+.mapa__fora-texto { display: flex; flex-direction: column; min-width: 0; color: var(--ink-muted); }
+.mapa__fora-texto .body-strong { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.mapa__descricao-fora { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--ink-subtle); }
+
+@media (max-width: 760px) {
+	.mapa__conceito { grid-template-columns: 22px auto minmax(0, 1fr) auto; }
+	.mapa__acoes { grid-column: 3 / -1; justify-self: end; }
+	.mapa__acoes-mapa { margin-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+	.mapa__conceito, .mapa__alca, .mapa__editavel, .mapa__referencia, .mapa__prioridade-botao, .mapa__acoes, .mapa__fora-cabeca { transition: none; }
+	.mapa__referencia:hover { transform: none; }
+}

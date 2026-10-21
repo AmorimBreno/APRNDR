@@ -261,7 +261,13 @@ function ListaConceitos(props: { conceitos: Conceito[]; operar(operacoes: Operac
 	const ordemAtual = useRef(ordem);
 	ordemAtual.current = ordem;
 
-	if (dentro.length === 0) return <p className="body-sm mapa__nenhum">Nenhum conceito dentro do mapa. Traga algum de volta ou escreva um novo.</p>;
+	if (dentro.length === 0) {
+		return (
+			<p className="body-sm mapa__nenhum">
+				{props.conceitos.length === 0 ? "Nenhum conceito ainda. Mapeie os arquivos acima ou escreva um conceito novo." : "Nenhum conceito dentro do mapa. Traga algum de volta ou escreva um novo."}
+			</p>
+		);
+	}
 
 	const soltar = (id: string) => {
 		const operacao = moverDepoisDoArrasto(ids, ordemAtual.current, id);

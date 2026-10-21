@@ -2,7 +2,7 @@
 
 Objetivo: confirmar que o "/" abre o menu de blocos, que cada bloco novo (fórmulas, caixa de destaque, recolhível, definição, pergunta e resposta) aparece formatado e é gravado no formato de docs/notas-formato.md, que o Destaque pinta o texto, e que as menções abrem, criam e acompanham a troca de nome das notas.
 
-Tempo: uns 25 minutos. Sem custo (nenhum passo fala com o professor).
+Tempo: uns 35 minutos. Sem custo (nenhum passo fala com o professor).
 
 Os passos usam a matéria Ciência de Dados e criam nela as notas "Árvores" e "Entropia". No fim, elas podem ficar (são suas) ou ser apagadas pelo Explorador.
 
@@ -50,6 +50,14 @@ No fim, anote o resultado de cada passo e mande para o Claude Code.
 16. No Explorador, crie uma nota com HTML que o app não conhece, por exemplo "Teste.md" com "<b>negrito em HTML</b>", e abra no app. Por quê: o resto do HTML continua protegido. O que você deve ver: "Só leitura"; o arquivo não muda. Uma nota só com os blocos deste roteiro abre editável.
 
 
+17. Abra uma nota. Por quê: a página no estilo do Notion. O que você deve ver: em cima, uma faixa fina com "← Notas · Ciência de Dados" e "Salva às…"; o título grande no topo da página, escrito como você digitou (sem caixa alta), que quebra a linha se for longo; o texto numa coluna no meio, com margem dos dois lados.
+
+18. Passe o mouse sobre um parágrafo, um título e a caixa. Por quê: a alça dos blocos. O que você deve ver: o bloco ganha um fundo leve (a caixa não, ela já tem cor) e, na margem esquerda, um "+" e a grade de seis pontos. O "+" abre uma linha nova logo abaixo com o menu de blocos aberto. Clique nos seis pontos: o menu com "Transformar em" (Texto, Títulos, Listas, Checklist, Citação) e "Bloco" (Duplicar, Mover para cima, Mover para baixo, Apagar); experimente Mover para baixo e Duplicar. Depois arraste os seis pontos de um bloco para outro lugar: ele muda de lugar e fica com uma moldura âmbar.
+
+19. Digite "/". Por quê: o menu novo. O que você deve ver: os blocos em grupos com título (Texto, Listas, Matemática, Destaques, Estudo), cada um com o atalho de digitação à direita (#, ##, -, 1., [ ], >, ```, $ $…). Com a janela larga, o menu fica ao lado da coluna de texto, na altura da linha; com a janela estreita, à direita do que você escreve, na mesma linha. Nos dois casos, a linha em que você digita fica à vista.
+
+20. Numa nota de Ciência de Dados (que já tem materiais), digite "[[" e parte do nome de um material (por exemplo "ML5"). Por quê: mencionar arquivos. O que você deve ver: o menu ao lado, com o grupo "Anotações" (etiqueta âmbar "Anotação") e o grupo "Arquivos de material" (etiqueta "Arquivo" e o tipo, como "Notebook em materiais/"). Escolha o arquivo: aparece uma etiqueta com um clipe e o nome. No arquivo da nota, `[[materiais/<nome do arquivo>]]`. Clique na etiqueta: a seção Materiais abre com o arquivo marcado em âmbar.
+
 ## Resultado
 
 Anote "ok" ou o que aconteceu:
@@ -70,3 +78,7 @@ Anote "ok" ou o que aconteceu:
 14. Criar pela menção:
 15. Renomear atualiza menções:
 16. HTML desconhecido só para leitura:
+17. Página no estilo do Notion:
+18. Alça dos blocos (+, menu, arrastar):
+19. Menu em grupos e ao lado:
+20. Menção a arquivo de material:

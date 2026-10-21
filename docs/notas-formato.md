@@ -22,6 +22,15 @@ Ver [[Limites laterais]].
 O nome entre colchetes duplos é o título de outra nota da mesma matéria. Ao renomear uma nota no app, as menções a ela nas outras notas da matéria são atualizadas (e o evento renomeou_nota diz quais notas mudaram).
 
 
+## Menção a um arquivo de material
+
+```
+Ver [[materiais/aula-04.pdf]].
+```
+
+O caminho começa com `materiais/` e é relativo à pasta da matéria (o arquivo materias/<matéria>/materiais/aula-04.pdf). No app, a menção aparece com um clipe e o nome do arquivo, e o clique abre a seção Materiais do caderno com o arquivo em destaque. O professor lê o arquivo com ler_material.
+
+
 ## Fórmulas (LaTeX)
 
 Na linha, entre cifrões:

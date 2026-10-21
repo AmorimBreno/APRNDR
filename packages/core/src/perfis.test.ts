@@ -24,6 +24,7 @@ describe("perfil estudos real", () => {
 			join(pastaPerfis, "estudos", "extensions", "quiz-web.ts"),
 			join(pastaPerfis, "estudos", "extensions", "materias.ts"),
 			join(pastaPerfis, "estudos", "extensions", "notas.ts"),
+			join(pastaPerfis, "estudos", "extensions", "mapa.ts"),
 		]);
 		expect(perfil.extensoesSubagentes).toEqual([
 			join(pastaPerfis, "estudos", "extensions", "visual-tools", "tools", "mermaid_tools.ts"),

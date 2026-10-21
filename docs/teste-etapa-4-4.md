@@ -53,7 +53,7 @@ Nota: trocar de conversa durante um mapeamento ("Conversar sobre a matéria", "N
 
 13. Clique em "Conceito novo", escreva um nome e uma descrição e aperte Enter. Por quê: escrever um conceito à mão. O que você deve ver: o conceito entra no fim da lista, sem referência. Esc fecha o campo sem criar.
 
-14. Apague o conceito escrito à mão. Por quê: só os conceitos escritos à mão podem ser apagados (os do material só saem do mapa). O que você deve ver: ele some da lista e não vai para "Fora do mapa".
+14. Tire do mapa o conceito escrito à mão, abra "Fora do mapa" e clique em "Apagar" na linha dele. Por quê: só os conceitos escritos à mão podem ser apagados (os do material só saem do mapa e não têm "Apagar"). O que você deve ver: ele some também de "Fora do mapa" e do mapa-conteudo.json.
 
 ### Aprovação
 

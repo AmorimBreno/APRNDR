@@ -4,7 +4,7 @@
 
 import { Editor } from "@tiptap/core";
 import { afterEach, describe, expect, it } from "vitest";
-import { filtrarItens, ITENS_BARRA } from "./comandos-barra.ts";
+import { blocosRecentes, filtrarItens, ITENS_BARRA, lembrarBloco } from "./comandos-barra.ts";
 import { carregarNoEditor, extensoesDaNota, markdownDaNota } from "./editor-nota.ts";
 
 let editor: Editor | undefined;
@@ -19,7 +19,22 @@ describe("filtro do menu", () => {
 	it("sem nada digitado, todos os itens, na ordem, cada um num grupo", () => {
 		expect(ids("")).toEqual(ITENS_BARRA.map((item) => item.id));
 		expect(ITENS_BARRA).toHaveLength(19);
-		expect(new Set(ITENS_BARRA.map((item) => item.grupo))).toEqual(new Set(["Texto", "Listas", "Matemática", "Destaques", "Estudo"]));
+		expect(new Set(ITENS_BARRA.map((item) => item.grupo))).toEqual(new Set(["Blocos básicos", "Matemática", "Destaques", "Estudo"]));
+	});
+	it("sem nada digitado, os últimos escolhidos vêm antes, em Sugestões", () => {
+		const itens = filtrarItens("", ITENS_BARRA, ["pergunta", "inexistente", "formula-bloco"]);
+		expect(itens.slice(0, 2).map((item) => [item.id, item.grupo])).toEqual([
+			["recente:pergunta", "Sugestões"],
+			["recente:formula-bloco", "Sugestões"],
+		]);
+		expect(itens).toHaveLength(ITENS_BARRA.length + 2);
+		// Com algo digitado, sem Sugestões.
+		expect(filtrarItens("form", ITENS_BARRA, ["pergunta"]).map((item) => item.id)).toEqual(["formula-bloco", "formula-linha"]);
+	});
+	it("lembra os três últimos, sem repetir, do mais recente ao mais antigo", () => {
+		for (const id of ["lista", "pergunta", "lista", "caixa-ideia", "definicao"]) lembrarBloco(id);
+		expect(blocosRecentes()).toEqual(["definicao", "caixa-ideia", "lista"]);
+		globalThis.localStorage.clear();
 	});
 	it("acha pelo nome sem acento e pelas outras palavras", () => {
 		expect(ids("form")).toEqual(["formula-bloco", "formula-linha"]);

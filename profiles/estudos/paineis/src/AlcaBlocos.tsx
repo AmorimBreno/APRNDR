@@ -228,11 +228,11 @@ export function AlcaBlocos({ editor, pagina, editavel }: PropsAlcaBlocos) {
 	};
 
 	const item = (opcao: OpcaoBloco) => (
-		<button key={opcao.nome} type="button" role="menuitem" className="menu-barra__item menu-bloco__item" onMouseDown={(evento) => evento.preventDefault()} onClick={() => escolher(opcao)}>
+		<button key={opcao.nome} type="button" role="menuitem" className="menu-barra__item" onMouseDown={(evento) => evento.preventDefault()} onClick={() => escolher(opcao)}>
 			<span className="menu-barra__icone" aria-hidden="true">
-				{opcao.icone ? <Icon name={opcao.icone} size={16} strokeWidth={2.25} /> : <span className="data">{opcao.sigla}</span>}
+				{opcao.icone ? <Icon name={opcao.icone} size={18} strokeWidth={2} /> : <span className="menu-barra__sigla">{opcao.sigla}</span>}
 			</span>
-			<span className="body-strong">{opcao.nome}</span>
+			<span className="body menu-barra__nome">{opcao.nome}</span>
 		</button>
 	);
 
@@ -270,11 +270,11 @@ export function AlcaBlocos({ editor, pagina, editavel }: PropsAlcaBlocos) {
 				<div className="menu-barra menu-bloco" role="menu" aria-label="Opções do bloco">
 					{PODE_TRANSFORMAR.has(no.type.name) ? (
 						<>
-							<p className="overline menu-barra__grupo">Transformar em</p>
+							<p className="body-sm menu-barra__grupo">Transformar em</p>
 							{TRANSFORMAR_EM.map(item)}
 						</>
 					) : null}
-					<p className="overline menu-barra__grupo">Bloco</p>
+					<p className="body-sm menu-barra__grupo">Bloco</p>
 					{ACOES.map(item)}
 				</div>
 			) : null}

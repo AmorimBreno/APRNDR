@@ -154,6 +154,7 @@ export const Mencao = Node.create<OpcoesMencao>({
 		const opcoes = this.options;
 		const tipo = this.type;
 		const editor = this.editor;
+		const chaveMenu = new PluginKey("menuMencao");
 		return [
 			// Tracejada a menção para uma nota que não existe (ou um arquivo que não está mais em
 			// materiais/); o clique abre a nota (ou oferece criar) ou a seção Materiais.
@@ -195,7 +196,7 @@ export const Mencao = Node.create<OpcoesMencao>({
 			// Digitar [[ abre a lista das notas e dos arquivos de material da matéria, com a etiqueta de cada um.
 			Suggestion<ItemBarra, ItemBarra>({
 				editor,
-				pluginKey: new PluginKey("menuMencao"),
+				pluginKey: chaveMenu,
 				char: "[[",
 				allowSpaces: true,
 				allowedPrefixes: null,
@@ -207,6 +208,7 @@ export const Mencao = Node.create<OpcoesMencao>({
 						dica: nova ? "Uma nota que ainda não existe" : deQue === "arquivo" ? `${detalhe ?? "Arquivo"} em materiais/` : "Nota deste caderno",
 						icone: nova ? "plus" : deQue === "arquivo" ? "paperclip" : "file",
 						etiqueta: deQue === "arquivo" ? "Arquivo" : "Anotação",
+						...(nova ? { detalhe: "nota nova" } : deQue === "arquivo" ? { detalhe: detalhe ?? "arquivo" } : {}),
 						grupo: deQue === "arquivo" ? "Arquivos de material" : "Anotações",
 						executar: ({ editor: atual, range }) =>
 							void atual
@@ -217,7 +219,7 @@ export const Mencao = Node.create<OpcoesMencao>({
 								.run(),
 					})),
 				command: ({ editor: atual, range, props: item }) => item.executar({ editor: atual, range }),
-				render: () => desenharMenu({ esconderVazio: true }),
+				render: () => desenharMenu({ chave: chaveMenu, rotulo: "Menções", vazio: "", esconderVazio: true }),
 			}),
 		];
 	},

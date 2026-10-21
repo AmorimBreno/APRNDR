@@ -30,6 +30,8 @@ export interface ItemBarra {
 	atalho?: string;
 	/** Uma etiqueta à direita do item ("Anotação", "Arquivo"), no lugar do atalho. */
 	etiqueta?: string;
+	/** Um complemento discreto depois do nome, na mesma linha ("PDF", nas menções a arquivo). */
+	detalhe?: string;
 	executar(contexto: ContextoComando): void;
 }
 
@@ -176,8 +178,10 @@ const ITENS_BASE: readonly ItemBarra[] = [
 
 /** Os grupos do menu, na ordem, com os itens e o atalho de digitação de cada um. */
 const GRUPOS: ReadonlyArray<[string, ReadonlyArray<[string, string?]>]> = [
-	["Texto", [["texto"], ["titulo-1", "#"], ["titulo-2", "##"], ["titulo-3", "###"], ["citacao", ">"], ["codigo", "```"], ["divisoria", "---"]]],
-	["Listas", [["lista", "-"], ["numerada", "1."], ["checklist", "[ ]"]]],
+	[
+		"Blocos básicos",
+		[["texto"], ["titulo-1", "#"], ["titulo-2", "##"], ["titulo-3", "###"], ["lista", "-"], ["numerada", "1."], ["checklist", "[ ]"], ["citacao", ">"], ["codigo", "```"], ["divisoria", "---"]],
+	],
 	["Matemática", [["formula-bloco", "$$ $$"], ["formula-linha", "$ $"]]],
 	["Destaques", [["caixa-ideia"], ["caixa-atencao"], ["caixa-exemplo"], ["caixa-resumo"]]],
 	["Estudo", [["recolhivel"], ["definicao"], ["pergunta"]]],
@@ -192,10 +196,44 @@ export const ITENS_BARRA: readonly ItemBarra[] = GRUPOS.flatMap(([grupo, itens])
 	}),
 );
 
-/** Os itens que batem com o que foi digitado depois do "/" (no nome, em qualquer palavra que comece assim, ou nas palavras do item). */
-export function filtrarItens(consulta: string, itens: readonly ItemBarra[] = ITENS_BARRA): ItemBarra[] {
+/** Onde ficam os últimos blocos escolhidos (só neste navegador: é uma conveniência, como as Sugestões do Notion). */
+const CHAVE_RECENTES = "estudos:notas:blocos-recentes";
+const MAXIMO_RECENTES = 3;
+
+/** Os ids dos últimos blocos escolhidos no menu, do mais recente ao mais antigo. */
+export function blocosRecentes(): string[] {
+	try {
+		const lidos = JSON.parse(globalThis.localStorage?.getItem(CHAVE_RECENTES) ?? "[]") as unknown;
+		return Array.isArray(lidos) ? lidos.filter((id): id is string => typeof id === "string").slice(0, MAXIMO_RECENTES) : [];
+	} catch {
+		return [];
+	}
+}
+
+/** Guarda um bloco escolhido no menu (os recentes aparecem em "Sugestões"). */
+export function lembrarBloco(id: string): void {
+	try {
+		const recentes = [id, ...blocosRecentes().filter((outro) => outro !== id)].slice(0, MAXIMO_RECENTES);
+		globalThis.localStorage?.setItem(CHAVE_RECENTES, JSON.stringify(recentes));
+	} catch {
+		// Sem o armazenamento do navegador, só não há sugestões.
+	}
+}
+
+/**
+ * Os itens que batem com o que foi digitado depois do "/" (no nome, em
+ * qualquer palavra que comece assim, ou nas palavras do item). Sem nada
+ * digitado, todos, com os últimos escolhidos antes, em "Sugestões".
+ */
+export function filtrarItens(consulta: string, itens: readonly ItemBarra[] = ITENS_BARRA, recentes: readonly string[] = blocosRecentes()): ItemBarra[] {
 	const procurado = semAcento(consulta.trim());
-	if (!procurado) return [...itens];
+	if (!procurado) {
+		const sugestoes = recentes
+			.map((id) => itens.find((item) => item.id === id))
+			.filter((item): item is ItemBarra => Boolean(item))
+			.map((item) => ({ ...item, id: `recente:${item.id}`, grupo: "Sugestões" }));
+		return [...sugestoes, ...itens];
+	}
 	return itens.filter((item) => {
 		const nome = semAcento(item.nome);
 		if (nome.includes(procurado)) return true;

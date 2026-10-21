@@ -252,16 +252,12 @@
 .cor-musgo { color: color-mix(in srgb, var(--moss) 45%, var(--ink)); }
 .cor-aco { color: var(--steel); }
 .cor-salvia { color: var(--sage-text); }
-/* A paleta do Destaque, logo abaixo da barra da seleção. */
-.paleta-destaque { display: flex; align-items: center; gap: 4px; margin-top: 6px; padding: 4px; border-radius: var(--radius-md); background: var(--cream); color: var(--on-cream); box-shadow: 0 8px 18px -8px #00000099; }
-.paleta-destaque__botao { display: grid; place-items: center; min-width: 30px; height: 30px; padding: 0 8px; border: 0; border-radius: var(--radius-sm); background: transparent; font: inherit; cursor: pointer; }
-/* A cor do texto vem da classe cor-… nos botões de cor; nos outros, a da paleta. */
-.paleta-destaque__botao:not(.paleta-destaque__cor) { color: inherit; }
-.paleta-destaque__botao:hover { background: #00000014; }
-.paleta-destaque__botao--ativo { box-shadow: inset 0 0 0 2px var(--on-cream); }
-.paleta-destaque__marca mark { padding: 0 .2em; background: var(--amber-pastel); color: var(--on-cream); box-shadow: inset 0 -2px 0 var(--amber-line); font-size: 13px; }
-.paleta-destaque__cor { width: 30px; padding: 0; background: var(--ink-inverse); font-family: var(--font-display); font-weight: 800; }
-.paleta-destaque__cor:hover { background: var(--ink-inverse); filter: brightness(1.3); }
+/* O marca-texto colorido (<mark class="fundo-…">); o <mark> sem classe é o âmbar do design system. */
+.ap-prose mark.fundo-tijolo, .fundo-tijolo { background: var(--brick-tint); box-shadow: inset 0 -2px 0 var(--brick); }
+.ap-prose mark.fundo-ambar, .fundo-ambar { background: var(--amber-tint); box-shadow: inset 0 -2px 0 var(--amber); }
+.ap-prose mark.fundo-musgo, .fundo-musgo { background: color-mix(in srgb, var(--moss) 30%, transparent); box-shadow: inset 0 -2px 0 var(--moss); }
+.ap-prose mark.fundo-aco, .fundo-aco { background: color-mix(in srgb, var(--steel) 22%, transparent); box-shadow: inset 0 -2px 0 var(--steel); }
+.ap-prose mark.fundo-salvia, .fundo-salvia { background: var(--sage-tint); box-shadow: inset 0 -2px 0 var(--sage); }
 /* Menções (mencao.ts): clicar abre a nota; tracejada, a nota que ainda não existe. */
 .editor-nota__texto .nota-mencao { cursor: pointer; transition: background-color .16s ease-out; }
 .editor-nota__texto .nota-mencao:hover { background: color-mix(in srgb, var(--amber) 35%, var(--amber-tint)); }
@@ -309,3 +305,58 @@
 .menu-bloco { position: absolute; top: 28px; left: 0; z-index: 30; width: 240px; padding: 6px; overflow-y: auto; }
 /* Depois do "/", enquanto nada foi digitado: "Digite para pesquisar" (o data-decoration-content do @tiptap/suggestion). */
 .editor-nota__texto .gatilho-menu.is-empty::after { content: attr(data-decoration-content); color: var(--ink-subtle); pointer-events: none; }
+/* ── A barra da seleção (BarraFormatacao.tsx), no modelo da do Notion: tipo do bloco, A, B I U S, código, √x, link e Tx ── */
+.barra-formatacao { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.barra-formatacao__linha { display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: var(--radius-md); background: var(--surface-raised); color: var(--ink); box-shadow: 0 0 0 var(--border-hair) var(--line-strong), 0 12px 28px -12px #000000c8; }
+.barra-formatacao__botao { display: inline-flex; align-items: center; justify-content: center; gap: 3px; min-width: 30px; height: 30px; padding: 0 6px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink); font: 600 15px/1 var(--font-sans); cursor: pointer; transition: background-color .12s ease-out; }
+.barra-formatacao__botao:hover { background: var(--surface-hover); }
+.barra-formatacao__botao:disabled { color: var(--ink-subtle); background: transparent; cursor: default; }
+.barra-formatacao__botao:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.barra-formatacao__botao--ativo { color: var(--amber); }
+.barra-formatacao__tipo { padding: 0 8px; color: var(--ink-muted); font-weight: 400; }
+.barra-formatacao__tipo:hover, .barra-formatacao__tipo.barra-formatacao__botao--ativo { color: var(--ink); }
+.barra-formatacao__fio { flex: none; width: var(--border-hair); height: 18px; margin: 0 3px; background: var(--line); }
+.barra-formatacao__letra-cor { padding: 1px 3px; border-radius: var(--radius-xs); font-weight: 700; }
+.barra-formatacao__italico { font-family: Georgia, serif; font-weight: 400; font-size: 16px; }
+.barra-formatacao__raiz { font-size: 14px; letter-spacing: -.02em; }
+.barra-formatacao__limpar { font-weight: 700; }
+.barra-formatacao__limpar sub { font-size: 10px; font-weight: 600; }
+.barra-formatacao__elo { display: inline-block; width: 16px; height: 16px; background: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='square'%3E%3Cpath d='M10 14a4 4 0 0 0 5.7 0l3.6-3.6a4 4 0 0 0-5.7-5.7L12.5 5.8M14 10a4 4 0 0 0-5.7 0l-3.6 3.6a4 4 0 0 0 5.7 5.7l1.1-1.1'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='square'%3E%3Cpath d='M10 14a4 4 0 0 0 5.7 0l3.6-3.6a4 4 0 0 0-5.7-5.7L12.5 5.8M14 10a4 4 0 0 0-5.7 0l-3.6 3.6a4 4 0 0 0 5.7 5.7l1.1-1.1'/%3E%3C/svg%3E") center / contain no-repeat; }
+.menu-barra--curto { width: 240px; }
+/* A paleta do A: dois grupos de quadrados (o "A" na cor do texto, ou com a cor de fundo). */
+.paleta-cores__grade { display: grid; grid-template-columns: repeat(6, 28px); gap: 4px; padding: 0 8px 8px; }
+.paleta-cores__quadrado { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink); font: 700 14px/1 var(--font-sans); box-shadow: inset 0 0 0 var(--border-hair) var(--line-strong); cursor: pointer; }
+.paleta-cores__quadrado.cor-tijolo { color: var(--brick-text); } .paleta-cores__quadrado.cor-ambar { color: var(--amber); } .paleta-cores__quadrado.cor-aco { color: var(--steel); } .paleta-cores__quadrado.cor-salvia { color: var(--sage-text); }
+.paleta-cores__quadrado.cor-musgo { color: color-mix(in srgb, var(--moss) 45%, var(--ink)); }
+/* Os quadrados da cor de fundo levam a cor do marca-texto (a mesma das regras .fundo-… acima). */
+.paleta-cores__quadrado.fundo-tijolo { background: var(--brick-tint); } .paleta-cores__quadrado.fundo-ambar { background: var(--amber-tint); } .paleta-cores__quadrado.fundo-salvia { background: var(--sage-tint); }
+.paleta-cores__quadrado.fundo-musgo { background: color-mix(in srgb, var(--moss) 30%, transparent); } .paleta-cores__quadrado.fundo-aco { background: color-mix(in srgb, var(--steel) 22%, transparent); }
+.paleta-cores__quadrado:hover { filter: brightness(1.25); }
+.paleta-cores__quadrado--ativo, .paleta-cores__quadrado.paleta-cores__quadrado--ativo { box-shadow: inset 0 0 0 2px var(--amber); }
+/* O campo do link. */
+.campo-link { padding: 6px; }
+.campo-link__linha { display: flex; align-items: center; gap: 4px; }
+.campo-link__entrada { flex: 1; min-width: 0; height: 30px; padding: 0 8px; border: 0; border-radius: var(--radius-sm); background: var(--surface-well); color: var(--ink); box-shadow: inset 0 0 0 var(--border-hair) var(--line); }
+.campo-link__entrada:focus { outline: none; box-shadow: var(--focus-ring); }
+.campo-link .menu-barra__item { margin-top: 4px; }
+
+/* ── A prévia dos blocos (PreviaBloco.tsx): um cartão ao lado do menu, na altura do item ativo ── */
+.menu-com-previa { position: relative; width: max-content; }
+.menu-com-previa__cartao { position: absolute; z-index: 1; left: calc(100% + 8px); pointer-events: none; }
+.menu-com-previa__cartao--esquerda { left: auto; right: calc(100% + 8px); }
+.previa-bloco { width: 240px; padding: 8px; border-radius: var(--radius-md); background: var(--surface-raised); color: var(--ink); box-shadow: 0 0 0 var(--border-hair) var(--line-strong), 0 18px 40px -14px #000000c8; }
+.previa-bloco__exemplo { max-height: 150px; overflow: hidden; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--surface-panel); font-size: 14px; }
+.previa-bloco__exemplo > :first-child { margin-top: 0; }
+.previa-bloco__exemplo > :last-child { margin-bottom: 0; }
+.previa-bloco__exemplo h1 { font-size: 24px; } .previa-bloco__exemplo h2 { font-size: 19px; } .previa-bloco__exemplo h3 { font-size: 16px; }
+.previa-bloco__exemplo pre { margin: 0; font-size: 12px; }
+.previa-bloco__dica { margin: 8px 4px 2px; color: var(--ink-muted); }
+.previa-bloco__tarefas { margin: 0; padding: 0; list-style: none; }
+.previa-bloco__tarefas li { display: flex; align-items: center; gap: 8px; }
+.previa-bloco__tarefas input { margin: 0; accent-color: var(--amber); }
+.previa-bloco__formula { overflow: hidden; text-align: center; }
+.previa-bloco__recolhivel { display: flex; align-items: center; gap: 4px; }
+.previa-bloco__definicao { display: flex; flex-direction: column; gap: 2px; }
+.previa-bloco__pergunta { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--surface-raised); }
+.previa-bloco__pergunta .overline { color: var(--amber); }
+.previa-bloco__caixa { margin: 0; }

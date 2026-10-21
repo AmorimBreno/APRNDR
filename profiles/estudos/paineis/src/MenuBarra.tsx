@@ -13,6 +13,10 @@ import { ReactRenderer } from "@tiptap/react";
 import { exitSuggestion, Suggestion, type SuggestionKeyDownProps, type SuggestionProps } from "@tiptap/suggestion";
 import { Fragment, forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { type ContextoComando, filtrarItens, type ItemBarra, lembrarBloco, semAcento } from "./comandos-barra.ts";
+import { PreviaBloco, temPrevia } from "./PreviaBloco.tsx";
+
+/** Largura do cartão da prévia (a mesma do CSS de .previa-bloco). */
+export const LARGURA_PREVIA = 240;
 
 interface PropsMenu {
 	itens: ItemBarra[];
@@ -40,10 +44,21 @@ export const ListaBarra = forwardRef<ControleMenu, PropsMenu>(function ListaBarr
 	const lista = useRef<HTMLDivElement>(null);
 	// Filtrou de novo: volta para o primeiro.
 	useEffect(() => setAtivo(0), [itens]);
-	// O item ativo fica à vista.
+	// O item ativo fica à vista, e a prévia vai para a altura dele (à direita do menu, ou à esquerda se não couber).
+	const raiz = useRef<HTMLDivElement>(null);
+	const [previa, setPrevia] = useState<{ topo: number; esquerda: boolean } | undefined>(undefined);
+	const itemAtivo = itens[ativo];
 	useEffect(() => {
-		lista.current?.querySelector<HTMLElement>(`[data-indice="${ativo}"]`)?.scrollIntoView({ block: "nearest" });
-	}, [ativo]);
+		const botao = lista.current?.querySelector<HTMLElement>(`[data-indice="${ativo}"]`);
+		botao?.scrollIntoView({ block: "nearest" });
+		if (!botao || !raiz.current || !itemAtivo || !temPrevia(itemAtivo.id)) return setPrevia(undefined);
+		const caixa = raiz.current.getBoundingClientRect();
+		const zoom = zoomDaInterface();
+		setPrevia({
+			topo: Math.max(0, (botao.getBoundingClientRect().top - caixa.top) / zoom - 8),
+			esquerda: caixa.right + (LARGURA_PREVIA + 16) * zoom > window.innerWidth,
+		});
+	}, [ativo, itemAtivo]);
 
 	useImperativeHandle(ref, () => ({
 		teclar(evento) {
@@ -66,6 +81,12 @@ export const ListaBarra = forwardRef<ControleMenu, PropsMenu>(function ListaBarr
 	}));
 
 	return (
+		<div ref={raiz} className="menu-com-previa">
+		{previa && itemAtivo ? (
+			<div className={`menu-com-previa__cartao${previa.esquerda ? " menu-com-previa__cartao--esquerda" : ""}`} style={{ top: previa.topo }}>
+				<PreviaBloco id={itemAtivo.id} {...(itemAtivo.dica ? { dica: itemAtivo.dica } : {})} />
+			</div>
+		) : null}
 		<div className="menu-barra" role="dialog" aria-label={rotulo}>
 			<div ref={lista} className="menu-barra__lista" role="listbox" aria-label={rotulo}>
 				{itens.length === 0 ? (
@@ -119,6 +140,7 @@ export const ListaBarra = forwardRef<ControleMenu, PropsMenu>(function ListaBarr
 				<span className="body">Fechar menu</span>
 				<kbd className="menu-barra__atalho">esc</kbd>
 			</button>
+		</div>
 		</div>
 	);
 });

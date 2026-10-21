@@ -148,6 +148,8 @@ export function AlcaBlocos({ editor, pagina, editavel }: PropsAlcaBlocos) {
 		if (!editor || !pagina || !editavel) return;
 		const aoMover = (evento: MouseEvent) => {
 			if (menu || arrastando.current) return;
+			// Sobre a barra da seleção (e os menus dela) o bloco marcado fica o mesmo.
+			if (evento.target instanceof Element && evento.target.closest(".editor-nota__selecao")) return;
 			const bloco = blocoNaAltura(editor, evento.clientY);
 			if (!bloco) return;
 			const linha = Number.parseFloat(getComputedStyle(bloco.dom).lineHeight) || 24;

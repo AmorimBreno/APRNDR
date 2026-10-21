@@ -13,21 +13,21 @@
 // O título é o nome do arquivo e se edita no topo; a troca de nome espera o
 // salvamento em andamento, e os salvamentos esperam a troca terminar.
 
-import { Button, Callout, Icon, Modal, SelectionMenu } from "@estudos/design-system";
+import { Button, Callout, Icon, Modal } from "@estudos/design-system";
 import type { JanelaPerfilHook } from "@estudos/ui";
 import { TextSelection } from "@tiptap/pm/state";
 import { EditorContent, useEditor } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import { type KeyboardEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { CORES_TEXTO, type CorTexto, conferirTitulo, type NotaAberta, TAMANHO_TITULO, temHtmlDesconhecido } from "../../lib/nota-tipos.ts";
+import { conferirTitulo, type NotaAberta, TAMANHO_TITULO, temHtmlDesconhecido } from "../../lib/nota-tipos.ts";
 import { carregarNoEditor, extensoesDaNota, markdownDaNota } from "./editor-nota.ts";
 import { AlcaBlocos } from "./AlcaBlocos.tsx";
+import { BarraFormatacao } from "./BarraFormatacao.tsx";
 import { EditorFormula } from "./EditorFormula.tsx";
 import { type ArquivoMencionavel, META_TITULOS, materialDoAlvo } from "./mencao.ts";
 
 type TipoFormula = "linha" | "bloco";
 
-const NOMES_COR_TEXTO: Record<CorTexto, string> = { tijolo: "tijolo", ambar: "âmbar", musgo: "musgo", aco: "aço", salvia: "sálvia" };
 import { mesmoTitulo, PAINEL_NOTAS, useNovasRespostas } from "./notas-ponte.ts";
 
 const ESPERA_SALVAR = 1500;
@@ -96,8 +96,10 @@ function EditorDaNota(props: PropsEditorNota) {
 	const [somenteLeitura, setSomenteLeitura] = useState(false);
 	const [tituloCampo, setTituloCampo] = useState(props.titulo);
 	const [erroTitulo, setErroTitulo] = useState<string | undefined>(undefined);
-	/** A paleta do Destaque aberta na barra da seleção. */
-	const [paleta, setPaleta] = useState(false);
+	/** Muda a cada vez que a barra da seleção some: ela volta com os menus fechados. */
+	const [vezBarra, setVezBarra] = useState(0);
+	/** A barra da seleção (o foco no campo do link fica dentro dela, e ela não pode sumir por isso). */
+	const barraSelecao = useRef<HTMLDivElement>(null);
 	/** A área que rola (o corpo da seção): a barra da seleção acompanha a rolagem dela. */
 	const [corpo, setCorpo] = useState<HTMLDivElement | null>(null);
 	/** A página (onde a alça dos blocos fica). */
@@ -529,7 +531,7 @@ function EditorDaNota(props: PropsEditorNota) {
 						className="editor-nota__selecao"
 						// Só com um trecho de texto selecionado (não com uma fórmula ou outro bloco selecionado inteiro).
 						shouldShow={({ editor: atual, state }) =>
-							atual.isEditable && atual.view.hasFocus() && state.selection instanceof TextSelection && !state.selection.empty && !atual.isActive("codeBlock")
+							atual.isEditable && (atual.view.hasFocus() || Boolean(barraSelecao.current?.contains(document.activeElement))) && state.selection instanceof TextSelection && !state.selection.empty && !atual.isActive("codeBlock")
 						}
 						options={{
 							placement: "top",
@@ -537,49 +539,16 @@ function EditorDaNota(props: PropsEditorNota) {
 							flip: true,
 							shift: { padding: 12 },
 							...(corpo ? { scrollTarget: corpo } : {}),
-							onHide: () => setPaleta(false),
+							onHide: () => setVezBarra((vez) => vez + 1),
 						}}
-						onMouseDown={(evento) => evento.preventDefault()}
+						// O clique na barra não tira o foco do texto (só o campo do link recebe o foco).
+						onMouseDown={(evento) => {
+							if (!(evento.target instanceof HTMLInputElement)) evento.preventDefault();
+						}}
 					>
-						<SelectionMenu
-							label="Formatar o trecho"
-							actions={[
-								{ label: "Negrito", onClick: () => editor.chain().focus().toggleBold().run() },
-								{ label: "Itálico", onClick: () => editor.chain().focus().toggleItalic().run() },
-								{ label: "Destaque", onClick: () => setPaleta((aberta) => !aberta) },
-							]}
-						/>
-						{/* Destaque: o marca-texto, as cores do texto e limpar (o Título fica no "/" e no "## "). */}
-						{paleta ? (
-							<div className="paleta-destaque" role="toolbar" aria-label="Destaque do trecho">
-								<button
-									type="button"
-									className={`paleta-destaque__botao paleta-destaque__marca${editor.isActive("marcaTexto") ? " paleta-destaque__botao--ativo" : ""}`}
-									onClick={() => editor.chain().focus().toggleMark("marcaTexto").run()}
-								>
-									<mark>Marca-texto</mark>
-								</button>
-								{CORES_TEXTO.map((cor) => (
-									<button
-										key={cor}
-										type="button"
-										className={`paleta-destaque__botao paleta-destaque__cor cor-${cor}${editor.isActive("corDoTexto", { cor }) ? " paleta-destaque__botao--ativo" : ""}`}
-										aria-label={`Texto ${NOMES_COR_TEXTO[cor]}`}
-										title={NOMES_COR_TEXTO[cor]}
-										onClick={() => editor.chain().focus().setMark("corDoTexto", { cor }).run()}
-									>
-										A
-									</button>
-								))}
-								<button
-									type="button"
-									className="paleta-destaque__botao overline"
-									onClick={() => editor.chain().focus().unsetMark("corDoTexto").unsetMark("marcaTexto").run()}
-								>
-									Limpar
-								</button>
-							</div>
-						) : null}
+						<div ref={barraSelecao}>
+							<BarraFormatacao key={vezBarra} editor={editor} editarFormula={(latex, posicao) => logica.current.editarFormula("linha", latex, posicao)} />
+						</div>
 					</BubbleMenu>
 				) : null}
 				</div>

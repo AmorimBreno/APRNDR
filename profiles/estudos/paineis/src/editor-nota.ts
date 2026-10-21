@@ -20,9 +20,10 @@ import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { StarterKit } from "@tiptap/starter-kit";
 import { Caixa, CorDoTexto, Definicao, FormulaEmBloco, FormulaNaLinha, MarcaTexto, Recolhivel, TermoDefinicao, TituloRecolhivel } from "./blocos-nota.ts";
 import { EscapeEnxuto } from "./escape-markdown.ts";
-import { Mencao } from "./mencao.ts";
+import { type ArquivoMencionavel, Mencao } from "./mencao.ts";
 import { MenuBarra } from "./MenuBarra.tsx";
 import { CaixaNaTela, RecolhivelNaTela } from "./VisoesBlocos.tsx";
+import { BlocoSobMouse } from "./AlcaBlocos.tsx";
 
 export interface OpcoesEditorNota {
 	/** A ajuda que aparece na nota vazia. */
@@ -33,6 +34,8 @@ export interface OpcoesEditorNota {
 	abrirFormula?(tipo: "linha" | "bloco", posicao: number): void;
 	/** Os títulos das notas da matéria agora: a lista do [[ e a menção tracejada (nota que não existe). */
 	titulosNotas?(): readonly string[] | undefined;
+	/** Os arquivos de material da matéria agora: também entram na lista do [[. */
+	arquivosMateria?(): readonly ArquivoMencionavel[] | undefined;
 	/** Clicaram numa menção: a tela abre a nota (ou oferece criar). */
 	abrirMencao?(alvo: string): void;
 	/** Os blocos com a aparência da tela (VisoesBlocos.tsx); os testes de formato não precisam. */
@@ -53,6 +56,7 @@ export function extensoesDaNota(opcoes: OpcoesEditorNota = {}): AnyExtension[] {
 		TaskItem.configure({ nested: true }),
 		Mencao.configure({
 			...(opcoes.titulosNotas ? { titulos: opcoes.titulosNotas } : {}),
+			...(opcoes.arquivosMateria ? { arquivos: opcoes.arquivosMateria } : {}),
 			...(opcoes.abrirMencao ? { abrir: opcoes.abrirMencao } : {}),
 		}),
 		opcoes.naTela ? CaixaNaTela : Caixa,
@@ -68,6 +72,8 @@ export function extensoesDaNota(opcoes: OpcoesEditorNota = {}): AnyExtension[] {
 			...(editar ? { onClick: (no: NoPM, posicao: number) => editar("bloco", no, posicao) } : {}),
 		}),
 		MenuBarra.configure(opcoes.abrirFormula ? { abrirFormula: opcoes.abrirFormula } : {}),
+		// O fundo leve do bloco sob o mouse (a alça, AlcaBlocos.tsx, diz qual).
+		...(opcoes.naTela ? [BlocoSobMouse] : []),
 		Markdown.configure({ indentation: { style: "space", size: 2 } }),
 		EscapeEnxuto,
 		// A ajuda de cada bloco vazio (ajudaDoBloco): todos os blocos de texto, também dentro de listas e caixas.

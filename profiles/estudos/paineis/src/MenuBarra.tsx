@@ -10,8 +10,8 @@ import { Extension, type Range } from "@tiptap/core";
 import { type EditorState, PluginKey } from "@tiptap/pm/state";
 import { ReactRenderer } from "@tiptap/react";
 import { Suggestion, type SuggestionKeyDownProps, type SuggestionProps } from "@tiptap/suggestion";
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { type ContextoComando, filtrarItens, type ItemBarra } from "./comandos-barra.ts";
+import { Fragment, forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { type ContextoComando, filtrarItens, type ItemBarra, semAcento } from "./comandos-barra.ts";
 
 interface PropsMenu {
 	itens: ItemBarra[];
@@ -59,8 +59,10 @@ export const ListaBarra = forwardRef<ControleMenu, PropsMenu>(function ListaBarr
 				<p className="body-sm menu-barra__vazio">Nenhum bloco com esse nome.</p>
 			) : (
 				itens.map((item, indice) => (
+					<Fragment key={item.id}>
+					{/* O título do grupo acima do primeiro item dele. */}
+					{item.grupo && item.grupo !== itens[indice - 1]?.grupo ? <p className="overline menu-barra__grupo">{item.grupo}</p> : null}
 					<button
-						key={item.id}
 						type="button"
 						role="option"
 						aria-selected={indice === ativo}
@@ -80,7 +82,13 @@ export const ListaBarra = forwardRef<ControleMenu, PropsMenu>(function ListaBarr
 							<span className="body-strong">{item.nome}</span>
 							<span className="body-sm menu-barra__dica">{item.dica}</span>
 						</span>
+						{item.etiqueta ? (
+							<span className={`menu-barra__etiqueta menu-barra__etiqueta--${semAcento(item.etiqueta)}`}>{item.etiqueta}</span>
+						) : item.atalho ? (
+							<kbd className="data menu-barra__atalho">{item.atalho}</kbd>
+						) : null}
 					</button>
+					</Fragment>
 				))
 			)}
 		</div>
@@ -91,16 +99,35 @@ export interface OpcoesMenuBarra {
 	abrirFormula?: ContextoComando["abrirFormula"];
 }
 
-/** Põe o menu logo abaixo do cursor (ou acima, se não couber), dentro da tela. */
+/** O zoom do body (a interface roda em 90%, ESPECIFICACAO 13.12). */
+export function zoomDaInterface(): number {
+	return Number.parseFloat(getComputedStyle(document.body).zoom) || 1;
+}
+
+/** Largura do menu (a mesma do CSS de .menu-barra) e a folga entre ele e a coluna de texto. */
+const LARGURA_MENU = 320;
+const FOLGA = 20;
+
+/**
+ * Põe o menu ao lado da coluna de texto, na altura da linha do cursor, para
+ * não cobrir o que você está escrevendo. Se não couber ao lado (tela estreita),
+ * vai logo abaixo do cursor. Sempre dentro da tela.
+ */
 function posicionar(elemento: HTMLElement, props: SuggestionProps<ItemBarra, ItemBarra>) {
-	const retangulo = props.clientRect?.();
-	if (!retangulo) return;
-	void computePosition({ getBoundingClientRect: () => retangulo }, elemento, {
-		placement: "bottom-start",
+	const cursor = props.clientRect?.();
+	if (!cursor) return;
+	const coluna = props.editor.view.dom.getBoundingClientRect();
+	const cabeAoLado = window.innerWidth - coluna.right - FOLGA >= (LARGURA_MENU + 12) * zoomDaInterface();
+	// Ao lado da coluna, se couber; senão, à direita do cursor, na mesma linha (o começo da linha continua à vista).
+	const referencia = cabeAoLado ? new DOMRect(coluna.right, cursor.top, 0, cursor.height) : cursor;
+	void computePosition({ getBoundingClientRect: () => referencia }, elemento, {
+		placement: "right-start",
 		strategy: "fixed",
-		middleware: [offset(6), flip({ padding: 12 }), shift({ padding: 12 })],
+		middleware: [offset(cabeAoLado ? FOLGA : 24), flip({ padding: 12, fallbackPlacements: ["left-start", "bottom-start"] }), shift({ padding: 12, crossAxis: true })],
 	}).then(({ x, y }) => {
-		Object.assign(elemento.style, { left: `${x}px`, top: `${y}px` });
+		// A interface roda com zoom no body (90%): as medidas vêm em pixels da tela, e o left e o top valem dentro do zoom.
+		const zoom = zoomDaInterface();
+		Object.assign(elemento.style, { left: `${x / zoom}px`, top: `${y / zoom}px` });
 	});
 }
 
@@ -123,6 +150,9 @@ export function desenharMenu(
 			mostrar(menu.element, props.items);
 			document.body.appendChild(menu.element);
 			posicionar(menu.element, props);
+			// De novo no quadro seguinte, com a lista já desenhada (a altura certa para caber na tela).
+			const elemento = menu.element;
+			requestAnimationFrame(() => posicionar(elemento, props));
 		},
 		onUpdate: (props) => {
 			menu?.updateProps({ itens: props.items, escolher: props.command });

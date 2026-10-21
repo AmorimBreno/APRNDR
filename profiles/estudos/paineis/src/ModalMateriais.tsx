@@ -9,7 +9,7 @@
 import { Button, FileDrop, formatBytes, Icon, type IconName, Modal, Tag, type TagProps } from "@estudos/design-system";
 import type { SituacaoMaterial } from "@estudos/ui";
 import { AnimatePresence, motion } from "motion/react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Materia } from "../../lib/materia-tipos.ts";
 
 const ACEITOS = ".pdf,.py,.ipynb,.md,.markdown,.txt";
@@ -98,6 +98,8 @@ export interface PropsConteudoMateriais {
 	pasta: string;
 	enviar(arquivos: File[]): Promise<string[]>;
 	reprocessar(caminho: string): Promise<void>;
+	/** O nome do arquivo em destaque (vindo de uma menção numa nota): marcado e rolado até ficar à vista. */
+	destaque?: string;
 }
 
 /** A área de soltar e a lista, sem o modal: o modal da tela de cadernos e a seção Materiais do caderno usam. */
@@ -143,7 +145,12 @@ export function ConteudoMateriais(props: PropsConteudoMateriais) {
 				<ul className="materiais__lista" aria-label="Arquivos de material">
 					<AnimatePresence initial={false}>
 						{materiais.map((material) => (
-							<LinhaMaterial key={material.caminho} material={material} reprocessar={props.reprocessar} />
+							<LinhaMaterial
+									key={material.caminho}
+									material={material}
+									reprocessar={props.reprocessar}
+									destacado={props.destaque !== undefined && material.nome.toLowerCase() === props.destaque.toLowerCase()}
+								/>
 						))}
 					</AnimatePresence>
 				</ul>
@@ -152,8 +159,16 @@ export function ConteudoMateriais(props: PropsConteudoMateriais) {
 	);
 }
 
-function LinhaMaterial({ material, reprocessar }: { material: SituacaoMaterial; reprocessar(caminho: string): Promise<void> }) {
+function LinhaMaterial({
+	material,
+	reprocessar,
+	destacado = false,
+}: { material: SituacaoMaterial; reprocessar(caminho: string): Promise<void>; destacado?: boolean }) {
 	const [pedindo, setPedindo] = useState(false);
+	const linha = useRef<HTMLLIElement>(null);
+	useEffect(() => {
+		if (destacado) linha.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+	}, [destacado]);
 	const { texto, ...tag } = etiqueta(material);
 	const progresso = material.estado === "processando" && material.progresso?.total ? material.progresso.feito / material.progresso.total : undefined;
 	const podeReprocessar = (material.estado === "pronto" || material.estado === "erro") && material.tipo;
@@ -164,7 +179,8 @@ function LinhaMaterial({ material, reprocessar }: { material: SituacaoMaterial; 
 			animate={{ opacity: 1, y: 0, scale: 1 }}
 			exit={{ opacity: 0, x: -16, transition: { duration: 0.16 } }}
 			transition={{ type: "spring", stiffness: 420, damping: 30 }}
-			className={`ap-file material${material.estado === "erro" ? " ap-file--error" : ""}`}
+			ref={linha}
+			className={`ap-file material${material.estado === "erro" ? " ap-file--error" : ""}${destacado ? " material--destacado" : ""}`}
 		>
 			<Icon name={(material.tipo && ICONE_TIPO[material.tipo]) || "file"} size={20} strokeWidth={2.25} />
 			<span className="ap-file__name body-sm" title={material.nome}>

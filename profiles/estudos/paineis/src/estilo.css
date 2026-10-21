@@ -161,23 +161,30 @@
 .notas__previa { display: -webkit-box; overflow: hidden; color: var(--ink-muted); -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .notas__quando { padding-top: 2px; color: var(--ink-subtle); white-space: nowrap; }
 
-.editor-nota__cabeca { row-gap: var(--space-2); }
-.editor-nota__voltar { grid-column: 1; justify-self: start; display: inline-flex; align-items: center; gap: 6px; padding: 2px 0; border: 0; background: none; color: var(--ink-muted); cursor: pointer; }
+/* A página da nota, como no Notion: uma faixa fina em cima (voltar e a situação), e a coluna de
+ * leitura no meio, com o título grande no topo. A margem esquerda da coluna guarda as alças dos blocos. */
+.editor-nota__barra { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding: var(--space-3) var(--space-6); border-bottom: var(--border-hair) solid var(--line); }
+.editor-nota__voltar { display: inline-flex; align-items: center; gap: 6px; padding: 2px 0; border: 0; background: none; color: var(--ink-muted); cursor: pointer; }
 .editor-nota__voltar:hover { color: var(--amber); }
 .editor-nota__voltar:focus-visible { outline: none; border-radius: 2px; box-shadow: var(--focus-ring); }
-.editor-nota__titulo { grid-column: 1; width: 100%; min-width: 0; margin: 0; padding: 2px 0; border: 0; border-bottom: var(--border-control) dashed transparent; background: none; color: var(--ink); text-overflow: ellipsis; }
-.editor-nota__titulo:hover:not(:disabled) { border-bottom-color: var(--line-strong); }
-.editor-nota__titulo:focus { outline: none; border-bottom-color: var(--amber); }
-.editor-nota__titulo[aria-invalid="true"] { border-bottom-color: var(--brick); }
+.editor-nota__situacao { color: var(--ink-muted); white-space: nowrap; }
+.editor-nota__corpo { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-8) var(--space-4) 30vh; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+.editor-nota__pagina { position: relative; display: flex; flex-direction: column; gap: var(--space-4); box-sizing: content-box; max-width: var(--measure-read, 720px); margin: 0 auto; padding: 0 var(--space-6) 0 56px; }
+.editor-nota__titulo { display: block; width: 100%; margin: 0 0 var(--space-2); padding: 0; overflow: hidden; border: 0; background: none; color: var(--ink); font-family: var(--font-sans); font-size: 36px; line-height: 44px; font-weight: 750; letter-spacing: -.01em; resize: none; }
+.editor-nota__titulo::placeholder { color: var(--ink-subtle); }
+.editor-nota__titulo:focus { outline: none; }
+.editor-nota__titulo[aria-invalid="true"] { text-decoration: underline wavy var(--brick-text); text-underline-offset: 6px; }
 .editor-nota__titulo:disabled { color: var(--ink); opacity: 1; }
-.editor-nota__situacao { white-space: nowrap; }
-.editor-nota__erro-titulo { grid-column: 1 / -1; color: var(--brick); }
-.editor-nota__corpo { display: flex; flex-direction: column; gap: var(--space-4); }
-.editor-nota__corpo > .ap-callout { max-width: 760px; margin: 0; }
+.editor-nota__erro-titulo { margin: calc(-1 * var(--space-3)) 0 0; color: var(--brick-text); }
+.editor-nota__pagina > .ap-callout { margin: 0; }
 .editor-nota__botoes { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
-.editor-nota__folha { flex: 1; max-width: var(--measure-read, 720px); }
+.editor-nota__folha { flex: 1; }
 .editor-nota__folha--escondida { display: none; }
-.editor-nota__texto { min-height: 50vh; outline: none; caret-color: var(--amber); }
+.editor-nota__texto { min-height: 40vh; outline: none; caret-color: var(--amber); }
+@media (max-width: 760px) {
+	.editor-nota__pagina { padding: 0 var(--space-2) 0 40px; }
+	.editor-nota__titulo { font-size: 28px; line-height: 36px; }
+}
 .editor-nota__texto h1 { font-size: 26px; line-height: 34px; }
 .editor-nota__texto[contenteditable="false"] { caret-color: transparent; }
 /* A ajuda de cada bloco vazio (ajudaDoBloco, em editor-nota.ts): no estilo do próprio bloco (título grande, item com o marcador), some ao escrever. */
@@ -195,10 +202,10 @@
 .editor-nota__selecao { z-index: 20; }
 
 /* ── Menu do "/" das notas (MenuBarra.tsx, parte C): no visual dos menus do app (o do agente) ── */
-.menu-barra { display: flex; flex-direction: column; gap: 2px; width: 300px; max-height: min(360px, 60vh); overflow-y: auto; padding: 6px; border-radius: var(--radius-md); background: var(--ink-inverse); color: var(--ink); box-shadow: 0 0 0 var(--border-control) var(--amber), 0 14px 32px -12px #000000b0; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+.menu-barra { display: flex; flex-direction: column; gap: 2px; width: 320px; max-height: min(420px, 70vh); overflow-y: auto; padding: 6px; border-radius: var(--radius-md); background: var(--ink-inverse); color: var(--ink); box-shadow: 0 0 0 var(--border-control) var(--amber), 0 14px 32px -12px #000000b0; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
 .menu-barra__item { display: flex; align-items: center; gap: var(--space-3); width: 100%; padding: 6px var(--space-2); border: 0; border-radius: var(--radius-sm); background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .menu-barra__item--ativo { background: var(--amber-tint); }
-.menu-barra__icone { display: grid; flex: none; place-items: center; width: 32px; height: 32px; border-radius: var(--radius-sm); background: var(--surface-raised); color: var(--amber); box-shadow: inset 0 0 0 var(--border-hair) var(--line); }
+.menu-barra__icone { display: grid; flex: none; place-items: center; width: 36px; height: 36px; border-radius: var(--radius-sm); background: var(--surface-raised); color: var(--amber); box-shadow: inset 0 0 0 var(--border-hair) var(--line); }
 .menu-barra__icone .data { color: var(--ink); font-size: 13px; }
 .menu-barra__texto { display: flex; flex-direction: column; min-width: 0; }
 .menu-barra__dica { overflow: hidden; color: var(--ink-muted); white-space: nowrap; text-overflow: ellipsis; }
@@ -268,3 +275,32 @@
 .editor-nota__texto .nota-mencao { cursor: pointer; transition: background-color .16s ease-out; }
 .editor-nota__texto .nota-mencao:hover { background: color-mix(in srgb, var(--amber) 35%, var(--amber-tint)); }
 .editor-nota__texto .nota-mencao--nova .nota-mencao, .editor-nota__texto .nota-mencao.nota-mencao--nova { background: transparent; color: var(--ink-muted); box-shadow: inset 0 0 0 1px var(--line-strong); outline: 1px dashed var(--amber); outline-offset: -1px; }
+
+/* ── A alça dos blocos (AlcaBlocos.tsx): na margem esquerda da página, à altura do bloco sob o mouse ── */
+.alca-blocos { position: absolute; z-index: 15; left: 4px; display: flex; align-items: center; gap: 2px; }
+.alca-blocos__botao { display: grid; place-items: center; width: 22px; height: 24px; padding: 0; border: 0; border-radius: var(--radius-xs); background: transparent; color: var(--ink-subtle); font: 700 14px/1 var(--font-sans); letter-spacing: -2px; cursor: pointer; transition: background-color .12s ease-out, color .12s ease-out; }
+.alca-blocos__botao:hover, .alca-blocos__botao[aria-expanded="true"] { background: var(--surface-hover); color: var(--ink); }
+.alca-blocos__botao:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.alca-blocos__arrastar { cursor: grab; }
+.alca-blocos__arrastar:active { cursor: grabbing; }
+.menu-bloco { position: absolute; top: 28px; left: 0; z-index: 30; width: 240px; }
+.menu-bloco__item { padding: 4px var(--space-2); }
+.menu-bloco__item .menu-barra__icone { width: 26px; height: 26px; }
+/* O bloco sob o mouse ganha um fundo leve; o selecionado inteiro (uma fórmula, uma caixa), uma moldura âmbar. */
+.editor-nota__texto > .bloco--sob-mouse:not(.ap-callout):not(.node-caixa) { border-radius: var(--radius-xs); background: color-mix(in srgb, var(--surface-hover) 55%, transparent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--surface-hover) 55%, transparent); }
+.editor-nota__texto > .ProseMirror-selectednode { border-radius: var(--radius-xs); outline: 2px solid var(--amber); outline-offset: 3px; }
+/* O menu em grupos (como o do Notion): o título do grupo, o atalho de digitação à direita e a etiqueta das menções. */
+.menu-barra__grupo { margin: var(--space-2) var(--space-2) 2px; color: var(--ink-subtle); }
+.menu-barra__grupo:first-child { margin-top: 2px; }
+.menu-barra__texto { flex: 1; }
+.menu-barra__atalho { flex: none; padding: 1px 6px; border-radius: var(--radius-xs); background: var(--surface-raised); color: var(--ink-muted); box-shadow: inset 0 0 0 var(--border-hair) var(--line); font-size: 11px; white-space: nowrap; }
+.menu-barra__etiqueta { flex: none; padding: 2px 8px; border-radius: var(--radius-full); font: 600 11px/16px var(--font-sans); letter-spacing: .02em; white-space: nowrap; }
+.menu-barra__etiqueta--anotacao { background: var(--amber-tint); color: var(--amber); }
+.menu-barra__etiqueta--arquivo { background: color-mix(in srgb, var(--steel) 22%, transparent); color: var(--steel); }
+/* A menção a um arquivo de material: o clipe (o traço do ícone paperclip do design system) e o nome do arquivo. */
+.editor-nota__texto .nota-mencao--arquivo { display: inline-flex; align-items: center; gap: 3px; background: color-mix(in srgb, var(--steel) 22%, transparent); }
+.nota-mencao__clipe { display: inline-block; width: 14px; height: 14px; background: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='square'%3E%3Cpath d='M15.5 7v8.5a3.5 3.5 0 0 1-7 0V6a2.5 2.5 0 0 1 5 0v9a1 1 0 0 1-2 0V8'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='square'%3E%3Cpath d='M15.5 7v8.5a3.5 3.5 0 0 1-7 0V6a2.5 2.5 0 0 1 5 0v9a1 1 0 0 1-2 0V8'/%3E%3C/svg%3E") center / contain no-repeat; }
+/* O arquivo aberto por uma menção, na seção Materiais. */
+.material--destacado { box-shadow: 0 0 0 2px var(--amber); }
+/* A grade de seis pontos da alça de arrastar (duas colunas de três). */
+.alca-blocos__pontos { display: block; width: 10px; height: 16px; background-image: radial-gradient(circle, currentColor 1.5px, transparent 1.7px); background-size: 5px 5.33px; }

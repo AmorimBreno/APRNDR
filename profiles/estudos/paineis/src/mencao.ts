@@ -24,25 +24,60 @@ const MENCAO = /^\[\[([^[\]\n]+?)\]\]/;
 /** Meta de uma transação que só avisa que a lista de notas mudou (as decorações são refeitas). */
 export const META_TITULOS = "mencao:titulos";
 
+/** O começo do alvo de uma menção a um arquivo de material: [[materiais/aula-04.pdf]]. */
+export const PREFIXO_MATERIAL = "materiais/";
+
+/** Um arquivo de material da matéria que pode ser mencionado: o nome dentro de materiais/ e o tipo para mostrar ("PDF"). */
+export interface ArquivoMencionavel {
+	nome: string;
+	tipo?: string;
+}
+
+/** Se o alvo é um arquivo de material, o nome dele dentro de materiais/. */
+export const materialDoAlvo = (alvo: string) => (alvo.startsWith(PREFIXO_MATERIAL) ? alvo.slice(PREFIXO_MATERIAL.length) : undefined);
+
 export interface OpcoesMencao {
 	/** Os títulos das notas da matéria agora (undefined enquanto a lista não chegou: nada fica tracejado). */
 	titulos?: () => readonly string[] | undefined;
+	/** Os arquivos de material da matéria agora (undefined enquanto a lista não chegou). */
+	arquivos?: () => readonly ArquivoMencionavel[] | undefined;
 	/** Clicaram numa menção. */
 	abrir?: (alvo: string) => void;
 }
 
-/** Até quantas notas a lista do [[ mostra. */
-const MAXIMO_SUGESTOES = 8;
+/** Até quantas notas e quantos arquivos a lista do [[ mostra. */
+const MAXIMO_NOTAS = 8;
+const MAXIMO_ARQUIVOS = 6;
 
-/** As notas que batem com o que foi digitado depois do [[ e, se não houver uma igual, a menção a uma nota nova. */
-export function sugestoesDeMencao(consulta: string, titulos: readonly string[]): Array<{ alvo: string; nova: boolean }> {
+export interface SugestaoMencao {
+	alvo: string;
+	tipo: "nota" | "arquivo";
+	/** Uma nota que ainda não existe. */
+	nova: boolean;
+	/** O tipo do arquivo, para mostrar ("PDF"). */
+	detalhe?: string;
+}
+
+/**
+ * O que a lista do [[ mostra para o que foi digitado: as notas que batem, os
+ * arquivos de material que batem e, se não houver uma nota com esse nome, a
+ * menção a uma nota nova.
+ */
+export function sugestoesDeMencao(consulta: string, titulos: readonly string[], arquivos: readonly ArquivoMencionavel[] = []): SugestaoMencao[] {
 	const procurado = semAcento(consulta.trim());
-	const batem = titulos.filter((titulo) => semAcento(titulo).includes(procurado)).slice(0, MAXIMO_SUGESTOES);
-	const sugestoes = batem.map((alvo) => ({ alvo, nova: false }));
+	const notas: SugestaoMencao[] = titulos
+		.filter((titulo) => semAcento(titulo).includes(procurado))
+		.slice(0, MAXIMO_NOTAS)
+		.map((alvo) => ({ alvo, tipo: "nota", nova: false }));
+	const deMaterial: SugestaoMencao[] = arquivos
+		.filter((arquivo) => semAcento(arquivo.nome).includes(procurado))
+		.slice(0, MAXIMO_ARQUIVOS)
+		.map((arquivo) => ({ alvo: `${PREFIXO_MATERIAL}${arquivo.nome}`, tipo: "arquivo", nova: false, ...(arquivo.tipo ? { detalhe: arquivo.tipo } : {}) }));
+	// A nota nova fecha o grupo das notas, antes dos arquivos.
 	const limpo = consulta.trim().replace(/\s+/g, " ");
 	const igual = titulos.some((titulo) => titulo.toLowerCase() === limpo.toLowerCase());
-	if (limpo && !igual && "titulo" in conferirTitulo(limpo)) sugestoes.push({ alvo: limpo, nova: true });
-	return sugestoes;
+	if (limpo && !igual && !limpo.startsWith(PREFIXO_MATERIAL) && "titulo" in conferirTitulo(limpo)) notas.push({ alvo: limpo, tipo: "nota", nova: true });
+	return [...notas, ...deMaterial];
 }
 
 export const Mencao = Node.create<OpcoesMencao>({
@@ -53,7 +88,7 @@ export const Mencao = Node.create<OpcoesMencao>({
 	selectable: true,
 
 	addOptions() {
-		return { titulos: undefined, abrir: undefined };
+		return { titulos: undefined, arquivos: undefined, abrir: undefined };
 	},
 
 	addAttributes() {
@@ -71,7 +106,13 @@ export const Mencao = Node.create<OpcoesMencao>({
 	},
 
 	renderHTML({ node, HTMLAttributes }) {
-		return ["span", { ...HTMLAttributes, class: "nota-mencao" }, `[[${node.attrs.alvo as string}]]`];
+		const alvo = node.attrs.alvo as string;
+		const material = materialDoAlvo(alvo);
+		// O arquivo de material aparece com um clipe e só o nome do arquivo.
+		if (material !== undefined) {
+			return ["span", { ...HTMLAttributes, class: "nota-mencao nota-mencao--arquivo", title: `Material: ${material}` }, ["span", { class: "nota-mencao__clipe", "aria-hidden": "true" }], material];
+		}
+		return ["span", { ...HTMLAttributes, class: "nota-mencao" }, `[[${alvo}]]`];
 	},
 
 	renderText({ node }) {
@@ -114,18 +155,26 @@ export const Mencao = Node.create<OpcoesMencao>({
 		const tipo = this.type;
 		const editor = this.editor;
 		return [
-			// Tracejada a menção para uma nota que não existe; o clique abre (ou oferece criar).
+			// Tracejada a menção para uma nota que não existe (ou um arquivo que não está mais em
+			// materiais/); o clique abre a nota (ou oferece criar) ou a seção Materiais.
 			new Plugin({
 				key: new PluginKey("mencaoNaTela"),
 				props: {
 					decorations(state) {
 						const titulos = opcoes.titulos?.();
-						if (!titulos) return DecorationSet.empty;
-						const existentes = new Set(titulos.map((titulo) => titulo.toLowerCase()));
+						const arquivos = opcoes.arquivos?.();
+						if (!titulos && !arquivos) return DecorationSet.empty;
+						const notas = new Set((titulos ?? []).map((titulo) => titulo.toLowerCase()));
+						const deMaterial = new Set((arquivos ?? []).map((arquivo) => arquivo.nome.toLowerCase()));
 						const marcas: Decoration[] = [];
 						state.doc.descendants((no, posicao) => {
-							if (no.type === tipo && !existentes.has(String(no.attrs.alvo).toLowerCase())) {
-								marcas.push(Decoration.node(posicao, posicao + no.nodeSize, { class: "nota-mencao--nova", title: "Nota que ainda não existe" }));
+							if (no.type !== tipo) return;
+							const alvo = String(no.attrs.alvo);
+							const material = materialDoAlvo(alvo);
+							const falta = material !== undefined ? arquivos && !deMaterial.has(material.toLowerCase()) : titulos && !notas.has(alvo.toLowerCase());
+							if (falta) {
+								const titulo = material !== undefined ? "Arquivo que não está nos materiais" : "Nota que ainda não existe";
+								marcas.push(Decoration.node(posicao, posicao + no.nodeSize, { class: "nota-mencao--nova", title: titulo }));
 							}
 						});
 						return DecorationSet.create(state.doc, marcas);
@@ -143,20 +192,22 @@ export const Mencao = Node.create<OpcoesMencao>({
 					},
 				},
 			}),
-			// Digitar [[ abre a lista das notas da matéria.
+			// Digitar [[ abre a lista das notas e dos arquivos de material da matéria, com a etiqueta de cada um.
 			Suggestion<ItemBarra, ItemBarra>({
 				editor,
 				pluginKey: new PluginKey("menuMencao"),
 				char: "[[",
 				allowSpaces: true,
 				allowedPrefixes: null,
-				allow: (contexto) => foraDeCodigo(contexto) && Boolean(opcoes.titulos?.()),
+				allow: (contexto) => foraDeCodigo(contexto) && Boolean(opcoes.titulos?.() || opcoes.arquivos?.()),
 				items: ({ query }) =>
-					sugestoesDeMencao(query.replace(/\]+$/, ""), opcoes.titulos?.() ?? []).map(({ alvo, nova }) => ({
-						id: `${nova ? "nova" : "nota"}:${alvo}`,
-						nome: alvo,
-						dica: nova ? "Mencionar uma nota que ainda não existe" : "Nota deste caderno",
-						icone: nova ? "plus" : "file",
+					sugestoesDeMencao(query.replace(/\]+$/, ""), opcoes.titulos?.() ?? [], opcoes.arquivos?.() ?? []).map(({ alvo, tipo: deQue, nova, detalhe }) => ({
+						id: `${nova ? "nova" : deQue}:${alvo}`,
+						nome: materialDoAlvo(alvo) ?? alvo,
+						dica: nova ? "Uma nota que ainda não existe" : deQue === "arquivo" ? `${detalhe ?? "Arquivo"} em materiais/` : "Nota deste caderno",
+						icone: nova ? "plus" : deQue === "arquivo" ? "paperclip" : "file",
+						etiqueta: deQue === "arquivo" ? "Arquivo" : "Anotação",
+						grupo: deQue === "arquivo" ? "Arquivos de material" : "Anotações",
 						executar: ({ editor: atual, range }) =>
 							void atual
 								.chain()

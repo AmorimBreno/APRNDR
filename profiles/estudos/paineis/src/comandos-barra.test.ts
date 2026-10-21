@@ -16,8 +16,10 @@ afterEach(() => {
 const ids = (consulta: string) => filtrarItens(consulta).map((item) => item.id);
 
 describe("filtro do menu", () => {
-	it("sem nada digitado, todos os itens, na ordem", () => {
+	it("sem nada digitado, todos os itens, na ordem, cada um num grupo", () => {
 		expect(ids("")).toEqual(ITENS_BARRA.map((item) => item.id));
+		expect(ITENS_BARRA).toHaveLength(19);
+		expect(new Set(ITENS_BARRA.map((item) => item.grupo))).toEqual(new Set(["Texto", "Listas", "Matemática", "Destaques", "Estudo"]));
 	});
 	it("acha pelo nome sem acento e pelas outras palavras", () => {
 		expect(ids("form")).toEqual(["formula-bloco", "formula-linha"]);

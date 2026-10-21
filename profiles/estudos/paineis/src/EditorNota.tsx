@@ -18,11 +18,12 @@ import type { JanelaPerfilHook } from "@estudos/ui";
 import { TextSelection } from "@tiptap/pm/state";
 import { EditorContent, useEditor } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
-import { type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { type KeyboardEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { CORES_TEXTO, type CorTexto, conferirTitulo, type NotaAberta, TAMANHO_TITULO, temHtmlDesconhecido } from "../../lib/nota-tipos.ts";
 import { carregarNoEditor, extensoesDaNota, markdownDaNota } from "./editor-nota.ts";
+import { AlcaBlocos } from "./AlcaBlocos.tsx";
 import { EditorFormula } from "./EditorFormula.tsx";
-import { META_TITULOS } from "./mencao.ts";
+import { type ArquivoMencionavel, META_TITULOS, materialDoAlvo } from "./mencao.ts";
 
 type TipoFormula = "linha" | "bloco";
 
@@ -53,6 +54,10 @@ export interface PropsEditorNota {
 	titulos?: readonly string[];
 	/** Abre outra nota da matéria (o clique numa menção). */
 	abrirNota(titulo: string): void;
+	/** Os arquivos de material da matéria (para as menções); undefined enquanto a lista não chegou. */
+	arquivos?: readonly ArquivoMencionavel[];
+	/** Abre a seção Materiais com o arquivo em destaque (o clique numa menção a material). */
+	abrirMaterial(nome: string): void;
 }
 
 /**
@@ -95,6 +100,16 @@ function EditorDaNota(props: PropsEditorNota) {
 	const [paleta, setPaleta] = useState(false);
 	/** A área que rola (o corpo da seção): a barra da seleção acompanha a rolagem dela. */
 	const [corpo, setCorpo] = useState<HTMLDivElement | null>(null);
+	/** A página (onde a alça dos blocos fica). */
+	const [pagina, setPagina] = useState<HTMLDivElement | null>(null);
+	/** O título grande da página: cresce com o texto (um título longo quebra a linha, como no Notion). */
+	const campoTitulo = useRef<HTMLTextAreaElement>(null);
+	useLayoutEffect(() => {
+		const campo = campoTitulo.current;
+		if (!campo) return;
+		campo.style.height = "auto";
+		campo.style.height = `${campo.scrollHeight}px`;
+	}, [tituloCampo]);
 
 	// O que vale entre as respostas da extensão (refs: as respostas chegam fora do render).
 	const tituloAtual = useRef(props.titulo);
@@ -120,6 +135,8 @@ function EditorDaNota(props: PropsEditorNota) {
 	/** Os títulos das notas agora (a extensão da menção lê daqui). */
 	const titulosAgora = useRef(props.titulos);
 	titulosAgora.current = props.titulos;
+	const arquivosAgora = useRef(props.arquivos);
+	arquivosAgora.current = props.arquivos;
 	/** A menção clicada para uma nota que não existe: o modal oferece criar. */
 	const [criarMencao, setCriarMencao] = useState<{ alvo: string; criando: boolean; erro?: string } | undefined>(undefined);
 	/** A fórmula aberta no modal (EditorFormula). */
@@ -132,6 +149,7 @@ function EditorDaNota(props: PropsEditorNota) {
 			editarFormula: (tipo, no, posicao) => logica.current.editarFormula(tipo, no.attrs.latex as string, posicao),
 			abrirFormula: (tipo, posicao) => logica.current.abrirFormula(tipo, posicao),
 			titulosNotas: () => titulosAgora.current,
+			arquivosMateria: () => arquivosAgora.current,
 			abrirMencao: (alvo) => logica.current.abrirMencao(alvo),
 		}),
 		editable: false,
@@ -191,6 +209,8 @@ function EditorDaNota(props: PropsEditorNota) {
 		},
 		abrirFormula: (tipo, posicao) => setFormula({ tipo, posicao, latex: "", nova: true }),
 		abrirMencao: (alvo) => {
+			const material = materialDoAlvo(alvo);
+			if (material !== undefined) return props.abrirMaterial(material);
 			const existente = props.titulos?.find((titulo) => mesmoTitulo(titulo, alvo));
 			if (existente) props.abrirNota(existente);
 			else if (props.titulos) setCriarMencao({ alvo, criando: false });
@@ -210,7 +230,7 @@ function EditorDaNota(props: PropsEditorNota) {
 	useEffect(() => {
 		if (!editor || editor.isDestroyed) return;
 		editor.view.dispatch(editor.state.tr.setMeta(META_TITULOS, true).setMeta("addToHistory", false));
-	}, [editor, props.titulos]);
+	}, [editor, props.titulos, props.arquivos]);
 
 	/** Tira a fórmula da nota (salvar vazio, Remover, ou cancelar uma fórmula nova). */
 	const removerFormula = () => {
@@ -417,19 +437,31 @@ function EditorDaNota(props: PropsEditorNota) {
 
 	return (
 		<>
-			<header className="caderno__secao-cabeca editor-nota__cabeca">
+			{/* A faixa de cima: voltar e a situação do salvamento. O título fica na página. */}
+			<header className="editor-nota__barra">
 				<button type="button" className="overline editor-nota__voltar" onClick={props.voltar}>
 					<Icon name="arrow-left" size={14} strokeWidth={2.5} />
 					Notas{props.materiaNome ? ` · ${props.materiaNome}` : ""}
 				</button>
-				<input
-					className="display-sm editor-nota__titulo"
+				<span className="data editor-nota__situacao" aria-live="polite">
+					{rotuloSituacao(situacao, somenteLeitura)}
+				</span>
+			</header>
+			<div ref={setCorpo} className="editor-nota__corpo" onKeyDown={teclas}>
+				{/* A página, como no Notion: uma coluna de leitura no meio, com o título grande no topo. */}
+				<div ref={setPagina} className="editor-nota__pagina">
+				<AlcaBlocos editor={editor} pagina={pagina} editavel={Boolean(nota) && !somenteLeitura} />
+				<textarea
+					ref={campoTitulo}
+					className="editor-nota__titulo"
+					rows={1}
 					value={tituloCampo}
 					maxLength={TAMANHO_TITULO}
+					placeholder="Sem título"
 					aria-label="Título da nota"
 					aria-invalid={erroTitulo ? true : undefined}
 					disabled={!nota || somenteLeitura}
-					onChange={(evento) => setTituloCampo(evento.target.value)}
+					onChange={(evento) => setTituloCampo(evento.target.value.replace(/\s*\n\s*/g, " "))}
 					onBlur={pedirRenomear}
 					onKeyDown={(evento) => {
 						if (evento.key === "Enter") {
@@ -442,12 +474,7 @@ function EditorDaNota(props: PropsEditorNota) {
 						}
 					}}
 				/>
-				<span className="data caderno__secao-meta editor-nota__situacao" aria-live="polite">
-					{rotuloSituacao(situacao, somenteLeitura)}
-				</span>
-				{erroTitulo ? <span className="body-sm editor-nota__erro-titulo">{erroTitulo}</span> : null}
-			</header>
-			<div ref={setCorpo} className="caderno__secao-corpo editor-nota__corpo" onKeyDown={teclas}>
+				{erroTitulo ? <p className="body-sm editor-nota__erro-titulo">{erroTitulo}</p> : null}
 				{erroAbrir ? (
 					<Callout tone="amber" label="Não abri a nota">
 						<p>{erroAbrir}</p>
@@ -555,6 +582,7 @@ function EditorDaNota(props: PropsEditorNota) {
 						) : null}
 					</BubbleMenu>
 				) : null}
+				</div>
 			</div>
 			<Modal
 				open={Boolean(criarMencao)}

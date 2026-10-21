@@ -24,6 +24,12 @@ export interface ItemBarra {
 	sigla?: string;
 	/** Outras palavras que acham o item ("checklist" também acha por "tarefa"). */
 	palavras?: string[];
+	/** O grupo do menu (o título que aparece acima do primeiro item dele). */
+	grupo?: string;
+	/** O atalho de digitação que faz o mesmo ("#", "- ", "[ ]"), à direita do item. */
+	atalho?: string;
+	/** Uma etiqueta à direita do item ("Anotação", "Arquivo"), no lugar do atalho. */
+	etiqueta?: string;
 	executar(contexto: ContextoComando): void;
 }
 
@@ -90,7 +96,7 @@ function caixa(tom: TomCaixa, nome: string, icone: IconName, dica: string, palav
 	};
 }
 
-export const ITENS_BARRA: readonly ItemBarra[] = [
+const ITENS_BASE: readonly ItemBarra[] = [
 	{ id: "texto", nome: "Texto", dica: "Um parágrafo comum", sigla: "Aa", palavras: ["paragrafo"], executar: ({ editor, range }) => void editor.chain().focus().deleteRange(range).setParagraph().run() },
 	...([1, 2, 3] as const).map(
 		(nivel): ItemBarra => ({
@@ -167,6 +173,24 @@ export const ITENS_BARRA: readonly ItemBarra[] = [
 			void inserirBloco(editor, range, { type: "recolhivel", attrs: { tipo: "pergunta" }, content: [{ type: "tituloRecolhivel" }, paragrafo] }),
 	},
 ];
+
+/** Os grupos do menu, na ordem, com os itens e o atalho de digitação de cada um. */
+const GRUPOS: ReadonlyArray<[string, ReadonlyArray<[string, string?]>]> = [
+	["Texto", [["texto"], ["titulo-1", "#"], ["titulo-2", "##"], ["titulo-3", "###"], ["citacao", ">"], ["codigo", "```"], ["divisoria", "---"]]],
+	["Listas", [["lista", "-"], ["numerada", "1."], ["checklist", "[ ]"]]],
+	["Matemática", [["formula-bloco", "$$ $$"], ["formula-linha", "$ $"]]],
+	["Destaques", [["caixa-ideia"], ["caixa-atencao"], ["caixa-exemplo"], ["caixa-resumo"]]],
+	["Estudo", [["recolhivel"], ["definicao"], ["pergunta"]]],
+];
+
+/** Os itens do menu do "/", na ordem dos grupos. */
+export const ITENS_BARRA: readonly ItemBarra[] = GRUPOS.flatMap(([grupo, itens]) =>
+	itens.map(([id, atalho]) => {
+		const item = ITENS_BASE.find((candidato) => candidato.id === id);
+		if (!item) throw new Error(`Item do menu sem definição: ${id}`);
+		return { ...item, grupo, ...(atalho ? { atalho } : {}) };
+	}),
+);
 
 /** Os itens que batem com o que foi digitado depois do "/" (no nome, em qualquer palavra que comece assim, ou nas palavras do item). */
 export function filtrarItens(consulta: string, itens: readonly ItemBarra[] = ITENS_BARRA): ItemBarra[] {

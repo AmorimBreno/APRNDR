@@ -164,6 +164,8 @@ export interface PropsTelaCaderno extends PropsTelaInicial {
 	secao?: string;
 	/** Título da nota aberta (na seção Notas). */
 	nota?: string;
+	/** O arquivo em destaque na seção Materiais (vindo de uma menção numa nota). */
+	material?: string;
 }
 
 export function TelaCaderno(props: PropsTelaCaderno) {
@@ -199,6 +201,15 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 	const notas = useListaNotas(props.janela, materiaId, `${secao.id}/${props.nota ?? ""}`);
 	// Os títulos para as menções do editor (o mesmo array enquanto a lista não muda).
 	const titulosNotas = useMemo(() => notas?.notas.map((nota) => nota.titulo), [notas]);
+	// Os arquivos de material para as menções do editor (só os desta matéria).
+	const materiaisDaMateria = estado.materiais;
+	const arquivosMencao = useMemo(
+		() =>
+			materiaisDaMateria
+				?.filter((material) => material.pasta === pastaMateriaisRelativa(materiaId))
+				.map((material) => ({ nome: material.nome, ...(material.tipo ? { tipo: NOMES_TIPO[material.tipo] ?? material.tipo } : {}) })),
+		[materiaisDaMateria, materiaId],
+	);
 
 	const materia = caderno?.materia ?? lista?.materias.find((item) => item.id === materiaId);
 	const indice = lista?.materias.findIndex((item) => item.id === materiaId) ?? -1;
@@ -290,6 +301,8 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 								renomeada={abrirNota}
 								{...(titulosNotas ? { titulos: titulosNotas } : {})}
 								abrirNota={abrirNota}
+								{...(arquivosMencao ? { arquivos: arquivosMencao } : {})}
+								abrirMaterial={(nome) => props.navegar(`caderno/${materiaId}/materiais/${nome}`)}
 							/>
 						) : (
 						<>
@@ -315,6 +328,7 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 									pasta={pastaMateriaisRelativa(materiaId)}
 									enviar={(arquivos) => acoes.enviarMateriais(pastaMateriaisRelativa(materiaId), arquivos)}
 									reprocessar={(caminho) => acoes.reprocessarMaterial(caminho)}
+									{...(secao.id === "materiais" && props.material ? { destaque: props.material } : {})}
 								/>
 							) : caderno ? (
 								<LinhaDoTempo eventos={caderno.eventos} invalidas={caderno.invalidas} />

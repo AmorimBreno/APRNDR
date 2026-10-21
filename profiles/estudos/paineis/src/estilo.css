@@ -228,8 +228,9 @@
 .recolhivel-nota:not(.recolhivel-nota--aberto) .recolhivel-nota__conteudo > [data-node-view-content-react] > :not(summary) { display: none; }
 .recolhivel-nota--aberto .recolhivel-nota__conteudo > [data-node-view-content-react] > summary { margin-bottom: .5em; }
 .recolhivel-nota--aberto .recolhivel-nota__conteudo { padding-bottom: 2px; }
-.recolhivel-nota--pergunta { border-radius: var(--radius-sm); background: var(--surface-raised); padding: var(--space-3) var(--space-4) var(--space-3) 42px; }
-.recolhivel-nota--pergunta .recolhivel-nota__seta { top: 12px; left: 10px; }
+/* A pergunta: o ícone à esquerda, centrado na linha do título, sem encostar no texto (mais específica que a regra geral do recolhível). */
+.editor-nota__texto .recolhivel-nota--pergunta { border-radius: var(--radius-sm); background: var(--surface-raised); padding: var(--space-3) var(--space-4) var(--space-3) 48px; }
+.editor-nota__texto .recolhivel-nota--pergunta .recolhivel-nota__seta { top: 14px; left: 12px; }
 .recolhivel-nota--pergunta.recolhivel-nota--aberto .recolhivel-nota__conteudo > [data-node-view-content-react] > :not(summary) { padding-left: var(--space-3); border-left: var(--border-control) solid var(--sage); }
 .recolhivel-nota__mostrar { margin-top: var(--space-2); padding: 2px 0; border: 0; background: none; color: var(--amber); cursor: pointer; }
 .recolhivel-nota__mostrar:hover { text-decoration: underline; }

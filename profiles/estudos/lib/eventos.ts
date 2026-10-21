@@ -20,6 +20,11 @@ export type VerboEvento =
 	| "criou_nota"
 	| "renomeou_nota"
 	| "editou_nota"
+	// Mapa de conteúdo (item 4.4): docs/mapa-conteudo.md, "Eventos".
+	| "mapeou_material"
+	| "atualizou_mapa"
+	| "revisou_mapa"
+	| "aprovou_mapa"
 	// Aprendizagem (seção 9.2), usados a partir dos itens 7 e 8:
 	| "pediu_reexplicacao"
 	| "pediu_outro_jeito"

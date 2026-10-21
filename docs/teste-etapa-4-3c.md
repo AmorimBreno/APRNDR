@@ -35,7 +35,7 @@ No fim, anote o resultado de cada passo e mande para o Claude Code.
 
 9. Use "/" e "Recolhível": título "Detalhes da conta", Enter, e um texto. Clique na seta. Por quê: o toggle do Notion. O que você deve ver: a seta gira e o conteúdo some e volta; o título continua à vista.
 
-10. Selecione um trecho com o mouse. Clique em Destaque, depois no "A" tijolo e em Marca-texto. Clique em Limpar. Por quê: as decorações. O que você deve ver: a barra creme com Negrito, Itálico e Destaque; o Destaque abre embaixo uma faixa com Marca-texto, cinco "A" coloridos e Limpar. O trecho fica tijolo, depois também com marca-texto, e Limpar tira os dois. A barra não aparece com uma fórmula selecionada.
+10. Selecione um trecho com o mouse. Clique no "A", escolha o tijolo em "Cor do texto" e o sálvia em "Cor de fundo". Depois clique em B, I, U e S, e por fim em Tx. Por quê: a barra da seleção, no modelo da do Notion. O que você deve ver: a barra escura em cima do trecho com "Texto ▾", "A ▾", B, I, U, S, o de código, √x, o de link e Tx. O "A" abre os dois grupos de quadrados; o trecho fica tijolo com fundo verde, e o "A" da barra mostra as duas cores. B, I, U e S ficam âmbar quando valem no trecho. Tx tira tudo. No arquivo, `<span class="cor-tijolo">`, `<mark class="fundo-salvia">` e `<u>`. A barra não aparece com uma fórmula selecionada.
 
 11. Numa linha vazia, digite "# " (cerquilha e espaço), Enter; "## ", Enter; "- ", Enter, Enter; "1. ", Enter, Enter; "[ ] ". Por quê: a ajuda de cada bloco, como no Notion. O que você deve ver: enquanto vazio, cada bloco mostra o próprio nome em cinza e já no estilo dele: "Título 1" grande, "Título 2", "• Lista", "1. Lista numerada", a caixa com "Tarefa"; a citação ("> ") mostra "Citação" em itálico. O nome some na primeira letra. Um parágrafo vazio só mostra "Escreva, ou “/” para os blocos" na linha do cursor; dentro da pergunta, "A pergunta" e "A resposta"; na definição, "O termo" e "A explicação".
 
@@ -54,9 +54,13 @@ No fim, anote o resultado de cada passo e mande para o Claude Code.
 
 18. Passe o mouse sobre um parágrafo, um título e a caixa. Por quê: a alça dos blocos. O que você deve ver: o bloco ganha um fundo leve (a caixa não, ela já tem cor) e, na margem esquerda, um "+" e a grade de seis pontos. O "+" abre uma linha nova logo abaixo com o menu de blocos aberto. Clique nos seis pontos: o menu com "Transformar em" (Texto, Títulos, Listas, Checklist, Citação) e "Bloco" (Duplicar, Mover para cima, Mover para baixo, Apagar); experimente Mover para baixo e Duplicar. Depois arraste os seis pontos de um bloco para outro lugar: ele muda de lugar e fica com uma moldura âmbar.
 
-19. Digite "/". Por quê: o menu novo. O que você deve ver: os blocos em grupos com título (Texto, Listas, Matemática, Destaques, Estudo), cada um com o atalho de digitação à direita (#, ##, -, 1., [ ], >, ```, $ $…). Com a janela larga, o menu fica ao lado da coluna de texto, na altura da linha; com a janela estreita, à direita do que você escreve, na mesma linha. Nos dois casos, a linha em que você digita fica à vista.
+19. Digite "/". Por quê: o menu no modelo do Notion. O que você deve ver: "Digite para pesquisar" em cinza depois do "/"; o menu logo abaixo da linha, alinhado ao "/" (ou logo acima, se não couber embaixo); os grupos com título discreto (Sugestões com os últimos blocos que você usou, Blocos básicos, Matemática, Destaques, Estudo), o atalho de digitação à direita (#, ##, -, 1., [ ], >, ```, $ $…) e, no pé, "Fechar menu · esc". Passe o mouse nos itens, ou desça com ↓: ao lado do menu, na altura do item, um cartão com um exemplo do bloco (a caixa de Atenção já colorida, a fórmula desenhada, a checklist com uma tarefa marcada) e a explicação.
 
 20. Numa nota de Ciência de Dados (que já tem materiais), digite "[[" e parte do nome de um material (por exemplo "ML5"). Por quê: mencionar arquivos. O que você deve ver: o menu ao lado, com o grupo "Anotações" (etiqueta âmbar "Anotação") e o grupo "Arquivos de material" (etiqueta "Arquivo" e o tipo, como "Notebook em materiais/"). Escolha o arquivo: aparece uma etiqueta com um clipe e o nome. No arquivo da nota, `[[materiais/<nome do arquivo>]]`. Clique na etiqueta: a seção Materiais abre com o arquivo marcado em âmbar.
+
+21. Selecione uma palavra e clique em "Texto ▾" na barra. Passe o mouse em Título 1, Checklist e Citação, e escolha Título 2. Por quê: trocar o tipo do bloco pela barra, com a prévia. O que você deve ver: a lista "Transformar em" com um ✓ em Texto e, ao lado, o cartão com o exemplo de cada tipo; ao escolher, o parágrafo inteiro vira Título 2, e a barra passa a dizer "Título 2".
+
+22. Selecione uma palavra, clique no botão de link, digite "exemplo.com" e aperte Enter. Depois selecione "x^2" escrito no texto e clique em √x. Por quê: link e fórmula pela barra. O que você deve ver: a palavra sublinhada em âmbar, e no arquivo `[palavra](https://exemplo.com)`; com o link selecionado, o botão aparece âmbar e o campo traz "Remover o link". O √x troca o trecho por uma fórmula e abre o editor de fórmula já com "x^2"; os espaços em volta continuam no texto.
 
 ## Resultado
 
@@ -71,7 +75,7 @@ Anote "ok" ou o que aconteceu:
 7. Definição:
 8. Pergunta e resposta:
 9. Recolhível:
-10. Destaque:
+10. Barra da seleção (cores, B I U S, Tx):
 11. Ajuda de cada bloco:
 12. Reabrir e F5:
 13. Lista do [[:
@@ -80,5 +84,7 @@ Anote "ok" ou o que aconteceu:
 16. HTML desconhecido só para leitura:
 17. Página no estilo do Notion:
 18. Alça dos blocos (+, menu, arrastar):
-19. Menu em grupos e ao lado:
+19. Menu do "/" e a prévia ao lado:
 20. Menção a arquivo de material:
+21. Texto ▾ com a prévia:
+22. Link e √x pela barra:

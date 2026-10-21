@@ -20,7 +20,7 @@ docs/notas-formato.md — formato das notas no arquivo: markdown, menções [[No
 docs/teste-etapa-4-2.md — roteiro do item 4.2: modal de materiais, PDF com visão, .py e .ipynb, .extraido, eventos, professor buscando e citando, reprocessar, apagar e reiniciar
 docs/teste-etapa-4-3a.md — roteiro do item 4.3, parte A: entrar no caderno, índice, linha do tempo, seções em breve, materiais, editar, conversar e voltar
 docs/teste-etapa-4-3b.md — roteiro do item 4.3, parte B: notas do caderno (nota nova, atalhos, salvar sozinho, conflito com o arquivo, trocar o nome, sair salva, HTML só para leitura, o professor lendo as notas)
-docs/teste-etapa-4-3c.md — roteiro do item 4.3, parte C: menu do "/", fórmulas, caixa, definição, pergunta, recolhível, Destaque, menções (lista, criar, renomear) e HTML desconhecido
+docs/teste-etapa-4-3c.md — roteiro do item 4.3, parte C: menu do "/" (com a prévia), fórmulas, caixa, definição, pergunta, recolhível, a barra da seleção, menções (lista, criar, renomear), HTML desconhecido, a página e a alça no estilo do Notion
 docs/ponte-de-eventos.md — protocolo da ponte (interface:mostrar, pedido, resposta, acao) para quem escreve extensão de perfil
 docs/historico/ — documentos do checkpoint 1 (pi no WSL com tmux e Obsidian); só consulta
 
@@ -154,7 +154,7 @@ profiles/estudos/paineis/src/index.ts — tela inicial do perfil (TelaEstudos) e
 profiles/estudos/paineis/src/TelaCadernos.tsx — tela inicial do perfil de estudos: abre a sessão do perfil, lista as matérias na SubjectWheel com capas NotebookCover (com a contagem de materiais), "Abrir" leva ao caderno, "Nova matéria" abre o ModalMateria, a tecla Materiais e a tecla para a conversa
 profiles/estudos/paineis/src/ModalMateriais.tsx — modal de materiais da matéria e o ConteudoMateriais (o mesmo conteúdo na seção Materiais do caderno): FileDrop que envia para materias/<id>/materiais e a lista com a situação de cada arquivo (fila, etapa e barra, pronto com trechos e custo, erro, não suportado) e processar de novo
 profiles/estudos/paineis/src/SecaoNotas.tsx — seção Notas do caderno: a lista das notas (prévia e "editada há"), Nova nota (cria e abre) e useListaNotas (o índice usa a contagem)
-profiles/estudos/paineis/src/EditorNota.tsx — editor de uma nota (caderno/<id>/notas/<título>): TipTap no estilo Prose, barra da seleção com Destaque, salvar sozinho (um por vez), conflito com o arquivo, troca de nome pelo título, só leitura com HTML desconhecido, salvar ao sair, o modal da fórmula e o "Criar esta nota?" da menção
+profiles/estudos/paineis/src/EditorNota.tsx — editor de uma nota (caderno/<id>/notas/<título>): TipTap no estilo Prose, a barra da seleção (BarraFormatacao), salvar sozinho (um por vez), conflito com o arquivo, troca de nome pelo título, só leitura com HTML desconhecido, salvar ao sair, o modal da fórmula e o "Criar esta nota?" da menção
 profiles/estudos/paineis/src/editor-nota.ts — extensões do TipTap das notas (StarterKit sem sublinhado, tarefas, menção, blocos e decorações da parte C, fórmulas, menu do "/", markdown, escape enxuto, AjudaDosBlocos: a ajuda de cada bloco vazio, como no Notion), markdownDaNota e carregarNoEditor (fora do desfazer)
 profiles/estudos/paineis/src/mencao.ts — nó de menção [[Nome]] e [[materiais/arquivo]]: preserva no markdown, vira etiqueta ao digitar (o arquivo com clipe e nome), lista ao digitar [[ com as notas e os arquivos de material (etiquetas Anotação e Arquivo), tracejada quando a nota ou o arquivo não existe e clique que abre a nota ou a seção Materiais
 profiles/estudos/paineis/src/mencao.test.ts — testes das sugestões do [[, da menção tracejada e do clique
@@ -163,7 +163,10 @@ profiles/estudos/paineis/src/VisoesBlocos.tsx — a aparência dos blocos no edi
 profiles/estudos/paineis/src/EditorFormula.tsx — modal da fórmula: o LaTeX, a prévia ao vivo pelo KaTeX e o erro; salvar vazio remove
 profiles/estudos/paineis/src/comandos-barra.ts — os itens do menu do "/" (nome, dica, ícone ou sigla, o que fazem), inserirBloco e o filtro sem acento
 profiles/estudos/paineis/src/comandos-barra.test.ts — testes do filtro e do que cada item faz na nota
-profiles/estudos/paineis/src/MenuBarra.tsx — o menu do "/" (@tiptap/suggestion e Floating UI): ListaBarra com teclado, grupos, atalhos e etiquetas; desenharMenu (também o do [[), que põe o menu ao lado da coluna ou do cursor; zoomDaInterface; a extensão MenuBarra
+profiles/estudos/paineis/src/MenuBarra.tsx — o menu do "/" (@tiptap/suggestion e Floating UI): ListaBarra com teclado, grupos, atalhos, etiquetas, rodapé e o cartão da prévia do item ativo; desenharMenu (também o do [[), que abre o menu logo abaixo da linha; zoomDaInterface; a extensão MenuBarra
+profiles/estudos/paineis/src/PreviaBloco.tsx — a prévia de um bloco (exemplo pequeno e explicação), no menu do "/" e no "Texto ▾" da barra da seleção
+profiles/estudos/paineis/src/BarraFormatacao.tsx — a barra da seleção no modelo da do Notion: Texto ▾ (trocar o tipo do bloco, com prévia), A (cor do texto e de fundo), B, I, U, S, código, √x, link e Tx
+profiles/estudos/paineis/src/barra-formatacao.test.ts — testes do endereço do link da barra
 profiles/estudos/paineis/src/AlcaBlocos.tsx — a alça dos blocos (como no Notion): o "+", a grade de seis pontos que arrasta ou abre o menu do bloco (Transformar em, Duplicar, Mover, Apagar) e BlocoSobMouse (o fundo leve do bloco sob o mouse)
 profiles/estudos/paineis/src/escape-markdown.ts — escape enxuto do texto comum no markdown das notas (troca o método interno do @tiptap/markdown 3.31.4)
 profiles/estudos/paineis/src/notas-ponte.ts — o painel "notas" da ponte: tipos das respostas, a última lista e useNovasRespostas

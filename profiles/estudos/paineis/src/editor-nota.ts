@@ -18,7 +18,7 @@ import type { Node as NoPM } from "@tiptap/pm/model";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { StarterKit } from "@tiptap/starter-kit";
-import { Caixa, CorDoTexto, Definicao, FormulaEmBloco, FormulaNaLinha, MarcaTexto, Recolhivel, TermoDefinicao, TituloRecolhivel } from "./blocos-nota.ts";
+import { Caixa, CorDoTexto, Definicao, FormulaEmBloco, FormulaNaLinha, MarcaTexto, Recolhivel, Sublinhado, TermoDefinicao, TituloRecolhivel } from "./blocos-nota.ts";
 import { EscapeEnxuto } from "./escape-markdown.ts";
 import { type ArquivoMencionavel, Mencao } from "./mencao.ts";
 import { MenuBarra } from "./MenuBarra.tsx";
@@ -65,6 +65,7 @@ export function extensoesDaNota(opcoes: OpcoesEditorNota = {}): AnyExtension[] {
 		opcoes.naTela ? RecolhivelNaTela : Recolhivel,
 		TituloRecolhivel,
 		MarcaTexto,
+		Sublinhado,
 		CorDoTexto,
 		FormulaNaLinha.configure({ katexOptions, ...(editar ? { onClick: (no: NoPM, posicao: number) => editar("linha", no, posicao) } : {}) }),
 		FormulaEmBloco.configure({

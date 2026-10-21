@@ -9,8 +9,8 @@ O editor do app (profiles/estudos/paineis) lê e escreve exatamente estes format
 
 - Títulos `#` a `####`, parágrafos, **negrito**, *itálico*, ~~tachado~~ e `código`.
 - Listas com `-`, numeradas com `1.`, e tarefas com `- [ ]` e `- [x]`.
-- Citação com `>`, bloco de código com três crases, linha divisória com `---`, links `[texto](endereço)`.
-- Não há sublinhado: o markdown não tem.
+- Citação com `>`, bloco de código com três crases, linha divisória com `---`, links `[texto](endereço)` (a barra da seleção põe `https://` num endereço sem protocolo).
+- Sublinhado: o markdown não tem, então é HTML, `<u>trecho</u>` (Ctrl+U ou o U da barra da seleção).
 
 
 ## Menção a outra nota
@@ -105,13 +105,13 @@ Preço de venda com impostos vezes a quantidade vendida.
 A pergunta fica no `<summary>` e a resposta, escondida até clicar, depois dela.
 
 
-## Marca-texto e cor do texto
+## Marca-texto (cor de fundo) e cor do texto
 
 ```
-Um <mark>trecho destacado</mark> e um <span class="cor-tijolo">trecho colorido</span>.
+Um <mark>trecho destacado</mark>, um <mark class="fundo-salvia">destaque verde</mark> e um <span class="cor-tijolo">trecho colorido</span>.
 ```
 
-As cores são `cor-tijolo`, `cor-ambar`, `cor-musgo`, `cor-aco` e `cor-salvia`. As duas decorações podem ir juntas: `<mark><span class="cor-tijolo">…</span></mark>`.
+As cores são `tijolo`, `ambar`, `musgo`, `aco` e `salvia`. A cor do texto é `<span class="cor-…">`. A cor de fundo é o marca-texto: `<mark>` sem classe é o âmbar, o de sempre, e as outras são `<mark class="fundo-…">` (o app escreve o âmbar sem classe). As duas decorações podem ir juntas: `<mark class="fundo-tijolo"><span class="cor-tijolo">…</span></mark>`.
 
 
 ## Regras para quem escreve uma nota fora do app

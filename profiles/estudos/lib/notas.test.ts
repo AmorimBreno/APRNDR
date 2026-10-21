@@ -58,6 +58,7 @@ describe("HTML e prévia", () => {
 	it("não conta o HTML das decorações e dos blocos", () => {
 		const conhecidos = [
 			'Um <mark>destaque</mark> e <span class="cor-ambar">cor</span>.',
+			'Um <u>sublinhado</u> e um <mark class="fundo-tijolo">fundo</mark>.',
 			'<div class="caixa atencao">\n\ntexto\n\n</div>',
 			'<div class="definicao">\n<dfn>Termo</dfn>\n\nexplicação\n\n</div>',
 			"<details>\n<summary>Título</summary>\n\nmiolo\n\n</details>",

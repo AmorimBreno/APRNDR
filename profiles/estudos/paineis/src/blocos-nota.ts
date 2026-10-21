@@ -221,16 +221,47 @@ export const Recolhivel = Node.create({
 	},
 });
 
-/** Marca-texto: <mark>. */
+/**
+ * Marca-texto (cor de fundo): <mark> é o âmbar, o de sempre; as outras cores
+ * são <mark class="fundo-…"> com uma das CORES_TEXTO.
+ */
 export const MarcaTexto = Mark.create({
 	name: "marcaTexto",
+	addAttributes() {
+		return {
+			cor: {
+				default: "ambar" as CorTexto,
+				parseHTML: (elemento) => CORES_TEXTO.find((cor) => elemento.classList.contains(`fundo-${cor}`)) ?? "ambar",
+				renderHTML: () => ({}),
+			},
+		};
+	},
 	parseHTML() {
 		return [{ tag: "mark" }];
 	},
-	renderHTML({ HTMLAttributes }) {
-		return ["mark", HTMLAttributes, 0];
+	renderHTML({ mark, HTMLAttributes }) {
+		const cor = mark.attrs.cor as CorTexto;
+		return ["mark", mergeAttributes(HTMLAttributes, cor === "ambar" ? {} : { class: `fundo-${cor}` }), 0];
 	},
-	renderMarkdown: (node, ajuda) => `<mark>${ajuda.renderChildren(node)}</mark>`,
+	renderMarkdown: (node, ajuda) => {
+		const cor = ((node as { attrs?: { cor?: string } }).attrs?.cor ?? "ambar") as string;
+		return `${cor === "ambar" ? "<mark>" : `<mark class="fundo-${cor}">`}${ajuda.renderChildren(node)}</mark>`;
+	},
+});
+
+/** Sublinhado: <u> (o markdown não tem; o do TipTap escreveria ++texto++). Ctrl+U. */
+export const Sublinhado = Mark.create({
+	name: "sublinhado",
+	parseHTML() {
+		return [{ tag: "u" }];
+	},
+	renderHTML({ HTMLAttributes }) {
+		return ["u", HTMLAttributes, 0];
+	},
+	renderMarkdown: (node, ajuda) => `<u>${ajuda.renderChildren(node)}</u>`,
+	addKeyboardShortcuts() {
+		return { "Mod-u": () => this.editor.commands.toggleMark(this.name) };
+	},
 });
 
 /** Cor do texto: <span class="cor-…"> com uma das CORES_TEXTO. */

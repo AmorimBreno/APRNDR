@@ -66,7 +66,10 @@ export type CorTexto = (typeof CORES_TEXTO)[number];
 /** As tags que o editor entende, exatamente como ele as escreve (abertura e fechamento). */
 const TAGS_CONHECIDAS = new Set([
 	"<mark>",
+	...CORES_TEXTO.map((cor) => `<mark class="fundo-${cor}">`),
 	"</mark>",
+	"<u>",
+	"</u>",
 	...CORES_TEXTO.map((cor) => `<span class="cor-${cor}">`),
 	"</span>",
 	...TONS_CAIXA.map((tom) => `<div class="caixa ${tom}">`),

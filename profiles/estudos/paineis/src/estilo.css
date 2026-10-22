@@ -401,7 +401,24 @@
 .mapa__campo[aria-invalid="true"] { border-color: var(--brick); }
 .mapa__campo::placeholder { color: var(--ink-subtle); }
 .mapa__marcas { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: var(--space-2); }
-.mapa__referencia { display: inline-flex; padding: 0; border: 0; border-radius: var(--radius-full); background: none; cursor: pointer; transition: transform .3s var(--mola); }
+/* Uma referência: a etiqueta e, se os locais não cabem, o "+N" (EtiquetaReferencia). */
+.mapa__ref { position: relative; display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-width: 0; }
+.mapa__referencia { display: inline-flex; min-width: 0; max-width: 100%; padding: 0; border: 0; border-radius: var(--radius-full); background: none; cursor: pointer; transition: transform .3s var(--mola); }
+.mapa__referencia .ap-tag { min-width: 0; max-width: 100%; }
+.mapa__referencia .ap-tag > svg { flex: none; }
+.mapa__referencia-texto { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Aberta: a etiqueta inteira, quebrando a linha. */
+.mapa__ref--aberta { align-items: flex-start; }
+.mapa__ref--aberta .ap-tag { height: auto; min-height: 26px; align-items: flex-start; padding-top: 3px; padding-bottom: 3px; border-radius: var(--radius-md); text-align: left; }
+.mapa__ref--aberta .mapa__referencia { border-radius: var(--radius-md); }
+.mapa__ref--aberta .mapa__referencia-texto { white-space: normal; overflow-wrap: anywhere; }
+.mapa__mais { flex: none; display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 26px; padding: 0 8px; border: 1px solid var(--cream-line); border-radius: var(--radius-full); background: transparent; color: var(--ink-muted); font-size: 13px; cursor: pointer; transition: background-color .12s ease-out, color .12s ease-out; }
+.mapa__mais:hover { background: var(--surface-hover); color: var(--ink); }
+.mapa__mais:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+/* A cópia escondida que mede quantos locais cabem (sem ocupar lugar nem criar rolagem). */
+.mapa__medida { position: absolute; top: 0; left: 0; width: 0; height: 0; overflow: hidden; visibility: hidden; pointer-events: none; }
+.mapa__medida > * { position: absolute; width: max-content; white-space: nowrap; }
+.mapa__medida > .ap-tag { left: 0; }
 .mapa__referencia:hover { transform: translateY(-1px); }
 .mapa__referencia:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .mapa__prioridade { align-self: start; }

@@ -125,9 +125,10 @@ export function abreviarLocal(local: string): string {
  * As referências de um conceito, uma etiqueta por arquivo, na ordem em que
  * cada arquivo aparece: "aula-04.pdf · p. 12, 13". As páginas vão juntas
  * depois de um "p." só (em ordem numérica); os outros locais vêm depois, como
- * vieram.
+ * vieram. `locais` são os pedaços depois do " · ", um por local ("p. 12",
+ * "13", "célula 3"), para a etiqueta mostrar só os que cabem.
  */
-export function agruparReferencias(referencias: readonly Referencia[]): Array<{ arquivo: string; texto: string }> {
+export function agruparReferencias(referencias: readonly Referencia[]): Array<{ arquivo: string; texto: string; locais: string[] }> {
 	const porArquivo = new Map<string, string[]>();
 	for (const referencia of referencias) {
 		const locais = porArquivo.get(referencia.arquivo) ?? [];
@@ -143,8 +144,8 @@ export function agruparReferencias(referencias: readonly Referencia[]): Array<{ 
 			else if (local.trim()) outros.push(local.trim());
 		}
 		if (paginas.every((pagina) => /^\d+$/.test(pagina))) paginas.sort((a, b) => Number(a) - Number(b));
-		const partes = [paginas.length ? `p. ${paginas.join(", ")}` : "", ...outros].filter(Boolean);
-		return { arquivo, texto: partes.length ? `${arquivo} · ${partes.join(", ")}` : arquivo };
+		const partes = [...paginas.map((pagina, indice) => (indice === 0 ? `p. ${pagina}` : pagina)), ...outros];
+		return { arquivo, texto: partes.length ? `${arquivo} · ${partes.join(", ")}` : arquivo, locais: partes };
 	});
 }
 

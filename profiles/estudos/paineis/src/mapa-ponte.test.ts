@@ -93,8 +93,8 @@ describe("referências", () => {
 			{ arquivo: "lista.ipynb", local: "célula 5", trecho: "celula-005" },
 		]);
 		expect(grupos).toEqual([
-			{ arquivo: "aula-04.pdf", texto: "aula-04.pdf · p. 12, 13" },
-			{ arquivo: "lista.ipynb", texto: "lista.ipynb · célula 2, célula 5" },
+			{ arquivo: "aula-04.pdf", texto: "aula-04.pdf · p. 12, 13", locais: ["p. 12", "13"] },
+			{ arquivo: "lista.ipynb", texto: "lista.ipynb · célula 2, célula 5", locais: ["célula 2", "célula 5"] },
 		]);
 	});
 
@@ -104,7 +104,7 @@ describe("referências", () => {
 				{ arquivo: "notas.md", local: "seção Limites", trecho: "secao-1" },
 				{ arquivo: "notas.md", local: "página 2", trecho: "pagina-002" },
 			]),
-		).toEqual([{ arquivo: "notas.md", texto: "notas.md · p. 2, seção Limites" }]);
+		).toEqual([{ arquivo: "notas.md", texto: "notas.md · p. 2, seção Limites", locais: ["p. 2", "seção Limites"] }]);
 		expect(agruparReferencias([])).toEqual([]);
 	});
 });

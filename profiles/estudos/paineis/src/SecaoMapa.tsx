@@ -14,7 +14,7 @@
 import { Button, Callout, EmptyState, Icon, Modal, pad2, Tag, type Tone } from "@estudos/design-system";
 import { MenuSuspenso } from "@estudos/ui";
 import { AnimatePresence, motion, Reorder, useDragControls } from "motion/react";
-import { type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { type KeyboardEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { type Conceito, contarMapa, novoIdConceito, type Operacao, type Prioridade, semFonte } from "../../lib/mapa-tipos.ts";
 import {
 	agruparReferencias,
@@ -309,6 +309,90 @@ interface PropsLinha {
 	abrirMaterial(arquivo: string): void;
 }
 
+/** Espaço entre a etiqueta e o "+N" (o gap de .mapa__ref). */
+const VAO_MAIS = 6;
+
+/**
+ * Uma referência: o arquivo e os locais, numa etiqueta que abre o arquivo nos
+ * materiais. Quando os locais não cabem na linha, a etiqueta mostra os que
+ * cabem e um "+N" no fim; o "+N" abre a etiqueta inteira (quebrando a linha) e
+ * o "−" fecha de novo. Quantos cabem é medido numa cópia escondida da
+ * etiqueta, de novo sempre que a largura da linha muda.
+ */
+function EtiquetaReferencia(props: { arquivo: string; locais: string[]; abrir(): void }) {
+	const { arquivo, locais } = props;
+	const [aberta, setAberta] = useState(false);
+	const [cabem, setCabem] = useState(locais.length);
+	const caixa = useRef<HTMLSpanElement>(null);
+	const medida = useRef<HTMLSpanElement>(null);
+	const chave = locais.join("\n");
+
+	useLayoutEffect(() => {
+		const linha = caixa.current?.parentElement;
+		const copia = medida.current;
+		if (aberta || !linha || !copia) return;
+		const medir = () => {
+			const etiqueta = copia.querySelector<HTMLElement>(".ap-tag");
+			const pedacos = [...copia.querySelectorAll<HTMLElement>("[data-local]")];
+			const mais = copia.querySelector<HTMLElement>(".mapa__mais");
+			const ultimo = pedacos.at(-1);
+			if (!etiqueta || !mais || !ultimo) return;
+			const largura = linha.clientWidth;
+			if (etiqueta.offsetWidth <= largura) return setCabem(pedacos.length);
+			// O que sobra depois do último pedaço (o respiro da direita da etiqueta).
+			const respiro = etiqueta.offsetWidth - (ultimo.offsetLeft + ultimo.offsetWidth);
+			let quantos = 1;
+			pedacos.forEach((pedaco, indice) => {
+				if (pedaco.offsetLeft + pedaco.offsetWidth + respiro + VAO_MAIS + mais.offsetWidth <= largura) quantos = indice + 1;
+			});
+			setCabem(quantos);
+		};
+		medir();
+		const observador = new ResizeObserver(medir);
+		observador.observe(linha);
+		return () => observador.disconnect();
+	}, [chave, aberta]);
+
+	const escondidos = aberta ? 0 : locais.length - Math.min(cabem, locais.length);
+	const visiveis = aberta ? locais : locais.slice(0, locais.length - escondidos);
+	return (
+		<span ref={caixa} className={`mapa__ref${aberta ? " mapa__ref--aberta" : ""}`}>
+			<button type="button" className="mapa__referencia" title={`Abrir ${arquivo} nos materiais`} onClick={props.abrir}>
+				<Tag size="sm" tone="cream" icon="file">
+					<span className="mapa__referencia-texto">{visiveis.length ? `${arquivo} · ${visiveis.join(", ")}` : arquivo}</span>
+				</Tag>
+			</button>
+			{escondidos > 0 || aberta ? (
+				<button
+					type="button"
+					className="data mapa__mais"
+					aria-expanded={aberta}
+					aria-label={aberta ? `Mostrar menos locais de ${arquivo}` : `Mostrar mais ${escondidos} locais de ${arquivo}`}
+					onClick={() => setAberta(!aberta)}
+				>
+					{aberta ? "−" : `+${escondidos}`}
+				</button>
+			) : null}
+			{aberta || locais.length === 0 ? null : (
+				<span ref={medida} className="mapa__medida" aria-hidden="true">
+					<Tag size="sm" tone="cream" icon="file">
+						<span>
+							{arquivo} ·{" "}
+							{locais.map((local, indice) => (
+								<span key={indice} data-local="">
+									{local}
+									{indice < locais.length - 1 ? ", " : ""}
+								</span>
+							))}
+						</span>
+					</Tag>
+					<span className="data mapa__mais">+{locais.length}</span>
+				</span>
+			)}
+		</span>
+	);
+}
+
 function LinhaConceito(props: PropsLinha) {
 	const { conceito } = props;
 	const controles = useDragControls();
@@ -362,17 +446,12 @@ function LinhaConceito(props: PropsLinha) {
 				{referencias.length || conceito.novo || semOrigem ? (
 					<div className="mapa__marcas">
 						{referencias.map((referencia) => (
-							<button
+							<EtiquetaReferencia
 								key={referencia.arquivo}
-								type="button"
-								className="mapa__referencia"
-								title={`Abrir ${referencia.arquivo} nos materiais`}
-								onClick={() => props.abrirMaterial(referencia.arquivo)}
-							>
-								<Tag size="sm" tone="cream" icon="file">
-									{referencia.texto}
-								</Tag>
-							</button>
+								arquivo={referencia.arquivo}
+								locais={referencia.locais}
+								abrir={() => props.abrirMaterial(referencia.arquivo)}
+							/>
 						))}
 						{conceito.novo ? (
 							<Tag size="sm" tone="amber">

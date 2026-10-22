@@ -52,8 +52,8 @@ export async function garantirPastaDeDados(dados: string): Promise<void> {
 	await mkdir(pastaAprendiz(dados), { recursive: true });
 }
 
-/** O nome sem acento, em minúsculas, só letras, números e hífen ("Cálculo I" → "calculo-i"). */
-export function idDoNome(nome: string): string {
+/** O nome sem acento, em minúsculas, só letras, números e hífen ("Cálculo I" → "calculo-i"). Sem nada disso, `reserva`. */
+export function idDoNome(nome: string, reserva = "materia"): string {
 	const base = nome
 		.normalize("NFD")
 		.replace(/[̀-ͯ]/g, "")
@@ -62,12 +62,12 @@ export function idDoNome(nome: string): string {
 		.replace(/^-+|-+$/g, "")
 		.slice(0, 48)
 		.replace(/-+$/g, "");
-	return base || "materia";
+	return base || reserva;
 }
 
-/** O id que ainda não existe: o do nome, ou ele com -2, -3… */
-export function idLivre(nome: string, existentes: ReadonlySet<string>): string {
-	const base = idDoNome(nome);
+/** O id que ainda não existe: o do nome, ou ele com -2, -3… (os cursos também usam, com reserva "curso"). */
+export function idLivre(nome: string, existentes: ReadonlySet<string>, reserva = "materia"): string {
+	const base = idDoNome(nome, reserva);
 	if (!existentes.has(base)) return base;
 	for (let numero = 2; ; numero++) {
 		const candidato = `${base}-${numero}`;

@@ -6,6 +6,8 @@
 // Todas as funções daqui são puras: recebem o mapa e devolvem um mapa novo,
 // sem mexer no que receberam.
 
+import type { TipoCurso } from "./curso-tipos.ts";
+
 /** Muda quando o formato do mapa-conteudo.json mudar. */
 export const VERSAO_MAPA = 1;
 
@@ -21,8 +23,12 @@ export type Prioridade = (typeof PRIORIDADES)[number];
 /** rascunho: nunca aprovado; alterado: já foi aprovado e mudou depois. */
 export type SituacaoMapa = "rascunho" | "aprovado" | "alterado";
 
-/** material: veio de um mapeamento; usuario: escrito à mão pelo Breno. */
-export type OrigemConceito = "material" | "usuario";
+/**
+ * material: veio de um mapeamento; usuario: escrito à mão pelo Breno; tema:
+ * veio do mapa montado a partir do tema de um curso (docs/cursos.md, "Mapa a
+ * partir do tema"). "tema" é só um valor novo: a versão do formato continua 1.
+ */
+export type OrigemConceito = "material" | "usuario" | "tema";
 
 /** Onde um conceito aparece. */
 export interface Referencia {
@@ -46,7 +52,7 @@ export interface Conceito {
 	criadoEm: string;
 	/** O Breno tirou do mapa. Só aparece quando é verdadeiro. */
 	fora?: true;
-	/** Entrou por um mapeamento depois da primeira aprovação. Só aparece quando é verdadeiro; toda aprovação limpa. */
+	/** Entrou por um mapeamento (ou pelo tema) depois da primeira aprovação. Só aparece quando é verdadeiro; toda aprovação limpa. */
 	novo?: true;
 }
 
@@ -97,7 +103,7 @@ export type Operacao =
 	| { tipo: "editar"; id: string; nome?: string; descricao?: string }
 	/** O id é gerado pela tela (novoIdConceito). depoisDe: id; null = primeiro; ausente = no fim. */
 	| { tipo: "adicionar"; id: string; nome: string; descricao?: string; depoisDe?: string | null }
-	/** Só um conceito de origem usuario. */
+	/** Só um conceito de origem usuario ou tema. */
 	| { tipo: "apagar"; id: string };
 
 export type TipoOperacao = Operacao["tipo"];
@@ -114,6 +120,8 @@ export interface AcoesMapa {
 	cancelar: { materia: string };
 	operar: { materia: string; edicao: string; pedido: string; operacoes: Operacao[] };
 	aprovar: { materia: string; pedido: string };
+	/** Monta o mapa a partir do tema de um curso (docs/cursos.md): tema = o nome do curso; tipo e motivo vêm do Objetivo. */
+	do_tema: { materia: string; pedido: string; tema: string; tipo?: TipoCurso; motivo?: string };
 }
 
 export type AcaoMapa = keyof AcoesMapa;
@@ -145,8 +153,10 @@ export interface EstadoMapa {
 	andamento: AndamentoMapa | null;
 	/** Os arquivos esperando, na ordem. */
 	fila: string[];
-	/** O da tela, quando a mudança respondeu a operar ou aprovar. */
+	/** O da tela, quando a mudança respondeu a operar, aprovar ou do_tema. */
 	pedido?: string;
+	/** O modelo está montando o mapa a partir do tema (do_tema). */
+	montandoTema?: boolean;
 }
 
 /** A mensagem "erro" (interface:mostrar, gravar: false). */
@@ -180,7 +190,7 @@ export function novoIdConceito(agora: number = Date.now()): string {
 	return `c-${agora.toString(36).padStart(12, "0")}-${hex}`;
 }
 
-/** Um conceito de origem material sem nenhuma referência (a tela mostra o aviso). Não é gravado. */
+/** Um conceito de origem material sem nenhuma referência (a tela mostra o aviso). Não é gravado. Os de origem usuario e tema nunca são. */
 export function semFonte(conceito: Conceito): boolean {
 	return conceito.origem === "material" && conceito.referencias.length === 0;
 }
@@ -300,7 +310,7 @@ function aplicarUma(mapa: MapaConteudo, operacao: Operacao, agora: Date): boolea
 			return mudou;
 		}
 		case "apagar":
-			if (conceito.origem !== "usuario") return undefined;
+			if (conceito.origem !== "usuario" && conceito.origem !== "tema") return undefined;
 			conceitos.splice(indice, 1);
 			return true;
 		default:
@@ -526,4 +536,44 @@ export function removerArquivoDoMapa(mapa: MapaConteudo, arquivo: string): { map
 		marcarAlterado(resultado.mapa);
 	}
 	return resultado;
+}
+
+/**
+ * Funde no mapa os conceitos que o modelo montou a partir do tema de um curso
+ * (docs/cursos.md, "Mapa a partir do tema"), sem mexer no mapa recebido: eles
+ * entram no fim do mapa, na ordem dada, com origem tema, sem referências,
+ * prioridade normal e novo se o mapa já tem aprovadoEm. Um nome igual
+ * (chaveDoNome) ao de um conceito do mapa, inclusive os que estão fora, ou ao
+ * de um item anterior da lista não entra; um item sem nome também não. Se
+ * entrou algum, um mapa aprovado passa a alterado. novos: quantos entraram.
+ */
+export function fundirTema(
+	mapa: MapaConteudo,
+	conceitos: ReadonlyArray<{ nome: string; descricao: string }>,
+	agora: Date = new Date(),
+): { mapa: MapaConteudo; novos: number } {
+	const novo = clonar(mapa);
+	const nomes = new Set(novo.conceitos.map((conceito) => chaveDoNome(conceito.nome)));
+	let novos = 0;
+	const brutos: unknown[] = Array.isArray(conceitos) ? conceitos : [];
+	for (const bruto of brutos as Array<Partial<Record<"nome" | "descricao", unknown>> | null>) {
+		const nome = typeof bruto?.nome === "string" ? limparTexto(bruto.nome) : "";
+		if (!bruto || !nome) continue;
+		const chave = chaveDoNome(nome);
+		if (nomes.has(chave)) continue;
+		nomes.add(chave);
+		novo.conceitos.push({
+			id: idLivre(novo, agora.getTime()),
+			nome,
+			descricao: typeof bruto.descricao === "string" ? bruto.descricao.trim() : "",
+			referencias: [],
+			prioridade: "normal",
+			origem: "tema",
+			criadoEm: agora.toISOString(),
+			...(novo.aprovadoEm ? { novo: true as const } : {}),
+		});
+		novos++;
+	}
+	if (novos > 0) marcarAlterado(novo);
+	return { mapa: novo, novos };
 }

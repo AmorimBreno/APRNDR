@@ -25,6 +25,12 @@ export type VerboEvento =
 	| "atualizou_mapa"
 	| "revisou_mapa"
 	| "aprovou_mapa"
+	// O mapa montado a partir do tema de um curso (item 5, parte A): docs/cursos.md, "Mapa a partir do tema".
+	| "montou_mapa_do_tema"
+	// Cursos (item 5): docs/cursos.md, "Eventos". Confirmar uma etapa do guia não grava evento.
+	| "comecou_curso"
+	| "descartou_curso"
+	| "criou_curso"
 	// Aprendizagem (seção 9.2), usados a partir dos itens 7 e 8:
 	| "pediu_reexplicacao"
 	| "pediu_outro_jeito"

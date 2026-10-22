@@ -15,6 +15,7 @@ import {
 	dividirEmPartes,
 	ErroMapa,
 	fundirResultado,
+	fundirTema,
 	gravarMapa,
 	lerMapa,
 	lerPendentes,
@@ -25,6 +26,7 @@ import {
 	novoIdConceito,
 	pastaExtraidoArquivo,
 	registrarAprovacaoMapa,
+	registrarMapaDoTema,
 	registrarMapeamento,
 	registrarMaterialRemovidoDoMapa,
 	registrarRevisaoMapa,
@@ -387,6 +389,63 @@ describe("material removido e sem fonte", () => {
 	});
 });
 
+describe("origem tema", () => {
+	const tema = (nome: string, descricao = "") => ({ nome, descricao });
+
+	it("fundirTema: no fim, na ordem, origem tema, sem referências, prioridade normal", () => {
+		const antes = mapaCom([conceito("c-a", "Limite")]);
+		const { mapa, novos } = fundirTema(antes, [tema(" Derivada ", " taxa "), tema("Integral")], AGORA);
+		expect(novos).toBe(2);
+		expect(nomes(mapa)).toEqual(["Limite", "Derivada", "Integral"]);
+		expect(mapa.conceitos[1]).toMatchObject({ nome: "Derivada", descricao: "taxa", referencias: [], prioridade: "normal", origem: "tema", criadoEm: AGORA.toISOString() });
+		expect(mapa.conceitos[1]!.id).toMatch(/^c-[0-9a-z]{12}-[0-9a-f]{4}$/);
+		expect(mapa.conceitos[1]!.novo).toBeUndefined();
+		expect(new Set(ids(mapa)).size).toBe(3);
+		expect(mapa.situacao).toBe("rascunho");
+		expect(antes.conceitos).toHaveLength(1);
+	});
+
+	it("fundirTema: não repete nome do mapa (inclusive fora) nem da própria lista; item sem nome não entra", () => {
+		const antes = mapaCom([conceito("c-a", "Regressão linear"), conceito("c-b", "Resíduo", { fora: true })]);
+		const { mapa, novos } = fundirTema(
+			antes,
+			[tema("regressao  LINEAR"), tema("Residuo"), tema("Correlação", "primeira"), tema("correlacao", "segunda"), tema("  "), null as never, { descricao: "x" } as never],
+			AGORA,
+		);
+		expect(novos).toBe(1);
+		expect(nomes(mapa)).toEqual(["Regressão linear", "Resíduo", "Correlação"]);
+		expect(mapa.conceitos[2]!.descricao).toBe("primeira");
+	});
+
+	it("fundirTema: novo se o mapa tem aprovadoEm; aprovado passa a alterado só se entrou algo", () => {
+		const aprovado = aprovar(mapaCom([conceito("c-a", "A")]), AGORA);
+		const { mapa } = fundirTema(aprovado, [tema("B")], AGORA);
+		expect(mapa.conceitos[1]!.novo).toBe(true);
+		expect(mapa.situacao).toBe("alterado");
+		const nada = fundirTema(aprovado, [tema("a")], AGORA);
+		expect(nada.novos).toBe(0);
+		expect(nada.mapa.situacao).toBe("aprovado");
+		expect(fundirTema(aprovado, [], AGORA).mapa).toEqual(aprovado);
+	});
+
+	it("apagar vale para usuario e tema, não para material", () => {
+		const base = mapaCom([conceito("c-m", "M"), conceito("c-u", "U", { origem: "usuario" }), conceito("c-t", "T", { origem: "tema" })]);
+		const { mapa, ignoradas, mudou } = aplicarOperacoes(base, [
+			{ tipo: "apagar", id: "c-t" },
+			{ tipo: "apagar", id: "c-u" },
+			{ tipo: "apagar", id: "c-m" },
+		]);
+		expect(ids(mapa)).toEqual(["c-m"]);
+		expect(ignoradas).toBe(1);
+		expect(mudou).toBe(true);
+	});
+
+	it("semFonte: um conceito de tema sem referência não é sem fonte", () => {
+		expect(semFonte(conceito("c", "x", { origem: "tema" }))).toBe(false);
+		expect(contarMapa(mapaCom([conceito("c-t", "T", { origem: "tema" })])).semFonte).toBe(0);
+	});
+});
+
 describe("dividirEmPartes", () => {
 	const t = (tamanho: number) => ({ texto: "x".repeat(tamanho) });
 	it("junta até o limite sem cortar um trecho", () => {
@@ -473,6 +532,21 @@ describe("no disco", () => {
 		await extraido("listas/l1.pdf", "h", [{ local: "célula 1", nome: "celula-001", texto: "print(1)\n\nfim" }]);
 		expect(await lerTrechos(dados, materia, "listas/l1.pdf")).toEqual([{ local: "célula 1", nome: "celula-001", texto: "print(1)\n\nfim" }]);
 		await expect(lerTrechos(dados, materia, "nao-tem.pdf")).rejects.toThrow(ErroMapa);
+	});
+
+	it("lê um mapa com conceitos de origem tema e um antigo, sem tema", async () => {
+		const comTema = fundirTema(mapaCom([conceito("c-a", "A")]), [{ nome: "B", descricao: "" }], AGORA).mapa;
+		await gravarMapa(dados, materia, comTema);
+		expect(await lerMapa(dados, materia)).toEqual(comTema);
+		const antigo = { versao: 1, situacao: "rascunho", conceitos: [conceito("c-a", "A"), conceito("c-u", "U", { origem: "usuario" })], arquivos: {} };
+		await writeFile(caminhoDoMapa(dados, materia), JSON.stringify(antigo), "utf8");
+		expect(await lerMapa(dados, materia)).toEqual(antigo);
+	});
+
+	it("montou_mapa_do_tema no eventos.jsonl da matéria", async () => {
+		await registrarMapaDoTema(dados, materia, { tema: "P1: regressão", novos: 7, custo: 0.02, modelo: "openrouter/x" }, { sessao: "s2" });
+		const [evento] = (await lerEventos(eventosMateria(dados, materia))).eventos.slice(1);
+		expect(evento).toMatchObject({ verbo: "montou_mapa_do_tema", sessao: "s2", objeto: { materia }, resultado: { novos: 7, custo: 0.02, tema: "P1: regressão" }, contexto: { modelo: "openrouter/x" } });
 	});
 
 	it("grava os quatro eventos no eventos.jsonl da matéria", async () => {

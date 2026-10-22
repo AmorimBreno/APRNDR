@@ -139,12 +139,11 @@ export interface ArquivoPendente {
 }
 
 /**
- * Os arquivos pendentes da matéria: os manifestos em
- * materias/<id>/.extraido/**\/manifesto.json cujo hash não está em
- * mapa.arquivos (ou é diferente), em ordem de caminho. Manifesto ilegível
- * fica de fora. Sem .extraido, nenhum.
+ * Os manifestos legíveis em materias/<id>/.extraido/**\/manifesto.json, com a
+ * pasta de cada um, em ordem de caminho do arquivo. Manifesto ilegível fica de
+ * fora. Sem .extraido, nenhum.
  */
-export async function lerPendentes(dados: string, materia: string, mapa: MapaConteudo): Promise<ArquivoPendente[]> {
+async function manifestosDaMateria(dados: string, materia: string): Promise<Array<{ pasta: string; manifesto: ManifestoLido }>> {
 	let entradas: Dirent[];
 	try {
 		entradas = await readdir(pastaExtraidoMateria(dados, materia), { recursive: true, withFileTypes: true });
@@ -152,13 +151,37 @@ export async function lerPendentes(dados: string, materia: string, mapa: MapaCon
 		if ((erro as NodeJS.ErrnoException).code === "ENOENT") return [];
 		throw erro;
 	}
-	const pendentes: ArquivoPendente[] = [];
+	const lidos: Array<{ pasta: string; manifesto: ManifestoLido }> = [];
 	for (const entrada of entradas) {
 		if (!entrada.isFile() || entrada.name !== "manifesto.json") continue;
 		const manifesto = await lerManifesto(join(entrada.parentPath, entrada.name));
-		if (!manifesto || mapa.arquivos[manifesto.arquivo]?.hash === manifesto.hash) continue;
+		if (manifesto) lidos.push({ pasta: entrada.parentPath, manifesto });
+	}
+	lidos.sort((a, b) => a.manifesto.arquivo.localeCompare(b.manifesto.arquivo));
+	return lidos;
+}
+
+/**
+ * Os arquivos prontos da matéria (os que têm manifesto legível no .extraido),
+ * com o hash do manifesto, em ordem de caminho. Os cursos guardam esta lista
+ * na etapa Materiais (docs/cursos.md).
+ */
+export async function listarManifestos(dados: string, materia: string): Promise<Array<{ arquivo: string; hash: string }>> {
+	return (await manifestosDaMateria(dados, materia)).map(({ manifesto }) => ({ arquivo: manifesto.arquivo, hash: manifesto.hash }));
+}
+
+/**
+ * Os arquivos pendentes da matéria: os manifestos em
+ * materias/<id>/.extraido/**\/manifesto.json cujo hash não está em
+ * mapa.arquivos (ou é diferente), em ordem de caminho. Manifesto ilegível
+ * fica de fora. Sem .extraido, nenhum.
+ */
+export async function lerPendentes(dados: string, materia: string, mapa: MapaConteudo): Promise<ArquivoPendente[]> {
+	const pendentes: ArquivoPendente[] = [];
+	for (const { pasta, manifesto } of await manifestosDaMateria(dados, materia)) {
+		if (mapa.arquivos[manifesto.arquivo]?.hash === manifesto.hash) continue;
 		const trechos: ArquivoPendente["trechos"] = [];
-		for (const trecho of manifesto.trechos) trechos.push({ ...trecho, caracteres: (await lerCorpo(entrada.parentPath, trecho.nome)).length });
+		for (const trecho of manifesto.trechos) trechos.push({ ...trecho, caracteres: (await lerCorpo(pasta, trecho.nome)).length });
 		pendentes.push({
 			arquivo: manifesto.arquivo,
 			tipo: manifesto.tipo,
@@ -167,7 +190,6 @@ export async function lerPendentes(dados: string, materia: string, mapa: MapaCon
 			caracteres: trechos.reduce((soma, trecho) => soma + trecho.caracteres, 0),
 		});
 	}
-	pendentes.sort((a, b) => a.arquivo.localeCompare(b.arquivo));
 	return pendentes;
 }
 
@@ -248,5 +270,24 @@ export async function registrarAprovacaoMapa(dados: string, materia: string, map
 	await acrescentarEvento(
 		eventosMateria(dados, materia),
 		criarEvento({ ...daSessao(contexto), verbo: "aprovou_mapa", objeto: { materia }, resultado: { conceitos: mapa.conceitos.length - fora, fora } }),
+	);
+}
+
+/** montou_mapa_do_tema: o mapa montado a partir do tema de um curso (docs/cursos.md); novos = quantos conceitos entraram. */
+export async function registrarMapaDoTema(
+	dados: string,
+	materia: string,
+	montagem: { tema: string; novos: number; custo: number; modelo: string },
+	contexto: ContextoEvento = {},
+): Promise<void> {
+	await acrescentarEvento(
+		eventosMateria(dados, materia),
+		criarEvento({
+			...daSessao(contexto),
+			verbo: "montou_mapa_do_tema",
+			objeto: { materia },
+			resultado: { novos: montagem.novos, custo: montagem.custo, tema: montagem.tema },
+			contexto: { modelo: montagem.modelo },
+		}),
 	);
 }

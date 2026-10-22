@@ -37,10 +37,10 @@ Tudo isto é do perfil de estudos (profiles/estudos), não do núcleo.
   - `id`: `c-` + 12 dígitos base 36 de milissegundos + `-` + 4 hex aleatórios.
   - `referencias`: `arquivo` é o caminho dentro de `materiais/`, com barras normais (o mesmo do manifesto do `.extraido`); `local` é o `local` do trecho no manifesto; `trecho` é o `nome` do trecho.
   - `prioridade`: `alta`, `normal` ou `baixa`.
-  - `origem`: `material` (veio de um mapeamento) ou `usuario` (escrito à mão).
+  - `origem`: `material` (veio de um mapeamento), `usuario` (escrito à mão) ou `tema` (veio do mapa montado a partir do tema de um curso, abaixo). `tema` é só um valor novo: a versão do formato continua 1, e os mapas antigos são lidos como estão.
   - `fora`: o Breno tirou do mapa. Só aparece quando é verdadeiro.
-  - `novo`: entrou por um mapeamento depois da primeira aprovação. Só aparece quando é verdadeiro e é limpo em toda aprovação.
-- "Sem fonte" não é gravado: é um conceito de origem `material` sem nenhuma referência.
+  - `novo`: entrou por um mapeamento (ou pelo tema) depois da primeira aprovação. Só aparece quando é verdadeiro e é limpo em toda aprovação.
+- "Sem fonte" não é gravado: é um conceito de origem `material` sem nenhuma referência (os de origem `usuario` e `tema` nunca são).
 - `arquivos`: os arquivos já mapeados, com o hash do manifesto do `.extraido` no momento do mapeamento.
 
 Um arquivo pendente é um arquivo com manifesto em `materias/<id>/.extraido/<arquivo>/manifesto.json` cujo hash não está em `arquivos` (ou é diferente). Sem `mapa-conteudo.json`, o mapa é vazio (situação `rascunho`).
@@ -80,11 +80,15 @@ A tela manda operações; a extensão as aplica em fila, com as mesmas funções
 | `mover` | `id`, `depoisDe` (id ou null = primeiro) | muda a posição |
 | `editar` | `id`, `nome?`, `descricao?` | troca o nome ou a descrição (nome vazio não vale) |
 | `adicionar` | `id`, `nome`, `descricao?`, `depoisDe` (id, null = primeiro; ausente = no fim) | conceito de origem `usuario`; o id é gerado pela tela |
-| `apagar` | `id` | só um conceito de origem `usuario` |
+| `apagar` | `id` | só um conceito de origem `usuario` ou `tema` |
 
 Uma operação sobre um id que não existe é ignorada (e contada). Qualquer operação que mude algo num mapa `aprovado` o passa para `alterado`.
 
 `aprovar`: `situacao: "aprovado"`, `aprovadoEm` agora, todos os `novo` saem. Mapa sem nenhum conceito dentro não pode ser aprovado.
+
+## Mapa a partir do tema
+
+Para um curso sem material (docs/cursos.md, "Mapa a partir do tema"), a ação `do_tema` pede ao modelo do `prompts/mapa-do-tema.md` os conceitos do tema, na ordem de estudo (`{"conceitos": [{"nome", "descricao"}]}`). A extensão do mapa os funde com `fundirTema` (mapa-tipos.ts): no fim do mapa, na ordem, com origem `tema`, sem referência, prioridade `normal` e `novo` se o mapa já tem `aprovadoEm`; um nome igual (sem diferença de maiúsculas e acentos) ao de um conceito do mapa, inclusive os que estão fora, ou a um anterior da lista não entra de novo. Se entrou algo, um mapa `aprovado` passa a `alterado`.
 
 ## Eventos (no eventos.jsonl da matéria)
 
@@ -92,6 +96,7 @@ Uma operação sobre um id que não existe é ignorada (e contada). Qualquer ope
 - `atualizou_mapa`: objeto `{materia, arquivo}`; resultado `{motivo: "material_removido", semFonte}` (quantos conceitos ficaram sem fonte).
 - `revisou_mapa`: um por abertura da seção em que o mapa mudou. A tela gera um id `edicao` quando abre a seção e o manda em cada lote de operações; só o primeiro lote de cada `edicao` grava o evento. Objeto `{materia}`; resultado `{edicao, tipo}` (o tipo da primeira operação).
 - `aprovou_mapa`: objeto `{materia}`; resultado `{conceitos, fora}`.
+- `montou_mapa_do_tema`: objeto `{materia}`; resultado `{novos, custo, tema}`; contexto `{modelo}`.
 
 ## Ponte (painel "mapa", docs/ponte-de-eventos.md)
 
@@ -103,14 +108,16 @@ Tela → extensão (`interface:acao`, painel `mapa`):
 - `cancelar {materia}`: para o mapeamento em andamento e esvazia a fila da matéria (o que já foi fundido fica)
 - `operar {materia, edicao, pedido, operacoes}`
 - `aprovar {materia, pedido}`
+- `do_tema {materia, pedido, tema, tipo?, motivo?}`: monta o mapa a partir do tema de um curso (tema = o nome do curso; tipo e motivo vêm do Objetivo)
 
 Extensão → tela (`interface:mostrar`, sempre `gravar: false`):
 
-- `mapa {materia, mapa, pendentes, andamento, fila, pedido?}`: o estado inteiro, mandado depois de `abrir` e de qualquer mudança (operação, aprovação, cada parte de um mapeamento, material removido).
+- `mapa {materia, mapa, pendentes, andamento, fila, pedido?, montandoTema?}`: o estado inteiro, mandado depois de `abrir` e de qualquer mudança (operação, aprovação, cada parte de um mapeamento, material removido, mapa do tema).
   - `pendentes`: `[{arquivo, tipo, caracteres, partes, custoEstimado}]`; `custoEstimado` em US$, pelo preço do modelo, ou null se o preço não for conhecido.
   - `andamento`: `{arquivo, parte, partes}` ou null.
   - `fila`: os arquivos esperando, na ordem.
-  - `pedido`: o da tela, quando a mudança respondeu a `operar` ou `aprovar`.
+  - `pedido`: o da tela, quando a mudança respondeu a `operar`, `aprovar` ou `do_tema`.
+  - `montandoTema`: `true` enquanto o modelo monta o mapa a partir do tema.
 - `erro {mensagem, ao?, materia?, arquivo?, pedido?}`
 
 ## O modelo e o prompt

@@ -459,3 +459,63 @@
 	.mapa__conceito, .mapa__alca, .mapa__editavel, .mapa__referencia, .mapa__prioridade-botao, .mapa__acoes, .mapa__fora-cabeca { transition: none; }
 	.mapa__referencia:hover { transform: none; }
 }
+
+/* O modo de seleção da lista do mapa (a etapa Mapa do guia de curso): a caixa de marcar antes do número. */
+.mapa__conceito--selecao { grid-template-columns: 22px auto auto minmax(0, 1fr) auto auto; }
+.mapa__marcar { gap: 0; padding-top: 1px; }
+.mapa__marcar .ap-check__box { margin-top: 0; }
+.mapa__marcar .ap-check__input { top: 0; }
+@media (max-width: 760px) {
+	.mapa__conceito--selecao { grid-template-columns: 22px auto auto minmax(0, 1fr) auto; }
+	.mapa__conceito--selecao .mapa__acoes { grid-column: 4 / -1; }
+}
+
+/* ── Cursos do caderno (SecaoCursos.tsx, item 5): a lista no ritmo da lista de notas ── */
+.cursos { display: flex; flex-direction: column; gap: var(--space-5); max-width: 880px; }
+.cursos .ap-callout { margin: 0; }
+.cursos__topo { display: flex; justify-content: flex-end; }
+.cursos__lista { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.cursos__item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); padding: var(--space-4); border: var(--border-control) solid transparent; border-radius: var(--radius-md); background: var(--surface-raised); color: var(--ink); transition: border-color .16s ease-out; }
+.cursos__item:hover { border-color: var(--line-strong); }
+.cursos__item > .ap-icon { align-self: start; margin-top: 2px; color: var(--amber); }
+.cursos__texto { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.cursos__nome { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.cursos__meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
+.cursos__quando { color: var(--ink-subtle); }
+.cursos__acoes { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
+.cursos__erro { margin: var(--space-3) 0 0; color: var(--brick-text); }
+
+/* ── O guia de criação de curso (TelaGuiaCurso.tsx, item 5): uma folha centrada no lugar do índice e
+ * da seção, com o trilho das etapas em cima, o corpo numa coluna de leitura e o rodapé fixo no pé. ── */
+.guia { display: flex; justify-content: center; min-height: 0; }
+.guia__folha { display: flex; flex-direction: column; width: 100%; max-width: var(--modal-lg); min-height: 0; overflow: hidden; border-radius: var(--radius-lg); background: var(--surface-panel); }
+.guia__cabeca { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: var(--space-4); padding: var(--space-6) var(--space-8) var(--space-5); }
+.guia__titulos { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.guia__titulos .overline { color: var(--ink-muted); }
+.guia__titulo { margin: 0; overflow-wrap: anywhere; }
+.guia__trilho { padding: 0 var(--space-8) var(--space-5); border-bottom: var(--border-hair) solid var(--line); }
+.guia__trilho .ap-step__label { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.guia__corpo { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-6) var(--space-8) var(--space-8); scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+.guia__coluna { display: flex; flex-direction: column; gap: var(--space-6); max-width: var(--measure-read); margin: 0 auto; }
+.guia__coluna > .ap-callout, .guia__mapa .ap-callout { margin: 0; }
+.guia__coluna .ap-empty { background: var(--surface-raised); }
+.guia__texto { margin: 0; color: var(--ink-muted); }
+.guia__grupo { display: flex; flex-direction: column; gap: var(--space-3); }
+.guia__data { max-width: 240px; padding-left: 32px; }
+.guia__horas { max-width: 160px; }
+.guia__mapa { max-width: none; }
+.guia__selecao { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-4); }
+.guia__selecao-conta { color: var(--ink-muted); }
+.guia__selecao-botoes { display: inline-flex; flex-wrap: wrap; gap: var(--space-2); }
+.guia__rodape { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding: var(--space-4) var(--space-8); border-top: var(--border-hair) solid var(--line); }
+.guia__primario { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-2) var(--space-4); }
+.guia__motivo { color: var(--ink-muted); text-align: right; }
+
+@media (max-width: 900px) {
+	.guia__cabeca, .guia__trilho, .guia__corpo, .guia__rodape { padding-left: var(--space-5); padding-right: var(--space-5); }
+	.guia__trilho .ap-step__text { display: none; }
+	.guia__trilho .ap-step--current .ap-step__text { display: flex; }
+}
+@media (prefers-reduced-motion: reduce) {
+	.cursos__item { transition: none; }
+}

@@ -10,10 +10,12 @@
 // - Materiais: a área de soltar e a lista do serviço de materiais;
 // - Mapa de conteúdo: os conceitos dos materiais, para revisar e aprovar
 //   (SecaoMapa, item 4.4);
-// - Cursos, Aulas, Resumos e Questionários: dizem o que vão ter e em que item
-//   chegam.
+// - Cursos: os cursos da matéria e "Novo curso" (SecaoCursos, item 5);
+// - Aulas, Resumos e Questionários: dizem o que vão ter e em que item chegam.
 // Caminho: caderno/<matéria>/<seção> (sem a seção, a linha do tempo);
-// caderno/<matéria>/notas/<título> abre uma nota.
+// caderno/<matéria>/notas/<título> abre uma nota; caderno/<matéria>/cursos/novo
+// e caderno/<matéria>/cursos/<curso>/guia[/<etapa>] abrem o guia de criação de
+// curso (TelaGuiaCurso) no lugar do índice e da seção, com a aba no topo.
 
 import { Button, EmptyState, Icon, type IconName, NotebookCover, type OrnamentGlyph, pad2 } from "@estudos/design-system";
 import { type JanelaPerfilHook, type PropsTelaInicial, semEsperar } from "@estudos/ui";
@@ -29,6 +31,9 @@ import { custoDoMapa, useMapa } from "./mapa-ponte.ts";
 import { ConteudoMateriais, custoDaVisao, formatarDolar } from "./ModalMateriais.tsx";
 import { SecaoMapa } from "./SecaoMapa.tsx";
 import { SecaoNotas, useListaNotas } from "./SecaoNotas.tsx";
+import { useCursos } from "./cursos-ponte.ts";
+import { SecaoCursos } from "./SecaoCursos.tsx";
+import { TelaGuiaCurso } from "./TelaGuiaCurso.tsx";
 
 interface Secao {
 	id: string;
@@ -43,16 +48,7 @@ export const SECOES: readonly Secao[] = [
 	{ id: "notas", nome: "Notas", icone: "book" },
 	{ id: "materiais", nome: "Materiais", icone: "paperclip" },
 	{ id: "mapa", nome: "Mapa de conteúdo", icone: "bulb" },
-	{
-		id: "cursos",
-		nome: "Cursos",
-		icone: "flag",
-		emBreve: {
-			glifo: "新",
-			titulo: "Nenhum curso ainda",
-			texto: "Planos de estudo em módulos, montados pelo guia a partir dos materiais e do mapa de conteúdo. Chegam no item 4.5.",
-		},
-	},
+	{ id: "cursos", nome: "Cursos", icone: "flag" },
 	{
 		id: "aulas",
 		nome: "Aulas",
@@ -169,6 +165,17 @@ export function descreverEvento(evento: Evento): { icone: IconName; texto: strin
 		}
 		case "revisou_mapa":
 			return { icone: "bulb", texto: "Mapa revisado" };
+		case "montou_mapa_do_tema": {
+			const tema = typeof resultado.tema === "string" ? resultado.tema : "do curso";
+			const novos = typeof resultado.novos === "number" ? resultado.novos : undefined;
+			const custo = typeof resultado.custo === "number" && resultado.custo > 0 ? formatarDolar(resultado.custo) : "";
+			const detalhe = [novos !== undefined ? `${novos} ${novos === 1 ? "conceito" : "conceitos"}` : "", custo].filter(Boolean).join(" · ");
+			return { icone: "bulb", texto: `Mapa montado a partir do tema ${tema}`, ...(detalhe ? { detalhe } : {}) };
+		}
+		case "comecou_curso":
+			return { icone: "flag", texto: `Curso começado: ${typeof resultado.nome === "string" ? resultado.nome : String(evento.objeto.curso ?? "um curso")}` };
+		case "descartou_curso":
+			return { icone: "close", texto: `Rascunho descartado: ${typeof resultado.nome === "string" ? resultado.nome : String(evento.objeto.curso ?? "um curso")}` };
 		case "aprovou_mapa": {
 			const conceitos = typeof resultado.conceitos === "number" ? resultado.conceitos : undefined;
 			return {
@@ -203,6 +210,8 @@ export interface PropsTelaCaderno extends PropsTelaInicial {
 	nota?: string;
 	/** O arquivo em destaque na seção Materiais (vindo de uma menção numa nota). */
 	material?: string;
+	/** O guia de criação de curso: sem curso, o de um curso novo; a etapa vem da rota. */
+	guia?: { curso?: string; etapa?: string };
 }
 
 export function TelaCaderno(props: PropsTelaCaderno) {
@@ -238,6 +247,9 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 	const notas = useListaNotas(props.janela, materiaId, `${secao.id}/${props.nota ?? ""}`);
 	// O mapa de conteúdo (a contagem do índice e a seção).
 	const mapa = useMapa(props.janela, materiaId);
+	// Os cursos (a contagem do índice, a seção e o guia); de novo ao trocar de tela (voltar do guia traz a lista nova).
+	const guia = props.guia;
+	const cursos = useCursos(props.janela, materiaId, `${secao.id}/${guia ? (guia.curso ?? "novo") : ""}`);
 	// Os títulos para as menções do editor (o mesmo array enquanto a lista não muda).
 	const titulosNotas = useMemo(() => notas?.notas.map((nota) => nota.titulo), [notas]);
 	// Os arquivos de material para as menções do editor (só os desta matéria).
@@ -259,6 +271,7 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 		materiais: materiais?.length,
 		notas: notas?.notas.length,
 		mapa: mapa.mapa ? contarMapa(mapa.mapa).dentro : undefined,
+		cursos: cursos.lista?.length,
 	};
 	const voltar = () => props.navegar("");
 	// A conversa da matéria: a mais recente dela, ou uma nova com o contexto do caderno.
@@ -298,6 +311,20 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 						{erro}
 					</EmptyState>
 				</div>
+			) : guia ? (
+				<TelaGuiaCurso
+					key={guia.curso ?? "novo"}
+					janela={props.janela}
+					materiaId={materiaId}
+					{...(materia ? { materia } : {})}
+					{...(guia.curso ? { cursoId: guia.curso } : {})}
+					{...(guia.etapa ? { etapa: guia.etapa } : {})}
+					mapa={mapa}
+					cursos={cursos}
+					{...(materiais ? { materiais } : {})}
+					navegar={props.navegar}
+					tom={tom}
+				/>
 			) : (
 				<div className="caderno">
 					<nav className="caderno__indice" aria-label="Seções do caderno">
@@ -366,6 +393,14 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 								</EmptyState>
 							) : secao.id === "notas" ? (
 								<SecaoNotas janela={props.janela} materiaId={materiaId} {...(notas ? { lista: notas } : {})} tom={tom} abrirNota={abrirNota} />
+							) : secao.id === "cursos" ? (
+								<SecaoCursos
+									cursos={cursos}
+									{...(materia ? { materia } : {})}
+									tom={tom}
+									novoCurso={() => props.navegar(`caderno/${materiaId}/cursos/novo`)}
+									continuar={(curso) => props.navegar(`caderno/${materiaId}/cursos/${curso.id}/guia`)}
+								/>
 							) : secao.id === "mapa" ? (
 								<SecaoMapa
 									mapa={mapa}

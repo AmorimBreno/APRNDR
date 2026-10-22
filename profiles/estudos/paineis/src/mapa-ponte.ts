@@ -25,6 +25,7 @@ import {
 	type PendenteMapa,
 	type Referencia,
 } from "../../lib/mapa-tipos.ts";
+import type { TipoCurso } from "../../lib/curso-tipos.ts";
 import { formatarDolar } from "./ModalMateriais.tsx";
 
 export { PAINEL_MAPA };
@@ -212,7 +213,10 @@ export interface MapaDaMateria {
 	/** Sem arquivos, todos os pendentes. */
 	mapear(arquivos?: string[]): void;
 	refazer(): void;
+	/** Para o mapeamento em andamento (ou o mapa do tema) e esvazia a fila. */
 	cancelar(): void;
+	/** Monta o mapa a partir do tema de um curso (docs/cursos.md): tema = o nome do curso; tipo e motivo vêm do Objetivo. */
+	doTema(tema: string, tipo?: TipoCurso, motivo?: string): void;
 }
 
 /**
@@ -282,5 +286,7 @@ export function useMapa(janela: JanelaPerfilHook, materiaId: string): MapaDaMate
 		mapear: (arquivos) => mandar("mapear", { materia: materiaId, ...(arquivos ? { arquivos } : {}) }),
 		refazer: () => mandar("refazer", { materia: materiaId }),
 		cancelar: () => mandar("cancelar", { materia: materiaId }),
+		doTema: (tema, tipo, motivo) =>
+			mandar("do_tema", { materia: materiaId, pedido: crypto.randomUUID(), tema, ...(tipo ? { tipo } : {}), ...(motivo?.trim() ? { motivo: motivo.trim() } : {}) }),
 	};
 }

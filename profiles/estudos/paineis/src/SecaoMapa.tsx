@@ -10,8 +10,13 @@
 // Refazer e Aprovar, o mapeamento em andamento (com Parar) ou os arquivos
 // pendentes (com Mapear), a lista numerada, "Conceito novo" e, fechada no
 // começo, "Fora do mapa".
+//
+// As peças (os avisos, o andamento, a lista, "Conceito novo" e "Fora do
+// mapa") são exportadas: a etapa Mapa do guia de criação de curso
+// (TelaGuiaCurso.tsx) monta a mesma lista, com uma caixa de marcar em cada
+// conceito de dentro (o modo de seleção da ListaConceitos).
 
-import { Button, Callout, EmptyState, Icon, Modal, pad2, Tag, type Tone } from "@estudos/design-system";
+import { Button, Callout, Checkbox, EmptyState, Icon, Modal, pad2, Tag, type Tone } from "@estudos/design-system";
 import { MenuSuspenso } from "@estudos/ui";
 import { AnimatePresence, motion, Reorder, useDragControls } from "motion/react";
 import { type KeyboardEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -47,35 +52,75 @@ export interface PropsSecaoMapa {
 	abrirMaterial(arquivo: string): void;
 }
 
-export function SecaoMapa(props: PropsSecaoMapa) {
-	const { estado, mapa, erros } = props.mapa;
-	// Um id por abertura da seção: a extensão grava um evento revisou_mapa por edicao.
+/** Um id por abertura (da seção ou da etapa do guia): a extensão grava um evento revisou_mapa por edicao. */
+export function useOperarMapa(mapa: MapaDaMateria): (operacoes: Operacao[]) => void {
 	const [edicao] = useState(() => crypto.randomUUID());
-	const operar = (operacoes: Operacao[]) => props.mapa.operar(edicao, operacoes);
-	const [confirmarRefazer, setConfirmarRefazer] = useState(false);
-	const [verFora, setVerFora] = useState(false);
+	return (operacoes) => mapa.operar(edicao, operacoes);
+}
 
-	const avisos = erros.length ? (
-		<div className="mapa__erros">
-			<AnimatePresence initial={false}>
-				{erros.map((erro) => (
-					<motion.div key={erro.chave} initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }} transition={MOLA}>
-						<Callout tone="amber" label="Não deu certo" icon="alert">
-							<p>
-								{erro.mensagem}
-								{erro.arquivo && !erro.mensagem.includes(erro.arquivo) ? ` (${erro.arquivo})` : ""}
-							</p>
-							<div className="mapa__botoes">
-								<Button variant="secondary" size="sm" icon="close" onClick={() => props.mapa.fecharErro(erro.chave)}>
-									Fechar
-								</Button>
-							</div>
-						</Callout>
-					</motion.div>
-				))}
-			</AnimatePresence>
-		</div>
-	) : null;
+/**
+ * O que o mapa está fazendo: montando os conceitos do tema (com Parar), o
+ * mapeamento em andamento (com Parar) ou os arquivos pendentes (com Mapear).
+ * `tema` é o nome em "Montando os conceitos de <tema>…".
+ */
+export function ProgressoMapa({ mapa, tema }: { mapa: MapaDaMateria; tema?: string }) {
+	const estado = mapa.estado;
+	if (!estado) return null;
+	const andamento = estado.andamento;
+	const pendentes = estado.pendentes;
+	if (estado.montandoTema) {
+		return (
+			<Callout tone="steel" label="Montando" icon="bulb" quote={false}>
+				<p>{tema ? `Montando os conceitos de ${tema}…` : "Montando os conceitos do tema…"}</p>
+				<div className="mapa__botoes">
+					<Button variant="ghost" size="sm" icon="stop" onClick={mapa.cancelar}>
+						Parar
+					</Button>
+				</div>
+			</Callout>
+		);
+	}
+	if (andamento) {
+		const { texto, fila } = textoAndamento(andamento, estado.fila);
+		return (
+			<Callout tone="steel" label="Mapeando" icon="bulb" quote={false}>
+				<p>
+					{texto}
+					{fila ? <span className="mapa__fila"> {fila}</span> : null}
+				</p>
+				<span className="mapa__barra" aria-hidden="true">
+					<motion.span initial={false} animate={{ width: `${Math.round(progressoAndamento(andamento) * 100)}%` }} transition={{ type: "spring", stiffness: 200, damping: 30 }} />
+				</span>
+				<div className="mapa__botoes">
+					<Button variant="ghost" size="sm" icon="stop" onClick={mapa.cancelar}>
+						Parar
+					</Button>
+				</div>
+			</Callout>
+		);
+	}
+	if (pendentes.length > 0) {
+		return (
+			<Callout tone="cream" label="Para mapear" icon="file" quote={false}>
+				<p>{textoPendentes(pendentes)}</p>
+				<p className="body-sm mapa__pendentes">{pendentes.map((pendente) => pendente.arquivo).join(" · ")}</p>
+				<div className="mapa__botoes">
+					<Button variant="secondary" size="sm" icon="bulb" onClick={() => mapa.mapear()}>
+						Mapear
+					</Button>
+				</div>
+			</Callout>
+		);
+	}
+	return null;
+}
+
+export function SecaoMapa(props: PropsSecaoMapa) {
+	const { estado, mapa } = props.mapa;
+	const operar = useOperarMapa(props.mapa);
+	const [confirmarRefazer, setConfirmarRefazer] = useState(false);
+
+	const avisos = <AvisosMapa mapa={props.mapa} />;
 
 	if (!estado || !mapa) {
 		return (
@@ -90,7 +135,7 @@ export function SecaoMapa(props: PropsSecaoMapa) {
 	const andamento = estado.andamento;
 	const mapeando = Boolean(andamento) || estado.fila.length > 0;
 	const pendentes = estado.pendentes;
-	const vazio = mapa.conceitos.length === 0 && pendentes.length === 0 && !mapeando;
+	const vazio = mapa.conceitos.length === 0 && pendentes.length === 0 && !mapeando && !estado.montandoTema;
 
 	if (vazio) {
 		return (
@@ -117,7 +162,6 @@ export function SecaoMapa(props: PropsSecaoMapa) {
 	const custo = custoDoMapa(mapa);
 	const porQueNaoAprova =
 		mapa.situacao === "aprovado" ? "O mapa já está aprovado." : contas.dentro === 0 ? "Traga ou escreva pelo menos um conceito antes de aprovar." : mapeando ? "Espere o mapeamento terminar." : undefined;
-	const fora = mapa.conceitos.filter((conceito) => conceito.fora);
 
 	return (
 		<div className="mapa">
@@ -139,82 +183,11 @@ export function SecaoMapa(props: PropsSecaoMapa) {
 				</span>
 			</div>
 
-			{andamento ? (
-				<Callout tone="steel" label="Mapeando" icon="bulb" quote={false}>
-					{(() => {
-						const { texto, fila } = textoAndamento(andamento, estado.fila);
-						return (
-							<p>
-								{texto}
-								{fila ? <span className="mapa__fila"> {fila}</span> : null}
-							</p>
-						);
-					})()}
-					<span className="mapa__barra" aria-hidden="true">
-						<motion.span initial={false} animate={{ width: `${Math.round(progressoAndamento(andamento) * 100)}%` }} transition={{ type: "spring", stiffness: 200, damping: 30 }} />
-					</span>
-					<div className="mapa__botoes">
-						<Button variant="ghost" size="sm" icon="stop" onClick={props.mapa.cancelar}>
-							Parar
-						</Button>
-					</div>
-				</Callout>
-			) : pendentes.length > 0 ? (
-				<Callout tone="cream" label="Para mapear" icon="file" quote={false}>
-					<p>{textoPendentes(pendentes)}</p>
-					<p className="body-sm mapa__pendentes">{pendentes.map((pendente) => pendente.arquivo).join(" · ")}</p>
-					<div className="mapa__botoes">
-						<Button variant="secondary" size="sm" icon="bulb" onClick={() => props.mapa.mapear()}>
-							Mapear
-						</Button>
-					</div>
-				</Callout>
-			) : null}
+			<ProgressoMapa mapa={props.mapa} />
 
 			<ListaConceitos conceitos={mapa.conceitos} operar={operar} abrirMaterial={props.abrirMaterial} />
 			<ConceitoNovo adicionar={(nome, descricao) => operar([{ tipo: "adicionar", id: novoIdConceito(), nome, ...(descricao ? { descricao } : {}) }])} />
-
-			{fora.length > 0 ? (
-				<section className="mapa__fora">
-					<button type="button" className="mapa__fora-cabeca" aria-expanded={verFora} onClick={() => setVerFora((valor) => !valor)}>
-						<span className="overline">Fora do mapa ({fora.length})</span>
-						<motion.span className="mapa__seta" animate={{ rotate: verFora ? 90 : 0 }} transition={{ type: "spring", stiffness: 500, damping: 30 }}>
-							<Icon name="chevron-right" size={16} strokeWidth={2.5} />
-						</motion.span>
-					</button>
-					<AnimatePresence initial={false}>
-						{verFora ? (
-							<motion.div
-								key="fora"
-								className="mapa__dobra"
-								initial={{ height: 0, opacity: 0 }}
-								animate={{ height: "auto", opacity: 1 }}
-								exit={{ height: 0, opacity: 0 }}
-								transition={{ type: "spring", stiffness: 420, damping: 38 }}
-							>
-								<ul className="mapa__fora-lista">
-									{fora.map((conceito) => (
-										<li key={conceito.id} className="mapa__fora-item">
-											<span className="mapa__fora-texto">
-												<span className="body-strong">{conceito.nome}</span>
-												{conceito.descricao ? <span className="body-sm mapa__descricao-fora">{conceito.descricao}</span> : null}
-											</span>
-											<Button variant="ghost" size="sm" onClick={() => operar([{ tipo: "trazer", id: conceito.id }])}>
-												Trazer de volta
-											</Button>
-											{conceito.origem === "usuario" ? (
-												<Button variant="danger" size="sm" onClick={() => operar([{ tipo: "apagar", id: conceito.id }])}>
-													Apagar
-												</Button>
-											) : null}
-										</li>
-									))}
-								</ul>
-							</motion.div>
-						) : null}
-					</AnimatePresence>
-				</section>
-			) : null}
+			<ForaDoMapa conceitos={mapa.conceitos} operar={operar} />
 
 			<Modal
 				open={confirmarRefazer}
@@ -250,8 +223,95 @@ export function SecaoMapa(props: PropsSecaoMapa) {
 	);
 }
 
+/** Os erros da extensão do mapa, cada um com Fechar. */
+export function AvisosMapa({ mapa }: { mapa: MapaDaMateria }) {
+	if (!mapa.erros.length) return null;
+	return (
+		<div className="mapa__erros">
+			<AnimatePresence initial={false}>
+				{mapa.erros.map((erro) => (
+					<motion.div key={erro.chave} initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }} transition={MOLA}>
+						<Callout tone="amber" label="Não deu certo" icon="alert">
+							<p>
+								{erro.mensagem}
+								{erro.arquivo && !erro.mensagem.includes(erro.arquivo) ? ` (${erro.arquivo})` : ""}
+							</p>
+							<div className="mapa__botoes">
+								<Button variant="secondary" size="sm" icon="close" onClick={() => mapa.fecharErro(erro.chave)}>
+									Fechar
+								</Button>
+							</div>
+						</Callout>
+					</motion.div>
+				))}
+			</AnimatePresence>
+		</div>
+	);
+}
+
+/** "Fora do mapa": fechada no começo; cada conceito volta com "Trazer de volta", e o escrito à mão ou vindo do tema pode ser apagado. */
+export function ForaDoMapa(props: { conceitos: Conceito[]; operar(operacoes: Operacao[]): void }) {
+	const [verFora, setVerFora] = useState(false);
+	const fora = props.conceitos.filter((conceito) => conceito.fora);
+	if (fora.length === 0) return null;
+	return (
+		<section className="mapa__fora">
+			<button type="button" className="mapa__fora-cabeca" aria-expanded={verFora} onClick={() => setVerFora((valor) => !valor)}>
+				<span className="overline">Fora do mapa ({fora.length})</span>
+				<motion.span className="mapa__seta" animate={{ rotate: verFora ? 90 : 0 }} transition={{ type: "spring", stiffness: 500, damping: 30 }}>
+					<Icon name="chevron-right" size={16} strokeWidth={2.5} />
+				</motion.span>
+			</button>
+			<AnimatePresence initial={false}>
+				{verFora ? (
+					<motion.div
+						key="fora"
+						className="mapa__dobra"
+						initial={{ height: 0, opacity: 0 }}
+						animate={{ height: "auto", opacity: 1 }}
+						exit={{ height: 0, opacity: 0 }}
+						transition={{ type: "spring", stiffness: 420, damping: 38 }}
+					>
+						<ul className="mapa__fora-lista">
+							{fora.map((conceito) => (
+								<li key={conceito.id} className="mapa__fora-item">
+									<span className="mapa__fora-texto">
+										<span className="body-strong">{conceito.nome}</span>
+										{conceito.descricao ? <span className="body-sm mapa__descricao-fora">{conceito.descricao}</span> : null}
+									</span>
+									<Button variant="ghost" size="sm" onClick={() => props.operar([{ tipo: "trazer", id: conceito.id }])}>
+										Trazer de volta
+									</Button>
+									{conceito.origem === "usuario" || conceito.origem === "tema" ? (
+										<Button variant="danger" size="sm" onClick={() => props.operar([{ tipo: "apagar", id: conceito.id }])}>
+											Apagar
+										</Button>
+									) : null}
+								</li>
+							))}
+						</ul>
+					</motion.div>
+				) : null}
+			</AnimatePresence>
+		</section>
+	);
+}
+
+/** O modo de seleção da lista (a etapa Mapa do guia de curso): uma caixa de marcar antes do número de cada conceito de dentro. */
+export interface SelecaoConceitos {
+	marcados: ReadonlySet<string>;
+	alternar(id: string): void;
+}
+
+export interface PropsListaConceitos {
+	conceitos: Conceito[];
+	operar(operacoes: Operacao[]): void;
+	abrirMaterial(arquivo: string): void;
+	selecao?: SelecaoConceitos;
+}
+
 /** Os conceitos de dentro, numerados, que mudam de ordem arrastando pela grade. */
-function ListaConceitos(props: { conceitos: Conceito[]; operar(operacoes: Operacao[]): void; abrirMaterial(arquivo: string): void }) {
+export function ListaConceitos(props: PropsListaConceitos) {
 	const dentro = props.conceitos.filter((conceito) => !conceito.fora);
 	const ids = dentro.map((conceito) => conceito.id);
 	const porId = new Map(dentro.map((conceito) => [conceito.id, conceito]));
@@ -292,6 +352,7 @@ function ListaConceitos(props: { conceitos: Conceito[]; operar(operacoes: Operac
 					soltar={() => soltar(id)}
 					mover={(direcao) => mover(id, direcao)}
 					abrirMaterial={props.abrirMaterial}
+					{...(props.selecao ? { selecao: props.selecao } : {})}
 				/>
 			))}
 		</Reorder.Group>
@@ -307,6 +368,7 @@ interface PropsLinha {
 	soltar(): void;
 	mover(direcao: "subir" | "descer"): void;
 	abrirMaterial(arquivo: string): void;
+	selecao?: SelecaoConceitos;
 }
 
 /** Espaço entre a etiqueta e o "+N" (o gap de .mapa__ref). */
@@ -401,6 +463,8 @@ function LinhaConceito(props: PropsLinha) {
 		props.operar([campo === "nome" ? { tipo: "editar", id: conceito.id, nome: valor } : { tipo: "editar", id: conceito.id, descricao: valor }]);
 	const referencias = agruparReferencias(conceito.referencias);
 	const semOrigem = semFonte(conceito);
+	const doTema = conceito.origem === "tema";
+	const selecao = props.selecao;
 	return (
 		<Reorder.Item
 			value={conceito.id}
@@ -413,7 +477,7 @@ function LinhaConceito(props: PropsLinha) {
 				props.soltar();
 			}}
 			transition={MOLA}
-			className={`mapa__conceito${arrastando ? " mapa__conceito--arrastando" : ""}`}
+			className={`mapa__conceito${selecao ? " mapa__conceito--selecao" : ""}${arrastando ? " mapa__conceito--arrastando" : ""}`}
 		>
 			<span
 				className="mapa__alca"
@@ -426,6 +490,14 @@ function LinhaConceito(props: PropsLinha) {
 			>
 				<span className="mapa__pontos" />
 			</span>
+			{selecao ? (
+				<Checkbox
+					className="mapa__marcar"
+					checked={selecao.marcados.has(conceito.id)}
+					onChange={() => selecao.alternar(conceito.id)}
+					label={<span className="ap-visually-hidden">{`${conceito.nome} neste curso`}</span>}
+				/>
+			) : null}
 			<span className="data mapa__numero">{pad2(props.numero)}</span>
 			<div className="mapa__texto">
 				<CampoNoLugar
@@ -443,8 +515,13 @@ function LinhaConceito(props: PropsLinha) {
 					longo
 					salvar={(valor) => editar("descricao", valor)}
 				/>
-				{referencias.length || conceito.novo || semOrigem ? (
+				{referencias.length || conceito.novo || semOrigem || doTema ? (
 					<div className="mapa__marcas">
+						{doTema ? (
+							<Tag size="sm" tone="outline" title="Veio do mapa montado a partir do tema de um curso.">
+								Do tema
+							</Tag>
+						) : null}
 						{referencias.map((referencia) => (
 							<EtiquetaReferencia
 								key={referencia.arquivo}
@@ -587,7 +664,7 @@ function CampoNoLugar(props: PropsCampo) {
 }
 
 /** "Conceito novo": a linha com o nome e a descrição; Enter adiciona no fim, Esc fecha. */
-function ConceitoNovo(props: { adicionar(nome: string, descricao: string): void }) {
+export function ConceitoNovo(props: { adicionar(nome: string, descricao: string): void }) {
 	const [aberto, setAberto] = useState(false);
 	const [nome, setNome] = useState("");
 	const [descricao, setDescricao] = useState("");

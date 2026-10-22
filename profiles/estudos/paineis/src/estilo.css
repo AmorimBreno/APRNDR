@@ -497,12 +497,16 @@
 .guia__trilho .ap-step__label { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .guia__corpo { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-6) var(--space-8) var(--space-8); scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
 .guia__coluna { display: flex; flex-direction: column; gap: var(--space-6); max-width: var(--measure-read); margin: 0 auto; }
+/* A etapa Mapa usa a folha inteira, como a lista da seção Mapa de conteúdo (a descrição vai até a prioridade). */
+.guia__coluna--larga { max-width: none; }
 .guia__coluna > .ap-callout, .guia__mapa .ap-callout { margin: 0; }
 .guia__coluna .ap-empty { background: var(--surface-raised); }
 .guia__texto { margin: 0; color: var(--ink-muted); }
 .guia__grupo { display: flex; flex-direction: column; gap: var(--space-3); }
-.guia__data { max-width: 240px; padding-left: 32px; }
-.guia__horas { max-width: 160px; }
+/* Os campos curtos ficam estreitos, mas a ajuda e o erro usam a largura da coluna. */
+.guia__data { padding-left: 32px; }
+.guia__data .ap-input { max-width: 240px; }
+.guia__horas .ap-input { max-width: 160px; }
 .guia__mapa { max-width: none; }
 .guia__selecao { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-4); }
 .guia__selecao-conta { color: var(--ink-muted); }

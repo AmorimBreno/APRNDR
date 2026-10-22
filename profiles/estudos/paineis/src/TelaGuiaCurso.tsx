@@ -49,7 +49,6 @@ import {
 	OPCOES_TIPO,
 	podeAbrir,
 	processando,
-	prontosDaTela,
 	provasFuturas,
 	rotuloDaProva,
 	textoPrimarioMapa,
@@ -91,10 +90,18 @@ type ErrosBasico = Partial<Record<"nome" | "prazo" | "horas", string>>;
 
 export function TelaGuiaCurso(props: PropsGuiaCurso) {
 	const { materiaId, mapa } = props;
-	const { curso, erro: erroAbrir, confirmar } = useCurso(props.janela, materiaId, props.cursoId);
+	const { curso, erro: erroAbrir, prontos, pedirProntos, confirmar } = useCurso(props.janela, materiaId, props.cursoId);
 	const provas = useMemo(() => provasFuturas(props.materia, new Date()), [props.materia]);
 	const vista = etapaEmVista(curso, props.etapa);
 	const materiais = props.materiais ?? [];
+	// Mudou quantos materiais prontos a matéria tem: pede de novo os prontos (com o hash) à extensão (só a contagem importa).
+	const quantosProntos = materiais.filter((material) => material.estado === "pronto").length;
+	const prontosAntes = useRef(quantosProntos);
+	useEffect(() => {
+		if (prontosAntes.current === quantosProntos) return;
+		prontosAntes.current = quantosProntos;
+		pedirProntos();
+	}, [quantosProntos]);
 	const operar = useOperarMapa(mapa);
 	const irPara = (etapa: Etapa) => (curso ? props.navegar(caminhoDoGuia(materiaId, curso.id, etapa)) : undefined);
 	const voltarAosCursos = () => props.navegar(`caderno/${materiaId}/cursos`);
@@ -218,8 +225,8 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 				}
 				confirmarComAviso("basico", limpo, limpo);
 			} else if (vista === "materiais" && curso) {
-				// A extensão monta a lista com os prontos; a tela compara com o que ela consegue ver.
-				confirmarComAviso("materiais", {}, { arquivos: prontosDaTela(materiais, mapa.estado, curso.materiais?.arquivos) });
+				// A extensão monta a lista com os prontos do disco; o aviso compara com os prontos que ela mandou com o curso.
+				confirmarComAviso("materiais", {}, prontos ? { arquivos: prontos } : (curso.materiais ?? { arquivos: [] }));
 			} else if (vista === "objetivo" && curso) {
 				const limpo = validarEtapa("objetivo", objetivo, { curso });
 				confirmarComAviso("objetivo", limpo, limpo);
@@ -374,7 +381,7 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 			const semMaterial = !curso.materiais?.arquivos.length;
 			const vazio = mapaVisto.conceitos.length === 0 && estadoMapa.pendentes.length === 0 && !estadoMapa.andamento && estadoMapa.fila.length === 0 && !estadoMapa.montandoTema;
 			const doTema = vazio && semMaterial && curso.objetivo?.escopo === "livre";
-			const mudaram = Boolean(curso.materiais) && materiaisMudaram(curso, prontosDaTela(materiais, estadoMapa, curso.materiais?.arquivos));
+			const mudaram = Boolean(curso.materiais && prontos) && materiaisMudaram(curso, prontos ?? []);
 			const sairam = conceitosForaDoMapa(curso, estadoMapa.mapa).length;
 			const alternar = (id: string) => {
 				setDesmarcados((atuais) => {
@@ -497,7 +504,7 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 				</header>
 				<TrilhoGuia curso={curso} vista={vista} abrir={irPara} />
 				<div className="guia__corpo">
-					<motion.div key={`${vista}|${curso?.id ?? "novo"}`} className="guia__coluna" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} transition={MOLA}>
+					<motion.div key={`${vista}|${curso?.id ?? "novo"}`} className={`guia__coluna${vista === "mapa" ? " guia__coluna--larga" : ""}`} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} transition={MOLA}>
 						{erro ? (
 							<Callout tone="amber" label="Não deu certo" icon="alert" quote={false}>
 								<p>{erro}</p>

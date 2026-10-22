@@ -76,11 +76,12 @@ Tela → extensão (`interface:acao`, painel `cursos`):
 - `comecar {materia, pedido, basico: {nome, prazo, prova?, horasPorSemana}}`: cria o rascunho com Básico já confirmado
 - `confirmar {materia, curso, pedido, etapa, dados}`: `dados` é o conteúdo da etapa; para `basico`, inclui `nome` (o nome do curso pode mudar; o id não muda)
 - `descartar {materia, curso, pedido}`
+- `prontos {materia, curso}`: manda de novo o curso com os materiais prontos de agora; a tela pede quando muda quantos materiais prontos a matéria tem
 
 Extensão → tela (`interface:mostrar`, sempre `gravar: false`):
 
 - `lista {materia, cursos: [{id, nome, situacao, etapa, prazo, alteradoEm}]}`
-- `curso {materia, curso, invalidadas?, pedido?}`: o curso.json inteiro, depois de abrir, começar ou confirmar; `invalidadas` são as etapas que a confirmação apagou
+- `curso {materia, curso, invalidadas?, pedido?, prontos?}`: o curso.json inteiro, depois de abrir, começar, confirmar ou `prontos`; `invalidadas` são as etapas que a confirmação apagou; `prontos` são os materiais prontos da matéria agora (`[{arquivo, hash}]` dos manifestos do `.extraido`, em ordem de caminho), que a tela compara com a etapa Materiais para avisar que eles mudaram
 - `descartado {materia, curso, pedido}`
 - `erro {mensagem, ao?, materia?, curso?, pedido?}`
 

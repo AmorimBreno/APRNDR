@@ -3,11 +3,13 @@
 // invalida) e o disco ficam em ../lib/curso-tipos.ts e ../lib/cursos.ts; aqui
 // ficam:
 // - a ponte com a tela (painel "cursos", docs/ponte-de-eventos.md): listar,
-//   abrir, comecar, confirmar e descartar; a extensão responde com "lista",
+//   abrir, comecar, confirmar, descartar e prontos; a extensão responde com "lista",
 //   "curso", "descartado" e "erro", sempre passageiros (gravar: false). Uma
 //   trava por matéria para todo ler-mudar-gravar dos cursos. Na etapa
 //   Materiais, a lista de arquivos é a dos materiais prontos na hora
-//   (materiaisProntos): o que a tela mandar é ignorado;
+//   (materiaisProntos): o que a tela mandar é ignorado; toda mensagem "curso"
+//   leva os materiais prontos de agora (prontos), para a tela avisar quando
+//   eles mudaram desde a etapa Materiais;
 // - a ferramenta só de leitura do professor, ler_curso. Numa conversa de
 //   caderno, ela fica na matéria da conversa.
 import { stat } from "node:fs/promises";
@@ -39,7 +41,7 @@ import { materiaDaConversa } from "./notas.ts";
 /** Até quantos caracteres ler_curso devolve de uma vez. */
 const LIMITE_LEITURA = 40_000;
 
-const ACOES: ReadonlyArray<keyof AcoesCursos> = ["listar", "abrir", "comecar", "confirmar", "descartar"];
+const ACOES: ReadonlyArray<keyof AcoesCursos> = ["listar", "abrir", "comecar", "confirmar", "descartar", "prontos"];
 
 interface DadosAcao {
 	materia?: unknown;
@@ -56,6 +58,7 @@ const FRASES: Record<keyof AcoesCursos | "ler", string> = {
 	comecar: "começar o curso",
 	confirmar: "confirmar a etapa do curso",
 	descartar: "descartar o curso",
+	prontos: "ler os materiais prontos",
 	ler: "ler o curso",
 };
 
@@ -206,7 +209,7 @@ export default function cursos(pi: ExtensionAPI) {
 				if (ao === "comecar") {
 					await naTrava(materia, async () => {
 						const novo = await comecarCurso(dados, materia, dadosAcao.basico, daSessao());
-						mostrar("curso", { materia, curso: novo, ...comPedido });
+						mostrar("curso", { materia, curso: novo, ...comPedido, prontos: await materiaisProntos(dados, materia) });
 						await mostrarLista(dados, materia);
 					});
 					return;
@@ -215,15 +218,18 @@ export default function cursos(pi: ExtensionAPI) {
 					mostrar("erro", { mensagem: "Falta o id do curso.", ao, materia, ...comPedido });
 					return;
 				}
-				if (ao === "abrir") {
-					await naTrava(materia, async () => mostrar("curso", { materia, curso: await lerCurso(dados, materia, curso) }));
+				if (ao === "abrir" || ao === "prontos") {
+					await naTrava(materia, async () =>
+						mostrar("curso", { materia, curso: await lerCurso(dados, materia, curso), prontos: await materiaisProntos(dados, materia) }),
+					);
 				} else if (ao === "confirmar") {
 					await naTrava(materia, async () => {
 						const etapa = dadosAcao.etapa as Parameters<typeof confirmarNoDisco>[3];
 						// A foto dos materiais é a do disco na hora, nunca a que a tela mandou.
-						const entrada = etapa === "materiais" ? { arquivos: await materiaisProntos(dados, materia) } : dadosAcao.dados;
+						const prontos = await materiaisProntos(dados, materia);
+						const entrada = etapa === "materiais" ? { arquivos: prontos } : dadosAcao.dados;
 						const resultado = await confirmarNoDisco(dados, materia, curso, etapa, entrada, daSessao());
-						mostrar("curso", { materia, curso: resultado.curso, invalidadas: resultado.invalidadas, ...comPedido });
+						mostrar("curso", { materia, curso: resultado.curso, invalidadas: resultado.invalidadas, ...comPedido, prontos });
 					});
 				} else if (ao === "descartar") {
 					await naTrava(materia, async () => {

@@ -145,14 +145,36 @@ describe("ponte", () => {
 		expect(mostrados.every((mensagem) => mensagem.gravar === false)).toBe(true);
 	});
 
-	it("abrir manda o curso; um curso que não existe vira erro", async () => {
+	it("abrir manda o curso com os prontos; um curso que não existe vira erro", async () => {
 		const curso = await comecar();
 		acao("abrir", { curso: curso.id });
 		await esperar(() => recebidas("curso").length > 1);
-		expect(recebidas("curso")[1]!.dados).toEqual({ materia, curso });
+		expect(recebidas("curso")[1]!.dados).toEqual({ materia, curso, prontos: [] });
 		acao("abrir", { curso: "nao-existe" });
 		await esperar(() => recebidas("erro").length > 0);
 		expect(recebidas("erro")[0]!.dados).toMatchObject({ ao: "abrir", materia, curso: "nao-existe" });
+	});
+
+	it("prontos manda de novo o curso com os materiais prontos de agora; comecar e confirmar também levam", async () => {
+		const curso = await comecar("p-c");
+		expect(cursoDe("p-c")!.prontos).toEqual([]);
+		await extrair("aula-02.pdf", "h2");
+		await extrair("aula-01.pdf", "h1");
+		acao("prontos", { curso: curso.id });
+		await esperar(() => recebidas("curso").length > 1);
+		expect(recebidas("curso")[1]!.dados).toEqual({
+			materia,
+			curso,
+			prontos: [
+				{ arquivo: "aula-01.pdf", hash: "h1" },
+				{ arquivo: "aula-02.pdf", hash: "h2" },
+			],
+		});
+		await confirmar(curso.id, "materiais", {}, "p-m");
+		expect(cursoDe("p-m")!.prontos).toEqual(cursoDe("p-m")!.curso.materiais!.arquivos);
+		acao("prontos", { curso: "nao-existe" });
+		await esperar(() => recebidas("erro").length > 0);
+		expect(recebidas("erro")[0]!.dados).toMatchObject({ ao: "prontos", materia, curso: "nao-existe" });
 	});
 
 	it("confirma cada etapa até o Mapa: materiais do disco, e o Mapa só com o mapa aprovado", async () => {

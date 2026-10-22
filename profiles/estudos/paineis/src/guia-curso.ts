@@ -1,11 +1,10 @@
 // As partes puras do guia de criação de curso (TelaGuiaCurso.tsx) e da seção
 // Cursos do caderno (SecaoCursos.tsx): o prazo pelas provas da matéria, os
-// rótulos da lista, a seleção da etapa Mapa guardada pelos desmarcados, o
-// texto do primário do Mapa e os materiais prontos como a tela os vê.
+// rótulos da lista, a seleção da etapa Mapa guardada pelos desmarcados e o
+// texto do primário do Mapa.
 
 import type { SituacaoMaterial } from "@estudos/ui";
 import {
-	type ArquivoDoCurso,
 	type Curso,
 	type DadosObjetivo,
 	ETAPAS,
@@ -159,32 +158,6 @@ export const OPCOES_TIPO: ReadonlyArray<{ value: TipoCurso; label: string; descr
 /** Quantos materiais da pasta ainda estão na fila ou processando. */
 export const processando = (materiais: readonly SituacaoMaterial[]) =>
 	materiais.filter((material) => material.estado === "processando" || material.estado === "na_fila").length;
-
-/**
- * Os materiais prontos como a tela consegue ver ({arquivo, hash}), para o
- * aviso "os materiais mudaram" e para avisar o que confirmar Materiais
- * descarta. A tela não lê os manifestos: o hash de um arquivo vem do mapa
- * (o hash do manifesto no mapeamento) quando ele está mapeado e não está
- * pendente; senão, vale o hash que a etapa Materiais confirmou para ele (a
- * mudança aparece quando o mapeamento sai); um arquivo que o curso não tinha
- * fica com hash vazio (é um arquivo a mais de qualquer jeito).
- */
-export function prontosDaTela(
-	materiais: readonly SituacaoMaterial[],
-	estadoMapa: Pick<EstadoMapa, "mapa" | "pendentes"> | undefined,
-	confirmados: readonly ArquivoDoCurso[] | undefined,
-): ArquivoDoCurso[] {
-	const pendentes = new Set(estadoMapa?.pendentes.map((pendente) => pendente.arquivo) ?? []);
-	const antes = new Map((confirmados ?? []).map((item) => [item.arquivo, item.hash]));
-	return materiais
-		.filter((material) => material.estado === "pronto")
-		.map((material) => {
-			const mapeado = estadoMapa?.mapa.arquivos[material.nome];
-			const hash = mapeado && !pendentes.has(material.nome) ? mapeado.hash : (antes.get(material.nome) ?? "");
-			return { arquivo: material.nome, hash };
-		})
-		.sort((a, b) => a.arquivo.localeCompare(b.arquivo));
-}
 
 // --- Mapa: a seleção pelos desmarcados ---------------------------------------
 

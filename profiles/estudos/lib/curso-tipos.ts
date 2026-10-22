@@ -148,6 +148,8 @@ export interface AcoesCursos {
 	confirmar: AcaoConfirmarCurso;
 	/** Só um rascunho. */
 	descartar: { materia: string; curso: string; pedido: string };
+	/** Manda de novo o curso com os materiais prontos de agora (a tela pede quando muda quantos materiais prontos a matéria tem). */
+	prontos: { materia: string; curso: string };
 }
 
 export type AcaoCursos = keyof AcoesCursos;
@@ -165,6 +167,8 @@ export interface MensagemCurso {
 	/** As etapas que a confirmação apagou. */
 	invalidadas?: Etapa[];
 	pedido?: string;
+	/** Os materiais prontos da matéria agora ({arquivo, hash} dos manifestos do .extraido, em ordem de caminho), para a tela comparar com a etapa Materiais. */
+	prontos?: ArquivoDoCurso[];
 }
 
 /** A mensagem "descartado". */

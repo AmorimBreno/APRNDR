@@ -2,13 +2,12 @@
 // As partes puras do guia de criação de curso (guia-curso.ts): o padrão do
 // prazo pelas provas da matéria, os rótulos da lista da seção Cursos, a
 // seleção da etapa Mapa guardada pelos desmarcados (com um conceito novo
-// chegando), o texto e o motivo do primário do Mapa, os materiais prontos
-// como a tela os vê e as etapas que dá para abrir; e as linhas da linha do
-// tempo dos eventos dos cursos (descreverEvento).
+// chegando), o texto e o motivo do primário do Mapa e as etapas que dá para
+// abrir; e as linhas da linha do tempo dos eventos dos cursos (descreverEvento).
 
 import type { SituacaoMaterial } from "@estudos/ui";
 import { describe, expect, it } from "vitest";
-import { type Curso, materiaisMudaram, validarEtapa } from "../../lib/curso-tipos.ts";
+import { type Curso, validarEtapa } from "../../lib/curso-tipos.ts";
 import type { Evento } from "../../lib/eventos.ts";
 import { aplicarOperacoes, type Conceito, type MapaConteudo, mapaVazio } from "../../lib/mapa-tipos.ts";
 import {
@@ -23,7 +22,6 @@ import {
 	motivoMapaParado,
 	podeAbrir,
 	processando,
-	prontosDaTela,
 	provasFuturas,
 	rotuloCurso,
 	rotuloDaProva,
@@ -200,7 +198,7 @@ describe("a seleção da etapa Mapa", () => {
 	});
 });
 
-describe("os materiais como a tela vê", () => {
+describe("os materiais", () => {
 	const material = (nome: string, estado: SituacaoMaterial["estado"] = "pronto"): SituacaoMaterial => ({
 		caminho: `materias/x/materiais/${nome}`,
 		pasta: "materias/x/materiais",
@@ -209,32 +207,8 @@ describe("os materiais como a tela vê", () => {
 		tamanho: 10,
 	});
 
-	it("o hash vem do mapa quando o arquivo está mapeado e não pendente; senão, o confirmado", () => {
-		const estado = {
-			mapa: { ...mapaVazio(), arquivos: { "a.pdf": { hash: "novo-a", mapeadoEm: "", modelo: "", custo: 0, conceitos: 1 }, "b.pdf": { hash: "velho-b", mapeadoEm: "", modelo: "", custo: 0, conceitos: 1 } } },
-			pendentes: [{ arquivo: "b.pdf", tipo: "pdf", caracteres: 1, partes: 1, custoEstimado: null }],
-		};
-		const confirmados = [
-			{ arquivo: "a.pdf", hash: "velho-a" },
-			{ arquivo: "b.pdf", hash: "conf-b" },
-		];
-		const prontos = prontosDaTela([material("b.pdf"), material("a.pdf"), material("c.pdf"), material("d.pdf", "processando")], estado, confirmados);
-		expect(prontos).toEqual([
-			{ arquivo: "a.pdf", hash: "novo-a" },
-			{ arquivo: "b.pdf", hash: "conf-b" },
-			{ arquivo: "c.pdf", hash: "" },
-		]);
-		expect(processando([material("a.pdf"), material("d.pdf", "processando"), material("e.pdf", "na_fila")])).toBe(2);
-	});
-
-	it("sem mudança, materiaisMudaram é falso; um arquivo a mais ou remapeado é verdadeiro", () => {
-		const confirmados = [{ arquivo: "a.pdf", hash: "h-a" }];
-		const comCurso = curso({ materiais: { arquivos: confirmados } });
-		const estado = { mapa: { ...mapaVazio(), arquivos: { "a.pdf": { hash: "h-a", mapeadoEm: "", modelo: "", custo: 0, conceitos: 1 } } }, pendentes: [] };
-		expect(materiaisMudaram(comCurso, prontosDaTela([material("a.pdf")], estado, confirmados))).toBe(false);
-		expect(materiaisMudaram(comCurso, prontosDaTela([material("a.pdf"), material("b.pdf")], estado, confirmados))).toBe(true);
-		const remapeado = { ...estado, mapa: { ...estado.mapa, arquivos: { "a.pdf": { ...estado.mapa.arquivos["a.pdf"]!, hash: "h-a2" } } } };
-		expect(materiaisMudaram(comCurso, prontosDaTela([material("a.pdf")], remapeado, confirmados))).toBe(true);
+	it("conta os que ainda estão na fila ou processando", () => {
+		expect(processando([material("a.pdf"), material("d.pdf", "processando"), material("e.pdf", "na_fila"), material("f.pdf", "erro")])).toBe(2);
 	});
 });
 

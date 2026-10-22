@@ -11,6 +11,7 @@ import { type AcaoRecebida, type JanelaPerfilHook, semEsperar } from "@estudos/u
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
 	type AcoesCursos,
+	type ArquivoDoCurso,
 	type Curso,
 	type EntradaBasico,
 	type EntradasDasEtapas,
@@ -30,8 +31,10 @@ export { PAINEL_CURSOS };
 export interface LidoCursos {
 	/** A última lista, com os cursos que chegaram depois dela atualizados (ou acrescentados) e sem os descartados depois dela. */
 	lista?: ResumoCurso[];
-	/** O último curso.json de cada curso que chegou (abrir, começar ou confirmar). */
+	/** O último curso.json de cada curso que chegou (abrir, começar, confirmar ou prontos). */
 	cursos: Record<string, Curso>;
+	/** Os materiais prontos da matéria que chegaram com o último curso de cada curso. */
+	prontos: Record<string, ArquivoDoCurso[]>;
 	/** O erro da última listagem, se ele veio depois da lista. */
 	erroLista?: string;
 	/** O erro de abrir cada curso, se ele veio depois do curso. */
@@ -43,6 +46,7 @@ export function lerCursos(recebidas: readonly AcaoRecebida[], materia: string): 
 	let lista: ResumoCurso[] | undefined;
 	let erroLista: string | undefined;
 	const cursos: Record<string, Curso> = {};
+	const prontos: Record<string, ArquivoDoCurso[]> = {};
 	const errosAbrir: Record<string, string> = {};
 	for (const recebida of recebidas) {
 		if (recebida.acao === "lista") {
@@ -55,6 +59,7 @@ export function lerCursos(recebidas: readonly AcaoRecebida[], materia: string): 
 			if (!dados || dados.materia !== materia || !dados.curso) continue;
 			const curso = dados.curso;
 			cursos[curso.id] = curso;
+			if (Array.isArray(dados.prontos)) prontos[curso.id] = dados.prontos;
 			delete errosAbrir[curso.id];
 			if (lista) {
 				const resumo = resumoDoCurso(curso);
@@ -66,6 +71,7 @@ export function lerCursos(recebidas: readonly AcaoRecebida[], materia: string): 
 			const dados = recebida.dados as MensagemDescartado | undefined;
 			if (!dados || dados.materia !== materia) continue;
 			delete cursos[dados.curso];
+			delete prontos[dados.curso];
 			if (lista) lista = lista.filter((item) => item.id !== dados.curso);
 		} else if (recebida.acao === "erro") {
 			const dados = recebida.dados as MensagemErroCursos | undefined;
@@ -75,7 +81,7 @@ export function lerCursos(recebidas: readonly AcaoRecebida[], materia: string): 
 			else if (dados.ao === "abrir" && dados.curso) errosAbrir[dados.curso] = mensagem;
 		}
 	}
-	return { ...(lista ? { lista } : {}), ...(erroLista ? { erroLista } : {}), cursos, errosAbrir };
+	return { ...(lista ? { lista } : {}), ...(erroLista ? { erroLista } : {}), cursos, prontos, errosAbrir };
 }
 
 // --- A espera pelo pedido ----------------------------------------------------
@@ -230,6 +236,10 @@ export interface CursoAberto {
 	curso?: Curso;
 	/** O erro de abrir o curso (não existe, ilegível). */
 	erro?: string;
+	/** Os materiais prontos da matéria agora, como a extensão mandou com o curso; undefined até chegar. */
+	prontos?: ArquivoDoCurso[];
+	/** Pede o curso de novo com os materiais prontos de agora (quando muda quantos materiais prontos a matéria tem). */
+	pedirProntos(): void;
 	/** Confirma a etapa; resolve com a mensagem "curso" (o curso novo e as etapas invalidadas). */
 	confirmar<E extends Etapa>(etapa: E, dados: EntradasDasEtapas[E] | Record<string, never>): Promise<MensagemCurso>;
 }
@@ -248,10 +258,18 @@ export function useCurso(janela: JanelaPerfilHook, materiaId: string, cursoId: s
 	if (doServidor) ultimo.current = doServidor;
 	const curso = doServidor ?? (cursoId && ultimo.current?.id === cursoId && ultimo.current.materia === materiaId ? ultimo.current : undefined);
 	const erro = cursoId ? lido.errosAbrir[cursoId] : undefined;
+	const ultimosProntos = useRef<{ curso: string; prontos: ArquivoDoCurso[] } | undefined>(undefined);
+	const prontosDoServidor = cursoId ? lido.prontos[cursoId] : undefined;
+	if (cursoId && prontosDoServidor) ultimosProntos.current = { curso: cursoId, prontos: prontosDoServidor };
+	const prontos = prontosDoServidor ?? (cursoId && ultimosProntos.current?.curso === cursoId ? ultimosProntos.current.prontos : undefined);
 	const mandar = useMandarComPedido(janela);
 	return {
 		...(curso ? { curso } : {}),
 		...(erro ? { erro } : {}),
+		...(prontos ? { prontos } : {}),
+		pedirProntos: () => {
+			if (sessaoId && cursoId) semEsperar(acoes.acaoDaInterface(PAINEL_CURSOS, "prontos", { materia: materiaId, curso: cursoId } satisfies AcoesCursos["prontos"]));
+		},
 		confirmar: async (etapa, dados) => {
 			if (!cursoId) throw new ErroDaPonte("O curso ainda não existe: confirme o Básico primeiro.");
 			const resposta = await mandar("confirmar", { materia: materiaId, curso: cursoId, pedido: crypto.randomUUID(), etapa, dados } as AcoesCursos["confirmar"]);

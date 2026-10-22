@@ -76,6 +76,19 @@ describe("lerCursos", () => {
 		expect(lido.erroLista).toBe("Pasta ilegível.");
 	});
 
+	it("os prontos vêm com o último curso que os trouxe; um curso sem prontos não apaga os de antes", () => {
+		const lido = lerCursos(
+			[
+				recebida("curso", { materia: "calculo", curso: curso("a"), prontos: [{ arquivo: "aula-01.pdf", hash: "h1" }] }),
+				recebida("curso", { materia: "calculo", curso: curso("a") }),
+				recebida("curso", { materia: "calculo", curso: curso("b"), prontos: [] }),
+				recebida("descartado", { materia: "calculo", curso: "b", pedido: "p" }),
+			],
+			"calculo",
+		);
+		expect(lido.prontos).toEqual({ a: [{ arquivo: "aula-01.pdf", hash: "h1" }] });
+	});
+
 	it("um curso que chega depois do erro de abrir apaga o erro", () => {
 		const lido = lerCursos(
 			[recebida("erro", { materia: "calculo", ao: "abrir", curso: "a", mensagem: "Falhou." }), recebida("curso", { materia: "calculo", curso: curso("a") })],

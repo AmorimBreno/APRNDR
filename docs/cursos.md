@@ -99,3 +99,87 @@ Sem material (escopo `livre` e nenhum arquivo), a etapa Mapa oferece "Montar a p
 
 - A seção Cursos do caderno deixa de ser "em breve": a lista dos cursos da matéria (os rascunhos com a etapa onde pararam e "Continuar"; os prontos abrem a visão do curso, que chega na parte C) e "Novo curso".
 - O guia é uma tela inteira em `caderno/<matéria>/cursos/novo` (antes de existir o rascunho) e `caderno/<matéria>/cursos/<curso>/guia[/<etapa>]` (F5 volta na mesma etapa).
+
+## Parte B: o diagnóstico
+
+ESPECIFICACAO 8.3, etapa 5, e 9.2. O diagnóstico compara o que o Breno acha que sabe de cada conceito do curso com o que ele acerta: é a primeira evidência de calibração, e as questões servem como pré-teste do curso. Ele tem três fases, na mesma etapa do guia: autoavaliação, questões e resultado.
+
+### No curso.json
+
+Enquanto o diagnóstico não termina, o progresso fica em `diagnosticoEmAndamento` (a etapa `diagnostico` continua `null`, e o guia reabre na fase em que parou). "Concluir diagnóstico" confirma a etapa: o conteúdo de `diagnosticoEmAndamento` vira `diagnostico` (com `concluidoEm`) e o campo em andamento sai. Tudo o que invalida a etapa `diagnostico` (tabela acima) apaga também o `diagnosticoEmAndamento`.
+
+```json
+"diagnosticoEmAndamento": {
+	"autoavaliacao": { "c-…": 2 },
+	"questoes": [
+		{
+			"id": "q1",
+			"tipo": "alternativa",
+			"conceitos": ["c-…"],
+			"enunciado": "…",
+			"alternativas": [
+				{ "texto": "…", "correta": true },
+				{ "texto": "…", "confusao": "Confunde correlação com causalidade." }
+			],
+			"explicacao": "…"
+		},
+		{
+			"id": "q7",
+			"tipo": "dissertativa",
+			"conceitos": ["c-…"],
+			"enunciado": "…",
+			"rubrica": [{ "criterio": "Define o resíduo", "descricao": "…", "pontos": 2 }],
+			"respostaModelo": "…"
+		}
+	],
+	"geradoEm": "…", "modelo": "openrouter/openai/gpt-6.1-sol", "custo": 0.03,
+	"respostas": {
+		"q1": { "confianca": 3, "escolha": 1, "correta": false, "tempoMs": 41000, "respondidaEm": "…" },
+		"q7": {
+			"confianca": 2, "texto": "…", "tempoMs": 180000, "respondidaEm": "…",
+			"correcao": {
+				"criterios": [{ "criterio": "Define o resíduo", "trechos": ["…"], "pontos": 1, "max": 2, "justificativa": "…" }],
+				"total": 3, "max": 5, "modelo": "…", "custo": 0.01
+			}
+		}
+	}
+}
+```
+
+- `autoavaliacao`: um nível por conceito do curso: 0 = nunca vi, 1 = já ouvi falar, 2 = sei explicar, 3 = sei aplicar.
+- `questoes`: geradas de uma vez, depois da autoavaliação. Cada alternativa errada leva a `confusao` que ela representa (8.5). A ordem das alternativas é a de exibição (o modelo já embaralha; o código confere que há exatamente uma correta).
+- `respostas`: `confianca` de 1 a 4 (1 = chute, 2 = pouca, 3 = boa, 4 = certeza), marcada antes de responder; `escolha` é o índice da alternativa; `tempoMs` do momento em que a questão apareceu até a resposta.
+- `correcao` da dissertativa: uma chamada só, pela rubrica, primeiro extraindo da resposta os trechos de cada critério e só depois pontuando (8.5). As rodadas repetidas, a mediana e a concordância com a nota do Breno ficam para o item 8.
+
+### Quais conceitos entram nas questões
+
+Escolhidos pelo código, não pelo modelo: até 8 conceitos do curso. Primeiro os de prioridade alta; depois, alternando entre os níveis da autoavaliação, com pelo menos 2 dos que ele disse "sei explicar" ou "sei aplicar" quando houver (é aí que a calibração aparece). Uma questão de alternativa por conceito escolhido, até 6; dissertativas: 1 (2 no tipo teórico, com pelo menos 4 conceitos), sobre conceitos escolhidos.
+
+### O modelo
+
+`prompts/diagnostico.md` (as questões) e `prompts/corretor.md` (a dissertativa), os dois com `model: openrouter/openai/gpt-6.1-sol`, chamados pela extensão de cursos como o mapeador (temperatura 0 no corretor; uma nova tentativa com JSON inválido). A mensagem das questões leva: o nome, a descrição e a autoavaliação de cada conceito escolhido, o tipo e o escopo do curso, o motivo e, nos escopos com material, até uns 6 mil caracteres por conceito dos trechos do `.extraido` citados nas referências dele (40 mil no total). No escopo "só o material", as questões só cobram o que está nesses trechos.
+
+### Eventos
+
+No `aprendiz/eventos.jsonl` (camada 1 da seção 9.2), com `objeto` `{materia, curso, conceitos, questao?}` e `contexto` `{fase: "diagnostico", modelo?, prompt}` (prompt = o nome do arquivo de prompt e o hash dele):
+- `autoavaliou_conceito`: um por conceito quando a autoavaliação é salva (só os que mudaram); resultado `{nivel}`;
+- `respondeu_questao`: resultado `{correta, escolha, confusao?, confianca, tempoMs}`;
+- `respondeu_dissertativa`: quando a correção chega; resultado `{confianca, tempoMs, total, max, criterios: [{criterio, pontos, max}]}` e o texto em `resultado.texto`.
+
+No `eventos.jsonl` da matéria (a linha do tempo): `gerou_diagnostico` (objeto `{materia, curso}`; resultado `{questoes, custo}`) e `concluiu_diagnostico` (resultado `{acertos, alternativas, dissertativas, nota}`).
+
+### Ponte (painel "cursos")
+
+Tela → extensão:
+- `autoavaliar {materia, curso, pedido, niveis}`: salva a autoavaliação (inteira) em andamento;
+- `gerar_diagnostico {materia, curso, pedido}`: exige a autoavaliação completa; gera as questões (estado `gerandoDiagnostico: true` na mensagem `curso` enquanto isso); gerar de novo descarta as questões e as respostas anteriores;
+- `responder {materia, curso, pedido, questao, confianca, escolha?, texto?, tempoMs}`: grava a resposta; na dissertativa, corrige em seguida (a mensagem `curso` leva `corrigindo: [questao]` enquanto isso);
+- `concluir_diagnostico {materia, curso, pedido}`: exige todas as questões respondidas e corrigidas; confirma a etapa.
+
+Todas respondem com `curso`. Enquanto o diagnóstico não é concluído, a tela nunca recebe `correta`, `confusao`, `explicacao`, `respostaModelo` nem a `rubrica` de uma questão ainda sem resposta (o pré-teste não pode mostrar o gabarito antes da hora); a extensão tira esses campos da mensagem.
+
+### A tela (etapa Diagnóstico)
+
+- Autoavaliação: a lista dos conceitos do curso, cada um com os 4 níveis; "Gerar as questões" quando todos têm nível.
+- Questões, uma por vez, com o placar do QuizProgress: primeiro a confiança (1 a 4), e só então as alternativas (QuizQuestion) ou o campo (EssayAnswer); sem gabarito durante as questões.
+- Resultado: por conceito, o que ele disse e o que acertou; cada questão com o gabarito, a confusão da alternativa errada escolhida e, na dissertativa, a nota por critério com os trechos; "Concluir diagnóstico".

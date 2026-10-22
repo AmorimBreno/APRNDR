@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { lerEventos } from "../lib/eventos.ts";
 import { caminhoDoMapa, type EstadoMapa, gravarMapa, lerMapa, type MapaConteudo, mapaVazio, pastaExtraidoArquivo } from "../lib/mapa.ts";
 import { criarMateria, eventosMateria } from "../lib/materias.ts";
-import mapa, { CAMINHO_PROMPT, estimarCusto, lerPromptMapeador, lerRespostaMapeador, textoDoMapa } from "./mapa.ts";
+import mapa, { CAMINHO_PROMPT, CAMINHO_PROMPT_TEMA, estimarCusto, lerPromptMapeador, lerRespostaMapeador, lerRespostaTema, textoDoMapa } from "./mapa.ts";
 
 type Resultado = { content: Array<{ text: string }>; details: unknown; isError?: boolean };
 type Entrada = { type: string; customType?: string; data?: unknown };
@@ -35,6 +35,7 @@ let respostas: Resposta[];
 let chamadas: Pedido[];
 let credencial: boolean;
 let caminhoPrompt = "";
+let caminhoPromptTema = "";
 
 const MODELO = { provider: "teste", id: "modelo-x", cost: { input: 3, output: 15, cacheRead: 0, cacheWrite: 0 } };
 
@@ -81,6 +82,8 @@ beforeEach(async () => {
 	materia = (await criarMateria(dados, { nome: "Cálculo I" })).id;
 	caminhoPrompt = join(dados, "mapeador.md");
 	await writeFile(caminhoPrompt, "---\nmodel: teste/modelo-x\n---\nMapeie os conceitos.\n", "utf8");
+	caminhoPromptTema = join(dados, "mapa-do-tema.md");
+	await writeFile(caminhoPromptTema, "---\nmodel: teste/modelo-x\n---\nListe os conceitos do tema.\n", "utf8");
 	entradas = [];
 	respostas = [];
 	chamadas = [];
@@ -91,7 +94,7 @@ beforeEach(async () => {
 	tratadores = {};
 	mostrados = [];
 	barramento.on("interface:mostrar", (mensagem: Mostrado) => mostrados.push(mensagem));
-	mapa(piFalso(), { caminhoPrompt });
+	mapa(piFalso(), { caminhoPrompt, caminhoPromptTema });
 	tratadores.session_start?.({}, ctx);
 });
 
@@ -424,7 +427,7 @@ describe("materiais:removido", () => {
 
 describe("ciclo de vida", () => {
 	it("uma cópia sem session_start no mesmo barramento fica calada e não mapeia", async () => {
-		mapa(piFalso(false), { caminhoPrompt });
+		mapa(piFalso(false), { caminhoPrompt, caminhoPromptTema });
 		await aula();
 		respostas.push(RESPOSTA_AULA);
 		pronto("aula.pdf");
@@ -453,6 +456,130 @@ describe("ciclo de vida", () => {
 		await new Promise((resolver) => setTimeout(resolver, 30));
 		expect(await doVerbo("mapeou_material")).toHaveLength(0);
 		expect(recebidas("erro")).toHaveLength(0);
+	});
+});
+
+describe("mapa a partir do tema", () => {
+	const RESPOSTA_TEMA = JSON.stringify({
+		conceitos: [
+			{ nome: "Espaço amostral", descricao: "O conjunto dos resultados possíveis." },
+			{ nome: "LIMITE", descricao: "Repetido do mapa: não entra." },
+			{ nome: "Probabilidade condicional", descricao: "A probabilidade dado um evento." },
+		],
+	});
+	const aprovadoComLimite = () =>
+		gravarMapa(dados, materia, {
+			...mapaVazio(),
+			situacao: "aprovado",
+			aprovadoEm: "2026-10-21T00:00:00.000Z",
+			conceitos: [{ ...conceitoBase, id: "c-000000000001-aaaa", nome: "Límite", referencias: [{ arquivo: "a.pdf", local: "p1", trecho: "t1" }] }],
+		});
+	const doTema = (pedido: string, extra: Record<string, unknown> = {}) => acao("do_tema", { pedido, tema: "Probabilidade básica", tipo: "teorico", motivo: "  Passar na P1. ", ...extra });
+	const comPedido = (pedido: string) => estados().find((estado) => estado.pedido === pedido);
+
+	it("o mapa-do-tema.md do perfil diz o modelo, e a resposta é lida como {conceitos: [{nome, descricao}]}", async () => {
+		const prompt = lerPromptMapeador(await readFile(CAMINHO_PROMPT_TEMA, "utf8"), CAMINHO_PROMPT_TEMA);
+		expect(prompt.modelo).toBe("openrouter/anthropic/claude-sonnet-5.5");
+		expect(prompt.instrucoes).toContain('"conceitos"');
+		expect(lerRespostaTema('```json\n{"conceitos": [{"nome": "A"}]}\n```').conceitos).toEqual([{ nome: "A", descricao: "" }]);
+		expect(() => lerRespostaTema('{"conceitos": [{"descricao": "sem nome"}]}')).toThrow(/nome/);
+	});
+
+	it("do_tema: estado com montandoTema, fusão no fim do mapa, evento e o estado com o pedido", async () => {
+		await aprovadoComLimite();
+		const espera = adiada();
+		respostas.push(espera.resposta);
+		doTema("p1");
+		await esperar(() => chamadas.length === 1);
+		expect(ultimoEstado()).toMatchObject({ materia, montandoTema: true });
+		expect(ultimoEstado()!.pedido).toBeUndefined();
+		const mensagem = JSON.stringify(chamadas[0]!.contexto.messages[0]);
+		expect(chamadas[0]!.contexto.systemPrompt).toBe("Liste os conceitos do tema.");
+		expect(chamadas[0]!.opcoes.temperature).toBe(0);
+		expect(mensagem).toContain("Tema do curso: Probabilidade básica");
+		expect(mensagem).toContain("teórico");
+		expect(mensagem).toContain("Motivo do aluno: Passar na P1.");
+		expect(mensagem).toContain("- Límite");
+		espera.soltar(RESPOSTA_TEMA);
+		await esperar(() => comPedido("p1") !== undefined);
+		const final = comPedido("p1")!;
+		expect(final.montandoTema).toBeUndefined();
+		const gravado = await lerMapa(dados, materia);
+		expect(gravado.situacao).toBe("alterado");
+		expect(gravado.conceitos.map((conceito) => conceito.nome)).toEqual(["Límite", "Espaço amostral", "Probabilidade condicional"]);
+		expect(gravado.conceitos[1]).toMatchObject({ origem: "tema", referencias: [], prioridade: "normal", novo: true, descricao: "O conjunto dos resultados possíveis." });
+		expect(final.mapa).toEqual(gravado);
+		const [evento] = await doVerbo("montou_mapa_do_tema");
+		expect(evento).toMatchObject({ sessao: "sessao-1", objeto: { materia }, resultado: { novos: 2, custo: 0.01, tema: "Probabilidade básica" }, contexto: { modelo: "teste/modelo-x" } });
+		expect(recebidas("erro")).toHaveLength(0);
+		expect(mostrados.every((recebida) => recebida.gravar === false)).toBe(true);
+	});
+
+	it("um do_tema com outro em andamento na mesma matéria dá erro", async () => {
+		const espera = adiada();
+		respostas.push(espera.resposta);
+		doTema("p1");
+		await esperar(() => chamadas.length === 1);
+		doTema("p2");
+		await esperar(() => recebidas("erro").length > 0);
+		expect(recebidas("erro")[0]!.dados).toMatchObject({ ao: "do_tema", materia, pedido: "p2" });
+		expect(String(recebidas("erro")[0]!.dados.mensagem)).toContain("já está sendo montado");
+		espera.soltar(RESPOSTA_TEMA);
+		await esperar(() => comPedido("p1") !== undefined);
+		expect(chamadas).toHaveLength(1);
+		expect((await lerMapa(dados, materia)).conceitos).toHaveLength(3);
+	});
+
+	it("JSON inválido: tenta de novo; inválido duas vezes, erro e o mapa fica como estava", async () => {
+		respostas.push("não sei", RESPOSTA_TEMA);
+		doTema("p1");
+		await esperar(() => comPedido("p1") !== undefined);
+		expect(chamadas).toHaveLength(2);
+		expect(JSON.stringify(chamadas[1]!.contexto.messages[2])).toContain("não veio no formato");
+		expect((await doVerbo("montou_mapa_do_tema"))[0]!.resultado).toMatchObject({ novos: 3, custo: 0.02 });
+
+		respostas.push("{quebrado", '{"outra": 1}');
+		doTema("p2", { tema: "Outro tema" });
+		await esperar(() => recebidas("erro").length > 0);
+		expect(recebidas("erro")[0]!.dados).toMatchObject({ ao: "do_tema", materia, pedido: "p2" });
+		expect(String(recebidas("erro")[0]!.dados.mensagem)).toContain("segunda tentativa");
+		await esperar(() => ultimoEstado()?.montandoTema === undefined);
+		expect((await lerMapa(dados, materia)).conceitos).toHaveLength(3);
+		expect(await doVerbo("montou_mapa_do_tema")).toHaveLength(1);
+	});
+
+	it("sem credencial ou sem tema: erro claro, sem chamada", async () => {
+		credencial = false;
+		doTema("p1");
+		await esperar(() => recebidas("erro").length > 0);
+		expect(recebidas("erro")[0]!.dados).toMatchObject({ ao: "do_tema", pedido: "p1" });
+		expect(String(recebidas("erro")[0]!.dados.mensagem)).toContain("credencial");
+		await esperar(() => ultimoEstado()?.montandoTema === undefined);
+		doTema("p2", { tema: "  " });
+		await esperar(() => recebidas("erro").length > 1);
+		expect(String(recebidas("erro")[1]!.dados.mensagem)).toContain("tema");
+		expect(chamadas).toHaveLength(0);
+		await expect(readFile(caminhoDoMapa(dados, materia), "utf8")).rejects.toThrow();
+	});
+
+	it("cancelar aborta o do_tema: nada gravado, sem erro, e o estado com o pedido sem montandoTema", async () => {
+		const espera = adiada();
+		respostas.push(espera.resposta);
+		doTema("p1");
+		await esperar(() => chamadas.length === 1);
+		acao("cancelar");
+		await esperar(() => comPedido("p1") !== undefined);
+		expect(chamadas[0]!.opcoes.signal!.aborted).toBe(true);
+		expect(comPedido("p1")!.montandoTema).toBeUndefined();
+		expect(ultimoEstado()!.montandoTema).toBeUndefined();
+		expect(recebidas("erro")).toHaveLength(0);
+		expect(await doVerbo("montou_mapa_do_tema")).toHaveLength(0);
+		await expect(readFile(caminhoDoMapa(dados, materia), "utf8")).rejects.toThrow();
+		// Depois de cancelar, um novo do_tema pode começar.
+		respostas.push(RESPOSTA_TEMA);
+		doTema("p2");
+		await esperar(() => comPedido("p2") !== undefined);
+		expect((await lerMapa(dados, materia)).conceitos).toHaveLength(3);
 	});
 });
 

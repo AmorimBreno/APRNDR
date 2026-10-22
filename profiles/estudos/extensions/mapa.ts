@@ -14,8 +14,12 @@
 // - os gatilhos: "materiais:pronto" (o arquivo pendente entra na fila),
 //   "materiais:removido" (as referências saem) e os botões da tela;
 // - a ponte com a tela (painel "mapa", docs/ponte-de-eventos.md): abrir,
-//   mapear, refazer, cancelar, operar e aprovar; a extensão responde com
-//   "mapa" (o estado inteiro) e "erro", sempre passageiros (gravar: false);
+//   mapear, refazer, cancelar, operar, aprovar e do_tema; a extensão responde
+//   com "mapa" (o estado inteiro) e "erro", sempre passageiros (gravar: false);
+// - o mapa a partir do tema de um curso (do_tema, docs/cursos.md): o prompt e
+//   o modelo vêm de ../prompts/mapa-do-tema.md; a chamada vai fora da trava,
+//   como a do mapeador, e a fusão (fundirTema) dentro dela. Um por matéria;
+//   cancelar também o para;
 // - a ferramenta só de leitura do professor, ler_mapa_conteudo. Numa conversa
 //   de caderno, ela fica na matéria da conversa.
 import { readFile, stat } from "node:fs/promises";
@@ -30,6 +34,7 @@ import {
 	ErroMapa,
 	type EstadoMapa,
 	fundirResultado,
+	fundirTema,
 	gravarMapa,
 	lerMapa,
 	lerPendentes,
@@ -43,6 +48,7 @@ import {
 	pastaExtraidoArquivo,
 	type ResultadoMapeador,
 	registrarAprovacaoMapa,
+	registrarMapaDoTema,
 	registrarMapeamento,
 	registrarMaterialRemovidoDoMapa,
 	registrarRevisaoMapa,
@@ -53,11 +59,15 @@ import {
 	aprovar as aprovarMapa,
 	aplicarOperacoes,
 } from "../lib/mapa.ts";
+import { TIPOS_CURSO, type TipoCurso } from "../lib/curso-tipos.ts";
 import { arquivoMateria, ErroMaterias } from "../lib/materias.ts";
 import { materiaDaConversa } from "./notas.ts";
 
 /** O prompt do mapeador (frontmatter com o modelo e o prompt no corpo). */
 export const CAMINHO_PROMPT = join(dirname(fileURLToPath(import.meta.url)), "..", "prompts", "mapeador.md");
+
+/** O prompt do mapa a partir do tema (mesmo formato do mapeador.md). */
+export const CAMINHO_PROMPT_TEMA = join(dirname(fileURLToPath(import.meta.url)), "..", "prompts", "mapa-do-tema.md");
 
 /** Uma chamada ao modelo que demora mais que isto é desistida (o arquivo fica pendente). */
 export const TEMPO_CHAMADA_MS = 5 * 60_000;
@@ -100,7 +110,7 @@ class ErroConfiguracao extends ErroMapa {}
  * e o corpo, que é o prompt. Leitor mínimo de propósito: a extensão do perfil
  * não carrega o pi em tempo de execução (nos testes ele não é resolvido daqui).
  */
-export function lerPromptMapeador(conteudo: string): { modelo: string; instrucoes: string } {
+export function lerPromptMapeador(conteudo: string, caminho: string = CAMINHO_PROMPT): { modelo: string; instrucoes: string } {
 	const normalizado = conteudo.replace(/\r\n/g, "\n");
 	const achado = /^---\n([\s\S]*?)\n---\n?/.exec(normalizado);
 	const modelo = achado?.[1]
@@ -110,8 +120,8 @@ export function lerPromptMapeador(conteudo: string): { modelo: string; instrucoe
 		?.trim()
 		.replace(/^["']|["']$/g, "");
 	const instrucoes = (achado ? normalizado.slice(achado[0].length) : normalizado).trim();
-	if (!modelo) throw new ErroConfiguracao(`O prompt do mapeador (${CAMINHO_PROMPT}) não diz o modelo: falta "model: provedor/id" no frontmatter.`);
-	if (!instrucoes) throw new ErroConfiguracao(`O prompt do mapeador (${CAMINHO_PROMPT}) está vazio.`);
+	if (!modelo) throw new ErroConfiguracao(`O prompt ${caminho} não diz o modelo: falta "model: provedor/id" no frontmatter.`);
+	if (!instrucoes) throw new ErroConfiguracao(`O prompt ${caminho} está vazio.`);
 	return { modelo, instrucoes };
 }
 
@@ -120,9 +130,9 @@ async function lerPrompt(caminho: string): Promise<{ modelo: string; instrucoes:
 	try {
 		conteudo = await readFile(caminho, "utf8");
 	} catch (erro) {
-		throw new ErroConfiguracao(`Não consegui ler o prompt do mapeador (${caminho}): ${(erro as Error).message}`);
+		throw new ErroConfiguracao(`Não consegui ler o prompt ${caminho}: ${(erro as Error).message}`);
 	}
-	return lerPromptMapeador(conteudo);
+	return lerPromptMapeador(conteudo, caminho);
 }
 
 /** "provedor/id" (o id pode ter barras) no registro do pi; sem credencial, ErroConfiguracao. Com credencial: false, só acha (para o preço). */
@@ -166,11 +176,10 @@ export function mensagemDoMapeador(entrada: { mapa: MapaConteudo; arquivo: strin
 }
 
 /**
- * Lê a resposta do modelo como o JSON do contrato ({conceitos: [{id, nome,
- * descricao, locais}]}), tolerando ```json em volta ou texto antes e depois.
- * Fora do formato, um Error com o motivo (vai para a nova tentativa).
+ * A lista "conceitos" do objeto JSON da resposta, tolerando ```json em volta
+ * ou texto antes e depois. Fora do formato, um Error com o motivo.
  */
-export function lerRespostaMapeador(texto: string): ResultadoMapeador {
+function conceitosDaResposta(texto: string): unknown[] {
 	const bruto = texto.trim();
 	const cercado = /```(?:json)?\s*([\s\S]*?)```/i.exec(bruto)?.[1];
 	let candidato = (cercado ?? bruto).trim();
@@ -188,8 +197,17 @@ export function lerRespostaMapeador(texto: string): ResultadoMapeador {
 	}
 	const conceitos = (valor as { conceitos?: unknown } | null)?.conceitos;
 	if (typeof valor !== "object" || valor === null || !Array.isArray(conceitos)) throw new Error('falta o campo "conceitos" com uma lista');
+	return conceitos;
+}
+
+/**
+ * Lê a resposta do modelo como o JSON do contrato ({conceitos: [{id, nome,
+ * descricao, locais}]}), tolerando ```json em volta ou texto antes e depois.
+ * Fora do formato, um Error com o motivo (vai para a nova tentativa).
+ */
+export function lerRespostaMapeador(texto: string): ResultadoMapeador {
 	return {
-		conceitos: conceitos.map((item: unknown, indice) => {
+		conceitos: conceitosDaResposta(texto).map((item: unknown, indice) => {
 			const conceito = item as Record<string, unknown> | null;
 			const onde = `conceitos[${indice}]`;
 			if (typeof conceito !== "object" || conceito === null || Array.isArray(conceito)) throw new Error(`${onde} não é um objeto`);
@@ -200,6 +218,32 @@ export function lerRespostaMapeador(texto: string): ResultadoMapeador {
 			return { id: typeof conceito.id === "string" ? conceito.id : null, nome: conceito.nome, descricao: typeof conceito.descricao === "string" ? conceito.descricao : "", locais: conceito.locais as string[] };
 		}),
 	};
+}
+
+/** Lê a resposta do mapa do tema ({conceitos: [{nome, descricao}]}), como lerRespostaMapeador. */
+export function lerRespostaTema(texto: string): { conceitos: Array<{ nome: string; descricao: string }> } {
+	return {
+		conceitos: conceitosDaResposta(texto).map((item: unknown, indice) => {
+			const conceito = item as Record<string, unknown> | null;
+			const onde = `conceitos[${indice}]`;
+			if (typeof conceito !== "object" || conceito === null || Array.isArray(conceito)) throw new Error(`${onde} não é um objeto`);
+			if (typeof conceito.nome !== "string") throw new Error(`${onde} não tem "nome" em texto`);
+			if (conceito.descricao !== undefined && typeof conceito.descricao !== "string") throw new Error(`${onde} tem "descricao" que não é texto`);
+			return { nome: conceito.nome, descricao: typeof conceito.descricao === "string" ? conceito.descricao : "" };
+		}),
+	};
+}
+
+/** A mensagem do mapa do tema: o tema, o tipo e o motivo do curso e os nomes do mapa atual (para não repetir). */
+export function mensagemDoTema(entrada: { tema: string; tipo?: TipoCurso; motivo?: string; mapa: MapaConteudo }): string {
+	const tipos: Record<TipoCurso, string> = { teorico: "teórico", aplicado: "aplicado", misto: "misto (teoria e aplicação)" };
+	const nomes = entrada.mapa.conceitos.map((conceito) => `- ${conceito.nome}`);
+	return [
+		`Tema do curso: ${entrada.tema}`,
+		...(entrada.tipo ? [`Tipo do curso: ${tipos[entrada.tipo]}`] : []),
+		...(entrada.motivo ? [`Motivo do aluno: ${entrada.motivo}`] : []),
+		nomes.length ? `Mapa atual da matéria (${nomes.length} conceitos; não repita estes nomes):\n${nomes.join("\n")}` : "Mapa atual da matéria: vazio.",
+	].join("\n\n");
 }
 
 const usuario = (texto: string): Mensagem => ({ role: "user", content: [{ type: "text", text: texto }], timestamp: Date.now() });
@@ -247,14 +291,31 @@ export async function mapearParte(
 	entrada: Parameters<typeof mensagemDoMapeador>[0],
 	sinal: AbortSignal,
 ): Promise<{ resultado: ResultadoMapeador; custo: number; tentativas: number }> {
-	const mensagens: Mensagem[] = [usuario(mensagemDoMapeador(entrada))];
+	return pedirJson(registro, modelo, instrucoes, mensagemDoMapeador(entrada), lerRespostaMapeador, sinal, "O arquivo continua pendente.");
+}
+
+/**
+ * Chama o modelo com a mensagem e lê a resposta com `ler`; fora do formato,
+ * tenta uma vez de novo dizendo o erro. Falhando de novo, ErroMapa com o
+ * gasto (e `depois`, o que ficou como estava).
+ */
+async function pedirJson<T>(
+	registro: RegistroMapa,
+	modelo: Modelo,
+	instrucoes: string,
+	texto: string,
+	ler: (texto: string) => T,
+	sinal: AbortSignal,
+	depois: string,
+): Promise<{ resultado: T; custo: number; tentativas: number }> {
+	const mensagens: Mensagem[] = [usuario(texto)];
 	let custo = 0;
 	let motivo = "";
 	for (let tentativa = 1; tentativa <= 2; tentativa++) {
 		const resposta = await chamar(registro, modelo, instrucoes, mensagens, sinal);
 		custo += resposta.usage?.cost?.total ?? 0;
 		try {
-			return { resultado: lerRespostaMapeador(textoDa(resposta)), custo, tentativas: tentativa };
+			return { resultado: ler(textoDa(resposta)), custo, tentativas: tentativa };
 		} catch (erro) {
 			motivo = (erro as Error).message;
 			if (resposta.stopReason === "length") motivo += " (a resposta foi cortada no limite de tamanho)";
@@ -264,7 +325,7 @@ export async function mapearParte(
 			);
 		}
 	}
-	throw new ErroMapa(`O modelo não devolveu o JSON do mapa, nem na segunda tentativa (${motivo}). O arquivo continua pendente. Gasto: US$ ${custo.toFixed(4)}.`);
+	throw new ErroMapa(`O modelo não devolveu o JSON do mapa, nem na segunda tentativa (${motivo}). ${depois} Gasto: US$ ${custo.toFixed(4)}.`);
 }
 
 // --- Custo estimado ------------------------------------------------------------
@@ -291,7 +352,7 @@ export function estimarCusto(
 /** As referências agrupadas por arquivo: "aula-04.pdf: página 12, página 13; l1.py: função f". */
 function textoDasReferencias(conceito: MapaConteudo["conceitos"][number]): string {
 	if (semFonte(conceito)) return "sem fonte";
-	if (conceito.referencias.length === 0) return "escrito pelo usuário";
+	if (conceito.referencias.length === 0) return conceito.origem === "tema" ? "do tema de um curso, sem material" : "escrito pelo usuário";
 	const porArquivo = new Map<string, string[]>();
 	for (const referencia of conceito.referencias) {
 		const locais = porArquivo.get(referencia.arquivo) ?? [];
@@ -358,6 +419,8 @@ interface DaMateria {
 	rodando: boolean;
 	/** Os pendentes da última leitura (ler os .md de cada trecho no Drive custa). */
 	pendentes?: PendenteMapa[];
+	/** O mapa a partir do tema em andamento (um por matéria). */
+	tema?: { controle: AbortController };
 }
 
 interface DadosAcao {
@@ -366,9 +429,12 @@ interface DadosAcao {
 	edicao?: unknown;
 	pedido?: unknown;
 	operacoes?: unknown;
+	tema?: unknown;
+	tipo?: unknown;
+	motivo?: unknown;
 }
 
-const ACOES: ReadonlyArray<keyof AcoesMapa> = ["abrir", "mapear", "refazer", "cancelar", "operar", "aprovar"];
+const ACOES: ReadonlyArray<keyof AcoesMapa> = ["abrir", "mapear", "refazer", "cancelar", "operar", "aprovar", "do_tema"];
 
 const mensagemDe = (erro: unknown, acao: string) =>
 	erro instanceof ErroMapa || erro instanceof ErroMaterias ? erro.message : `Não consegui ${acao} o mapa de conteúdo: ${(erro as Error).message}`;
@@ -395,10 +461,13 @@ async function hashDoManifesto(dados: string, materia: string, arquivo: string):
 export interface OpcoesMapa {
 	/** O mapeador.md (nos testes, um prompt de mentira). */
 	caminhoPrompt?: string;
+	/** O mapa-do-tema.md (nos testes, um prompt de mentira). */
+	caminhoPromptTema?: string;
 }
 
 export default function mapa(pi: ExtensionAPI, opcoes: OpcoesMapa = {}) {
 	const caminhoPrompt = opcoes.caminhoPrompt ?? CAMINHO_PROMPT;
+	const caminhoPromptTema = opcoes.caminhoPromptTema ?? CAMINHO_PROMPT_TEMA;
 	let pastaDados: string | undefined;
 	let sessao: string | undefined;
 	let registro: RegistroMapa | undefined;
@@ -468,6 +537,7 @@ export default function mapa(pi: ExtensionAPI, opcoes: OpcoesMapa = {}) {
 			andamento: atual ? { arquivo: atual.arquivo, parte: atual.parte, partes: atual.partes } : null,
 			fila: [...estado.fila],
 			...(pedido ? { pedido } : {}),
+			...(estado.tema ? { montandoTema: true } : {}),
 		});
 	};
 
@@ -569,6 +639,51 @@ export default function mapa(pi: ExtensionAPI, opcoes: OpcoesMapa = {}) {
 		void andarFila(dados, materia);
 	};
 
+	/**
+	 * O mapa a partir do tema (do_tema): manda o estado com montandoTema, chama
+	 * o modelo fora da trava (como o mapeador, com a nova tentativa), e dentro
+	 * dela funde (fundirTema), grava, registra montou_mapa_do_tema e manda o
+	 * estado com o pedido. Cancelado (pelo botão), manda o estado com o pedido;
+	 * com erro, o erro e o estado. Depois do fim da sessão, nada.
+	 */
+	const montarDoTema = async (dados: string, materia: string, entrada: { tema: string; tipo?: TipoCurso; motivo?: string }, pedido: string | undefined) => {
+		const estado = daMateria(materia);
+		if (estado.tema) throw new ErroMapa("O mapa a partir do tema já está sendo montado nesta matéria. Espere terminar (ou cancele) antes de pedir de novo.");
+		const trabalho = { controle: new AbortController() };
+		estado.tema = trabalho;
+		const sinal = trabalho.controle.signal;
+		const comPedido = pedido ? { pedido } : {};
+		try {
+			await naTrava(materia, () => mostrarEstado(dados, materia));
+			const prompt = await lerPrompt(caminhoPromptTema);
+			if (!registro) throw new ErroConfiguracao("A sessão não tem o registro de modelos do pi; não dá para chamar o modelo do mapa do tema.");
+			const modelo = resolverModelo(registro, prompt.modelo);
+			// Fora da trava: a chamada pode levar minutos. O mapa lido aqui só serve para o modelo ver os nomes.
+			const visto = await lerMapa(dados, materia);
+			const resposta = await pedirJson(registro, modelo, prompt.instrucoes, mensagemDoTema({ ...entrada, mapa: visto }), lerRespostaTema, sinal, "O mapa não mudou.");
+			await naTrava(materia, async () => {
+				if (sinal.aborted) throw new Cancelado();
+				// Lido de novo: uma operação ou um mapeamento pode ter mudado o mapa durante a chamada.
+				const fundido = fundirTema(await lerMapa(dados, materia), resposta.resultado.conceitos);
+				if (fundido.novos > 0) await gravarMapa(dados, materia, fundido.mapa);
+				await registrarMapaDoTema(dados, materia, { tema: entrada.tema, novos: fundido.novos, custo: resposta.custo, modelo: prompt.modelo }, daSessao());
+				if (estado.tema === trabalho) estado.tema = undefined;
+				await mostrarEstado(dados, materia, fundido.mapa, pedido);
+			});
+		} catch (erro) {
+			if (estado.tema === trabalho) estado.tema = undefined;
+			if (pastaDados !== dados) return;
+			if (erro instanceof Cancelado || sinal.aborted) {
+				await mostrarNaTrava(dados, materia, "do_tema", pedido);
+				return;
+			}
+			mostrarErro({ mensagem: mensagemDe(erro, "montar"), ao: "do_tema", materia, ...comPedido });
+			await mostrarNaTrava(dados, materia, "do_tema");
+		} finally {
+			if (estado.tema === trabalho) estado.tema = undefined;
+		}
+	};
+
 	/** A matéria existe (o materia.json)? O id vem da tela; nunca cria pasta solta. */
 	const materiaExiste = async (dados: string, materia: string) => {
 		if (!/^[a-z0-9-]+$/.test(materia)) return false;
@@ -593,6 +708,7 @@ export default function mapa(pi: ExtensionAPI, opcoes: OpcoesMapa = {}) {
 		for (const estado of materias.values()) {
 			estado.fila.length = 0;
 			estado.atual?.controle.abort();
+			estado.tema?.controle.abort();
 		}
 	});
 
@@ -681,6 +797,9 @@ export default function mapa(pi: ExtensionAPI, opcoes: OpcoesMapa = {}) {
 				} else if (ao === "cancelar") {
 					estado.fila.length = 0;
 					estado.atual?.controle.abort();
+					// O mapa do tema também para; o estado já sai sem montandoTema (o do_tema manda o seu, com o pedido, ao terminar).
+					estado.tema?.controle.abort();
+					estado.tema = undefined;
 					await mostrarNaTrava(dados, materia, ao);
 				} else if (ao === "operar") {
 					const { edicao, operacoes } = dadosAcao;
@@ -707,9 +826,22 @@ export default function mapa(pi: ExtensionAPI, opcoes: OpcoesMapa = {}) {
 						await registrarAprovacaoMapa(dados, materia, aprovado, daSessao());
 						await mostrarEstado(dados, materia, aprovado, pedido);
 					});
+				} else if (ao === "do_tema") {
+					const tema = typeof dadosAcao.tema === "string" ? dadosAcao.tema.trim().replace(/\s+/g, " ") : "";
+					if (!tema) {
+						mostrarErro({ mensagem: "O mapa a partir do tema precisa do tema (o nome do curso).", ao, materia, ...comPedido });
+						return;
+					}
+					const { tipo, motivo } = dadosAcao;
+					if (tipo !== undefined && tipo !== null && !(TIPOS_CURSO as readonly unknown[]).includes(tipo)) {
+						mostrarErro({ mensagem: `O tipo do curso precisa ser um de: ${TIPOS_CURSO.join(", ")} (veio "${String(tipo)}").`, ao, materia, ...comPedido });
+						return;
+					}
+					const motivoLimpo = typeof motivo === "string" ? motivo.trim() : "";
+					await montarDoTema(dados, materia, { tema, ...(tipo ? { tipo: tipo as TipoCurso } : {}), ...(motivoLimpo ? { motivo: motivoLimpo } : {}) }, pedido);
 				}
 			} catch (erro) {
-				mostrarErro({ mensagem: mensagemDe(erro, ao === "aprovar" ? "aprovar" : ao === "operar" ? "mudar" : "ler"), ao, materia, ...comPedido });
+				mostrarErro({ mensagem: mensagemDe(erro, ao === "aprovar" ? "aprovar" : ao === "operar" ? "mudar" : ao === "do_tema" ? "montar" : "ler"), ao, materia, ...comPedido });
 			}
 		})();
 	});

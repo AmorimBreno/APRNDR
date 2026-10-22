@@ -188,6 +188,18 @@ describe("oQueInvalida e confirmarEtapa pela tabela", () => {
 		expect(oQueInvalida(comMapa, "objetivo", { ...OBJETIVO, escopo: "livre", tipo: "teorico" })).toEqual([]);
 	});
 
+	it("Materiais vazia com o Objetivo só do material invalida também o Objetivo", () => {
+		const soMaterial = confirmarEtapa(cursoCompleto(), "objetivo", { ...OBJETIVO, escopo: "so_material" }, AGORA).curso;
+		const comMapa = confirmarEtapa(soMaterial, "mapa", MAPA, AGORA).curso;
+		expect(oQueInvalida(comMapa, "materiais", { arquivos: [] })).toEqual(["objetivo", "mapa"]);
+		const { curso, invalidadas } = confirmarEtapa(comMapa, "materiais", { arquivos: [] }, DEPOIS);
+		expect(invalidadas).toEqual(["objetivo", "mapa"]);
+		expect(curso.objetivo).toBeNull();
+		expect(curso.etapa).toBe("objetivo");
+		expect(oQueInvalida(comMapa, "materiais", { arquivos: [{ arquivo: "outro.pdf", hash: "h" }] })).toEqual(["mapa"]);
+		expect(oQueInvalida(cursoCompleto(), "materiais", { arquivos: [] })).toEqual(["mapa", "diagnostico", "esqueleto"]);
+	});
+
 	it("a mesma coisa não invalida nada nem muda o curso", () => {
 		const curso = cursoCompleto();
 		const mesmas: Array<[Etapa, unknown]> = [
@@ -367,9 +379,10 @@ describe("no disco", () => {
 		expect(comMapa.curso.etapa).toBe("diagnostico");
 		expect(await lerCurso(dados, materia, id)).toEqual(comMapa.curso);
 		const mudou = await confirmarNoDisco(dados, materia, id, "materiais", { arquivos: [] }, ctx);
-		expect(mudou.invalidadas).toEqual(["mapa"]);
+		expect(mudou.invalidadas).toEqual(["objetivo", "mapa"]);
 		expect((await lerCurso(dados, materia, id)).mapa).toBeNull();
-		expect((await lerCurso(dados, materia, id)).etapa).toBe("mapa");
+		expect((await lerCurso(dados, materia, id)).objetivo).toBeNull();
+		expect((await lerCurso(dados, materia, id)).etapa).toBe("objetivo");
 		expect((await eventosDoCurso()).map((evento) => evento.verbo)).toEqual(["comecou_curso"]);
 	});
 

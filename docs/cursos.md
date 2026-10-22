@@ -50,7 +50,7 @@ O guia só anda para a frente confirmando: "Continuar" grava a etapa e passa `et
 | etapa mudada | invalida |
 |---|---|
 | `basico` | `esqueleto` (o prazo e as horas mudam o calendário) |
-| `materiais` | `mapa`, `diagnostico`, `esqueleto` |
+| `materiais` | `mapa`, `diagnostico`, `esqueleto` (e `objetivo` se a lista ficou vazia e o escopo confirmado é `so_material`) |
 | `objetivo` | `diagnostico`, `esqueleto` (e `mapa` se o escopo mudou de ou para `livre`) |
 | `mapa` | `diagnostico`, `esqueleto` |
 | `diagnostico` | `esqueleto` |

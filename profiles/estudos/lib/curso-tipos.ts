@@ -397,7 +397,8 @@ const DEPENDENTES: Record<Etapa, readonly Etapa[]> = {
  * para a tela avisar antes. Só entram as que estão confirmadas (as outras já
  * estão vazias). Nada se a etapa ainda não estava confirmada ou se os dados
  * são a mesma coisa (iguais). No Objetivo, o Mapa entra também se o escopo
- * mudou de ou para livre.
+ * mudou de ou para livre. Em Materiais, o Objetivo entra também se a lista
+ * ficou vazia e o Objetivo confirmado é só o material.
  */
 export function oQueInvalida<E extends Etapa>(curso: Curso, etapa: E, dados: EntradasDasEtapas[E] | DadosDasEtapas[E]): Etapa[] {
 	const atual = curso[etapa];
@@ -408,6 +409,7 @@ export function oQueInvalida<E extends Etapa>(curso: Curso, etapa: E, dados: Ent
 		const depois = (dados as DadosObjetivo | null)?.escopo === "livre";
 		if (antes !== depois) alvo.add("mapa");
 	}
+	if (etapa === "materiais" && curso.objetivo?.escopo === "so_material" && !(dados as DadosMateriais | null)?.arquivos?.length) alvo.add("objetivo");
 	return ETAPAS.filter((item) => alvo.has(item) && curso[item] !== null && curso[item] !== undefined);
 }
 

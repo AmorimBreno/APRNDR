@@ -60,13 +60,13 @@ const MATERIAIS = { arquivos: [{ arquivo: "aula-04.pdf", hash: "h4" }] };
 const OBJETIVO = { escopo: "material_base" as const, tipo: "misto" as const, motivo: "Passar na P1." };
 const MAPA = { conceitos: ["c-a", "c-b"] };
 
-/** Um curso com as seis etapas confirmadas (diagnóstico e esqueleto com conteúdo de mentira até as partes B e C). */
+/** Um curso com as seis etapas confirmadas (diagnóstico e esqueleto com conteúdo de mentira: confirmarEtapa não valida; o diagnóstico de verdade está em diagnostico.test.ts). */
 function cursoCompleto(): Curso {
 	let curso = novoCurso("p1-regressao", "calculo-i", BASICO, AGORA);
 	curso = confirmarEtapa(curso, "materiais", MATERIAIS, AGORA).curso;
 	curso = confirmarEtapa(curso, "objetivo", OBJETIVO, AGORA).curso;
 	curso = confirmarEtapa(curso, "mapa", MAPA, AGORA).curso;
-	curso = confirmarEtapa(curso, "diagnostico", { nivel: 1 }, AGORA).curso;
+	curso = confirmarEtapa(curso, "diagnostico", { nivel: 1 } as never, AGORA).curso;
 	return confirmarEtapa(curso, "esqueleto", { modulos: 2 }, AGORA).curso;
 }
 
@@ -133,8 +133,8 @@ describe("validarEtapa", () => {
 		expect(() => validarEtapa("mapa", { conceitos: ["c-x", "c-f"] }, { mapa })).toThrow(/não estão dentro do mapa.*c-x, c-f/);
 	});
 
-	it("Diagnóstico e Esqueleto: partes B e C", () => {
-		expect(() => validarEtapa("diagnostico", {})).toThrow(/parte B/);
+	it("Diagnóstico sem o em andamento completo (diagnostico.test.ts) e Esqueleto: parte C", () => {
+		expect(() => validarEtapa("diagnostico", {})).toThrow(/autoavaliação, das questões e das respostas/);
 		expect(() => validarEtapa("esqueleto", {})).toThrow(/parte C/);
 		expect(() => validarEtapa("outra" as Etapa, {})).toThrow(/Etapa desconhecida/);
 	});
@@ -219,7 +219,7 @@ describe("oQueInvalida e confirmarEtapa pela tabela", () => {
 	});
 
 	it("só conta as etapas que estão confirmadas", () => {
-		const curso = confirmarEtapa(cursoCompleto(), "diagnostico", { nivel: 9 }, AGORA).curso;
+		const curso = confirmarEtapa(cursoCompleto(), "diagnostico", { nivel: 9 } as never, AGORA).curso;
 		expect(curso.esqueleto).toBeNull();
 		expect(oQueInvalida(curso, "materiais", { arquivos: [] })).toEqual(["mapa", "diagnostico"]);
 	});
@@ -255,7 +255,7 @@ describe("ordem das etapas", () => {
 		expect(() => confirmarEtapa(curso, "objetivo", OBJETIVO, AGORA)).toThrow(/Confirme antes a etapa Materiais/);
 		expect(() => confirmarEtapa(curso, "mapa", MAPA, AGORA)).toThrow(ErroCurso);
 		const invalidado = confirmarEtapa(cursoCompleto(), "materiais", { arquivos: [] }, AGORA).curso;
-		expect(() => confirmarEtapa(invalidado, "diagnostico", { nivel: 1 }, AGORA)).toThrow(/Confirme antes a etapa Mapa/);
+		expect(() => confirmarEtapa(invalidado, "diagnostico", { nivel: 1 } as never, AGORA)).toThrow(/Confirme antes a etapa Mapa/);
 	});
 
 	it("a etapa é a primeira não confirmada, e esqueleto com todas", () => {

@@ -6,6 +6,9 @@
 // Todas as funções daqui são puras: recebem o curso e devolvem um curso novo,
 // sem mexer no que receberam.
 
+// Só tipos de diagnostico-tipos.ts (apagados na compilação): os valores vão no
+// sentido contrário (diagnostico-tipos importa daqui), sem ciclo ao carregar.
+import type { Confianca, Diagnostico, DiagnosticoEmAndamento, NivelAutoavaliacao, RespostaDissertativa } from "./diagnostico-tipos.ts";
 import type { MapaConteudo } from "./mapa-tipos.ts";
 
 /** Muda quando o formato do curso.json mudar. */
@@ -66,8 +69,8 @@ export interface DadosMapa {
 	conceitos: string[];
 }
 
-/** Parte B: o formato chega com ela. */
-export type DadosDiagnostico = Record<string, unknown>;
+/** A etapa Diagnóstico (parte B, docs/cursos.md): o diagnóstico concluído, com concluidoEm (diagnostico-tipos.ts). */
+export type DadosDiagnostico = Diagnostico;
 /** Parte C: o formato chega com ela. */
 export type DadosEsqueleto = Record<string, unknown>;
 
@@ -110,6 +113,13 @@ export interface Curso {
 	materiais: DadosMateriais | null;
 	objetivo: DadosObjetivo | null;
 	mapa: DadosMapa | null;
+	/**
+	 * O diagnóstico enquanto não termina (a etapa diagnostico continua null):
+	 * a autoavaliação, as questões e as respostas. Concluir o diagnóstico o
+	 * transforma na etapa; tudo o que invalida a etapa diagnostico o apaga.
+	 * Ausente (ou null) quando não há.
+	 */
+	diagnosticoEmAndamento?: DiagnosticoEmAndamento | null;
 	diagnostico: DadosDiagnostico | null;
 	esqueleto: DadosEsqueleto | null;
 }
@@ -150,6 +160,14 @@ export interface AcoesCursos {
 	descartar: { materia: string; curso: string; pedido: string };
 	/** Manda de novo o curso com os materiais prontos de agora (a tela pede quando muda quantos materiais prontos a matéria tem). */
 	prontos: { materia: string; curso: string };
+	/** Diagnóstico: salva a autoavaliação (inteira: um nível por conceito avaliado) em andamento. */
+	autoavaliar: { materia: string; curso: string; pedido: string; niveis: Record<string, NivelAutoavaliacao> };
+	/** Diagnóstico: gera as questões (exige a autoavaliação completa); gerar de novo descarta as questões e as respostas anteriores. */
+	gerar_diagnostico: { materia: string; curso: string; pedido: string };
+	/** Diagnóstico: grava a resposta (escolha na alternativa, texto na dissertativa); a dissertativa é corrigida em seguida. */
+	responder: { materia: string; curso: string; pedido: string; questao: string; confianca: Confianca; escolha?: number; texto?: string; tempoMs: number };
+	/** Diagnóstico: exige todas as questões respondidas e corrigidas; confirma a etapa. */
+	concluir_diagnostico: { materia: string; curso: string; pedido: string };
 }
 
 export type AcaoCursos = keyof AcoesCursos;
@@ -160,7 +178,11 @@ export interface MensagemListaCursos {
 	cursos: ResumoCurso[];
 }
 
-/** A mensagem "curso": o curso.json inteiro, depois de abrir, começar ou confirmar. */
+/**
+ * A mensagem "curso": o curso.json inteiro, depois de abrir, começar ou
+ * confirmar. Enquanto alguma questão do diagnóstico está sem resposta, o
+ * diagnosticoEmAndamento vem sem o gabarito (paraATela, em diagnostico-tipos.ts).
+ */
 export interface MensagemCurso {
 	materia: string;
 	curso: Curso;
@@ -169,6 +191,10 @@ export interface MensagemCurso {
 	pedido?: string;
 	/** Os materiais prontos da matéria agora ({arquivo, hash} dos manifestos do .extraido, em ordem de caminho), para a tela comparar com a etapa Materiais. */
 	prontos?: ArquivoDoCurso[];
+	/** Enquanto as questões do diagnóstico estão sendo geradas. */
+	gerandoDiagnostico?: boolean;
+	/** As dissertativas do diagnóstico que estão sendo corrigidas agora. */
+	corrigindo?: string[];
 }
 
 /** A mensagem "descartado". */
@@ -246,8 +272,10 @@ const ehObjeto = (valor: unknown): valor is Record<string, unknown> => typeof va
 export interface ContextoValidacao {
 	/** AAAA-MM-DD; sem ele, hojeLocal(). O prazo não pode ser antes. */
 	hoje?: string;
-	/** O curso como está (o Objetivo confere os materiais confirmados nele). */
-	curso?: Pick<Curso, "materiais"> | null;
+	/** O curso como está (o Objetivo confere os materiais confirmados nele; o Diagnóstico, a autoavaliação dos conceitos do Mapa). */
+	curso?: (Pick<Curso, "materiais"> & Partial<Pick<Curso, "mapa">>) | null;
+	/** O momento da confirmação (o concluidoEm do Diagnóstico); sem ele, agora. */
+	agora?: Date;
 	/** O mapa da matéria (a etapa Mapa precisa dele). */
 	mapa?: MapaConteudo | null;
 }
@@ -324,15 +352,88 @@ function validarMapa(dados: Record<string, unknown>, contexto: ContextoValidacao
 	return { conceitos: dentro.filter((id) => escolhidos.has(id)) };
 }
 
+// --- O diagnóstico em andamento (parte B) --------------------------------------
+// Ficam aqui, e não em diagnostico-tipos.ts, porque validarEtapa usa; o
+// diagnostico-tipos.ts reexporta.
+
+const ehNivel = (valor: unknown): valor is NivelAutoavaliacao => valor === 0 || valor === 1 || valor === 2 || valor === 3;
+
+/** Os ids das questões do diagnóstico sem resposta, na ordem das questões. Sem diagnóstico, nenhuma. */
+export function faltaResponder(emAndamento: DiagnosticoEmAndamento | null | undefined): string[] {
+	if (!emAndamento) return [];
+	return emAndamento.questoes.filter((questao) => emAndamento.respostas[questao.id] === undefined).map((questao) => questao.id);
+}
+
+/** Os ids das dissertativas já respondidas cuja correção ainda não chegou, na ordem das questões. */
+export function faltaCorrigir(emAndamento: DiagnosticoEmAndamento | null | undefined): string[] {
+	if (!emAndamento) return [];
+	return emAndamento.questoes
+		.filter((questao) => {
+			const resposta = emAndamento.respostas[questao.id] as RespostaDissertativa | undefined;
+			return questao.tipo === "dissertativa" && resposta !== undefined && !resposta.correcao;
+		})
+		.map((questao) => questao.id);
+}
+
+/** Se o diagnóstico pode ser concluído: há questões, todas respondidas, e as dissertativas corrigidas. */
+export function podeConcluir(emAndamento: DiagnosticoEmAndamento | null | undefined): boolean {
+	return !!emAndamento && emAndamento.questoes.length > 0 && faltaResponder(emAndamento).length === 0 && faltaCorrigir(emAndamento).length === 0;
+}
+
+const listaDeIds = (ids: string[]) => ids.join(", ");
+
+/**
+ * O Diagnóstico: o conteúdo do diagnosticoEmAndamento, com podeConcluir
+ * verdadeiro, vira o diagnóstico concluído (com concluidoEm: o que já vier, ou
+ * agora). Com o Mapa do curso no contexto, todo conceito dele precisa de nível.
+ */
+function validarDiagnostico(dados: Record<string, unknown>, contexto: ContextoValidacao): Diagnostico {
+	const { autoavaliacao, questoes, respostas } = dados;
+	if (!ehObjeto(autoavaliacao) || !Array.isArray(questoes) || !ehObjeto(respostas)) {
+		throw new ErroCurso("O diagnóstico precisa da autoavaliação, das questões e das respostas.");
+	}
+	const invalidos = Object.keys(autoavaliacao).filter((id) => !ehNivel(autoavaliacao[id]));
+	if (invalidos.length > 0) throw new ErroCurso(`A autoavaliação precisa de um nível de 0 a 3 em cada conceito (veio outra coisa em ${listaDeIds(invalidos)}).`);
+	const semNivel = (contexto.curso?.mapa?.conceitos ?? []).filter((id) => !ehNivel(autoavaliacao[id]));
+	if (semNivel.length > 0) {
+		throw new ErroCurso(`Falta a autoavaliação de ${semNivel.length === 1 ? "um conceito do curso" : `${semNivel.length} conceitos do curso`}: ${listaDeIds(semNivel)}.`);
+	}
+	if (questoes.length === 0 || typeof dados.geradoEm !== "string" || typeof dados.modelo !== "string" || typeof dados.custo !== "number") {
+		throw new ErroCurso("Gere as questões do diagnóstico antes de concluir.");
+	}
+	if (!questoes.every((questao) => ehObjeto(questao) && typeof questao.id === "string" && (questao.tipo === "alternativa" || questao.tipo === "dissertativa"))) {
+		throw new ErroCurso("As questões do diagnóstico não estão no formato (cada uma precisa de id e tipo).");
+	}
+	const emAndamento = dados as unknown as DiagnosticoEmAndamento;
+	const semResposta = faltaResponder(emAndamento);
+	if (semResposta.length > 0) {
+		throw new ErroCurso(`Responda todas as questões antes de concluir o diagnóstico (falta${semResposta.length === 1 ? "" : "m"} ${listaDeIds(semResposta)}).`);
+	}
+	const semCorrecao = faltaCorrigir(emAndamento);
+	if (semCorrecao.length > 0) {
+		throw new ErroCurso(`Espere a correção da${semCorrecao.length === 1 ? " dissertativa" : "s dissertativas"} ${listaDeIds(semCorrecao)} antes de concluir o diagnóstico.`);
+	}
+	const concluidoEm = typeof dados.concluidoEm === "string" && dados.concluidoEm ? dados.concluidoEm : (contexto.agora ?? new Date()).toISOString();
+	return structuredClone({
+		autoavaliacao,
+		questoes,
+		geradoEm: dados.geradoEm,
+		modelo: dados.modelo,
+		custo: dados.custo,
+		respostas,
+		concluidoEm,
+	}) as unknown as Diagnostico;
+}
+
 /**
  * Confere os dados de uma etapa e devolve eles limpos (espaços nas pontas,
  * campos na ordem do formato; Materiais em ordem de caminho e sem repetir;
- * Mapa na ordem do mapa e sem repetir). Um problema é um ErroCurso com a frase
- * para a tela. Não confere a ordem das etapas: isso é conferirOrdem.
+ * Mapa na ordem do mapa e sem repetir; Diagnóstico com concluidoEm). Um
+ * problema é um ErroCurso com a frase para a tela. Não confere a ordem das
+ * etapas: isso é conferirOrdem.
  */
 export function validarEtapa<E extends Etapa>(etapa: E, dados: unknown, contexto: ContextoValidacao = {}): EntradasDasEtapas[E] {
 	if (!ehEtapa(etapa)) throw new ErroCurso(`Etapa desconhecida: "${mostrar(etapa)}".`);
-	if (etapa === "diagnostico") throw new ErroCurso("A etapa Diagnóstico chega na parte B do item 5.");
 	if (etapa === "esqueleto") throw new ErroCurso("A etapa Esqueleto chega na parte C do item 5.");
 	if (!ehObjeto(dados)) throw new ErroCurso(`Os dados da etapa ${nomeDaEtapa(etapa)} vieram vazios.`);
 	switch (etapa) {
@@ -342,6 +443,8 @@ export function validarEtapa<E extends Etapa>(etapa: E, dados: unknown, contexto
 			return validarMateriais(dados) as EntradasDasEtapas[E];
 		case "objetivo":
 			return validarObjetivo(dados, contexto) as EntradasDasEtapas[E];
+		case "diagnostico":
+			return validarDiagnostico(dados, contexto) as EntradasDasEtapas[E];
 		default:
 			return validarMapa(dados, contexto) as EntradasDasEtapas[E];
 	}
@@ -402,7 +505,9 @@ const DEPENDENTES: Record<Etapa, readonly Etapa[]> = {
  * estão vazias). Nada se a etapa ainda não estava confirmada ou se os dados
  * são a mesma coisa (iguais). No Objetivo, o Mapa entra também se o escopo
  * mudou de ou para livre. Em Materiais, o Objetivo entra também se a lista
- * ficou vazia e o Objetivo confirmado é só o material.
+ * ficou vazia e o Objetivo confirmado é só o material. O Diagnóstico entra
+ * também quando só há o diagnóstico em andamento (diagnosticoEmAndamento),
+ * que a confirmação apagaria.
  */
 export function oQueInvalida<E extends Etapa>(curso: Curso, etapa: E, dados: EntradasDasEtapas[E] | DadosDasEtapas[E]): Etapa[] {
 	const atual = curso[etapa];
@@ -414,7 +519,8 @@ export function oQueInvalida<E extends Etapa>(curso: Curso, etapa: E, dados: Ent
 		if (antes !== depois) alvo.add("mapa");
 	}
 	if (etapa === "materiais" && curso.objetivo?.escopo === "so_material" && !(dados as DadosMateriais | null)?.arquivos?.length) alvo.add("objetivo");
-	return ETAPAS.filter((item) => alvo.has(item) && curso[item] !== null && curso[item] !== undefined);
+	const emAndamento = curso.diagnosticoEmAndamento !== null && curso.diagnosticoEmAndamento !== undefined;
+	return ETAPAS.filter((item) => alvo.has(item) && ((curso[item] !== null && curso[item] !== undefined) || (item === "diagnostico" && emAndamento)));
 }
 
 /** A primeira etapa não confirmada; com todas confirmadas, esqueleto. */
@@ -433,8 +539,9 @@ export function conferirOrdem(curso: Curso, etapa: Etapa): void {
  * Confirma a etapa com os dados (já validados por validarEtapa): grava a
  * etapa, apaga as que ela invalida (oQueInvalida), recalcula `etapa` e, se
  * algo mudou, alteradoEm. No Básico, o nome que vier troca o nome do curso
- * (o id fica). Confirmar com a mesma coisa não muda nada. Se uma etapa
- * anterior não está confirmada, ErroCurso.
+ * (o id fica). Confirmar o Diagnóstico tira o diagnosticoEmAndamento, e
+ * invalidar o Diagnóstico também o apaga. Confirmar com a mesma coisa não
+ * muda nada. Se uma etapa anterior não está confirmada, ErroCurso.
  */
 export function confirmarEtapa<E extends Etapa>(
 	curso: Curso,
@@ -454,6 +561,7 @@ export function confirmarEtapa<E extends Etapa>(
 	const atual = curso[etapa];
 	if (atual === null || atual === undefined || !iguais(etapa, atual, valor)) (novo as unknown as Record<Etapa, unknown>)[etapa] = valor;
 	for (const item of invalidadas) novo[item] = null;
+	if (etapa === "diagnostico" || invalidadas.includes("diagnostico")) delete novo.diagnosticoEmAndamento;
 	novo.etapa = etapaDoCurso(novo);
 	if (JSON.stringify(novo) !== JSON.stringify(curso)) novo.alteradoEm = agora.toISOString();
 	return { curso: novo, invalidadas };

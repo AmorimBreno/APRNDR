@@ -31,6 +31,12 @@ export type VerboEvento =
 	| "comecou_curso"
 	| "descartou_curso"
 	| "criou_curso"
+	// O diagnóstico do guia de cursos (item 5, parte B): docs/cursos.md, "Parte B: o diagnóstico", "Eventos".
+	// gerou_diagnostico e concluiu_diagnostico vão para o eventos.jsonl da matéria;
+	// autoavaliou_conceito, para o aprendiz/eventos.jsonl (com respondeu_questao e respondeu_dissertativa).
+	| "gerou_diagnostico"
+	| "concluiu_diagnostico"
+	| "autoavaliou_conceito"
 	// Aprendizagem (seção 9.2), usados a partir dos itens 7 e 8:
 	| "pediu_reexplicacao"
 	| "pediu_outro_jeito"

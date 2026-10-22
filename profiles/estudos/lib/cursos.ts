@@ -67,10 +67,14 @@ function cursoLido(valor: unknown, materia: string, pasta: string): Curso {
 		const dados = curso[etapa];
 		if (dados !== undefined && dados !== null && (typeof dados !== "object" || Array.isArray(dados))) throw new Error(`a etapa ${etapa} não é um objeto`);
 	}
+	const emAndamento = curso.diagnosticoEmAndamento;
+	if (emAndamento !== undefined && emAndamento !== null && (typeof emAndamento !== "object" || Array.isArray(emAndamento))) {
+		throw new Error("o diagnosticoEmAndamento não é um objeto");
+	}
 	return cursoNaOrdem(curso as Curso);
 }
 
-/** O curso com os campos na ordem do formato (etapas ausentes como null). */
+/** O curso com os campos na ordem do formato (etapas ausentes como null; o diagnosticoEmAndamento só quando há). */
 function cursoNaOrdem(curso: Curso): Curso {
 	const basico: DadosBasico | null = curso.basico
 		? { prazo: curso.basico.prazo ?? null, ...(curso.basico.prova ? { prova: curso.basico.prova } : {}), horasPorSemana: curso.basico.horasPorSemana }
@@ -88,6 +92,7 @@ function cursoNaOrdem(curso: Curso): Curso {
 		materiais: curso.materiais ?? null,
 		objetivo: curso.objetivo ?? null,
 		mapa: curso.mapa ?? null,
+		...(curso.diagnosticoEmAndamento ? { diagnosticoEmAndamento: curso.diagnosticoEmAndamento } : {}),
 		diagnostico: curso.diagnostico ?? null,
 		esqueleto: curso.esqueleto ?? null,
 	};
@@ -215,7 +220,7 @@ export async function confirmarNoDisco(
 	const agora = contexto.agora ?? new Date();
 	conferirOrdem(atual, etapa);
 	const mapa = etapa === "mapa" ? await lerMapa(dados, materia) : undefined;
-	const validos = validarEtapa(etapa, entrada, { hoje: contexto.hoje ?? hojeLocal(agora), curso: atual, mapa });
+	const validos = validarEtapa(etapa, entrada, { hoje: contexto.hoje ?? hojeLocal(agora), curso: atual, mapa, agora });
 	const resultado = confirmarEtapa(atual, etapa, validos, agora);
 	if (JSON.stringify(resultado.curso) !== JSON.stringify(atual)) await gravarCurso(dados, resultado.curso);
 	return resultado;

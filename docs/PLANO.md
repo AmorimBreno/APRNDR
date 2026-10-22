@@ -173,4 +173,18 @@ Limite conhecido: trocar de conversa encerra a sessão do pi e para o mapeamento
 Pendência observada: há uma pasta materias/teste-do-editor com problema na pasta de dados (a tela de cadernos avisa). Ela não foi criada nesta tarefa e não foi mexida.
 Em 2026-10-21 o Breno mapeou a Ciência de Dados pelo app (38 conceitos) e pediu que a etiqueta de referência longa não saísse do quadro: ela mostra os locais que cabem e um "+N" que abre o resto. Em 2026-10-22 ele disse que está tudo certo e pediu para seguir para o item 5.
 
-Depois: o item 5 da seção 10 da especificação, o guia de criação de curso.
+Plano do item 5 (guia de criação de curso) aprovado pelo Breno em 2026-10-22, com as recomendações: o guia é uma tela inteira sobre o caderno, não um modal; cada curso marca quais conceitos do mapa da matéria entram nele; o diagnóstico e o esqueleto usam o GPT-6.1 Sol; o mapa sem material é montado a partir do tema pelo Sonnet 5.5 e entra no mapa da matéria com origem "tema". O item vem em três partes, cada uma aprovada no app:
+- A: o rascunho, a seção Cursos e as etapas Básico a Mapa.
+- B: o diagnóstico. Autoavaliação por conceito em 4 níveis, umas 6 questões de alternativa com distratores das confusões comuns e 1 ou 2 dissertativas com rubrica, corrigidas uma vez; confiança de 1 a 4 antes de cada resposta; os eventos em aprendiz/eventos.jsonl.
+- C: o esqueleto. Módulos com objetivo, conceitos e tipo (normal, curto ou de revisão), o calendário das avaliações pelo prazo e pelas horas por semana, a edição e "Criar curso"; a visão do curso, só para leitura.
+Contrato em docs/cursos.md.
+
+Item 5, parte A, feita (2026-10-22, aguarda o roteiro docs/teste-etapa-5a.md). Um commit por parte:
+- Lógica pura em profiles/estudos/lib/curso-tipos.ts: a validação de cada etapa, oQueInvalida pela tabela do contrato, confirmarEtapa e os avisos. Disco e eventos em lib/cursos.ts (comecou_curso, descartou_curso). No mapa, a origem "tema" e fundirTema.
+- Extensão extensions/cursos.ts: a ponte "cursos"; a etapa Materiais montada pela extensão com os prontos do .extraido; os prontos mandados junto com o curso, para a tela avisar quando os materiais mudam; a ferramenta ler_curso. Na extensão do mapa, a ação do_tema (prompts/mapa-do-tema.md, evento montou_mapa_do_tema).
+- Tela: a seção Cursos do caderno; o guia em caderno/<m>/cursos/novo e .../cursos/<curso>/guia/<etapa>, com o trilho de 6 etapas (exceção ao manual registrada em design-system/ESTUDOS.md); as etapas Básico a Mapa; o aviso antes de descartar etapas; a lista de conceitos da seção Mapa reaproveitada com as caixas de marcar.
+- Chamada real do mapa a partir do tema (scripts/testar-mapa-tema.ts): "Probabilidade básica" deu 24 conceitos em ordem de estudo, por US$ 0,018.
+Conferido no navegador numa matéria de teste, apagada depois: a seção vazia, o Básico criando o rascunho, Continuar sem material, os padrões do Objetivo (livre e misto, "Só o material" desligado), Montar a partir do tema pelo app (26 conceitos em 12 s, com "Do tema"), desmarcar dois (24 de 26), Aprovar o mapa e continuar (curso.json com 24 conceitos, o mapa aprovado e os eventos conferidos no disco), a etapa Diagnóstico em breve, o aviso "Mudar Objetivo descarta: Mapa" com "Manter como estava", F5 na etapa Mapa com a seleção certa, a lista com "Rascunho · parou em Diagnóstico" e o Descartar (a pasta do curso apagada e o evento). Não conferi: o fluxo com material e a etapa Materiais com arquivo, o aviso de materiais mudados, o Sair com mudança e o professor usando ler_curso (estão no roteiro).
+Achado no caminho: o Vite ficou servindo uma versão intermediária de um arquivo escrito em várias etapas (o aviso de mudança de arquivo do Windows se perdeu) e a página abriu em branco; tocar o arquivo resolveu. Se a página abrir em branco depois de uma mudança grande, salve de novo o arquivo citado no console.
+
+Depois: o item 5, parte B (o diagnóstico), depois de o Breno aprovar a parte A no app.

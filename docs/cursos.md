@@ -176,7 +176,7 @@ Tela → extensão:
 - `responder {materia, curso, pedido, questao, confianca, escolha?, texto?, tempoMs}`: grava a resposta; na dissertativa, corrige em seguida (a mensagem `curso` leva `corrigindo: [questao]` enquanto isso);
 - `concluir_diagnostico {materia, curso, pedido}`: exige todas as questões respondidas e corrigidas; confirma a etapa.
 
-Todas respondem com `curso`. Enquanto o diagnóstico não é concluído, a tela nunca recebe `correta`, `confusao`, `explicacao`, `respostaModelo` nem a `rubrica` de uma questão ainda sem resposta (o pré-teste não pode mostrar o gabarito antes da hora); a extensão tira esses campos da mensagem.
+Todas respondem com `curso`. Enquanto alguma questão estiver sem resposta, a tela não recebe `correta`, `confusao`, `explicacao`, `respostaModelo`, a `rubrica`, nem a `correta` e a `correcao` das respostas (o pré-teste não mostra o gabarito durante as questões); a extensão tira esses campos da mensagem. Com todas respondidas, a mensagem vai inteira (a fase Resultado).
 
 ### A tela (etapa Diagnóstico)
 

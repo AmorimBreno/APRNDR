@@ -25,6 +25,22 @@ describe("rehype-palavras", () => {
 		expect(arvore.children[1]!.children).toEqual([{ type: "text", value: "x = 1" }]);
 		expect(arvore.children[2]!.children).toEqual([{ type: "text", value: "f(x)" }]);
 	});
+	it("código em linha e bloco com destaque e números de linha (rehype-codigo) ficam inteiros", () => {
+		const linha = { type: "element", tagName: "span", properties: { className: ["codigo__linha"], dataLinha: 1 }, children: [{ type: "element", tagName: "span", properties: { className: ["hljs-keyword"] }, children: [{ type: "text", value: "return x" }] }] };
+		const emLinha = { type: "element", tagName: "code", properties: { className: ["codigo-em-linha"] }, children: [{ type: "text", value: "len(x) + 1" }] };
+		const arvore = {
+			type: "root",
+			children: [
+				{ type: "element", tagName: "p", children: [{ type: "text", value: "Use " }, emLinha] },
+				{ type: "element", tagName: "pre", children: [{ type: "element", tagName: "code", children: [linha, { type: "text", value: "\n" }, structuredClone(linha)] }] },
+			],
+		};
+		const antes = structuredClone(arvore);
+		const emLinhaAntes = structuredClone(emLinha);
+		rehypePalavras()(arvore);
+		expect(arvore.children[0]!.children.at(-1)).toEqual(emLinhaAntes);
+		expect(arvore.children[1]).toEqual(antes.children[1]);
+	});
 	it("o atraso de cada palavra vai no style dela (a primeira, sem atraso, fica sem style)", () => {
 		const arvore = { type: "root", children: [{ type: "element", tagName: "p", children: [{ type: "text", value: "um dois três" }] }] };
 		rehypePalavras({ atrasoDe: (indice) => indice * 35 })(arvore);

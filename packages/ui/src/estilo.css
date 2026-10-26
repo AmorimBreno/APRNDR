@@ -347,3 +347,63 @@ a.linha:hover .linha__texto .overline, a.linha:focus-visible .linha__texto .over
 /* Fórmulas: o KaTeX usa as fontes dele; a de bloco rola se for larga. */
 .ap-prose .katex { font-size: 1.05em; }
 .ap-prose .katex-display { margin: 0 0 1em; padding: var(--space-2) 0; overflow-x: auto; overflow-y: hidden; }
+
+/* ── Código no Markdown (Markdown.tsx, rehype-codigo.ts) ──
+ * Caixa escura de editor, a mesma em qualquer fundo (balão, painel, papel).
+ * Cada cor tem contraste AA (4,5:1 ou mais) sobre --codigo-fundo. */
+:root {
+	--codigo-fundo: var(--surface-well);
+	--codigo-borda: var(--line);
+	--codigo-barra-fundo: var(--surface-panel);
+	--codigo-barra-texto: var(--ink-muted);
+	--codigo-texto: var(--steel-pastel);
+	--codigo-palavra: var(--brick-text);
+	--codigo-texto-literal: var(--sage-text);
+	--codigo-numero: var(--amber);
+	--codigo-funcao: var(--cream);
+	--codigo-tipo: var(--moss-pastel);
+	--codigo-comentario: var(--ink-subtle);
+	--codigo-numero-linha: var(--steel-line);
+	/* Código em linha (`len(x)`). */
+	--codigo-linha-fundo: var(--amber-tint);
+	--codigo-linha-texto: var(--amber-pastel);
+	--codigo-linha-borda: var(--amber-deep);
+}
+
+.codigo { display: block; max-width: 100%; margin: 0 0 1em; overflow: hidden; border: var(--border-hair) solid var(--codigo-borda); border-radius: var(--radius-sm); background: var(--codigo-fundo); color: var(--codigo-texto); }
+.codigo__barra { display: block; padding: 4px var(--space-4); border-bottom: var(--border-hair) solid var(--codigo-borda); background: var(--codigo-barra-fundo); color: var(--codigo-barra-texto); font-family: var(--font-mono); font-size: 11px; line-height: 16px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; }
+.codigo .codigo__pre { margin: 0; padding: var(--space-3) var(--space-4); overflow-x: auto; border-radius: 0; background: none; box-shadow: none; color: var(--codigo-texto); white-space: pre; overflow-wrap: normal; font-family: var(--font-mono); font-size: 14px; line-height: 22px; scrollbar-width: thin; color-scheme: dark; }
+.codigo .codigo__pre code { padding: 0; border-radius: 0; background: none; box-shadow: none; color: inherit; font-family: inherit; font-size: inherit; white-space: inherit; }
+/* Os números de linha: do data-linha, pelo CSS, para não irem junto ao copiar. */
+.codigo__linha::before { content: attr(data-linha); display: inline-block; width: calc(var(--digitos, 1) * 1ch); margin-right: var(--space-4); text-align: right; color: var(--codigo-numero-linha); user-select: none; }
+
+/* Destaque de sintaxe (classes do highlight.js). */
+.codigo .hljs-keyword, .codigo .hljs-selector-tag, .codigo .hljs-section, .codigo .hljs-doctag, .codigo .hljs-deletion { color: var(--codigo-palavra); }
+.codigo .hljs-string, .codigo .hljs-regexp, .codigo .hljs-symbol, .codigo .hljs-char, .codigo .hljs-template-tag, .codigo .hljs-template-variable, .codigo .hljs-addition, .codigo .hljs-link { color: var(--codigo-texto-literal); }
+.codigo .hljs-number, .codigo .hljs-literal, .codigo .hljs-variable.constant_ { color: var(--codigo-numero); }
+.codigo .hljs-title, .codigo .hljs-attr, .codigo .hljs-attribute, .codigo .hljs-property, .codigo .hljs-selector-class, .codigo .hljs-selector-id { color: var(--codigo-funcao); }
+.codigo .hljs-title.class_, .codigo .hljs-type, .codigo .hljs-built_in, .codigo .hljs-meta, .codigo .hljs-name { color: var(--codigo-tipo); }
+.codigo .hljs-comment, .codigo .hljs-quote { color: var(--codigo-comentario); font-style: italic; }
+.codigo .hljs-params, .codigo .hljs-subst, .codigo .hljs-variable, .codigo .hljs-operator, .codigo .hljs-punctuation { color: inherit; }
+.codigo .hljs-emphasis { font-style: italic; }
+.codigo .hljs-strong { font-weight: 700; }
+
+/* Código em linha: no meio da frase, sem mudar a altura da linha; se quebrar, cada pedaço fecha a caixa. */
+code.codigo-em-linha, .ap-prose code.codigo-em-linha { padding: .1em .35em; border-radius: var(--radius-xs); background: var(--codigo-linha-fundo); color: var(--codigo-linha-texto); box-shadow: inset 0 0 0 var(--border-hair) var(--codigo-linha-borda); font-family: var(--font-mono); font-size: .85em; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+
+/* ── Vetores e matrizes no Markdown (Estrutura.tsx) ──
+ * Caixas pastel com a borda de controle; os índices em mono pequeno, na cor
+ * do texto em volta, apagados. */
+.estrutura { display: block; max-width: 100%; margin: 0 0 1em; }
+.estrutura__rotulo { display: block; margin-bottom: var(--space-2); font-family: var(--font-mono); font-size: 13px; line-height: 20px; opacity: .8; }
+.estrutura .vetor { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-1); margin: 0; padding: 0; list-style: none; }
+.estrutura .vetor__celula { display: flex; flex-direction: column; align-items: center; gap: 2px; margin: 0; }
+.vetor__valor, .matriz__valor { display: block; min-width: 2.5em; box-sizing: border-box; padding: 4px var(--space-2); border-radius: var(--radius-xs); text-align: center; white-space: pre; font-family: var(--font-mono); font-size: 14px; line-height: 22px; }
+.vetor__valor { border: var(--border-control) solid var(--amber-line); background: var(--amber-pastel); color: var(--amber-deep); }
+.matriz__valor { border: var(--border-control) solid var(--steel-line); background: var(--steel-pastel); color: var(--steel-deep); }
+.vetor__indice { font-family: var(--font-mono); font-size: 11px; line-height: 14px; opacity: .7; }
+.matriz-rolagem { display: block; max-width: 100%; overflow-x: auto; scrollbar-width: thin; }
+.estrutura .matriz { width: auto; margin: 0; border-collapse: separate; border-spacing: var(--space-1); }
+.estrutura .matriz td { padding: 0; border: 0; vertical-align: middle; }
+.estrutura .matriz th { padding: 0 var(--space-1); border: 0; color: inherit; font-family: var(--font-mono); font-size: 11px; line-height: 14px; font-weight: 500; letter-spacing: 0; text-align: center; vertical-align: middle; opacity: .7; }
+.estrutura .matriz tbody th { text-align: right; }

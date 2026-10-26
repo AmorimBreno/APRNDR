@@ -13,9 +13,11 @@
 	"dependencies": {
 		"@estudos/core": "workspace:*",
 		"@estudos/design-system": "workspace:*",
+		"highlight.js": "11.11.1",
 		"katex": "0.16.22",
 		"motion": "13.5.1",
 		"react-markdown": "10.1.0",
+		"rehype-highlight": "7.0.2",
 		"rehype-katex": "7.0.1",
 		"remark-gfm": "4.0.1",
 		"remark-math": "6.0.0"

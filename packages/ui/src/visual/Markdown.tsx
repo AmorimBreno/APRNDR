@@ -1,6 +1,10 @@
 // Markdown das respostas: react-markdown com GFM (tabelas, listas de tarefa,
 // riscado) e matemática em LaTeX ($...$ e $$...$$, desenhada pelo KaTeX; a
-// skill teach do perfil de estudos escreve toda conta assim). O embed de
+// skill teach do perfil de estudos escreve toda conta assim). O $ de dinheiro
+// não abre fórmula: o $ logo depois de uma letra (R$ 20, US$ 0,03, R$20) e o $
+// seguido de espaço ("$ 5"; e, como no pandoc, "$ x $" fica texto) são texto
+// comum (remark-dinheiro.ts, uma extensão do micromark tentada antes da do
+// remark-math; código e o $$ em bloco não passam por ela). O embed de
 // imagem do Obsidian (![[nome.png|650]]) mostra a imagem da pasta de dados do
 // perfil (remark-embeds.ts e ImagemDoPerfil.tsx). HTML cru no texto não é
 // interpretado: aparece como texto. Os estilos vêm do Prose do design system
@@ -45,6 +49,7 @@ import { ImagemDoPerfil } from "./ImagemDoPerfil.tsx";
 import { lerEstrutura } from "./ler-estrutura.ts";
 import rehypeCodigo, { CLASSE_LINHA } from "./rehype-codigo.ts";
 import rehypePalavras from "./rehype-palavras.ts";
+import remarkDinheiro from "./remark-dinheiro.ts";
 import remarkEmbeds from "./remark-embeds.ts";
 
 /** As linguagens com destaque (os apelidos de cada uma, como py, js, ts, sh, também valem). */
@@ -52,7 +57,8 @@ export const LINGUAGENS = { python, javascript, typescript, sql, bash, json, r, 
 /** Blocos que viram desenho: o rehype-highlight não mexe neles. */
 const ESTRUTURAS = ["vetor", "matriz"] as const;
 
-const pluginsRemark = [remarkGfm, remarkMath, remarkEmbeds];
+// remarkDinheiro depois do remarkMath: a extensão dele, com add "before", entra na frente da do remark-math (o micromark põe cada extensão "before" antes das já registradas).
+const pluginsRemark = [remarkGfm, remarkMath, remarkDinheiro, remarkEmbeds];
 // throwOnError false: uma fórmula com erro aparece em vermelho, sem derrubar o resto.
 type PluginsRehype = NonNullable<Parameters<typeof ReactMarkdown>[0]["rehypePlugins"]>;
 const pluginsRehype: PluginsRehype = [

@@ -135,3 +135,67 @@ describe("aparecendo (palavras uma a uma)", () => {
 		expect(contar(vetor, 'class="vetor__celula"')).toBe(2);
 	});
 });
+
+describe("o $ de dinheiro não abre fórmula", () => {
+	const semTags = (saida: string) => saida.replace(/<[^>]+>/g, "");
+	const semFormula = (texto: string, opcoes: { emLinha?: boolean; aparecendo?: boolean } = {}) => {
+		const saida = html(texto, opcoes);
+		expect(saida).not.toContain("katex");
+		return saida;
+	};
+
+	it("R$ 20 … R$ 19: sem KaTeX e com o texto inteiro", () => {
+		const frase = "Você compra uma ação por R$ 20 e programa uma ordem de stop para disparar uma venda a R$ 19.";
+		expect(semTags(semFormula(frase))).toBe(frase);
+	});
+
+	it("US$ 0,03, \"$ 5\" e R$20", () => {
+		expect(semTags(semFormula("Custa US$ 0,03 por mil, e o outro US$ 0,05."))).toBe("Custa US$ 0,03 por mil, e o outro US$ 0,05.");
+		expect(semTags(semFormula("Paguei $ 5 e depois $ 7."))).toBe("Paguei $ 5 e depois $ 7.");
+		expect(semTags(semFormula("De R$20 para R$25."))).toBe("De R$20 para R$25.");
+		expect(semTags(semFormula("A$ 10 e C$ 12."))).toBe("A$ 10 e C$ 12.");
+	});
+
+	it("o $ de abertura seguido de espaço não abre fórmula, como no pandoc", () => {
+		expect(semTags(semFormula("Entre $ x $ e mais."))).toBe("Entre $ x $ e mais.");
+	});
+
+	it("preço com código em linha: o `R$` fica intacto", () => {
+		const saida = semFormula("O símbolo `R$` aparece em R$ 10 e `$x$` não é fórmula.");
+		expect(saida).toContain('<code class="codigo-em-linha">R$</code>');
+		expect(saida).toContain('<code class="codigo-em-linha">$x$</code>');
+		expect(semTags(saida)).toBe("O símbolo R$ aparece em R$ 10 e $x$ não é fórmula.");
+	});
+
+	it("blocos de código e vetor não mudam", () => {
+		expect(semFormula("```\npreço = 'R$ 20' + '$x$'\n```")).toContain("preço = &#x27;R$ 20&#x27; + &#x27;$x$&#x27;");
+		expect(semFormula("```vetor\n['R$ 1', 'US$ 2']\n```")).toContain('class="estrutura estrutura--vetor"');
+	});
+
+	it("fórmulas de verdade continuam virando KaTeX", () => {
+		for (const texto of ["$x^2$", "$2x+1$", "$\\frac{a}{b}$", "a área é $\\pi r^2$.", "$R$"]) {
+			const saida = html(texto);
+			expect(saida, texto).toContain('class="katex"');
+			expect(saida, texto).not.toMatch(/<p>[^<]*\$/);
+		}
+		const bloco = html("$$\n\\int_0^1 x\\,dx\n$$");
+		expect(bloco).toContain('class="katex-display"');
+	});
+
+	it("uma fórmula e um preço na mesma frase", () => {
+		const saida = html("o lucro $L = R - C$ foi de R$ 300");
+		expect(contar(saida, 'class="katex"')).toBe(1);
+		expect(saida).toContain("L = R - C</annotation>");
+		expect(saida).toContain(" foi de R$ 300</p>");
+	});
+
+	it("streaming: texto pela metade não lança erro e o preço já aparece certo", () => {
+		const frase = "o lucro $L = R - C$ foi de R$ 300, e $ 5 de taxa; o resto $$\n\\int";
+		for (let fim = 0; fim <= frase.length; fim++) {
+			expect(() => html(frase.slice(0, fim), { aparecendo: true })).not.toThrow();
+		}
+		const meio = html("Comprou por R$ 20 e vendeu a R$", { aparecendo: true });
+		expect(meio).not.toContain("katex");
+		expect(meio).toMatch(/<span class="palavra"[^>]*>R\$<\/span><\/p>/);
+	});
+});

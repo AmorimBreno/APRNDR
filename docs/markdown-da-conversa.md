@@ -25,6 +25,13 @@ A derivada de $x^2$ é $2x$.
 $$\int_0^1 x^2\,dx = \frac{1}{3}$$
 ```
 
+O $ de dinheiro não abre fórmula, para "R$ 20 … R$ 19" não virar LaTeX entre os dois $. Fica como texto comum:
+
+- o $ logo depois de uma letra: `R$ 20`, `US$ 0,03`, `A$`, `C$`, e também `R$20`;
+- o $ seguido de espaço: `$ 5`, `custa $ 20`. Como no pandoc, um $ de abertura seguido de espaço não abre fórmula: `$ x $` fica como texto.
+
+A fórmula na linha, então, começa com o $ colado no primeiro caractere da conta e sem letra logo antes dele: `$x^2$`, `$\frac{a}{b}$`, `a área é $\pi r^2$`, `$R$` (a variável R). Fórmula e preço convivem na mesma frase: `o lucro $L = R - C$ foi de R$ 300`. Dentro de código (em linha ou em bloco, vetor e matriz incluídos) o $ nunca é fórmula, e o `$$` em bloco não muda. Quem precisar de um $ literal num caso fora dessas regras escreve `\$`.
+
 
 ## Imagem da pasta de dados
 

@@ -29,7 +29,8 @@ import { Type } from "typebox";
 import { type Curso, ErroCurso, type Escopo, lerCurso, materiaisProntos, type TipoCurso } from "../lib/cursos.ts";
 import type { PromptUsado } from "../lib/diagnostico.ts";
 import { NOMES_TIPO_MODULO } from "../lib/esqueleto.ts";
-import { ErroMapa, lerMapa } from "../lib/mapa.ts";
+import { objetoJsonDoModelo } from "../lib/json-do-modelo.ts";
+import { ErroMapa, lerMapa, PAINEL_MAPA } from "../lib/mapa.ts";
 import { arquivoMateria, ErroMaterias } from "../lib/materias.ts";
 import {
 	type AcoesModulos,
@@ -108,11 +109,22 @@ const mensagemDe = (erro: unknown, acao: keyof typeof FRASES) =>
 	erro instanceof ErroCurso || erro instanceof ErroMapa || erro instanceof ErroMaterias ? erro.message : `Não consegui ${FRASES[acao]}: ${(erro as Error).message}`;
 
 /**
+ * O estado de um módulo na tela com o aviso: os materiais do formulário que
+ * entraram sem referências porque o mapa de conteúdo não terminou (durante a
+ * geração e no módulo gerado, até a próxima ação nele). EstadoModuloNaTela
+ * ainda não tem o campo. Em esperando_materiais, `mensagem` diz a etapa
+ * ("Esperando o processamento de aula-05.pdf", "Esperando o mapa de conteúdo
+ * de aula-05.pdf").
+ */
+export type EstadoModulo = EstadoModuloNaTela & { aviso?: string };
+
+/**
  * A mensagem "estado" com o próximo módulo do curso (proximoModulo: o
  * primeiro que não está gerado nem aguardando; null com todos gerados ou
- * aguardando). MensagemEstadoModulos ainda não tem o campo.
+ * aguardando) e os módulos com o aviso. MensagemEstadoModulos ainda não tem
+ * esses campos.
  */
-export type MensagemEstado = MensagensModulos["estado"] & { proximo: string | null };
+export type MensagemEstado = Omit<MensagensModulos["estado"], "modulos"> & { modulos: EstadoModulo[]; proximo: string | null };
 
 // --- O modelo --------------------------------------------------------------------
 
@@ -155,29 +167,6 @@ function resolverModelo(registro: RegistroCursos, nome: string, para: string): M
 		throw new ErroModulo(`O modelo ${para} "${nome}": o provedor "${provedor}" não tem credencial. Defina a variável de ambiente do provedor (por exemplo OPENROUTER_API_KEY) e reinicie o app.`);
 	}
 	return modelo;
-}
-
-/**
- * O objeto JSON da resposta, tolerando ```json em volta do texto inteiro ou
- * texto antes e depois. Diferente do objetoDaResposta de cursos.ts, uma cerca
- * ``` dentro das strings do JSON (os blocos de código das lições) não é
- * tomada pela cerca de fora. Fora disso, um Error com o motivo.
- */
-export function objetoDoTexto(texto: string): unknown {
-	let candidato = texto.trim();
-	const cercado = /^```[a-z]*[ \t]*\r?\n([\s\S]*)\r?\n?```$/i.exec(candidato)?.[1];
-	if (cercado !== undefined) candidato = cercado.trim();
-	if (!candidato.startsWith("{")) {
-		const inicio = candidato.indexOf("{");
-		const fim = candidato.lastIndexOf("}");
-		if (inicio < 0 || fim < inicio) throw new Error("a resposta não tem um objeto JSON");
-		candidato = candidato.slice(inicio, fim + 1);
-	}
-	try {
-		return JSON.parse(candidato);
-	} catch (erro) {
-		throw new Error(`o JSON está inválido (${(erro as Error).message})`);
-	}
 }
 
 // --- As mensagens aos modelos ------------------------------------------------------
@@ -388,14 +377,22 @@ interface Geracao {
 	/** Só depois de conferida (podeGerar) a geração aparece no estado. */
 	aceita: boolean;
 	situacao: "esperando_materiais" | "planejando" | "escrevendo";
-	/** Em esperando_materiais: os materiais do formulário que ainda não ficaram prontos. */
+	/** Em esperando_materiais: os materiais do formulário que ainda não ficaram prontos (etapa processamento) ou que ainda não entraram no mapa (etapa mapa). */
 	esperando?: string[];
+	etapa?: "processamento" | "mapa";
 	/** Em escrevendo: a lição (a partir de 1) e quantas o plano tem. */
 	licao?: number;
 	licoes?: number;
-	/** Acorda a espera dos materiais (um aviso "materiais:pronto" da matéria). */
+	/** Os materiais do formulário que entraram sem referências (o mapa não terminou). */
+	aviso?: string;
+	/** Os materiais cujo mapeamento deu erro (a mensagem "erro" do painel do mapa). */
+	falhasDoMapa: Set<string>;
+	/** Acorda a espera (um aviso "materiais:pronto" ou uma mensagem do mapa da matéria). */
 	acordar?: () => void;
 }
+
+/** "a", "a e b", "a, b e c". */
+const listaComE = (itens: readonly string[]) => (itens.length <= 1 ? (itens[0] ?? "") : `${itens.slice(0, -1).join(", ")} e ${itens.at(-1)}`);
 
 /** Os materiais do formulário: textos com barras normais, sem vazios e sem repetir. */
 function listaDeMateriais(valor: unknown): string[] {
@@ -420,6 +417,8 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 	const geracoes = new Map<string, Geracao>();
 	/** A frase da última geração que falhou, por "matéria/curso/módulo", até a próxima ação nele. */
 	const erros = new Map<string, string>();
+	/** O aviso da última geração (materiais sem referências), por "matéria/curso/módulo", até a próxima ação nele. */
+	const avisos = new Map<string, string>();
 	/** Os cursos cujo estado a tela pediu, por matéria: recebem o estado de novo quando um material chega ou sai. */
 	const vistos = new Map<string, Set<string>>();
 
@@ -458,20 +457,24 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 	 * quando há), o arquivo ilegível (erro), o gravado (gerado ou aguardando,
 	 * com materialNovo) ou a_gerar. Curso que não está pronto: nenhum módulo.
 	 */
-	const estadoDoCurso = async (dados: string, materia: string, curso: string): Promise<{ modulos: EstadoModuloNaTela[]; proximo: string | null }> => {
+	const estadoDoCurso = async (dados: string, materia: string, curso: string): Promise<{ modulos: EstadoModulo[]; proximo: string | null }> => {
 		const atual = await lerCurso(dados, materia, curso);
 		if (atual.situacao !== "pronto" || !atual.esqueleto) return { modulos: [], proximo: null };
 		const lidos = await situacoesDoCurso(dados, materia, curso);
 		const algumAguardando = Object.values(lidos.modulos).some((modulo) => modulo.situacao === "aguardando_material");
 		const prontos = algumAguardando ? await materiaisProntos(dados, materia) : [];
 		const geracao = geracoes.get(chaveDo(materia, atual.id));
-		const lista = atual.esqueleto.modulos.map(({ id }): EstadoModuloNaTela => {
+		const lista = atual.esqueleto.modulos.map(({ id }): EstadoModulo => {
 			if (geracao?.aceita && geracao.modulo === id) {
+				const esperando = geracao.esperando ?? [];
 				return {
 					id,
 					situacao: geracao.situacao,
-					...(geracao.situacao === "esperando_materiais" ? { esperando: [...(geracao.esperando ?? [])] } : {}),
+					...(geracao.situacao === "esperando_materiais"
+						? { esperando: [...esperando], mensagem: `Esperando ${geracao.etapa === "mapa" ? "o mapa de conteúdo" : "o processamento"} de ${listaComE(esperando)}` }
+						: {}),
 					...(geracao.situacao === "escrevendo" ? { licao: geracao.licao, licoes: geracao.licoes } : {}),
+					...(geracao.aviso ? { aviso: geracao.aviso } : {}),
 				};
 			}
 			const ilegivel = lidos.erros.find((erro) => erro.modulo === id);
@@ -486,7 +489,8 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 			}
 			const erro = erros.get(chaveDoModulo(materia, atual.id, id));
 			if (erro) return { id, situacao: "erro", mensagem: erro, ...doGravado };
-			if (gravado) return { id, situacao: gravado.situacao, ...doGravado };
+			const aviso = gravado?.situacao === "gerado" ? avisos.get(chaveDoModulo(materia, atual.id, id)) : undefined;
+			if (gravado) return { id, situacao: gravado.situacao, ...doGravado, ...(aviso ? { aviso } : {}) };
 			return { id, situacao: "a_gerar" };
 		});
 		return { modulos: lista, proximo: proximoModulo(atual.esqueleto, lidos.situacoes) };
@@ -508,6 +512,35 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 			await mostrarEstado(dados, materia, curso);
 		}).catch((erro: unknown) => mostrar("erro", { mensagem: mensagemDe(erro, "listar"), ao, materia, curso }));
 
+	/** Dorme até `ms`, um aviso que acorda a geração ou o cancelamento. */
+	const dormir = (geracao: Geracao, ms: number) =>
+		new Promise<void>((resolver) => {
+			const sinal = geracao.controle.signal;
+			const fim = () => {
+				clearTimeout(relogio);
+				sinal.removeEventListener("abort", fim);
+				if (geracao.acordar === fim) geracao.acordar = undefined;
+				resolver();
+			};
+			const relogio = setTimeout(fim, ms);
+			sinal.addEventListener("abort", fim, { once: true });
+			geracao.acordar = fim;
+		});
+
+	/** Muda o que a geração está esperando e manda o estado, se mudou. */
+	const mostrarEspera = async (dados: string, materia: string, curso: string, geracao: Geracao, etapa: "processamento" | "mapa", faltam: string[]) => {
+		if (geracao.situacao === "esperando_materiais" && geracao.etapa === etapa && JSON.stringify(faltam) === JSON.stringify(geracao.esperando)) return;
+		geracao.situacao = "esperando_materiais";
+		geracao.etapa = etapa;
+		geracao.esperando = faltam;
+		await mostrarNaTrava(dados, materia, curso, "gerar");
+	};
+
+	const minutosDaEspera = () => {
+		const minutos = Math.max(1, Math.round(tempoEspera / 60_000));
+		return `${minutos} minuto${minutos === 1 ? "" : "s"}`;
+	};
+
 	/**
 	 * Espera os materiais do formulário aparecerem entre os materiais prontos
 	 * da matéria (manifesto no .extraido), acordando a cada aviso
@@ -522,29 +555,47 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 			const prontos = new Set((await materiaisProntos(dados, materia)).map((item) => item.arquivo));
 			const faltam = nomes.filter((nome) => !prontos.has(nome));
 			if (faltam.length === 0) return;
-			if (JSON.stringify(faltam) !== JSON.stringify(geracao.esperando)) {
-				geracao.situacao = "esperando_materiais";
-				geracao.esperando = faltam;
-				await mostrarNaTrava(dados, materia, curso, "gerar");
-			}
+			await mostrarEspera(dados, materia, curso, geracao, "processamento", faltam);
 			const resta = limite - Date.now();
 			if (resta <= 0) {
-				const minutos = Math.max(1, Math.round(tempoEspera / 60_000));
 				throw new ErroModulo(
-					`${faltam.length === 1 ? `O material ${faltam[0]} não ficou pronto` : `Os materiais ${faltam.join(", ")} não ficaram prontos`} em ${minutos} minuto${minutos === 1 ? "" : "s"} (o processamento falhou ou ainda não terminou). O módulo não foi gerado; confira os materiais da matéria e gere de novo.`,
+					`${faltam.length === 1 ? `O material ${faltam[0]} não ficou pronto` : `Os materiais ${listaComE(faltam)} não ficaram prontos`} em ${minutosDaEspera()} (o processamento falhou ou ainda não terminou). O módulo não foi gerado; confira os materiais da matéria e gere de novo.`,
 				);
 			}
-			await new Promise<void>((resolver) => {
-				const fim = () => {
-					clearTimeout(relogio);
-					sinal.removeEventListener("abort", fim);
-					if (geracao.acordar === fim) geracao.acordar = undefined;
-					resolver();
-				};
-				const relogio = setTimeout(fim, Math.min(intervalo, resta));
-				sinal.addEventListener("abort", fim, { once: true });
-				geracao.acordar = fim;
-			});
+			await dormir(geracao, Math.min(intervalo, resta));
+		}
+	};
+
+	/**
+	 * Depois de prontos, espera os materiais do formulário entrarem no mapa de
+	 * conteúdo da matéria (mapa.arquivos com o hash do manifesto; o mapa se
+	 * atualiza sozinho pelo "materiais:pronto"), com o mesmo tempo limite,
+	 * acordando a cada mensagem do painel do mapa da matéria ou a cada
+	 * `intervalo`. Devolve os que ficaram sem mapa: os com erro no mapeamento
+	 * (a mensagem "erro" do mapa), os que passaram do tempo limite, ou todos,
+	 * se o mapa não puder ser lido. A geração segue com eles sem referências
+	 * (o aviso). Cancelada, Cancelado.
+	 */
+	const esperarMapa = async (dados: string, materia: string, curso: string, geracao: Geracao, nomes: readonly string[]): Promise<string[]> => {
+		const sinal = geracao.controle.signal;
+		const limite = Date.now() + tempoEspera;
+		for (;;) {
+			if (sinal.aborted) throw new Cancelado();
+			const prontos = new Map((await materiaisProntos(dados, materia)).map((item) => [item.arquivo, item.hash]));
+			let mapeados: Record<string, { hash: string } | undefined>;
+			try {
+				mapeados = (await lerMapa(dados, materia)).arquivos;
+			} catch {
+				return nomes.filter((nome) => prontos.has(nome));
+			}
+			const semMapa = nomes.filter((nome) => prontos.has(nome) && mapeados[nome]?.hash !== prontos.get(nome));
+			const falharam = semMapa.filter((nome) => geracao.falhasDoMapa.has(nome));
+			const faltam = semMapa.filter((nome) => !geracao.falhasDoMapa.has(nome));
+			if (faltam.length === 0) return falharam;
+			await mostrarEspera(dados, materia, curso, geracao, "mapa", faltam);
+			const resta = limite - Date.now();
+			if (resta <= 0) return semMapa;
+			await dormir(geracao, Math.min(intervalo, resta));
 		}
 	};
 
@@ -570,7 +621,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 					: `O módulo ${emAndamento.modulo} deste curso está sendo gerado. Espere terminar (ou pare) antes de gerar outro.`,
 			);
 		}
-		const geracao: Geracao = { modulo, controle: new AbortController(), aceita: false, situacao: "planejando" };
+		const geracao: Geracao = { modulo, controle: new AbortController(), aceita: false, situacao: "planejando", falhasDoMapa: new Set() };
 		geracoes.set(chave, geracao);
 		const sinal = geracao.controle.signal;
 		const comPedido = pedido ? { pedido } : {};
@@ -592,7 +643,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 			const modeloPlano = resolverModelo(registro, promptPlano.modelo, "do plano do módulo");
 			const modeloLicao = resolverModelo(registro, promptLicao.modelo, "das lições do módulo");
 
-			await naTrava(materia, async () => {
+			const escopo = await naTrava(materia, async () => {
 				const atual = await lerCurso(dados, materia, curso);
 				const { situacoes } = await situacoesDoCurso(dados, materia, curso);
 				podeGerar(atual, situacoes, modulo);
@@ -603,15 +654,25 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 					const faltam = materiaisNovos.filter((nome) => !prontos.has(nome));
 					if (faltam.length > 0) {
 						geracao.situacao = "esperando_materiais";
+						geracao.etapa = "processamento";
 						geracao.esperando = faltam;
 					}
 				}
 				geracao.aceita = true;
 				erros.delete(chaveModulo);
+				avisos.delete(chaveModulo);
 				await mostrarEstado(dados, materia, curso, pedido);
+				return atual.objetivo?.escopo;
 			});
 
-			if (materiaisNovos.length > 0) await esperarMateriais(dados, materia, curso, geracao, materiaisNovos);
+			if (materiaisNovos.length > 0) {
+				await esperarMateriais(dados, materia, curso, geracao, materiaisNovos);
+				// No escopo livre o material não entra na geração: não há referências para esperar.
+				if (escopo !== "livre") {
+					const semMapa = await esperarMapa(dados, materia, curso, geracao, materiaisNovos);
+					if (semMapa.length > 0) geracao.aviso = `${listaComE(semMapa)} ${semMapa.length === 1 ? "entrou" : "entraram"} sem referências: o mapa não terminou.`;
+				}
+			}
 
 			// O plano: uma chamada, fora da trava.
 			if (sinal.aborted) throw new Cancelado();
@@ -619,6 +680,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 			if (geracao.situacao !== "planejando") {
 				geracao.situacao = "planejando";
 				geracao.esperando = undefined;
+				geracao.etapa = undefined;
 				await mostrarNaTrava(dados, materia, curso, "gerar");
 			}
 			const entrada = await entradaDoModelo(dados, materia, curso, modulo, { pedido: doPedido });
@@ -627,7 +689,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 				modeloPlano,
 				promptPlano.instrucoes,
 				mensagemDoPlano(entrada.plano),
-				(texto) => validarPlano(objetoDoTexto(texto), { conceitosDoModulo: entrada.plano.conceitos.map((conceito) => conceito.id), licoes: entrada.plano.licoes, tipo: entrada.plano.curso.tipo }),
+				(texto) => validarPlano(objetoJsonDoModelo(texto), { conceitosDoModulo: entrada.plano.conceitos.map((conceito) => conceito.id), licoes: entrada.plano.licoes, tipo: entrada.plano.curso.tipo }),
 				sinal,
 				{
 					maxTokens: MAX_TOKENS_PLANO,
@@ -653,7 +715,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 					modeloLicao,
 					promptLicao.instrucoes,
 					mensagemDaLicao(entradaLicao),
-					(texto) => validarLicao(objetoDoTexto(texto), { licao: entradaLicao.licao, trechos: entradaLicao.referencias, escopo: entradaLicao.curso.escopo }).licao,
+					(texto) => validarLicao(objetoJsonDoModelo(texto), { licao: entradaLicao.licao, trechos: entradaLicao.referencias, escopo: entradaLicao.curso.escopo }).licao,
 					sinal,
 					{
 						maxTokens: MAX_TOKENS_LICAO,
@@ -669,6 +731,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 			await naTrava(materia, async () => {
 				if (sinal.aborted) throw new Cancelado();
 				if (geracoes.get(chave) === geracao) geracoes.delete(chave);
+				if (geracao.aviso) avisos.set(chaveModulo, geracao.aviso);
 				const modelo = promptPlano.modelo === promptLicao.modelo ? promptPlano.modelo : `${promptPlano.modelo} (plano) e ${promptLicao.modelo} (lições)`;
 				await gravarModuloGerado(
 					dados,
@@ -709,6 +772,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 		for (const geracao of geracoes.values()) geracao.controle.abort();
 		geracoes.clear();
 		erros.clear();
+		avisos.clear();
 		vistos.clear();
 	});
 
@@ -733,6 +797,19 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 	};
 	pi.events.on("materiais:pronto", avisoDeMaterial);
 	pi.events.on("materiais:removido", avisoDeMaterial);
+
+	// O mapa da matéria mudou ou deu erro (as mensagens do painel do mapa pela
+	// ponte): as gerações da matéria que esperam o mapa conferem de novo; um
+	// erro de mapeamento de um material esperado deixa ele sem mapa.
+	pi.events.on("interface:mostrar", (recebido) => {
+		const { painel, acao, dados } = (recebido ?? {}) as { painel?: unknown; acao?: unknown; dados?: { materia?: unknown; arquivo?: unknown } };
+		if (painel !== PAINEL_MAPA || !pastaDados || typeof dados?.materia !== "string") return;
+		for (const [chave, geracao] of geracoes) {
+			if (!chave.startsWith(`${dados.materia}/`) || geracao.etapa !== "mapa") continue;
+			if (acao === "erro" && typeof dados.arquivo === "string" && geracao.esperando?.includes(dados.arquivo)) geracao.falhasDoMapa.add(dados.arquivo);
+			geracao.acordar?.();
+		}
+	});
 
 	pi.events.on("interface:acao", (recebido) => {
 		const { painel, acao, dados: bruto } = recebido as { painel?: string; acao?: string; dados?: unknown };
@@ -779,6 +856,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 						if (emAndamento?.modulo === modulo) throw new ErroModulo("Este módulo está sendo gerado. Pare a geração antes de marcá-lo como aguardando material.");
 						await marcarAguardando(dados, materia, curso, modulo, dadosAcao.nota, daSessao());
 						erros.delete(chaveDoModulo(materia, curso, modulo));
+						avisos.delete(chaveDoModulo(materia, curso, modulo));
 						await mostrarEstado(dados, materia, curso, pedido);
 					});
 				} else if (ao === "cancelar") {
@@ -789,6 +867,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 						geracoes.delete(chave);
 					}
 					erros.delete(chaveDoModulo(materia, curso, modulo));
+					avisos.delete(chaveDoModulo(materia, curso, modulo));
 					await naTrava(materia, () => mostrarEstado(dados, materia, curso, pedido));
 				} else if (ao === "abrir") {
 					await naTrava(materia, async () => {

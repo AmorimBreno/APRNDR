@@ -14,11 +14,11 @@ import { confirmarEtapa, type Curso, gravarCurso, novoCurso } from "../lib/curso
 import type { Diagnostico } from "../lib/diagnostico.ts";
 import { calcularCalendario, type Modulo as ModuloDoEsqueleto } from "../lib/esqueleto.ts";
 import { lerEventos } from "../lib/eventos.ts";
-import { type Conceito, gravarMapa, mapaVazio, pastaExtraidoArquivo } from "../lib/mapa.ts";
+import { type Conceito, gravarMapa, lerMapa, mapaVazio, pastaExtraidoArquivo } from "../lib/mapa.ts";
 import { criarMateria, eventosMateria } from "../lib/materias.ts";
 import { caminhoDoModulo, type EstadoModuloNaTela, lerModulo, type ModuloGerado } from "../lib/modulos.ts";
 import { hashDoPrompt } from "./cursos.ts";
-import modulos, { type MensagemEstado, objetoDoTexto, type OpcoesModulos } from "./modulos.ts";
+import modulos, { type MensagemEstado, type OpcoesModulos } from "./modulos.ts";
 
 type Resultado = { content: Array<{ text: string }>; details: unknown; isError?: boolean };
 type Entrada = { type: string; customType?: string; data?: unknown };
@@ -268,6 +268,12 @@ const LICAO_2 = JSON.stringify({ blocos: [explicacao("c-idf", "exemplo_incomplet
 /** Uma lição sem prática que valha (validarLicao pede a nova tentativa). */
 const LICAO_SEM_PRATICA = JSON.stringify({ blocos: [explicacao("c-tf", "conceito", "página 1")] });
 
+/** Marca o arquivo como mapeado no mapa da matéria (mapa.arquivos com o hash do manifesto), como o mapeador faria. */
+async function mapear(arquivo: string, hash = `h-${arquivo}`): Promise<void> {
+	const mapa = await lerMapa(dados, materia);
+	await gravarMapa(dados, materia, { ...mapa, arquivos: { ...mapa.arquivos, [arquivo]: { hash, mapeadoEm: AGORA.toISOString(), modelo: "teste/modelo-x", custo: 0, conceitos: 0 } } });
+}
+
 /** Põe as respostas de uma geração de m1 que dá certo. */
 const geracaoQueDaCerto = () => respostas.push(PLANO_M1, LICAO_1, LICAO_2);
 
@@ -426,18 +432,54 @@ describe("ponte", () => {
 		expect(situacaoDe("m1")).toBe("gerado");
 	});
 
-	it("esperando_materiais até o material do formulário ficar pronto (pelo aviso)", async () => {
+	it("esperando_materiais até o material do formulário ficar pronto (pelo aviso) e entrar no mapa", async () => {
 		geracaoQueDaCerto();
 		acao("gerar", { modulo: "m1", pedido: "p-esp", materiaisNovos: ["aula-05.pdf", "aula-05.pdf"] });
 		await respondeu("p-esp");
-		expect(doModulo(ultimo(), "m1")).toEqual({ id: "m1", situacao: "esperando_materiais", esperando: ["aula-05.pdf"] });
+		expect(doModulo(ultimo(), "m1")).toEqual({ id: "m1", situacao: "esperando_materiais", esperando: ["aula-05.pdf"], mensagem: "Esperando o processamento de aula-05.pdf" });
 		await new Promise((resolver) => setTimeout(resolver, 30));
 		expect(chamadas).toHaveLength(0);
 		await extrair("aula-05.pdf", [{ local: "página 1", nome: "pagina-1", texto: "Aula 5." }]);
 		barramento.emit("materiais:pronto", { caminho: `materias/${materia}/materiais/aula-05.pdf` });
+		await esperar(() => doModulo(ultimo(), "m1")?.mensagem === "Esperando o mapa de conteúdo de aula-05.pdf");
+		expect(doModulo(ultimo(), "m1")).toMatchObject({ situacao: "esperando_materiais", esperando: ["aula-05.pdf"] });
+		await new Promise((resolver) => setTimeout(resolver, 30));
+		expect(chamadas).toHaveLength(0);
+		// O mapa grava o arquivo e manda o estado dele pela ponte.
+		await mapear("aula-05.pdf");
+		barramento.emit("interface:mostrar", { painel: "mapa", acao: "mapa", dados: { materia }, gravar: false });
 		await esperar(() => situacaoDe("m1") === "gerado");
 		expect(caminhoDe("m1")).toEqual(["esperando_materiais", "planejando", "escrevendo 1/2", "escrevendo 2/2", "gerado"]);
+		expect(doModulo(ultimo(), "m1")!.aviso).toBeUndefined();
 		expect(((await lerModulo(dados, materia, CURSO, "m1")) as ModuloGerado).pedido?.materiaisNovos).toEqual(["aula-05.pdf"]);
+	});
+
+	it("um material já pronto e mapeado não faz esperar", async () => {
+		await extrair("aula-05.pdf", [{ local: "página 1", nome: "pagina-1", texto: "Aula 5." }]);
+		await mapear("aula-05.pdf");
+		geracaoQueDaCerto();
+		await gerarM1("p", { materiaisNovos: ["aula-05.pdf"] });
+		expect(caminhoDe("m1")).toEqual(["planejando", "escrevendo 1/2", "escrevendo 2/2", "gerado"]);
+	});
+
+	it("o mapeamento que dá erro: gera assim mesmo, com o aviso no estado até a próxima ação", async () => {
+		await extrair("aula-05.pdf", [{ local: "página 1", nome: "pagina-1", texto: "Aula 5." }]);
+		geracaoQueDaCerto();
+		acao("gerar", { modulo: "m1", pedido: "p", materiaisNovos: ["aula-05.pdf"] });
+		await respondeu("p");
+		await esperar(() => doModulo(ultimo(), "m1")?.mensagem === "Esperando o mapa de conteúdo de aula-05.pdf");
+		barramento.emit("interface:mostrar", { painel: "mapa", acao: "erro", dados: { mensagem: "falhou", ao: "mapear", materia, arquivo: "aula-05.pdf" }, gravar: false });
+		await esperar(() => situacaoDe("m1") === "gerado");
+		const aviso = "aula-05.pdf entrou sem referências: o mapa não terminou.";
+		// Durante a geração (planejando, escrevendo) e no gerado.
+		expect(doModulo(estados().find((estado) => doModulo(estado, "m1")?.situacao === "escrevendo"), "m1")?.aviso).toBe(aviso);
+		expect(doModulo(ultimo(), "m1")?.aviso).toBe(aviso);
+		acao("listar", { pedido: "l" });
+		await respondeu("l");
+		expect(doModulo(ultimo(), "m1")?.aviso).toBe(aviso);
+		acao("cancelar", { modulo: "m1", pedido: "c" });
+		await respondeu("c");
+		expect(doModulo(ultimo(), "m1")?.aviso).toBeUndefined();
 	});
 
 	it("cancelar para a geração e volta ao que estava", async () => {
@@ -531,6 +573,16 @@ describe("ponte", () => {
 });
 
 describe("tempo limite dos materiais", () => {
+	it("o mapa que não termina no tempo: gera assim mesmo, com o aviso", async () => {
+		ligar({ tempoEsperaMateriaisMs: 60, intervaloVarreduraMs: 10 });
+		await extrair("aula-05.pdf", [{ local: "página 1", nome: "pagina-1", texto: "Aula 5." }]);
+		await extrair("aula-06.pdf", [{ local: "página 1", nome: "pagina-1", texto: "Aula 6." }]);
+		geracaoQueDaCerto();
+		acao("gerar", { modulo: "m1", pedido: "p", materiaisNovos: ["aula-05.pdf", "aula-06.pdf"] });
+		await esperar(() => situacaoDe("m1") === "gerado");
+		expect(doModulo(ultimo(), "m1")?.aviso).toBe("aula-05.pdf e aula-06.pdf entraram sem referências: o mapa não terminou.");
+	});
+
 	it("o material que não fica pronto vira erro claro", async () => {
 		ligar({ tempoEsperaMateriaisMs: 60, intervaloVarreduraMs: 10 });
 		acao("gerar", { modulo: "m1", pedido: "p", materiaisNovos: ["aula-09.pdf"] });
@@ -587,17 +639,5 @@ describe("ler_modulo", () => {
 		const fora = await ferramentas.ler_modulo!.execute("3", { curso: CURSO, modulo: "m9" }, undefined, undefined, ctx);
 		expect(fora.isError).toBe(true);
 		expect(fora.content[0]!.text).toContain('Não achei o módulo "m9"');
-	});
-});
-
-describe("objetoDoTexto", () => {
-	it("aceita o JSON puro, com cerca em volta ou com texto antes e depois, mesmo com ``` dentro das strings", () => {
-		const json = JSON.stringify({ blocos: [{ texto: "```python\nx = 1\n```" }] });
-		const esperado = { blocos: [{ texto: "```python\nx = 1\n```" }] };
-		expect(objetoDoTexto(json)).toEqual(esperado);
-		expect(objetoDoTexto(`\`\`\`json\n${json}\n\`\`\``)).toEqual(esperado);
-		expect(objetoDoTexto(`Aqui está:\n${json}\nPronto.`)).toEqual(esperado);
-		expect(() => objetoDoTexto("nada")).toThrow("a resposta não tem um objeto JSON");
-		expect(() => objetoDoTexto("{ quebrado")).toThrow(/o JSON está inválido/);
 	});
 });

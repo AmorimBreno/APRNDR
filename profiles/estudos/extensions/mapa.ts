@@ -60,6 +60,7 @@ import {
 	aplicarOperacoes,
 } from "../lib/mapa.ts";
 import { TIPOS_CURSO, type TipoCurso } from "../lib/curso-tipos.ts";
+import { objetoJsonDoModelo } from "../lib/json-do-modelo.ts";
 import { arquivoMateria, ErroMaterias } from "../lib/materias.ts";
 import { materiaDaConversa } from "./notas.ts";
 
@@ -176,27 +177,12 @@ export function mensagemDoMapeador(entrada: { mapa: MapaConteudo; arquivo: strin
 }
 
 /**
- * A lista "conceitos" do objeto JSON da resposta, tolerando ```json em volta
- * ou texto antes e depois. Fora do formato, um Error com o motivo.
+ * A lista "conceitos" do objeto JSON da resposta (objetoJsonDoModelo: ```json
+ * em volta ou texto antes e depois). Fora do formato, um Error com o motivo.
  */
 function conceitosDaResposta(texto: string): unknown[] {
-	const bruto = texto.trim();
-	const cercado = /```(?:json)?\s*([\s\S]*?)```/i.exec(bruto)?.[1];
-	let candidato = (cercado ?? bruto).trim();
-	if (!candidato.startsWith("{")) {
-		const inicio = candidato.indexOf("{");
-		const fim = candidato.lastIndexOf("}");
-		if (inicio < 0 || fim < inicio) throw new Error("a resposta não tem um objeto JSON");
-		candidato = candidato.slice(inicio, fim + 1);
-	}
-	let valor: unknown;
-	try {
-		valor = JSON.parse(candidato);
-	} catch (erro) {
-		throw new Error(`o JSON está inválido (${(erro as Error).message})`);
-	}
-	const conceitos = (valor as { conceitos?: unknown } | null)?.conceitos;
-	if (typeof valor !== "object" || valor === null || !Array.isArray(conceitos)) throw new Error('falta o campo "conceitos" com uma lista');
+	const conceitos = objetoJsonDoModelo(texto).conceitos;
+	if (!Array.isArray(conceitos)) throw new Error('falta o campo "conceitos" com uma lista');
 	return conceitos;
 }
 

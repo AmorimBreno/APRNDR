@@ -103,6 +103,7 @@ import {
 	recalcularCalendario,
 	salvarEdicao,
 } from "../lib/esqueleto.ts";
+import { objetoJsonDoModelo } from "../lib/json-do-modelo.ts";
 import { ErroMapa, lerMapa, type MapaConteudo } from "../lib/mapa.ts";
 import { arquivoMateria, ErroMaterias } from "../lib/materias.ts";
 import { lerPromptMapeador } from "./mapa.ts";
@@ -262,24 +263,6 @@ const textoDa = (resposta: RespostaModelo) =>
 		.map((parte) => parte.text)
 		.join("")
 		.trim();
-
-/** O objeto JSON da resposta, tolerando ```json em volta ou texto antes e depois. Fora disso, um Error com o motivo. */
-export function objetoDaResposta(texto: string): unknown {
-	const bruto = texto.trim();
-	const cercado = /```(?:json)?\s*([\s\S]*?)```/i.exec(bruto)?.[1];
-	let candidato = (cercado ?? bruto).trim();
-	if (!candidato.startsWith("{")) {
-		const inicio = candidato.indexOf("{");
-		const fim = candidato.lastIndexOf("}");
-		if (inicio < 0 || fim < inicio) throw new Error("a resposta não tem um objeto JSON");
-		candidato = candidato.slice(inicio, fim + 1);
-	}
-	try {
-		return JSON.parse(candidato);
-	} catch (erro) {
-		throw new Error(`o JSON está inválido (${(erro as Error).message})`);
-	}
-}
 
 interface OpcoesChamada {
 	/** Sem ela, a do modelo. */
@@ -871,7 +854,7 @@ export default function cursos(pi: ExtensionAPI, opcoes: OpcoesCursos = {}) {
 				...(trechos ? { trechos } : {}),
 			});
 			// Fora da trava: a chamada pode levar minutos.
-			const resposta = await pedirJson(registro, modelo, prompt.instrucoes, mensagem, (texto) => validarQuestoes(objetoDaResposta(texto), pedidos), sinal, {
+			const resposta = await pedirJson(registro, modelo, prompt.instrucoes, mensagem, (texto) => validarQuestoes(objetoJsonDoModelo(texto), pedidos), sinal, {
 				maxTokens: MAX_TOKENS_QUESTOES,
 				formato: '{"questoes": [...]}, com uma questão para cada uma das pedidas',
 				oQue: "as questões do diagnóstico",
@@ -923,7 +906,7 @@ export default function cursos(pi: ExtensionAPI, opcoes: OpcoesCursos = {}) {
 				modelo,
 				prompt.instrucoes,
 				mensagemDoCorretor(questao, resposta.texto),
-				(texto) => validarCorrecao(objetoDaResposta(texto), questao, { modelo: prompt.modelo, custo: 0 }),
+				(texto) => validarCorrecao(objetoJsonDoModelo(texto), questao, { modelo: prompt.modelo, custo: 0 }),
 				sinal,
 				{
 					temperatura: 0,
@@ -990,7 +973,7 @@ export default function cursos(pi: ExtensionAPI, opcoes: OpcoesCursos = {}) {
 			const mensagem = mensagemDoEsqueleto({ nome: atual.nome, objetivo: atual.objetivo!, basico, hoje, conceitos });
 			// A proposta consertada que passa de 1,5 vez as horas disponíveis volta ao modelo uma vez, com a soma e o limite; na segunda, é aceita (o calendário avisa).
 			const ler = (texto: string, tentativa: number) => {
-				const modulos = consertarProposta(objetoDaResposta(texto), doCurso);
+				const modulos = consertarProposta(objetoJsonDoModelo(texto), doCurso);
 				const pedido = tentativa === 1 ? pedidoDoLimite(modulos, basico, hoje) : undefined;
 				if (pedido) throw new PedirDeNovo(pedido);
 				return modulos;

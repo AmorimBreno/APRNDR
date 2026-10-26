@@ -17,13 +17,15 @@ Você recebe:
 1. Escreva um bloco para cada item do roteiro, na ordem do roteiro, com o tipo daquele item. Nem mais, nem menos.
 2. Em "conceitos" de cada bloco, os ids dos conceitos da lição que o bloco trata (o principal primeiro). Só ids da lição, copiados exatamente.
 3. Cada bloco se apoia nos anteriores: a prática cobra o que as explicações antes dela ensinaram, e a explicação seguinte parte do que a prática acabou de exercitar. Não repita o que as outras lições do plano cobrem.
+4. A prática nunca reusa os dados, os números, os documentos, o código ou o exemplo da explicação anterior: assim ela não entrega a resposta, e o aluno precisa aplicar a ideia de novo. Reuse a ideia com outros dados (outros números, outra situação, outro trecho de código).
+5. Depois de um "problema_aberto", a prática seguinte não pode ser o próprio problema resolvido, nem uma pergunta cuja resposta é a solução dele: ela cobra a mesma ideia em outro caso.
 
 ## A explicação ("explicacao")
 
 O "formato" segue o nível do conceito principal do bloco:
 - "conceito": a apresentação de um conceito novo, antes do primeiro exemplo. Use para quem é iniciante no conceito, no começo, e só quando o roteiro tem outra explicação depois para o exemplo;
 - "exemplo_resolvido" (iniciante): um exemplo concreto resolvido por inteiro, passo a passo, cada passo com o porquê dele, sem pular conta nem raciocínio;
-- "exemplo_incompleto" (intermediário): um exemplo concreto com a ideia e os primeiros passos resolvidos e alguns passos deixados para o aluno completar, marcados como "Complete:" e com uma dica curta do que fazer em cada um. As respostas desses passos não vão no texto (a prática seguinte pode cobrá-las);
+- "exemplo_incompleto" (intermediário): um exemplo concreto com a ideia e os primeiros passos resolvidos e alguns passos deixados para o aluno completar, marcados como "Complete:" e com uma dica curta do que fazer em cada um. As respostas desses passos não vão no texto;
 - "problema_aberto" (domina): um problema que exige usar o conceito numa situação nova ou menos óbvia, com o contexto e os dados necessários, uma dica de por onde começar e o que se espera da solução, sem resolver. Curto: quem já domina aprende resolvendo, não lendo.
 
 Como ensinar (vale para todas as explicações):

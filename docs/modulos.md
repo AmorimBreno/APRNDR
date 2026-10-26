@@ -57,7 +57,7 @@ Calculado pelo código a partir do diagnóstico concluído do curso (por enquant
 
 Pela extensão `extensions/modulos.ts` (painel `modulos`), com os prompts `prompts/modulo-plano.md` e `prompts/modulo-licao.md` (`model: openrouter/openai/gpt-6.1-sol`), como o mapeador e o diagnóstico (chamadas fora da trava, uma nova tentativa com JSON inválido, custo somado, cancelamento).
 
-1. Espera os materiais mandados pelo formulário ficarem prontos (o estado mostra "Esperando o processamento de aula-05.pdf").
+1. Espera os materiais mandados pelo formulário ficarem prontos (o estado mostra "Esperando o processamento de aula-05.pdf") e depois entrarem no mapa de conteúdo da matéria (`mapa.arquivos` com o hash do manifesto; o mapa se atualiza sozinho pelo `materiais:pronto`), com o estado ainda `esperando_materiais` e "Esperando o mapa de conteúdo de aula-05.pdf" (o texto vai em `mensagem`). Cada espera tem o mesmo tempo limite (30 minutos). O material que não fica pronto no tempo é erro e o módulo não é gerado. O mapeamento que falha (a mensagem "erro" do mapa para o arquivo, ou o tempo limite) não impede a geração: o módulo é gerado assim mesmo e o estado leva o `aviso` "aula-05.pdf entrou sem referências: o mapa não terminou." (durante a geração e no módulo gerado, até a próxima ação nele). No escopo livre só a primeira espera vale (o material não entra na geração).
 2. Plano do módulo (uma chamada): recebe os conceitos do módulo (nome, descrição, prioridade, nível), o objetivo e o tipo do módulo, as horas, o objetivo, o escopo, o tipo e o motivo do curso, o formulário e, por conceito, a lista dos locais do material que o citam. Devolve as lições: título, objetivo, conceitos e o roteiro (a sequência dos tipos de bloco). Uma lição por uns 40 a 60 minutos do módulo (de 1 a 6); cada lição alterna explicação e prática e termina com prática; uma dissertativa por módulo pelo menos quando o tipo do curso é teórico ou misto.
 3. Uma chamada por lição: recebe o plano inteiro (para não repetir as outras), a lição, os níveis, e os trechos do `.extraido` citados pelos conceitos da lição (até uns 40 mil caracteres). Devolve os blocos. No escopo "só o material", as questões só cobram o que está nos trechos, e o que for além aparece como complemento.
 4. O código valida: referências como no mapa (um local que não existe é descartado); as questões como no diagnóstico (uma correta, confusão nas erradas, rubrica); blocos vazios saem; uma lição sem prática ou sem explicação pede uma nova tentativa daquela lição (uma vez).
@@ -80,7 +80,7 @@ Tela → extensão:
 - `abrir {materia, curso, modulo}` (parte B).
 
 Extensão → tela (`gravar: false`):
-- `estado {materia, curso, modulos: [{id, situacao, licao?, licoes?, mensagem?, geradoEm?, custo?, licoesGeradas?, blocos?, materialNovo?}], pedido?}`, mandado a cada mudança;
+- `estado {materia, curso, modulos: [{id, situacao, licao?, licoes?, esperando?, mensagem?, aviso?, geradoEm?, custo?, licoesGeradas?, blocos?, questoes?, nota?, materialNovo?}], proximo, pedido?}`, mandado a cada mudança (`proximo`: o próximo módulo, ou null);
 - `modulo {materia, curso, modulo: <o json>}` (parte B);
 - `erro {mensagem, ao?, materia?, curso?, modulo?, pedido?}`.
 

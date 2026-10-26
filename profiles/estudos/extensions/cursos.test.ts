@@ -514,6 +514,20 @@ describe("diagnóstico", () => {
 		expect(chamadas).toHaveLength(0);
 	});
 
+	it("gerar_diagnostico lê de primeira uma resposta com código em bloco no contexto, numa cerca ```json e com texto em volta", async () => {
+		const id = await cursoNoDiagnostico();
+		acao("autoavaliar", { curso: id, pedido: "a1", niveis: NIVEIS });
+		await respondeu("a1");
+		const contexto = "Rode o trecho:\n\n```python\nfreq = {'a': 2}\nprint(len(freq))\n```";
+		const comCodigo = JSON.stringify({ questoes: [{ ...alternativa("c-1"), contexto }, alternativa("c-2"), alternativa("c-3"), DISSERTATIVA] }, null, 2);
+		respostas.push(`Seguem as questões:\n\n\`\`\`json\n${comCodigo}\n\`\`\`\n\nQualquer {ajuste}, avise.`);
+		acao("gerar_diagnostico", { curso: id, pedido: "g1" });
+		await respondeu("g1");
+		expect(erroDe("g1")).toBeUndefined();
+		expect(chamadas).toHaveLength(1);
+		expect((await emAndamento(id)).questoes[0]).toMatchObject({ id: "q1", contexto, enunciado: "Sobre c-1?" });
+	});
+
 	it("gerar_diagnostico chama o modelo com os trechos, tenta de novo com JSON inválido, grava e esconde o gabarito", async () => {
 		const id = await cursoNoDiagnostico();
 		acao("autoavaliar", { curso: id, pedido: "a1", niveis: NIVEIS });

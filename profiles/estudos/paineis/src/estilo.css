@@ -496,10 +496,11 @@
 .guia__titulo { margin: 0; overflow-wrap: anywhere; }
 .guia__trilho { padding: 0 var(--space-8) var(--space-5); border-bottom: var(--border-hair) solid var(--line); }
 .guia__trilho .ap-step__label { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.guia__corpo { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-6) var(--space-8) var(--space-8); scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+.guia__corpo { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-6) var(--space-8) var(--space-5); scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
 .guia__coluna { display: flex; flex-direction: column; gap: var(--space-6); max-width: var(--measure-read); margin: 0 auto; }
 /* A etapa Mapa usa a folha inteira, como a lista da seção Mapa de conteúdo (a descrição vai até a prioridade). */
-.guia__coluna--larga { max-width: none; }
+/* As etapas largas (Mapa, Diagnóstico, Esqueleto) com vão menor: a questão do diagnóstico cabe sem rolar numa janela comum. */
+.guia__coluna--larga { max-width: none; gap: var(--space-4); }
 .guia__coluna > .ap-callout, .guia__mapa .ap-callout { margin: 0; }
 .guia__coluna .ap-empty { background: var(--surface-raised); }
 .guia__texto { margin: 0; color: var(--ink-muted); }
@@ -571,7 +572,9 @@
  * confiança: o invólucro e a section do quiz viram display: contents, e a ordem vem do order. */
 .diag__questao--contexto { container-type: inline-size; }
 .diag__colunas { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-6); }
-.diag__contexto { min-width: 0; }
+.diag__contexto { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+/* O título da questão (os conceitos), no alto da coluna do contexto. */
+.diag__titulo { margin: 0; color: var(--ink-muted); }
 .diag__contexto-dentro { padding: var(--space-4) var(--space-5); border-radius: var(--radius-md); background: var(--surface-raised); scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
 .diag__direita { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
 .diag__direita > .diag__resposta, .diag__direita .ap-quiz { display: contents; }
@@ -582,8 +585,9 @@
 /* Lado a lado, a coluna do contexto tem a altura da questão (pelo menos 16rem) e rola sozinha quando é mais alta. */
 @container (min-width: 720px) {
 	.diag__colunas { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: stretch; }
-	.diag__contexto { position: relative; min-height: 16rem; }
-	.diag__contexto > .diag__contexto-dentro { position: absolute; top: 0; left: 0; right: 0; max-height: 100%; overflow-y: auto; }
+	.diag__contexto { min-height: 16rem; }
+	.diag__contexto-caixa { position: relative; flex: 1; min-height: 0; }
+	.diag__contexto-caixa > .diag__contexto-dentro { position: absolute; top: 0; left: 0; right: 0; max-height: 100%; overflow-y: auto; }
 }
 
 /* Resultado. */

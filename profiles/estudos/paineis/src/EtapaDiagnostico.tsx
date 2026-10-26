@@ -456,6 +456,8 @@ function QuestaoAtual(props: {
 	// Com contexto (gravado, ou o enunciado antigo dividido), duas colunas: o contexto e, ao lado, a pergunta, a confiança e as alternativas.
 	const partes = partesDaQuestao(questao);
 	const enunciado = <Markdown texto={partes.pergunta} emLinha />;
+	// Com contexto, o título da questão (os conceitos) vai no alto da coluna do contexto, não em cima da pergunta.
+	const kicker = partes.contexto ? undefined : props.kicker;
 	const conteudo = (
 		<>
 			<div className="diag__confianca">
@@ -470,7 +472,7 @@ function QuestaoAtual(props: {
 			<div className={`diag__resposta${confianca === undefined ? " diag__resposta--apagada" : ""}`} inert={confianca === undefined}>
 				{questao.tipo === "alternativa" ? (
 					<QuizQuestion
-						kicker={props.kicker}
+						{...(kicker ? { kicker } : {})}
 						prompt={enunciado}
 						options={questao.alternativas.map((alternativa, indice) => ({ id: String(indice), label: <Markdown texto={alternativa.texto} emLinha /> }))}
 						value={escolha !== undefined ? String(escolha) : null}
@@ -485,7 +487,7 @@ function QuestaoAtual(props: {
 					</QuizQuestion>
 				) : (
 					<EssayAnswer
-						kicker={props.kicker}
+						{...(kicker ? { kicker } : {})}
 						prompt={enunciado}
 						value={texto}
 						onChange={setTexto}
@@ -504,8 +506,11 @@ function QuestaoAtual(props: {
 		<div className="diag__questao diag__questao--contexto">
 			<div className="diag__colunas">
 				<div className="diag__contexto" role="region" aria-label="Contexto da questão">
-					<div className="ap-prose body diag__contexto-dentro">
-						<Markdown texto={partes.contexto} />
+					<p className="overline diag__titulo">{props.kicker}</p>
+					<div className="diag__contexto-caixa">
+						<div className="ap-prose body diag__contexto-dentro">
+							<Markdown texto={partes.contexto} />
+						</div>
 					</div>
 				</div>
 				<div className="diag__direita">{conteudo}</div>

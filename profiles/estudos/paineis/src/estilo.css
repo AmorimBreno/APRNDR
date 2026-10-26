@@ -617,10 +617,14 @@
 /* Os menus (tipo, "Mover para…") ficam por cima dos módulos de baixo. */
 .esq__modulo:focus-within { z-index: 3; }
 .esq__modulo--vazio { border-style: dashed; border-color: var(--line-strong); }
-.esq__cabeca { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: var(--space-2) var(--space-3); }
-.esq__titulos { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+/* O número e os controles (tipo, horas, ações) dividem a primeira linha; o nome e o objetivo usam a largura toda embaixo. */
+.esq__cabeca { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 2px var(--space-3); }
+.esq__titulos { display: contents; }
+.esq__titulos > .esq__numero { grid-column: 1; grid-row: 1; }
+.esq__cabeca > .esq__controles { grid-column: 2; grid-row: 1; }
+.esq__titulos > :not(.esq__numero) { grid-column: 1 / -1; min-width: 0; }
 .esq__numero { color: var(--ink-subtle); }
-.esq__nome { overflow-wrap: anywhere; }
+.esq__nome { overflow-wrap: break-word; hyphens: manual; }
 .esq__objetivo { color: var(--ink-muted); }
 .esq__titulos .mapa__campo { width: calc(100% + 12px); margin: 0 -6px; }
 .esq__controles { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-1) var(--space-2); }
@@ -668,7 +672,7 @@
 }
 @media (max-width: 760px) {
 	.esq__cabeca { grid-template-columns: minmax(0, 1fr); }
-	.esq__controles { justify-content: flex-start; }
+	.esq__cabeca > .esq__controles { grid-column: 1; grid-row: 2; justify-content: flex-start; }
 }
 @media (prefers-reduced-motion: reduce) {
 	.esq__modulo, .esq__tipo-botao, .esq__conceito-botao, .esq__acoes { transition: none; }

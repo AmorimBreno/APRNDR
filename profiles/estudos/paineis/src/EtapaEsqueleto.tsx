@@ -404,7 +404,7 @@ function BlocoModulo(props: PropsBloco) {
 					<span className="data esq__numero">Módulo {numero}</span>
 					{somenteLeitura ? (
 						<>
-							<span className="display-sm esq__nome">{modulo.nome}</span>
+							<span className="heading esq__nome">{modulo.nome}</span>
 							{modulo.objetivo ? <span className="body-sm esq__objetivo">{modulo.objetivo}</span> : null}
 						</>
 					) : (
@@ -412,7 +412,7 @@ function BlocoModulo(props: PropsBloco) {
 							<CampoNoLugar
 								valor={modulo.nome}
 								rotulo={`Nome do módulo ${numero}`}
-								classe="display-sm esq__nome"
+								classe="heading esq__nome"
 								vazio="Sem nome"
 								obrigatorio
 								salvar={(valor) => aplicar((atuais) => renomearModulo(atuais, modulo.id, valor))}

@@ -191,3 +191,68 @@ O `contexto.prompt` dos eventos é `{nome, hash}`: o nome do arquivo e os 12 pri
 - Autoavaliação: a lista dos conceitos do curso, cada um com os 4 níveis; "Gerar as questões" quando todos têm nível.
 - Questões, uma por vez, com o placar do QuizProgress: primeiro a confiança (1 a 4), e só então as alternativas (QuizQuestion) ou o campo (EssayAnswer); sem gabarito durante as questões.
 - Resultado: por conceito, o que ele disse e o que acertou; cada questão com o gabarito, a confusão da alternativa errada escolhida e, na dissertativa, a nota por critério com os trechos; "Concluir diagnóstico".
+
+## Parte C: o esqueleto e o curso pronto
+
+ESPECIFICACAO 8.3, etapa 6, e 8.5. O esqueleto são os módulos do curso: nome, objetivo, conceitos e tipo de cada um, com um calendário sugerido de avaliações dentro do prazo. O conteúdo dos módulos não é gerado aqui: ele vem pelo "gerar módulo" quando o Breno chega em cada um (item 6).
+
+### No curso.json
+
+Como no diagnóstico, a proposta em edição fica em `esqueletoEmAndamento`; "Criar curso" confirma a etapa: o conteúdo vira `esqueleto` (com `criadoEm`), o em andamento sai, e a `situacao` do curso passa a `pronto`. Tudo o que invalida a etapa `esqueleto` apaga também o em andamento. Um curso pronto não volta a ser rascunho: mudar uma etapa dele fica para depois (o guia de um curso pronto abre só para leitura).
+
+```json
+"esqueletoEmAndamento": {
+	"modulos": [
+		{
+			"id": "m1",
+			"nome": "A reta de regressão",
+			"objetivo": "Ajustar e interpretar uma regressão linear simples.",
+			"conceitos": ["c-…", "c-…"],
+			"tipo": "normal",
+			"horas": 3
+		}
+	],
+	"geradoEm": "…", "modelo": "openrouter/openai/gpt-6.1-sol", "custo": 0.02
+}
+```
+
+- `modulos`, na ordem do curso. Todo conceito do curso (`curso.mapa.conceitos`) está em exatamente um módulo; um módulo tem pelo menos um conceito.
+- `tipo`: `normal`, `curto` (conceitos que o diagnóstico mostrou que ele já domina: menos explicação, mais prática) ou `revisao` (só retomar e praticar).
+- `horas`: o tempo estimado do módulo (de 0,5 a 40, passo de 0,5).
+- `id`: m1, m2… atribuídos pelo código (um módulo novo ganha o próximo número livre).
+
+### O calendário
+
+Calculado pelo código, nunca pelo modelo, a partir de `horas`, de `basico.horasPorSemana`, de `basico.prazo` e de hoje (funções puras, as mesmas na tela e na extensão):
+- os módulos vão em sequência a partir de amanhã; cada um dura `ceil(horas / horasPorSemana × 7)` dias corridos (pelo menos 1);
+- a avaliação de cada módulo fica disponível no dia seguinte ao fim dele (8.5: medir retenção, não memória recente);
+- com prazo: a avaliação geral fica no dia anterior ao prazo; se a soma não cabe antes dela, as durações são encolhidas na mesma proporção (cada módulo com pelo menos 1 dia) e o calendário leva um aviso com as horas por semana que o plano pede ("No prazo, este plano pede cerca de 7 h por semana; você disse 4.");
+- sem prazo: a avaliação geral fica no dia seguinte ao fim do último módulo;
+- prazo que já passou ou é amanhã: aviso, e o calendário segue como sem prazo.
+
+O resultado (`{modulos: [{id, inicio, fim, avaliacao}], avaliacaoGeral, horasPorSemanaNecessarias?, avisos}`) não é gravado no em andamento; ele é gravado em `esqueleto.calendario` ao criar o curso (a foto do dia da criação).
+
+### O modelo
+
+`prompts/esqueleto.md`, `model: openrouter/openai/gpt-6.1-sol`, chamado pela extensão como o diagnóstico. A mensagem leva: os conceitos do curso na ordem (id, nome, descrição, prioridade), o resumo do diagnóstico por conceito (o nível que ele disse e o resultado), o tipo, o escopo e o motivo, as horas por semana e os dias até o prazo. O modelo devolve `{"modulos": [{"nome", "objetivo", "conceitos": [ids], "tipo", "horas"}]}`. O código valida: ids só do curso; um conceito repetido fica no primeiro módulo; um conceito que faltou entra no módulo do conceito anterior a ele na ordem do curso (ou no primeiro); módulos vazios saem; tipo e horas fora do permitido viram `normal` e 2; e reatribui os ids. Entre 2 e 12 módulos; fora disso é erro (e uma nova tentativa).
+
+### Eventos (na matéria)
+
+- `gerou_esqueleto`: objeto `{materia, curso}`; resultado `{modulos, custo}`; contexto `{modelo, prompt}`.
+- `criou_curso`: objeto `{materia, curso}`; resultado `{nome, modulos, prazo, avaliacaoGeral}`.
+
+### Ponte (painel "cursos")
+
+Tela → extensão:
+- `gerar_esqueleto {materia, curso, pedido}`: exige o diagnóstico concluído; gera a proposta (a mensagem `curso` leva `gerandoEsqueleto: true` enquanto isso); gerar de novo substitui a proposta;
+- `editar_esqueleto {materia, curso, pedido, modulos}`: grava a proposta editada inteira (validada pelas mesmas regras, sem o conserto: aqui um conceito faltando ou repetido é erro);
+- `criar_curso {materia, curso, pedido}`: confirma a etapa com o em andamento e o calendário de hoje.
+
+### A tela
+
+- Etapa Esqueleto, na coluna larga: sem proposta, "Montar o esqueleto" (com a espera do professor); com proposta, a lista de módulos editável e, ao lado (ou embaixo, em tela estreita), o calendário.
+  - Cada módulo: o número, o nome e o objetivo (editáveis no lugar), o tipo (Normal, Curto, Revisão), as horas, e os conceitos dele como etiquetas; cada etiqueta abre um menu "Mover para o módulo…"; subir, descer e apagar o módulo (só vazio; os conceitos de um módulo que sai vão para o anterior); "Módulo novo" no fim.
+  - O calendário: uma linha por módulo (datas de início e fim e o dia da avaliação) e a avaliação geral, com os avisos.
+  - Cada edição salva sozinha (editar_esqueleto, com atraso, um por vez), e o calendário acompanha na hora.
+  - O primário: "Criar curso". "Gerar de novo" com confirmação.
+- O curso pronto, em `caderno/<matéria>/cursos/<curso>`: o nome, o prazo, as horas por semana, o tipo e o escopo; os módulos em ModuleCard (o primeiro como próximo e os outros bloqueados, com o número de conceitos e as horas; a ação de gerar o módulo é do item 6 e aparece como "Em breve"); e o calendário. A seção Cursos abre o curso pronto por aqui.

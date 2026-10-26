@@ -1,8 +1,10 @@
 // As partes puras da etapa Diagnóstico do guia de curso (EtapaDiagnostico.tsx,
 // docs/cursos.md, "Parte B: o diagnóstico"): a fase pelo curso, a contagem da
 // autoavaliação, o salvamento adiado (um por vez), o placar do resultado, os
-// critérios da correção, a situação de cada correção na tela e a divisão de
-// uma questão em contexto e pergunta.
+// critérios da correção, a situação de cada correção na tela, a divisão de
+// uma questão em contexto e pergunta e, no resultado em duas colunas, o
+// resultado e o tom de cada questão, os assuntos do índice, a ordem de
+// navegação, a questão em vista e a linha "Sua resposta".
 
 import type { Correcao, DiagnosticoNaTela, NivelAutoavaliacao, ResumoDiagnostico } from "../../lib/diagnostico-tipos.ts";
 import { ehNivel } from "../../lib/diagnostico-tipos.ts";
@@ -318,4 +320,159 @@ export function partesDaQuestao(questao: { contexto?: string; enunciado: string 
 	const contexto = questao.contexto?.trim();
 	if (contexto) return { contexto, pergunta: questao.enunciado };
 	return dividirQuestao(questao.enunciado);
+}
+
+// --- O resultado em duas colunas -----------------------------------------------------
+//
+// À esquerda, o índice por assunto (um grupo por conceito, na ordem do curso, só
+// os que têm questão); à direita, uma questão por vez, num cartão na cor do
+// resultado, com "Anterior" e "Próxima" na ordem do índice.
+
+/** O resultado de uma questão como a tela mostra (a dissertativa ainda sem nota fica corrigindo ou sem correção). */
+export type ResultadoNaTela = "certa" | "errada" | "parcial" | "corrigindo" | "sem_correcao";
+
+/**
+ * O resultado de uma questão respondida: a alternativa pela correta da
+ * resposta; a dissertativa corrigida pela nota (statusDaCorrecao); sem
+ * correção, corrigindo ou sem correção, pela situação (situacaoDaCorrecao).
+ */
+export function resultadoNaTela(
+	questao: { tipo: "alternativa" | "dissertativa" },
+	resposta: { correta?: boolean; correcao?: Pick<Correcao, "total" | "max"> } | undefined,
+	situacao: "corrigida" | "corrigindo" | "falhou",
+): ResultadoNaTela {
+	if (questao.tipo === "alternativa") return resposta?.correta === true ? "certa" : "errada";
+	const correcao = resposta?.correcao;
+	if (correcao) {
+		const status = statusDaCorrecao(correcao);
+		return status === "correct" ? "certa" : status === "incorrect" ? "errada" : "parcial";
+	}
+	return situacao === "corrigindo" ? "corrigindo" : "sem_correcao";
+}
+
+export interface TomDoResultado {
+	/** A cor do cartão: sálvia, tijolo, âmbar ou neutro (a superfície de sempre). */
+	tom: "sage" | "brick" | "amber" | "neutro";
+	/** O ícone (nunca só a cor): visto, xis, meia volta, relógio ou alerta. */
+	icone: "check" | "close" | "refresh" | "clock" | "alert";
+	/** A palavra do resultado, como o QuizFeedback. */
+	palavra: string;
+	/** O bloco no QuizProgress do placar (sem resultado, o bloco fica vazio). */
+	progresso?: "correct" | "incorrect" | "partial" | "skipped";
+}
+
+const TONS: Record<ResultadoNaTela, TomDoResultado> = {
+	certa: { tom: "sage", icone: "check", palavra: "Correta", progresso: "correct" },
+	errada: { tom: "brick", icone: "close", palavra: "Ainda não", progresso: "incorrect" },
+	parcial: { tom: "amber", icone: "refresh", palavra: "Quase lá", progresso: "partial" },
+	corrigindo: { tom: "neutro", icone: "clock", palavra: "Corrigindo" },
+	sem_correcao: { tom: "neutro", icone: "alert", palavra: "Sem correção", progresso: "skipped" },
+};
+
+/** A cor, o ícone e a palavra de um resultado. */
+export const tomDoResultado = (resultado: ResultadoNaTela): TomDoResultado => TONS[resultado];
+
+export interface GrupoDoAssunto<Q> {
+	/** O id do conceito. */
+	conceito: string;
+	/** As questões que cobrem o conceito, na ordem das questões. */
+	questoes: Q[];
+}
+
+/**
+ * Os assuntos do índice: um grupo por conceito do curso (na ordem do curso)
+ * com as questões que o cobrem, na ordem das questões; o conceito sem questão
+ * fica de fora. Uma questão de dois conceitos aparece nos dois grupos. Um
+ * conceito de questão que não está no curso (o mapa mudou depois) entra no
+ * fim, na ordem em que aparece, para nenhuma questão sumir do índice.
+ */
+export function gruposPorAssunto<Q extends { id: string; conceitos: readonly string[] }>(conceitosDoCurso: readonly string[], questoes: readonly Q[]): Array<GrupoDoAssunto<Q>> {
+	const ordem = [...new Set(conceitosDoCurso)];
+	const doCurso = new Set(ordem);
+	for (const questao of questoes) for (const id of questao.conceitos) if (!doCurso.has(id) && !ordem.includes(id)) ordem.push(id);
+	return ordem.map((conceito) => ({ conceito, questoes: questoes.filter((questao) => questao.conceitos.includes(conceito)) })).filter((grupo) => grupo.questoes.length > 0);
+}
+
+/** Uma questão aberta no resultado: a questão e o assunto em que ela foi aberta (uma questão pode estar em dois). */
+export interface EntradaDoResultado {
+	conceito: string;
+	questao: string;
+}
+
+/**
+ * A ordem de "Anterior" e "Próxima": as questões na ordem do índice (de cima
+ * para baixo), cada uma uma vez só, no primeiro assunto em que aparece.
+ */
+export function ordemDeNavegacao(grupos: ReadonlyArray<GrupoDoAssunto<{ id: string }>>): EntradaDoResultado[] {
+	const vistas = new Set<string>();
+	const ordem: EntradaDoResultado[] = [];
+	for (const grupo of grupos) {
+		for (const questao of grupo.questoes) {
+			if (vistas.has(questao.id)) continue;
+			vistas.add(questao.id);
+			ordem.push({ conceito: grupo.conceito, questao: questao.id });
+		}
+	}
+	return ordem;
+}
+
+/**
+ * A questão em vista: a escolhida, se ainda existe naquele assunto (as
+ * questões podem ter sido geradas de novo); senão, a primeira do índice.
+ */
+export function questaoEmVista(
+	grupos: ReadonlyArray<GrupoDoAssunto<{ id: string }>>,
+	escolhida: EntradaDoResultado | undefined,
+): EntradaDoResultado | undefined {
+	if (escolhida && grupos.some((grupo) => grupo.conceito === escolhida.conceito && grupo.questoes.some((questao) => questao.id === escolhida.questao))) return escolhida;
+	return ordemDeNavegacao(grupos)[0];
+}
+
+/** Onde a questão está na ordem de navegação (posição de 1 a total) e as vizinhas, sem dar a volta nas pontas. */
+export function vizinhasNaOrdem(
+	ordem: readonly EntradaDoResultado[],
+	questao: string,
+): { posicao: number; total: number; anterior?: EntradaDoResultado; proxima?: EntradaDoResultado } {
+	const indice = ordem.findIndex((entrada) => entrada.questao === questao);
+	if (indice < 0) return { posicao: 0, total: ordem.length };
+	const anterior = ordem[indice - 1];
+	const proxima = ordem[indice + 1];
+	return { posicao: indice + 1, total: ordem.length, ...(anterior ? { anterior } : {}), ...(proxima ? { proxima } : {}) };
+}
+
+/** A letra de uma alternativa: 0 = A, 1 = B… */
+export const letraDaAlternativa = (indice: number) => String.fromCharCode(65 + indice);
+
+/**
+ * Um texto de alternativa encurtado para uma linha: as quebras viram espaço
+ * e, passando do limite, corta no último espaço antes dele, com "…". O corte
+ * nunca cai dentro de código ou de LaTeX (o trecho inteiro fica de fora, ou
+ * inteiro dentro, se é o começo do texto).
+ */
+export function encurtarAlternativa(texto: string, limite = 90): string {
+	const linha = texto.replace(/\s+/g, " ").trim();
+	if (linha.length <= limite) return linha;
+	const protegidos = trechosProtegidos(linha);
+	let corte = linha.lastIndexOf(" ", limite);
+	const dentro = protegidos.find((trecho) => corte > trecho.inicio && corte < trecho.fim);
+	if (dentro) corte = dentro.inicio > 0 ? dentro.inicio : dentro.fim;
+	if (corte <= 0) {
+		// Nenhum espaço antes do limite (uma palavra só, comprida): corta no limite, se não for dentro de código.
+		const trecho = protegidos.find((item) => limite > item.inicio && limite < item.fim);
+		corte = trecho ? trecho.fim : limite;
+	}
+	const curto = linha.slice(0, corte).trimEnd();
+	return curto.length < linha.length ? `${curto.replace(/[\s.,;:]+$/, "")}…` : curto;
+}
+
+/**
+ * A linha "Sua resposta: B · <o texto curto da alternativa>": o rótulo com a
+ * letra e o texto encurtado (encurtarAlternativa), em markdown. Sem
+ * alternativa nesse índice, só o rótulo.
+ */
+export function suaRespostaAlternativa(alternativas: ReadonlyArray<{ texto: string }>, escolha: number): { rotulo: string; texto?: string } {
+	const rotulo = `Sua resposta: ${letraDaAlternativa(escolha)}`;
+	const alternativa = alternativas[escolha];
+	const texto = alternativa ? encurtarAlternativa(alternativa.texto) : "";
+	return texto ? { rotulo, texto } : { rotulo };
 }

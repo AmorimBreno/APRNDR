@@ -595,40 +595,123 @@
 	.diag__contexto-caixa > .diag__contexto-dentro { position: absolute; top: 0; left: 0; right: 0; max-height: 100%; overflow-y: auto; }
 }
 
-/* Resultado. */
-.diag__placar { display: flex; flex-direction: column; gap: var(--space-1); }
-.diag__placar-linha { margin: 0; }
-.diag__blocos { display: flex; flex-direction: column; gap: var(--space-5); margin: 0; padding: 0; list-style: none; }
-.diag__bloco { display: flex; flex-direction: column; gap: var(--space-2); }
-.diag__bloco-cabeca { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
-.diag__questoes { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
-.diag__item { display: flex; flex-direction: column; gap: var(--space-3); border-radius: var(--radius-md); background: var(--surface-raised); }
-.diag__item > .ap-callout { margin: 0 var(--space-4) var(--space-4); }
-.diag__item-cabeca { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: var(--space-2) var(--space-3); width: 100%; padding: var(--space-3) var(--space-4); border: 0; border-radius: var(--radius-md); background: transparent; color: var(--ink); text-align: left; cursor: pointer; transition: background-color .12s ease-out; }
-.diag__item-cabeca:hover { background: var(--surface-hover); }
-.diag__item-cabeca:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-.diag__item-cabeca .overline { color: var(--ink-muted); }
-.diag__item-meta { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-2) var(--space-3); }
-.diag__nota, .diag__confianca-dita { color: var(--ink-muted); }
-.diag__dobra { overflow: hidden; }
-.diag__dobra-dentro { display: flex; flex-direction: column; gap: var(--space-4); padding: 0 var(--space-4) var(--space-4); }
-.diag__dobra-dentro .ap-quiz { max-width: none; }
-.diag__dissertativa { display: flex; flex-direction: column; gap: var(--space-4); }
+/* Resultado, em duas colunas: à esquerda o índice (o placar e, por assunto, as questões), fixo no alto do
+ * corpo do guia enquanto ele rola; à direita uma questão por vez, num cartão na cor do resultado. Com o
+ * contêiner estreito, o índice vira uma faixa de fichas no topo, agrupadas por assunto. */
+.diag__resultado { container-type: inline-size; }
+.diag__res-grade { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: var(--space-5); }
+
+/* O índice. */
+.diag__indice { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+.diag__placar { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-4); border-radius: var(--radius-md); background: var(--surface-raised); }
+.diag__placar p { margin: 0; }
+.diag__placar-titulo { color: var(--ink-muted); }
+.diag__placar-blocos { max-width: none; margin-top: var(--space-2); }
+.diag__placar-blocos .ap-qprog__row { display: none; }
+.diag__placar-blocos .ap-qprog__segs, .diag__placar-blocos .ap-qprog__seg { height: 8px; }
+.diag__placar-blocos .ap-qprog__seg--incorrect { height: 4px; }
+.diag__grupos { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+.diag__grupo { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; padding: var(--space-4) 0; }
+.diag__grupo:first-child { padding-top: 0; }
+.diag__grupo + .diag__grupo { border-top: var(--border-hair) solid var(--line); }
+.diag__grupo-cabeca { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); padding: 0 var(--space-3); }
+.diag__grupo-nome { min-width: 0; overflow-wrap: anywhere; }
+.diag__linhas { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.diag__linha { position: relative; display: flex; align-items: center; gap: var(--space-2); width: 100%; min-height: var(--control-md); padding: var(--space-1) var(--space-3); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink); text-align: left; cursor: pointer; transition: background-color .12s ease-out; }
+.diag__linha:hover { background: var(--surface-hover); }
+.diag__linha:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.diag__linha--aberta, .diag__linha--aberta:hover { background: var(--surface-raised); }
+.diag__linha--aberta::before { content: ""; position: absolute; top: 6px; bottom: 6px; left: 0; width: 3px; border-radius: var(--radius-full); background: var(--amber); }
+.diag__linha-num { white-space: nowrap; }
+.diag__linha-tipo { margin-left: auto; color: var(--ink-muted); }
+.diag__icone { flex: none; }
+.diag__icone--certa { color: var(--sage-text); }
+.diag__icone--errada, .diag__icone--sem_correcao { color: var(--brick-text); }
+.diag__icone--parcial { color: var(--amber); }
+.diag__icone--corrigindo { color: var(--ink-muted); }
+.diag__sem-questao { padding: var(--space-4) var(--space-3) 0; border-top: var(--border-hair) solid var(--line); }
+.diag__sem-questao summary { color: var(--ink-muted); cursor: pointer; }
+.diag__sem-questao summary:focus-visible { outline: none; border-radius: var(--radius-xs); box-shadow: var(--focus-ring); }
+.diag__sem-questao ul { display: flex; flex-direction: column; gap: var(--space-1); margin: var(--space-3) 0 0; padding: 0; list-style: none; }
+.diag__sem-nivel { color: var(--ink-muted); }
+
+/* A questão aberta: a faixa do assunto e o cartão. */
+.diag__coluna { min-width: 0; }
+.diag__vista { display: flex; flex-direction: column; gap: var(--space-6); }
+.diag__assunto { display: flex; flex-direction: column; gap: var(--space-1); }
+.diag__assunto p, .diag__assunto h3 { margin: 0; }
+.diag__assunto-rotulo, .diag__assunto-frase { color: var(--ink-muted); }
+.diag__assunto-linha { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
+.diag__assunto-nome { overflow-wrap: anywhere; }
+.diag__cartao { display: flex; flex-direction: column; gap: var(--space-6); padding: var(--space-6); border: var(--border-hair) solid var(--line); border-radius: var(--radius-lg); background: var(--surface-raised); }
+.diag__cartao--sage { border-color: var(--sage-line); background: var(--sage-tint); }
+.diag__cartao--brick { border-color: var(--brick-line); background: var(--brick-tint); }
+.diag__cartao--amber { border-color: var(--amber-line); background: var(--amber-tint); }
+.diag__cartao .ap-quiz, .diag__cartao .ap-feedback { max-width: none; }
+.diag__cartao > .ap-callout { margin: 0; }
+.diag__cartao-cabeca { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-4); padding-bottom: var(--space-4); border-bottom: var(--border-hair) solid var(--line); }
+.diag__cartao-titulo { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.diag__cartao-titulo > .overline { color: var(--ink-muted); }
+.diag__cartao-meta { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); color: var(--ink-muted); }
+/* O contexto num tom mais escuro que o cartão, qualquer que seja a cor dele. */
+.diag__cartao .diag__cartao-contexto { background: color-mix(in srgb, var(--surface-ground) 55%, transparent); }
+.diag__secao { display: flex; flex-direction: column; gap: var(--space-4); }
+.diag__secao p { margin: 0; }
+.diag__secao--fio { padding-top: var(--space-5); border-top: var(--border-hair) solid var(--line); }
+.diag__secao-rotulo { color: var(--ink-muted); }
+.diag__sua-escolha { overflow-wrap: anywhere; }
+.diag__sua-escolha--certa, .diag__cartao-titulo > .diag__sua-escolha--certa { color: var(--sage-text); }
+.diag__sua-escolha--errada, .diag__cartao-titulo > .diag__sua-escolha--errada, .diag__cartao-titulo > .diag__sua-escolha--sem_correcao { color: var(--brick-text); }
+.diag__sua-escolha--parcial, .diag__cartao-titulo > .diag__sua-escolha--parcial { color: var(--amber); }
+.diag__porque { display: flex; flex-direction: column; gap: var(--space-1); padding-left: var(--space-4); border-left: var(--border-strong) solid var(--brick-text); }
+.diag__cartao-pe { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: var(--space-3); padding-top: var(--space-4); border-top: var(--border-hair) solid var(--line); }
+.diag__cartao-pe > :first-child { justify-self: start; }
+.diag__cartao-pe > :last-child { justify-self: end; }
+.diag__cartao-posicao { color: var(--ink-muted); text-align: center; }
+.diag__nota { color: var(--ink-muted); }
 .diag__sua-resposta { align-self: stretch; max-width: none; margin-left: 0; transform: none; }
 .diag__sua-resposta p { margin: 0; white-space: pre-wrap; }
 .diag__criterios { display: flex; flex-direction: column; gap: var(--space-4); margin: 0; padding: 0; list-style: none; }
 .diag__criterio { display: flex; flex-direction: column; gap: var(--space-2); }
+.diag__criterio + .diag__criterio { padding-top: var(--space-4); border-top: var(--border-hair) solid var(--line); }
 .diag__criterio p { margin: 0; }
 .diag__trecho { margin: 0; padding: var(--space-1) 0 var(--space-1) var(--space-3); border-left: var(--border-strong) solid var(--cream); color: var(--ink); }
 .diag__justificativa { color: var(--ink-muted); }
 
+/* Largo: o índice à esquerda, fixo no alto do corpo do guia, com rolagem própria quando passa da altura dele. */
+@container (min-width: 900px) {
+	.diag__res-grade { grid-template-columns: 300px minmax(0, 1fr); gap: var(--space-8); }
+	.diag__indice { position: sticky; top: 0; max-height: var(--diag-indice-altura, none); overflow-y: auto; }
+	.diag__cartao { padding: var(--space-6) var(--space-8); }
+}
+
+/* Estreito: o índice vira uma faixa de fichas (número e ícone) que rola na horizontal, com um fio entre
+ * os assuntos e o nome de cada um, cortado, em cima das fichas dele. */
+@container (max-width: 899.98px) {
+	.diag__indice { gap: var(--space-3); }
+	.diag__grupos { flex-direction: row; overflow-x: auto; padding-bottom: var(--space-2); }
+	.diag__grupo { flex: none; gap: var(--space-1); padding: 0 var(--space-3); }
+	.diag__grupo:first-child { padding-left: 0; }
+	.diag__grupo + .diag__grupo { border-top: 0; border-left: var(--border-hair) solid var(--line); }
+	.diag__grupo-cabeca { display: block; width: 0; min-width: 100%; padding: 0; }
+	.diag__grupo-nome { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+	.diag__grupo-nivel { display: none; }
+	.diag__linhas { flex-direction: row; gap: var(--space-1); }
+	.diag__linha { width: auto; min-height: var(--control-sm); padding: 0 var(--space-2); background: var(--surface-raised); }
+	.diag__linha-num { order: -1; }
+	.diag__so-largo, .diag__linha-tipo { display: none; }
+	.diag__linha--aberta, .diag__linha--aberta:hover { background: var(--amber-tint); box-shadow: inset 0 0 0 var(--border-hair) var(--amber); }
+	.diag__linha--aberta::before { display: none; }
+	.diag__linha--aberta:focus-visible { box-shadow: inset 0 0 0 var(--border-hair) var(--amber), var(--focus-ring); }
+	.diag__sem-questao { padding-top: var(--space-3); }
+}
+
 @media (max-width: 760px) {
 	.diag__conceito { grid-template-columns: minmax(0, 1fr); }
-	.diag__item-cabeca { grid-template-columns: minmax(0, 1fr) auto; }
-	.diag__item-meta { grid-column: 1 / -1; grid-row: 2; justify-content: flex-start; }
+	.diag__cartao { padding: var(--space-5) var(--space-4); }
 }
 @media (prefers-reduced-motion: reduce) {
-	.diag__tecla, .diag__item-cabeca { transition: none; }
+	.diag__tecla, .diag__linha { transition: none; }
 	.diag__tecla:active { transform: none; }
 }
 

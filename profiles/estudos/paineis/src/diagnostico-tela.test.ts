@@ -16,9 +16,18 @@ import {
 	criarSalvadorAdiado,
 	criteriosDoFeedback,
 	dividirQuestao,
+	encurtarAlternativa,
 	faseDoDiagnostico,
 	fraseDaConfusao,
+	gruposPorAssunto,
+	letraDaAlternativa,
 	niveisDoCurso,
+	ordemDeNavegacao,
+	questaoEmVista,
+	resultadoNaTela,
+	suaRespostaAlternativa,
+	tomDoResultado,
+	vizinhasNaOrdem,
 	partesDaQuestao,
 	numeroCurto,
 	situacaoDaCorrecao,
@@ -316,5 +325,94 @@ describe("o contexto e a pergunta (dividirQuestao)", () => {
 		expect(partesDaQuestao({ contexto: "  ```python\nlen(x)\n```  ", enunciado: "O que dá? Mesmo." })).toEqual({ contexto: "```python\nlen(x)\n```", pergunta: "O que dá? Mesmo." });
 		expect(partesDaQuestao({ contexto: " ", enunciado: "A é B. O que é C?" })).toEqual({ contexto: "A é B.", pergunta: "O que é C?" });
 		expect(partesDaQuestao({ enunciado: "Explique." })).toEqual({ pergunta: "Explique." });
+	});
+});
+
+describe("o resultado em duas colunas", () => {
+	it("o resultado de cada questão: alternativa pela correta, dissertativa pela nota ou pela situação", () => {
+		const alternativa = { tipo: "alternativa" as const };
+		const dissertativa = { tipo: "dissertativa" as const };
+		expect(resultadoNaTela(alternativa, { correta: true }, "corrigida")).toBe("certa");
+		expect(resultadoNaTela(alternativa, { correta: false }, "corrigida")).toBe("errada");
+		expect(resultadoNaTela(alternativa, undefined, "corrigida")).toBe("errada");
+		expect(resultadoNaTela(dissertativa, { correcao: { total: 8, max: 8 } }, "corrigida")).toBe("certa");
+		expect(resultadoNaTela(dissertativa, { correcao: { total: 0, max: 8 } }, "corrigida")).toBe("errada");
+		expect(resultadoNaTela(dissertativa, { correcao: { total: 4, max: 8 } }, "corrigida")).toBe("parcial");
+		expect(resultadoNaTela(dissertativa, {}, "corrigindo")).toBe("corrigindo");
+		expect(resultadoNaTela(dissertativa, {}, "falhou")).toBe("sem_correcao");
+	});
+
+	it("o tom de cada resultado: cor, ícone e palavra (nunca só a cor)", () => {
+		expect(tomDoResultado("certa")).toEqual({ tom: "sage", icone: "check", palavra: "Correta", progresso: "correct" });
+		expect(tomDoResultado("errada")).toEqual({ tom: "brick", icone: "close", palavra: "Ainda não", progresso: "incorrect" });
+		expect(tomDoResultado("parcial")).toEqual({ tom: "amber", icone: "refresh", palavra: "Quase lá", progresso: "partial" });
+		expect(tomDoResultado("corrigindo")).toEqual({ tom: "neutro", icone: "clock", palavra: "Corrigindo" });
+		expect(tomDoResultado("sem_correcao")).toEqual({ tom: "neutro", icone: "alert", palavra: "Sem correção", progresso: "skipped" });
+	});
+
+	const doIndice = [
+		{ id: "q1", conceitos: ["b"] },
+		{ id: "q2", conceitos: ["a", "c"] },
+		{ id: "q3", conceitos: ["c"] },
+		{ id: "q4", conceitos: ["b", "z"] },
+	];
+
+	it("os assuntos: na ordem do curso, só os que têm questão; questão de dois conceitos nos dois; conceito de fora no fim", () => {
+		const grupos = gruposPorAssunto(["a", "b", "c", "d"], doIndice);
+		expect(grupos.map((grupo) => [grupo.conceito, grupo.questoes.map((questao) => questao.id)])).toEqual([
+			["a", ["q2"]],
+			["b", ["q1", "q4"]],
+			["c", ["q2", "q3"]],
+			["z", ["q4"]],
+		]);
+		expect(gruposPorAssunto([], [])).toEqual([]);
+	});
+
+	it("a ordem de navegação: a do índice, cada questão uma vez, no primeiro assunto em que aparece", () => {
+		const ordem = ordemDeNavegacao(gruposPorAssunto(["a", "b", "c", "d"], doIndice));
+		expect(ordem).toEqual([
+			{ conceito: "a", questao: "q2" },
+			{ conceito: "b", questao: "q1" },
+			{ conceito: "b", questao: "q4" },
+			{ conceito: "c", questao: "q3" },
+		]);
+	});
+
+	it("a questão em vista: a escolhida, se existe naquele assunto; senão, a primeira do índice", () => {
+		const grupos = gruposPorAssunto(["a", "b", "c"], doIndice);
+		expect(questaoEmVista(grupos, undefined)).toEqual({ conceito: "a", questao: "q2" });
+		expect(questaoEmVista(grupos, { conceito: "c", questao: "q2" })).toEqual({ conceito: "c", questao: "q2" });
+		expect(questaoEmVista(grupos, { conceito: "b", questao: "q2" })).toEqual({ conceito: "a", questao: "q2" });
+		expect(questaoEmVista(grupos, { conceito: "a", questao: "q9" })).toEqual({ conceito: "a", questao: "q2" });
+		expect(questaoEmVista([], undefined)).toBeUndefined();
+	});
+
+	it("as vizinhas na ordem: sem dar a volta nas pontas; a questão de dois assuntos anda pela posição dela", () => {
+		const ordem = ordemDeNavegacao(gruposPorAssunto(["a", "b", "c"], doIndice));
+		expect(vizinhasNaOrdem(ordem, "q2")).toEqual({ posicao: 1, total: 4, proxima: { conceito: "b", questao: "q1" } });
+		expect(vizinhasNaOrdem(ordem, "q4")).toEqual({ posicao: 3, total: 4, anterior: { conceito: "b", questao: "q1" }, proxima: { conceito: "c", questao: "q3" } });
+		expect(vizinhasNaOrdem(ordem, "q3")).toEqual({ posicao: 4, total: 4, anterior: { conceito: "b", questao: "q4" } });
+		expect(vizinhasNaOrdem(ordem, "q9")).toEqual({ posicao: 0, total: 4 });
+	});
+
+	it("a letra da alternativa", () => {
+		expect([0, 1, 4].map(letraDaAlternativa)).toEqual(["A", "B", "E"]);
+	});
+
+	it("o texto curto da alternativa: cabe, fica; passa, corta no espaço com reticências; nunca dentro de código", () => {
+		expect(encurtarAlternativa("Média\n e  mediana")).toBe("Média e mediana");
+		expect(encurtarAlternativa("um dois três quatro", 12)).toBe("um dois três…");
+		expect(encurtarAlternativa("um dois três quatro", 11)).toBe("um dois…");
+		expect(encurtarAlternativa("Use isto, e aquilo", 10)).toBe("Use isto…");
+		expect(encurtarAlternativa("Rode `df.groupby(x).mean()` agora", 14)).toBe("Rode…");
+		expect(encurtarAlternativa("Rode `a = b + c` e veja", 10)).toBe("Rode…");
+		expect(encurtarAlternativa("`df.groupby(x).mean()` e mais texto", 10)).toBe("`df.groupby(x).mean()`…");
+		expect(encurtarAlternativa("abcdefghijklmnop", 5)).toBe("abcde…");
+	});
+
+	it("a linha Sua resposta: a letra e o texto curto", () => {
+		const alternativas = [{ texto: "Correlação" }, { texto: "Causalidade" }];
+		expect(suaRespostaAlternativa(alternativas, 1)).toEqual({ rotulo: "Sua resposta: B", texto: "Causalidade" });
+		expect(suaRespostaAlternativa(alternativas, 3)).toEqual({ rotulo: "Sua resposta: D" });
 	});
 });

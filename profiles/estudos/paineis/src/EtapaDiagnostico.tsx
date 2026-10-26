@@ -1,8 +1,9 @@
 // A etapa Diagnóstico do guia de curso (item 5, parte B, docs/cursos.md,
 // "Parte B: o diagnóstico"), em três fases na mesma etapa: autoavaliação (um
 // nível por conceito, salvo sozinho), questões (uma por vez, a confiança antes
-// de responder, sem gabarito) e resultado (o placar, por conceito o que você
-// disse e as questões com o gabarito e a correção). A fase vem do curso
+// de responder, sem gabarito) e resultado, em duas colunas: o índice (o placar
+// e, por assunto, o que você disse e as questões) e uma questão por vez, num
+// cartão na cor do resultado, com o gabarito e a correção. A fase vem do curso
 // (faseDoDiagnostico); gerar as questões e corrigir a dissertativa correm em
 // segundo plano na extensão dos cursos (cursos-ponte.ts).
 //
@@ -11,8 +12,8 @@
 
 import { Button, Callout, EssayAnswer, Icon, Modal, pad2, QuizFeedback, QuizProgress, QuizQuestion, StudentNote, Tag } from "@estudos/design-system";
 import { AgenteAnimado, type DadosAvatarAgente, Markdown, semMovimento } from "@estudos/ui";
-import { AnimatePresence, motion } from "motion/react";
-import { type ReactNode, useEffect, useId, useMemo, useRef, useState } from "react";
+import { motion } from "motion/react";
+import { type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Curso } from "../../lib/curso-tipos.ts";
 import {
 	CONFIANCAS,
@@ -29,6 +30,7 @@ import {
 	type RespostaAlternativa,
 	type RespostaDissertativa,
 	type RespostaNaTela,
+	type ResumoDiagnostico,
 	resumoDoDiagnostico,
 } from "../../lib/diagnostico-tipos.ts";
 import type { Conceito } from "../../lib/mapa-tipos.ts";
@@ -37,23 +39,33 @@ import {
 	contarMarcados,
 	criarSalvadorAdiado,
 	criteriosDoFeedback,
+	type EntradaDoResultado,
 	FASES,
 	faseDoDiagnostico,
 	fraseDaConfusao,
+	gruposPorAssunto,
 	niveisDoCurso,
 	NOMES_FASE,
 	numeroCurto,
+	ordemDeNavegacao,
 	partesDaQuestao,
+	questaoEmVista,
+	type ResultadoNaTela,
+	resultadoNaTela,
 	type SalvadorAdiado,
 	situacaoDaCorrecao,
 	statusDaCorrecao,
+	suaRespostaAlternativa,
 	textoMarcados,
 	pontosDasDissertativas,
 	textoPlacar,
+	tomDoResultado,
+	vizinhasNaOrdem,
 } from "./diagnostico-tela.ts";
 import type { MapaDaMateria } from "./mapa-ponte.ts";
 
-const MOLA = { type: "spring", stiffness: 420, damping: 38 } as const;
+/** A troca de questão no resultado: uma mola curta (fade e um leve deslocamento). */
+const MOLA_CURTA = { type: "spring", stiffness: 520, damping: 42 } as const;
 /** O atraso do salvamento da autoavaliação depois da última mudança. */
 const ATRASO_AUTOAVALIACAO = 600;
 /** O mínimo de caracteres da dissertativa. */
@@ -281,63 +293,29 @@ export function useEtapaDiagnostico(props: PropsEtapaDiagnostico): EtapaDiagnost
 	} else if (diagnostico) {
 		const comoEmAndamento = diagnostico as unknown as DiagnosticoEmAndamento;
 		const resumo = resumoDoDiagnostico(comoEmAndamento, conceitos);
-		const placar = textoPlacar(resumo.total, pontosDasDissertativas(comoEmAndamento));
 		const pendentes = faltaCorrigir(comoEmAndamento);
+		const erroDe = (id: string) => (erroCorrigir && (!erroCorrigir.questao || erroCorrigir.questao === id) ? erroCorrigir.mensagem : undefined);
 		const situacao = (id: string) =>
 			situacaoDaCorrecao({
 				corrigida: !pendentes.includes(id),
 				corrigindo: andamento.corrigindo.includes(id),
-				erro: Boolean(erroCorrigir && (!erroCorrigir.questao || erroCorrigir.questao === id)),
+				erro: erroDe(id) !== undefined,
 				pedidaAqui: pedidasAqui.has(id),
 			});
 		const falhou = pendentes.some((id) => situacao(id) === "falhou");
-		const semQuestao = conceitos.filter((id) => !diagnostico.questoes.some((questao) => questao.conceitos.includes(id)));
 		corpo = (
-			<>
-				<div className="diag__placar">
-					{placar.alternativas ? <p className="heading diag__placar-linha">{placar.alternativas}</p> : null}
-					{placar.dissertativa ? <p className="heading diag__placar-linha">{placar.dissertativa}</p> : null}
-					{pendentes.length > 0 ? <p className="body-sm guia__texto">A nota da dissertativa entra quando a correção chegar.</p> : null}
-				</div>
-				<ul className="diag__blocos">
-					{resumo.conceitos.map((item) => {
-						const questoes = diagnostico.questoes.filter((questao) => questao.conceitos.includes(item.id));
-						if (questoes.length === 0) return null;
-						return (
-							<li key={item.id} className="diag__bloco">
-								<div className="diag__bloco-cabeca">
-									<span className="body-strong">{nomeDe(item.id)}</span>
-									{item.nivel !== null ? (
-										<Tag tone="cream" size="sm">
-											{NOMES_NIVEL[item.nivel]}
-										</Tag>
-									) : null}
-								</div>
-								{item.questoes.length > 0 ? <p className="body-sm guia__texto">{item.frase}</p> : null}
-								<ul className="diag__questoes">
-									{questoes.map((questao) => (
-										<QuestaoResultado
-											key={questao.id}
-											numero={diagnostico.questoes.indexOf(questao) + 1}
-											questao={questao}
-											resposta={diagnostico.respostas[questao.id]}
-											situacao={questao.tipo === "dissertativa" ? situacao(questao.id) : "corrigida"}
-											{...(erroCorrigir && (!erroCorrigir.questao || erroCorrigir.questao === questao.id) ? { erro: erroCorrigir.mensagem } : {})}
-											corrigir={() => corrigirDeNovo(questao.id)}
-										/>
-									))}
-								</ul>
-							</li>
-						);
-					})}
-				</ul>
-				{semQuestao.length > 0 ? (
-					<p className="body-sm guia__texto">
-						Sem questão no diagnóstico:{" "}
-						{semQuestao.map((id) => `${nomeDe(id)} (${niveis[id] !== undefined ? NOMES_NIVEL[niveis[id]!] : "sem nível"})`).join(", ")}.
-					</p>
-				) : null}
-			</>
+			<ResultadoDiagnostico
+				diagnostico={diagnostico}
+				resumo={resumo}
+				conceitos={conceitos}
+				niveis={niveis}
+				nomeDe={nomeDe}
+				pontos={pontosDasDissertativas(comoEmAndamento)}
+				pendentes={pendentes.length}
+				situacao={situacao}
+				erroDe={erroDe}
+				corrigir={corrigirDeNovo}
+			/>
 		);
 		primario = concluido
 			? { texto: "Continuar", acao: () => props.seguir(curso) }
@@ -519,102 +497,348 @@ function QuestaoAtual(props: {
 	);
 }
 
-/** Uma questão no resultado: a linha com o resultado e, aberta, o enunciado com o gabarito e a correção. */
-function QuestaoResultado(props: {
+type Situacao = "corrigida" | "corrigindo" | "falhou";
+
+/** O primeiro ancestral que rola na vertical (o corpo do guia). */
+function rolagemDe(elemento: HTMLElement): HTMLElement | undefined {
+	for (let pai = elemento.parentElement; pai; pai = pai.parentElement) {
+		const { overflowY } = getComputedStyle(pai);
+		if (overflowY === "auto" || overflowY === "scroll") return pai;
+	}
+	return undefined;
+}
+
+/**
+ * Rola `caixa` (só ela, nenhum ancestral) até `alvo` aparecer inteiro. As
+ * medidas da tela vêm com o zoom do body e o scroll anda em px da caixa, por
+ * isso a escala.
+ */
+function trazerParaVista(caixa: HTMLElement, alvo: HTMLElement) {
+	const fora = caixa.getBoundingClientRect();
+	const dentro = alvo.getBoundingClientRect();
+	const escalaY = caixa.offsetHeight ? fora.height / caixa.offsetHeight : 1;
+	const escalaX = caixa.offsetWidth ? fora.width / caixa.offsetWidth : 1;
+	if (dentro.top < fora.top) caixa.scrollTop -= (fora.top - dentro.top) / escalaY;
+	else if (dentro.bottom > fora.bottom) caixa.scrollTop += (dentro.bottom - fora.bottom) / escalaY;
+	if (dentro.left < fora.left) caixa.scrollLeft -= (fora.left - dentro.left) / escalaX;
+	else if (dentro.right > fora.right) caixa.scrollLeft += (dentro.right - fora.right) / escalaX;
+}
+
+/**
+ * A fase Resultado em duas colunas: à esquerda, o índice (o placar e, por
+ * assunto, as questões; fixo ao rolar o corpo do guia); à direita, uma questão
+ * por vez, num cartão na cor do resultado, com "Anterior" e "Próxima" na ordem
+ * do índice. Com o contêiner estreito, o índice vira uma faixa de fichas no
+ * topo (estilo.css).
+ */
+function ResultadoDiagnostico(props: {
+	diagnostico: DiagnosticoNaTela;
+	resumo: ResumoDiagnostico;
+	conceitos: readonly string[];
+	niveis: Readonly<Record<string, NivelAutoavaliacao>>;
+	nomeDe(id: string): string;
+	pontos: { total: number; max: number } | undefined;
+	/** Quantas dissertativas ainda sem correção. */
+	pendentes: number;
+	situacao(questao: string): Situacao;
+	erroDe(questao: string): string | undefined;
+	corrigir(questao: string): void;
+}) {
+	const { diagnostico, resumo, nomeDe } = props;
+	const grupos = gruposPorAssunto(props.conceitos, diagnostico.questoes);
+	const ordem = ordemDeNavegacao(grupos);
+	const [escolhida, setEscolhida] = useState<EntradaDoResultado | undefined>(undefined);
+	const vista = questaoEmVista(grupos, escolhida);
+	const questao = vista ? diagnostico.questoes.find((item) => item.id === vista.questao) : undefined;
+	const vizinhas = vizinhasNaOrdem(ordem, vista?.questao ?? "");
+	const numeroDe = (id: string) => diagnostico.questoes.findIndex((item) => item.id === id) + 1;
+	const situacaoDe = (item: QuestaoNaTela): Situacao => (item.tipo === "dissertativa" ? props.situacao(item.id) : "corrigida");
+	const resultadoDe = (item: QuestaoNaTela) => resultadoNaTela(item, diagnostico.respostas[item.id], situacaoDe(item));
+	const resumoDe = (id: string) => resumo.conceitos.find((item) => item.id === id);
+	const placar = textoPlacar(resumo.total, props.pontos);
+	const semQuestao = props.conceitos.filter((id) => !grupos.some((grupo) => grupo.conceito === id));
+
+	const raiz = useRef<HTMLDivElement>(null);
+	const indice = useRef<HTMLElement>(null);
+	const faixa = useRef<HTMLUListElement>(null);
+	const coluna = useRef<HTMLDivElement>(null);
+
+	// A altura do índice fixo: a do corpo do guia que rola (o índice rola por dentro quando passa dela).
+	const [altura, setAltura] = useState<number | undefined>(undefined);
+	useLayoutEffect(() => {
+		const rolagem = raiz.current ? rolagemDe(raiz.current) : undefined;
+		if (!rolagem) return;
+		const medir = () => setAltura(Math.max(0, rolagem.clientHeight - (Number.parseFloat(getComputedStyle(rolagem).paddingBottom) || 0)));
+		medir();
+		const observador = new ResizeObserver(medir);
+		observador.observe(rolagem);
+		return () => observador.disconnect();
+	}, []);
+
+	// Trocou de questão: a linha dela aparece no índice e o cartão volta para o topo da coluna.
+	const chave = vista ? `${vista.conceito}|${vista.questao}` : "";
+	const primeira = useRef(true);
+	useEffect(() => {
+		if (primeira.current) {
+			primeira.current = false;
+			return;
+		}
+		const linha = indice.current?.querySelector<HTMLElement>(".diag__linha--aberta");
+		if (linha) for (const caixa of [indice.current, faixa.current]) if (caixa) trazerParaVista(caixa, linha);
+		const alvo = coluna.current;
+		const rolagem = alvo ? rolagemDe(alvo) : undefined;
+		if (!alvo || !rolagem) return;
+		const topo = rolagem.getBoundingClientRect();
+		const doAlvo = alvo.getBoundingClientRect();
+		if (doAlvo.top >= topo.top) return;
+		const escala = rolagem.offsetHeight ? topo.height / rolagem.offsetHeight : 1;
+		const respiro = Number.parseFloat(getComputedStyle(rolagem).paddingTop) || 0;
+		rolagem.scrollTo({ top: Math.max(0, rolagem.scrollTop - (topo.top - doAlvo.top) / escala - respiro), behavior: semMovimento() ? "auto" : "smooth" });
+	}, [chave]);
+
+	// ↑ ↓ (e ← →, na faixa estreita) trocam de questão com o foco no índice.
+	const teclas = (evento: ReactKeyboardEvent<HTMLUListElement>) => {
+		const passo = evento.key === "ArrowDown" || evento.key === "ArrowRight" ? 1 : evento.key === "ArrowUp" || evento.key === "ArrowLeft" ? -1 : 0;
+		if (!passo) return;
+		const linhas = [...evento.currentTarget.querySelectorAll<HTMLButtonElement>("button.diag__linha")];
+		const atual = linhas.indexOf(document.activeElement as HTMLButtonElement);
+		const proxima = atual >= 0 ? linhas[atual + passo] : undefined;
+		if (!proxima) return;
+		evento.preventDefault();
+		proxima.focus();
+		proxima.click();
+	};
+
+	const assunto = vista ? resumoDe(vista.conceito) : undefined;
+	const nivelDoAssunto = assunto?.nivel ?? null;
+
+	return (
+		<div ref={raiz} className="diag__resultado" style={altura !== undefined ? ({ "--diag-indice-altura": `${altura}px` } as CSSProperties) : undefined}>
+			<div className="diag__res-grade">
+				<nav ref={indice} className="diag__indice" aria-label="Questões do diagnóstico por assunto">
+					<div className="diag__placar">
+						<p className="overline diag__placar-titulo">Resultado</p>
+						{placar.alternativas ? <p className="body-strong">{placar.alternativas}</p> : null}
+						{placar.dissertativa ? <p className="body-strong">{placar.dissertativa}</p> : null}
+						{props.pendentes > 0 ? <p className="body-sm guia__texto">A nota da dissertativa entra quando a correção chegar.</p> : null}
+						{ordem.length > 0 ? (
+							<QuizProgress
+								className="diag__placar-blocos"
+								label="Resultado por questão"
+								total={ordem.length}
+								current={Math.max(1, vizinhas.posicao)}
+								results={ordem.map((entrada) => {
+									const item = diagnostico.questoes.find((q) => q.id === entrada.questao);
+									return item ? (tomDoResultado(resultadoDe(item)).progresso ?? null) : null;
+								})}
+							/>
+						) : null}
+					</div>
+					<ul ref={faixa} className="diag__grupos" onKeyDown={teclas}>
+						{grupos.map((grupo) => {
+							const nivel = resumoDe(grupo.conceito)?.nivel ?? null;
+							return (
+								<li key={grupo.conceito} className="diag__grupo">
+									<div className="diag__grupo-cabeca">
+										<span className="body-strong diag__grupo-nome" title={nomeDe(grupo.conceito)}>
+											{nomeDe(grupo.conceito)}
+										</span>
+										{nivel !== null ? (
+											<Tag tone="cream" size="sm" className="diag__grupo-nivel">
+												{NOMES_NIVEL[nivel]}
+											</Tag>
+										) : null}
+									</div>
+									<ul className="diag__linhas">
+										{grupo.questoes.map((item) => {
+											const resultado = resultadoDe(item);
+											const tom = tomDoResultado(resultado);
+											const aberta = vista?.conceito === grupo.conceito && vista.questao === item.id;
+											return (
+												<li key={item.id}>
+													<button
+														type="button"
+														className={`diag__linha${aberta ? " diag__linha--aberta" : ""}`}
+														aria-current={aberta ? "true" : undefined}
+														onClick={() => setEscolhida({ conceito: grupo.conceito, questao: item.id })}
+													>
+														<Icon name={tom.icone} size={18} strokeWidth={2.5} className={`diag__icone diag__icone--${resultado}`} />
+														<span className="body diag__linha-num">
+															<span className="diag__so-largo">Questão </span>
+															{pad2(numeroDe(item.id))}
+														</span>
+														<span className="body-sm diag__linha-tipo">{item.tipo === "alternativa" ? "Alternativa" : "Dissertativa"}</span>
+														<span className="ap-visually-hidden">: {tom.palavra}</span>
+													</button>
+												</li>
+											);
+										})}
+									</ul>
+								</li>
+							);
+						})}
+					</ul>
+					{semQuestao.length > 0 ? (
+						<details className="diag__sem-questao">
+							<summary className="body-sm">Sem questão no diagnóstico ({semQuestao.length})</summary>
+							<ul>
+								{semQuestao.map((id) => (
+									<li key={id} className="body-sm">
+										{nomeDe(id)} <span className="diag__sem-nivel">· {props.niveis[id] !== undefined ? NOMES_NIVEL[props.niveis[id]!] : "sem nível"}</span>
+									</li>
+								))}
+							</ul>
+						</details>
+					) : null}
+				</nav>
+				<div ref={coluna} className="diag__coluna">
+					{vista && questao ? (
+						<motion.div
+							key={chave}
+							className="diag__vista"
+							initial={semMovimento() ? false : { opacity: 0, y: 8 }}
+							animate={{ opacity: 1, y: 0 }}
+							transition={MOLA_CURTA}
+						>
+							<header className="diag__assunto">
+								<p className="overline diag__assunto-rotulo">Assunto</p>
+								<div className="diag__assunto-linha">
+									<h3 className="heading diag__assunto-nome">{nomeDe(vista.conceito)}</h3>
+									{nivelDoAssunto !== null ? (
+										<Tag tone="cream" size="sm">
+											Você disse: {NOMES_NIVEL[nivelDoAssunto]}
+										</Tag>
+									) : null}
+								</div>
+								{assunto && assunto.questoes.length > 0 ? <p className="body-sm diag__assunto-frase">{assunto.frase}</p> : null}
+							</header>
+							<CartaoDaQuestao
+								numero={numeroDe(questao.id)}
+								questao={questao}
+								resposta={diagnostico.respostas[questao.id]}
+								resultado={resultadoDe(questao)}
+								situacao={situacaoDe(questao)}
+								{...(props.erroDe(questao.id) !== undefined ? { erro: props.erroDe(questao.id)! } : {})}
+								corrigir={() => props.corrigir(questao.id)}
+								posicao={vizinhas.posicao}
+								total={vizinhas.total}
+								{...(vizinhas.anterior ? { anterior: () => setEscolhida(vizinhas.anterior) } : {})}
+								{...(vizinhas.proxima ? { proxima: () => setEscolhida(vizinhas.proxima) } : {})}
+							/>
+						</motion.div>
+					) : null}
+				</div>
+			</div>
+		</div>
+	);
+}
+
+/**
+ * A questão aberta no resultado, num cartão na cor do resultado: o cabeçalho
+ * (número, tipo, resultado, confiança e nota), o contexto e a pergunta, as
+ * alternativas com o gabarito (ou a sua resposta e a correção, na
+ * dissertativa), a sua resposta, o porquê do erro e a explicação; no pé,
+ * "Anterior" e "Próxima".
+ */
+function CartaoDaQuestao(props: {
 	numero: number;
 	questao: QuestaoNaTela;
 	resposta: RespostaNaTela | undefined;
-	situacao: "corrigida" | "corrigindo" | "falhou";
+	resultado: ResultadoNaTela;
+	situacao: Situacao;
 	erro?: string;
 	corrigir(): void;
+	posicao: number;
+	total: number;
+	anterior?: () => void;
+	proxima?: () => void;
 }) {
-	const { questao, resposta } = props;
-	const [aberta, setAberta] = useState(false);
-	const dobra = useId();
+	const { questao, resposta, resultado } = props;
+	const tom = tomDoResultado(resultado);
 	const partes = partesDaQuestao(questao);
 	const enunciado = <Markdown texto={partes.pergunta} emLinha />;
-	// O contexto, quando há, vem acima da pergunta, numa coluna só.
 	const contexto = partes.contexto ? (
-		<div className="ap-prose body diag__contexto-dentro">
+		<div className="ap-prose body diag__contexto-dentro diag__cartao-contexto">
 			<Markdown texto={partes.contexto} />
 		</div>
 	) : null;
+	const correcao = questao.tipo === "dissertativa" ? (resposta as RespostaDissertativa | undefined)?.correcao : undefined;
 
-	let etiqueta: ReactNode = null;
-	let conteudo: ReactNode = null;
+	let miolo: ReactNode;
 	if (questao.tipo === "alternativa") {
 		const daAlternativa = resposta as RespostaAlternativa | undefined;
 		const correta = questao.alternativas.findIndex((alternativa) => alternativa.correta === true);
 		const acertou = daAlternativa?.correta === true;
 		const confusao = daAlternativa && !acertou ? (daAlternativa.confusao ?? questao.alternativas[daAlternativa.escolha]?.confusao) : undefined;
-		etiqueta = acertou ? (
-			<Tag tone="sage" size="sm" icon="check">
-				Correta
-			</Tag>
-		) : (
-			<Tag tone="brick" size="sm" icon="close">
-				Ainda não
-			</Tag>
-		);
-		conteudo = (
+		const sua = daAlternativa ? suaRespostaAlternativa(questao.alternativas, daAlternativa.escolha) : undefined;
+		miolo = (
 			<>
-				{contexto}
-				<QuizQuestion
-					prompt={enunciado}
-					options={questao.alternativas.map((alternativa, indice) => ({ id: String(indice), label: <Markdown texto={alternativa.texto} emLinha /> }))}
-					value={daAlternativa ? String(daAlternativa.escolha) : null}
-					{...(correta >= 0 ? { correctId: String(correta) } : {})}
-				>
-					<QuizFeedback status={acertou ? "correct" : "incorrect"}>
-						{confusao ? <p>{fraseDaConfusao(confusao)}</p> : null}
-						{questao.explicacao ? <Markdown texto={questao.explicacao} /> : null}
-					</QuizFeedback>
-				</QuizQuestion>
+				<div className="diag__secao">
+					{contexto}
+					<QuizQuestion
+						prompt={enunciado}
+						options={questao.alternativas.map((alternativa, indice) => ({ id: String(indice), label: <Markdown texto={alternativa.texto} emLinha /> }))}
+						value={daAlternativa ? String(daAlternativa.escolha) : null}
+						{...(correta >= 0 ? { correctId: String(correta) } : {})}
+					/>
+				</div>
+				{sua ? (
+					<div className="diag__secao diag__secao--fio">
+						<p className={`body-strong diag__sua-escolha diag__sua-escolha--${resultado}`}>
+							{sua.rotulo}
+							{sua.texto ? (
+								<>
+									{" · "}
+									<Markdown texto={sua.texto} emLinha />
+								</>
+							) : null}
+						</p>
+						{confusao ? (
+							<div className="diag__porque">
+								<p className="overline diag__secao-rotulo">Por que você pode ter errado</p>
+								<p className="body">{fraseDaConfusao(confusao)}</p>
+							</div>
+						) : null}
+					</div>
+				) : null}
+				{questao.explicacao ? (
+					<div className="diag__secao diag__secao--fio">
+						<p className="overline diag__secao-rotulo">Explicação</p>
+						<div className="ap-prose body">
+							<Markdown texto={questao.explicacao} />
+						</div>
+					</div>
+				) : null}
 			</>
 		);
 	} else {
 		const daDissertativa = resposta as RespostaDissertativa | undefined;
-		const correcao = daDissertativa?.correcao;
-		if (correcao) {
-			const status = statusDaCorrecao(correcao);
-			etiqueta = (
-				<>
-					<Tag tone={status === "correct" ? "sage" : status === "incorrect" ? "brick" : "cream"} size="sm" icon={status === "correct" ? "check" : status === "incorrect" ? "close" : "refresh"}>
-						{status === "correct" ? "Correta" : status === "incorrect" ? "Ainda não" : "Quase lá"}
-					</Tag>
-					<span className="data diag__nota">
-						{numeroCurto(correcao.total)}/{numeroCurto(correcao.max)}
-					</span>
-				</>
-			);
-		} else {
-			etiqueta =
-				props.situacao === "corrigindo" ? (
-					<Tag tone="amber" size="sm" icon="clock">
-						Corrigindo
-					</Tag>
-				) : (
-					<Tag tone="brick" size="sm" icon="alert">
-						Sem correção
-					</Tag>
-				);
-		}
-		conteudo = (
-			<div className="diag__dissertativa">
-				{contexto}
-				<h3 className="ap-quiz__prompt heading">{enunciado}</h3>
+		miolo = (
+			<>
+				<div className="diag__secao">
+					{contexto}
+					<h3 className="ap-quiz__prompt heading">{enunciado}</h3>
+				</div>
 				{daDissertativa ? (
-					<StudentNote label="Sua resposta" className="diag__sua-resposta">
-						<p className="body">{daDissertativa.texto}</p>
-					</StudentNote>
+					<div className="diag__secao diag__secao--fio">
+						<StudentNote label="Sua resposta" className="diag__sua-resposta">
+							<p className="body">{daDissertativa.texto}</p>
+						</StudentNote>
+					</div>
+				) : null}
+				{props.situacao === "falhou" ? (
+					<Callout tone="amber" label="Atenção" icon="alert" quote={false}>
+						<p>{props.erro ?? "A correção desta dissertativa não chegou."}</p>
+						<div className="diag__botoes">
+							<Button variant="secondary" size="sm" icon="refresh" onClick={props.corrigir}>
+								Corrigir de novo
+							</Button>
+						</div>
+					</Callout>
 				) : null}
 				{correcao ? (
-					<>
-						<QuizFeedback
-							status={statusDaCorrecao(correcao)}
-							score={`${numeroCurto(correcao.total)}/${numeroCurto(correcao.max)}`}
-							criteria={criteriosDoFeedback(correcao)}
-						/>
+					<div className="diag__secao diag__secao--fio">
+						<QuizFeedback status={statusDaCorrecao(correcao)} score={`${numeroCurto(correcao.total)}/${numeroCurto(correcao.max)}`} criteria={criteriosDoFeedback(correcao)} />
 						<ul className="diag__criterios">
 							{correcao.criterios.map((item) => (
 								<li key={item.criterio} className="diag__criterio">
@@ -634,53 +858,45 @@ function QuestaoResultado(props: {
 								</li>
 							))}
 						</ul>
-					</>
+					</div>
 				) : props.situacao === "corrigindo" ? (
 					<p className="body guia__texto">Corrigindo…</p>
 				) : null}
-			</div>
+			</>
 		);
 	}
 
 	return (
-		<li className="diag__item">
-			<button type="button" className="diag__item-cabeca" aria-expanded={aberta} {...(aberta ? { "aria-controls": dobra } : {})} onClick={() => setAberta((valor) => !valor)}>
-				<span className="overline">
-					Questão {pad2(props.numero)} · {questao.tipo === "alternativa" ? "Alternativa" : "Dissertativa"}
+		<article className={`diag__cartao diag__cartao--${tom.tom}`} aria-label={`Questão ${pad2(props.numero)}: ${tom.palavra}`}>
+			<header className="diag__cartao-cabeca">
+				<span className="diag__cartao-titulo">
+					<Icon name={tom.icone} size={20} strokeWidth={2.5} className={`diag__icone diag__icone--${resultado}`} />
+					<span className="overline">
+						Questão {pad2(props.numero)} · {questao.tipo === "alternativa" ? "Alternativa" : "Dissertativa"}
+					</span>
+					<span className={`overline diag__cartao-palavra diag__sua-escolha--${resultado}`}>{tom.palavra}</span>
 				</span>
-				<span className="diag__item-meta">
-					{etiqueta}
-					{resposta ? <span className="data diag__confianca-dita">Confiança: {NOMES_CONFIANCA[resposta.confianca]}</span> : null}
+				<span className="diag__cartao-meta">
+					{resposta ? <span className="data">Confiança: {NOMES_CONFIANCA[resposta.confianca]}</span> : null}
+					{correcao ? (
+						<span className="data">
+							Nota: {numeroCurto(correcao.total)}/{numeroCurto(correcao.max)}
+						</span>
+					) : null}
 				</span>
-				<motion.span className="mapa__seta" animate={{ rotate: aberta ? 90 : 0 }} transition={{ type: "spring", stiffness: 500, damping: 30 }}>
-					<Icon name="chevron-right" size={16} strokeWidth={2.5} />
-				</motion.span>
-			</button>
-			{questao.tipo === "dissertativa" && props.situacao === "falhou" ? (
-				<Callout tone="amber" label="Atenção" icon="alert" quote={false}>
-					<p>{props.erro ?? "A correção desta dissertativa não chegou."}</p>
-					<div className="diag__botoes">
-						<Button variant="secondary" size="sm" icon="refresh" onClick={props.corrigir}>
-							Corrigir de novo
-						</Button>
-					</div>
-				</Callout>
-			) : null}
-			<AnimatePresence initial={false}>
-				{aberta ? (
-					<motion.div
-						key="dobra"
-						id={dobra}
-						className="diag__dobra"
-						initial={{ height: 0, opacity: 0 }}
-						animate={{ height: "auto", opacity: 1 }}
-						exit={{ height: 0, opacity: 0 }}
-						transition={semMovimento() ? { duration: 0 } : MOLA}
-					>
-						<div className="diag__dobra-dentro">{conteudo}</div>
-					</motion.div>
-				) : null}
-			</AnimatePresence>
-		</li>
+			</header>
+			{miolo}
+			<footer className="diag__cartao-pe">
+				<Button variant="ghost" size="sm" icon="arrow-left" disabled={!props.anterior} onClick={props.anterior}>
+					Anterior
+				</Button>
+				<span className="data diag__cartao-posicao">
+					{props.posicao} de {props.total} no índice
+				</span>
+				<Button variant="secondary" size="sm" iconRight="arrow-right" disabled={!props.proxima} onClick={props.proxima}>
+					Próxima
+				</Button>
+			</footer>
+		</article>
 	);
 }

@@ -40,6 +40,8 @@ export type VerboEvento =
 	// O esqueleto do guia de cursos (item 5, parte C): docs/cursos.md, "Parte C", "Eventos (na matéria)".
 	// gerou_esqueleto vai para o eventos.jsonl da matéria, como o criou_curso (acima).
 	| "gerou_esqueleto"
+	// "Recalcular o calendário" num curso pronto (docs/cursos.md, "O calendário"), também na matéria.
+	| "recalculou_calendario"
 	// Aprendizagem (seção 9.2), usados a partir dos itens 7 e 8:
 	| "pediu_reexplicacao"
 	| "pediu_outro_jeito"

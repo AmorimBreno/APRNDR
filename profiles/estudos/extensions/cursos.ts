@@ -22,7 +22,8 @@
 //   pelo paraATela (sem o gabarito enquanto falta responder alguma questão) e
 //   diz se as questões estão sendo geradas (gerandoDiagnostico) e quais
 //   dissertativas estão sendo corrigidas (corrigindo);
-// - o esqueleto (parte C): gerar_esqueleto, editar_esqueleto e criar_curso. A
+// - o esqueleto (parte C): gerar_esqueleto, editar_esqueleto, criar_curso e,
+//   no curso pronto, recalcular_calendario (o calendário com os dias de hoje). A
 //   proposta vem do modelo de ../prompts/esqueleto.md, chamado do mesmo jeito
 //   (fora da trava, com a nova tentativa), e é consertada pelo código
 //   (consertarProposta) antes de gravar; o calendário é sempre do código.
@@ -92,11 +93,14 @@ import {
 	conceitosParaOModelo,
 	consertarProposta,
 	criarCurso,
+	diasDeEstudo,
 	diasEntre,
 	ErroEsqueleto,
 	gravarProposta,
+	horasDisponiveis,
 	type Modulo,
 	NOMES_TIPO_MODULO,
+	recalcularCalendario,
 	salvarEdicao,
 } from "../lib/esqueleto.ts";
 import { ErroMapa, lerMapa, type MapaConteudo } from "../lib/mapa.ts";
@@ -146,6 +150,7 @@ const ACOES: ReadonlyArray<AcaoDaTela> = [
 	"gerar_esqueleto",
 	"editar_esqueleto",
 	"criar_curso",
+	"recalcular_calendario",
 ];
 
 interface DadosAcao {
@@ -179,6 +184,7 @@ const FRASES: Record<AcaoDaTela | "ler", string> = {
 	gerar_esqueleto: "montar o esqueleto do curso",
 	editar_esqueleto: "salvar os módulos do esqueleto",
 	criar_curso: "criar o curso",
+	recalcular_calendario: "recalcular o calendário",
 	ler: "ler o curso",
 };
 
@@ -313,9 +319,21 @@ async function chamar(registro: RegistroCursos, modelo: Modelo, instrucoes: stri
 }
 
 /**
+ * A resposta veio no formato, mas o código quer outra (o esqueleto acima do
+ * limite de horas): a mensagem vai ao modelo como está, na nova tentativa.
+ */
+export class PedirDeNovo extends Error {
+	constructor(mensagem: string) {
+		super(mensagem);
+		this.name = "PedirDeNovo";
+	}
+}
+
+/**
  * Chama o modelo com a mensagem e lê a resposta com `ler` (que também confere
- * o conteúdo: validarQuestoes, validarCorrecao); fora do formato ou com
- * problema, tenta uma vez de novo dizendo o motivo. Falhando de novo,
+ * o conteúdo: validarQuestoes, validarCorrecao; recebe o número da
+ * tentativa); fora do formato ou com problema, tenta uma vez de novo dizendo
+ * o motivo (um PedirDeNovo vai com a frase dele, inteira). Falhando de novo,
  * ErroDiagnostico com o gasto.
  */
 export async function pedirJson<T>(
@@ -323,7 +341,7 @@ export async function pedirJson<T>(
 	modelo: Modelo,
 	instrucoes: string,
 	texto: string,
-	ler: (texto: string) => T,
+	ler: (texto: string, tentativa: number) => T,
 	sinal: AbortSignal,
 	opcoes: OpcoesChamada,
 ): Promise<{ resultado: T; custo: number; tentativas: number }> {
@@ -334,9 +352,13 @@ export async function pedirJson<T>(
 		const resposta = await chamar(registro, modelo, instrucoes, mensagens, sinal, opcoes);
 		custo += resposta.usage?.cost?.total ?? 0;
 		try {
-			return { resultado: ler(textoDa(resposta)), custo, tentativas: tentativa };
+			return { resultado: ler(textoDa(resposta), tentativa), custo, tentativas: tentativa };
 		} catch (erro) {
 			motivo = (erro as Error).message;
+			if (erro instanceof PedirDeNovo) {
+				mensagens.push(resposta, usuario(motivo));
+				continue;
+			}
 			if (resposta.stopReason === "length") motivo += " (a resposta foi cortada no limite de tamanho)";
 			mensagens.push(resposta, usuario(`A sua resposta não veio como o pedido: ${motivo}. Responda de novo só com o JSON ${opcoes.formato}, sem nenhum texto antes ou depois.`));
 		}
@@ -435,12 +457,17 @@ const numeroComVirgula = (numero: number) => String(numero).replace(".", ",");
 const NOMES_PRIORIDADE = { alta: "alta", normal: "normal", baixa: "baixa" } as const;
 const NOMES_RESULTADO = { certa: "certa", errada: "errada", parcial: "parcial" } as const;
 
+/** As horas arredondadas a 0,5, para os textos ao modelo. */
+const meiaHora = (horas: number) => Math.round(horas * 2) / 2;
+
 /**
  * A linha do prazo para o modelo do esqueleto, com as mesmas contas do
  * calcularCalendario: a avaliação geral fica na véspera do prazo e os módulos
- * vão de amanhã até o dia anterior a ela; o tempo disponível é horas por
- * semana × esses dias / 7 (arredondado a 0,5). Prazo que já passou, que é hoje
- * ou amanhã, ou que não deixa dias para os módulos: o modelo trata como sem prazo.
+ * vão de amanhã até o dia anterior a ela (diasDeEstudo); o tempo disponível é
+ * horas por semana × esses dias / 7 (arredondado a 0,5), e ele é o limite da
+ * soma das horas dos módulos (docs/cursos.md, "O modelo"). Prazo que já
+ * passou, que é hoje ou amanhã, ou que não deixa dias para os módulos: o
+ * modelo trata como sem prazo.
  */
 export function linhaDoPrazo(basico: Pick<DadosBasico, "prazo" | "horasPorSemana">, hoje: string): string {
 	if (!basico.prazo) return "Prazo: sem prazo (estime as horas pelo que o conteúdo pede).";
@@ -449,13 +476,35 @@ export function linhaDoPrazo(basico: Pick<DadosBasico, "prazo" | "horasPorSemana
 	if (dias < 0) return `Prazo: ${basico.prazo} (já passou; ${semPrazo}).`;
 	if (dias === 0) return `Prazo: ${basico.prazo} (é hoje; ${semPrazo}).`;
 	if (dias === 1) return `Prazo: ${basico.prazo} (é amanhã; ${semPrazo}).`;
-	const disponiveis = dias - 2;
-	if (disponiveis < 1) return `Prazo: ${basico.prazo}, daqui a ${dias} dias (não sobra dia para os módulos antes da avaliação geral; ${semPrazo}).`;
-	const horas = Math.round(((basico.horasPorSemana * disponiveis) / 7) * 2) / 2;
+	const disponiveis = diasDeEstudo(basico.prazo, hoje);
+	if (disponiveis === null) return `Prazo: ${basico.prazo}, daqui a ${dias} dias (não sobra dia para os módulos antes da avaliação geral; ${semPrazo}).`;
+	const horas = meiaHora(horasDisponiveis(basico, hoje)!);
 	return [
 		`Prazo: ${basico.prazo}, daqui a ${dias} dias. A avaliação geral fica na véspera do prazo, e os módulos vão de amanhã até o dia anterior a ela: ${disponiveis} dia${disponiveis === 1 ? "" : "s"}.`,
-		`Tempo disponível para os módulos: cerca de ${numeroComVirgula(horas)} h (${numeroComVirgula(basico.horasPorSemana)} h por semana × ${disponiveis} dias).`,
+		`Tempo disponível para os módulos: cerca de ${numeroComVirgula(horas)} h (${numeroComVirgula(basico.horasPorSemana)} h por semana × ${disponiveis} dia${disponiveis === 1 ? "" : "s"}).`,
+		`Este tempo é o limite: a soma das horas de todos os módulos precisa caber nele.`,
 	].join("\n");
+}
+
+/** Quantas vezes as horas disponíveis a proposta do esqueleto pode somar antes de o código pedir uma nova tentativa. */
+export const FOLGA_HORAS_ESQUELETO = 1.5;
+
+/**
+ * Se a proposta (já consertada) passa de FOLGA_HORAS_ESQUELETO × as horas
+ * disponíveis até o prazo (horasDisponiveis), a frase da nova tentativa, com
+ * a soma e o limite; senão (ou sem prazo, ou sem dia de estudo), undefined.
+ */
+export function pedidoDoLimite(modulos: ReadonlyArray<Pick<Modulo, "horas">>, basico: Pick<DadosBasico, "prazo" | "horasPorSemana">, hoje: string): string | undefined {
+	const limite = horasDisponiveis(basico, hoje);
+	if (limite === null) return undefined;
+	const soma = modulos.reduce((total, modulo) => total + modulo.horas, 0);
+	if (soma <= FOLGA_HORAS_ESQUELETO * limite + 1e-9) return undefined;
+	const dias = diasDeEstudo(basico.prazo, hoje)!;
+	return [
+		`A soma das horas dos módulos deu ${numeroComVirgula(soma)} h, mas o limite até o prazo é de cerca de ${numeroComVirgula(meiaHora(limite))} h (${numeroComVirgula(basico.horasPorSemana)} h por semana × ${dias} dia${dias === 1 ? "" : "s"}).`,
+		"Refaça a proposta dentro do limite: menos módulos e mais curtos; mais tempo para os conceitos de prioridade alta e para os que o diagnóstico mostrou fracos; os de prioridade baixa e os já dominados juntos em módulos curtos ou de revisão. Todo conceito do curso continua em exatamente um módulo.",
+		'Responda de novo só com o JSON {"modulos": [...]}, sem nenhum texto antes ou depois.',
+	].join(" ");
 }
 
 /**
@@ -936,9 +985,18 @@ export default function cursos(pi: ExtensionAPI, opcoes: OpcoesCursos = {}) {
 			if (!registro) throw new ErroEsqueleto("A sessão não tem o registro de modelos do pi; não dá para chamar o modelo do esqueleto.");
 			const modelo = resolverModelo(registro, prompt.modelo, "do esqueleto");
 			const doCurso = atual.mapa?.conceitos ?? [];
-			const mensagem = mensagemDoEsqueleto({ nome: atual.nome, objetivo: atual.objetivo!, basico: atual.basico!, hoje: hojeLocal(), conceitos });
+			const hoje = hojeLocal();
+			const basico = atual.basico!;
+			const mensagem = mensagemDoEsqueleto({ nome: atual.nome, objetivo: atual.objetivo!, basico, hoje, conceitos });
+			// A proposta consertada que passa de 1,5 vez as horas disponíveis volta ao modelo uma vez, com a soma e o limite; na segunda, é aceita (o calendário avisa).
+			const ler = (texto: string, tentativa: number) => {
+				const modulos = consertarProposta(objetoDaResposta(texto), doCurso);
+				const pedido = tentativa === 1 ? pedidoDoLimite(modulos, basico, hoje) : undefined;
+				if (pedido) throw new PedirDeNovo(pedido);
+				return modulos;
+			};
 			// Fora da trava: a chamada pode levar minutos.
-			const resposta = await pedirJson(registro, modelo, prompt.instrucoes, mensagem, (texto) => consertarProposta(objetoDaResposta(texto), doCurso), sinal, {
+			const resposta = await pedirJson(registro, modelo, prompt.instrucoes, mensagem, ler, sinal, {
 				maxTokens: MAX_TOKENS_ESQUELETO,
 				formato: '{"modulos": [...]}, de 2 a 12 módulos, com cada conceito do curso em exatamente um módulo',
 				oQue: "o esqueleto do curso",
@@ -1113,6 +1171,11 @@ export default function cursos(pi: ExtensionAPI, opcoes: OpcoesCursos = {}) {
 						const criado = await criarCurso(dados, materia, curso, daSessao());
 						await mostrarCurso(dados, materia, criado, comPedido);
 						await mostrarLista(dados, materia);
+					});
+				} else if (ao === "recalcular_calendario") {
+					await naTrava(materia, async () => {
+						const novo = await recalcularCalendario(dados, materia, curso, daSessao());
+						await mostrarCurso(dados, materia, novo, comPedido);
 					});
 				}
 			} catch (erro) {

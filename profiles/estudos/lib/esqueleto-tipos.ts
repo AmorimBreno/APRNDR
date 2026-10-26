@@ -86,7 +86,7 @@ export interface CalendarioModulo {
 	inicio: string;
 	/** O último dia do módulo. */
 	fim: string;
-	/** O dia em que a avaliação do módulo fica disponível: o seguinte ao fim. */
+	/** O dia em que a avaliação do módulo fica disponível: o seguinte ao fim (nunca depois da avaliação geral). */
 	avaliacao: string;
 }
 
@@ -98,6 +98,8 @@ export interface CalendarioCurso {
 	avaliacaoGeral: string;
 	/** Com prazo apertado: as horas por semana que o plano pede (arredondadas a 0,5). Só aparece quando passa das horas do Básico. */
 	horasPorSemanaNecessarias?: number;
+	/** Junto com horasPorSemanaNecessarias: as horas por dia de estudo que o plano pede (arredondadas a 0,1). */
+	horasPorDiaNecessarias?: number;
 	/** As frases para a tela (prazo apertado, prazo que já passou…). */
 	avisos: string[];
 }
@@ -240,6 +242,9 @@ export function diasEntre(de: string, ate: string): number {
 /** 20/11/2026, para as frases dos avisos. */
 const dataNaFrase = (data: string) => `${data.slice(8, 10)}/${data.slice(5, 7)}/${data.slice(0, 4)}`;
 
+/** 04/11: o dia e o mês, para o aviso das horas que o plano pede. */
+const diaMesNaFrase = (data: string) => `${data.slice(8, 10)}/${data.slice(5, 7)}`;
+
 /** 7, 6,5: o número com vírgula, para as frases dos avisos. */
 const numeroNaFrase = (numero: number) => String(numero).replace(".", ",");
 
@@ -262,35 +267,31 @@ export function diasDoModulo(horas: number, horasPorSemana: number): number {
 }
 
 /**
- * Encolhe as durações na mesma proporção para somarem exatamente `disponiveis`
- * dias, cada uma com pelo menos 1 (pede disponiveis >= quantidade). Quem a
- * proporção deixaria abaixo de 1 fica com 1, e a proporção é refeita com os
- * outros; a parte inteira vai para cada um, e os dias que sobram, um para
- * cada, para as maiores frações (no empate, o primeiro). Contas em inteiros.
+ * Os dias de estudo antes da avaliação geral, com prazo: de amanhã até o dia
+ * anterior à avaliação geral (que fica no dia anterior ao prazo), ou seja,
+ * os dias até o prazo menos 2. Sem prazo, ou com um prazo que não deixa
+ * nenhum dia de estudo (já passou, é hoje, amanhã ou depois de amanhã),
+ * null. Hoje ou prazo fora do formato, ErroEsqueleto.
  */
-function encolher(duracoes: readonly number[], disponiveis: number): number[] {
-	const fixos = new Set<number>();
-	for (;;) {
-		const livres = duracoes.map((_, indice) => indice).filter((indice) => !fixos.has(indice));
-		const dias = disponiveis - fixos.size;
-		const soma = livres.reduce((total, indice) => total + duracoes[indice]!, 0);
-		const abaixo = livres.filter((indice) => duracoes[indice]! * dias < soma);
-		if (abaixo.length === 0 || livres.length === 0) {
-			const saida = duracoes.map((duracao, indice) => (fixos.has(indice) || soma === 0 ? 1 : Math.floor((duracao * dias) / soma)));
-			let sobra = disponiveis - saida.reduce((total, valor) => total + valor, 0);
-			const porFracao = livres
-				.map((indice) => ({ indice, fracao: soma === 0 ? 0 : (duracoes[indice]! * dias) % soma }))
-				.sort((a, b) => b.fracao - a.fracao || a.indice - b.indice);
-			for (const { indice } of porFracao) {
-				if (sobra <= 0) break;
-				saida[indice]!++;
-				sobra--;
-			}
-			return saida;
-		}
-		for (const indice of abaixo) fixos.add(indice);
-	}
+export function diasDeEstudo(prazo: string | null | undefined, hoje: string): number | null {
+	const dia = conferirData(hoje, "O dia de hoje");
+	if (prazo === null || prazo === undefined || prazo === "") return null;
+	const dias = conferirData(prazo, "O prazo") - dia - 2;
+	return dias >= 1 ? dias : null;
 }
+
+/**
+ * O tempo disponível para os módulos até o prazo (docs/cursos.md, "O
+ * modelo"): horas por semana × dias de estudo (diasDeEstudo) / 7, sem
+ * arredondar. Sem prazo, ou sem dia de estudo, null.
+ */
+export function horasDisponiveis(basico: { prazo: string | null; horasPorSemana: number }, hoje: string): number | null {
+	const dias = diasDeEstudo(basico.prazo, hoje);
+	return dias === null ? null : (basico.horasPorSemana * dias) / 7;
+}
+
+/** Folga contra o erro de ponto flutuante nas frações de dia. */
+const EPSILON = 1e-9;
 
 /**
  * O calendário do curso (docs/cursos.md, "O calendário"), o mesmo na tela e
@@ -298,17 +299,23 @@ function encolher(duracoes: readonly number[], disponiveis: number): number[] {
  * - os módulos vão em sequência a partir de amanhã, cada um com
  *   diasDoModulo(horas, horasPorSemana) dias corridos; o seguinte começa no
  *   dia depois do fim do anterior;
- * - a avaliação de cada módulo fica no dia seguinte ao fim dele;
- * - com prazo: a avaliação geral fica no dia anterior ao prazo, e os módulos
- *   precisam acabar antes dela; se não cabem, as durações encolhem na mesma
- *   proporção (cada módulo com pelo menos 1 dia), e quando as horas por
- *   semana que isso pede (horas dos módulos × 7 / dias disponíveis,
- *   arredondadas a 0,5) passam das do Básico, vão em
- *   horasPorSemanaNecessarias e num aviso;
+ * - a avaliação de cada módulo fica no dia seguinte ao fim dele, e nunca
+ *   depois da avaliação geral (se cair nela ou depois, fica nela);
+ * - com prazo: a avaliação geral fica no dia anterior ao prazo, e os dias de
+ *   estudo vão de amanhã até o dia anterior a ela (diasDeEstudo). Se a soma
+ *   das durações não cabe nesses dias, o tempo é dividido na proporção das
+ *   horas de cada módulo, em frações de dia: o módulo vai da fração
+ *   acumulada antes dele até a fração acumulada depois dele, e as datas são
+ *   os dias em que essas frações caem (um módulo pode começar e terminar no
+ *   mesmo dia, e vários podem dividir um dia). Quando as horas por semana
+ *   que o plano pede (horas dos módulos × 7 / dias de estudo, arredondadas a
+ *   0,5) passam das do Básico, elas vão em horasPorSemanaNecessarias, as
+ *   horas por dia (horas / dias de estudo, arredondadas a 0,1) em
+ *   horasPorDiaNecessarias, e as duas num aviso;
  * - sem prazo: a avaliação geral fica no dia seguinte ao fim do último módulo
  *   (sem módulos, amanhã);
- * - prazo que já passou, que é hoje ou amanhã, ou que não deixa um dia para
- *   cada módulo antes da avaliação geral: aviso, e o calendário segue como
+ * - prazo que já passou, que é hoje, amanhã ou depois de amanhã (nenhum dia
+ *   de estudo antes da avaliação geral): aviso, e o calendário segue como
  *   sem prazo.
  * Hoje ou prazo fora do formato, ou horas por semana que não são um número
  * maior que zero, ErroEsqueleto.
@@ -320,46 +327,81 @@ export function calcularCalendario(modulos: ReadonlyArray<Pick<Modulo, "id" | "h
 		throw new ErroEsqueleto(`As horas por semana precisam ser um número maior que zero (veio "${mostrar(horasPorSemana)}").`);
 	}
 	const amanha = hoje + 1;
-	let duracoes = modulos.map((modulo) => diasDoModulo(modulo.horas, horasPorSemana));
+	const duracoes = modulos.map((modulo) => diasDoModulo(modulo.horas, horasPorSemana));
 	const avisos: string[] = [];
 	let avaliacaoGeral: number | null = null;
+	/** Com prazo apertado: os dias de estudo, divididos em frações de dia. */
+	let emFracoes: number | null = null;
 	let horasPorSemanaNecessarias: number | undefined;
+	let horasPorDiaNecessarias: number | undefined;
 	if (prazo !== null && prazo !== undefined && prazo !== "") {
 		const dia = conferirData(prazo, "O prazo");
 		const naFrase = dataNaFrase(prazo);
 		if (dia < hoje) avisos.push(`O prazo (${naFrase}) já passou; o calendário segue sem prazo.`);
 		else if (dia === hoje) avisos.push(`O prazo (${naFrase}) é hoje; o calendário segue sem prazo.`);
 		else if (dia === amanha) avisos.push(`O prazo (${naFrase}) é amanhã e não deixa dias para os módulos; o calendário segue sem prazo.`);
-		else {
+		else if (dia === amanha + 1) {
+			avisos.push(`O prazo (${naFrase}) é depois de amanhã: a avaliação geral fica amanhã, sem dias para os módulos; o calendário segue sem prazo.`);
+		} else {
 			const geral = dia - 1;
 			const disponiveis = geral - amanha;
+			avaliacaoGeral = geral;
 			const total = duracoes.reduce((soma, valor) => soma + valor, 0);
-			if (total <= disponiveis) avaliacaoGeral = geral;
-			else if (modulos.length > disponiveis) {
-				avisos.push(`Até o prazo (${naFrase}) não há um dia para cada módulo antes da avaliação geral; o calendário segue sem prazo.`);
-			} else {
-				duracoes = encolher(duracoes, disponiveis);
-				avaliacaoGeral = geral;
-				const horas = modulos.reduce((soma, modulo) => soma + modulo.horas, 0);
-				const pede = Math.round(((horas * 7) / disponiveis) * 2) / 2;
-				if (pede > horasPorSemana) {
-					horasPorSemanaNecessarias = pede;
-					avisos.push(`No prazo, este plano pede cerca de ${numeroNaFrase(pede)} h por semana; você disse ${numeroNaFrase(horasPorSemana)}.`);
-				}
+			if (total > disponiveis) emFracoes = disponiveis;
+			const horas = modulos.reduce((soma, modulo) => soma + modulo.horas, 0);
+			const porSemana = (horas * 7) / disponiveis;
+			const pede = Math.round(porSemana * 2) / 2;
+			if (porSemana > horasPorSemana + EPSILON && pede > horasPorSemana) {
+				horasPorSemanaNecessarias = pede;
+				horasPorDiaNecessarias = Math.round((horas / disponiveis) * 10) / 10;
+				avisos.push(
+					`Até ${diaMesNaFrase(dataDoNumero(geral))} (${disponiveis} ${disponiveis === 1 ? "dia" : "dias"}), este plano pede cerca de ${numeroNaFrase(horasPorDiaNecessarias)} h por dia (${numeroNaFrase(pede)} h por semana); você disse ${numeroNaFrase(horasPorSemana)} h por semana.`,
+				);
 			}
 		}
 	}
-	let cursor = amanha;
-	const datas = modulos.map((modulo, indice): CalendarioModulo => {
-		const inicio = cursor;
-		const fim = inicio + duracoes[indice]! - 1;
-		cursor = fim + 1;
-		return { id: modulo.id, inicio: dataDoNumero(inicio), fim: dataDoNumero(fim), avaliacao: dataDoNumero(fim + 1) };
-	});
+	let inicios: number[];
+	let fins: number[];
+	if (emFracoes !== null) {
+		// Cada módulo fica com a parte dos dias de estudo na proporção das horas dele.
+		const pesos = modulos.map((modulo) => (Number.isFinite(modulo.horas) && modulo.horas > 0 ? modulo.horas : 0));
+		const soma = pesos.reduce((total, peso) => total + peso, 0);
+		const fracoes = soma > 0 ? pesos.map((peso) => (peso * emFracoes!) / soma) : pesos.map(() => emFracoes! / modulos.length);
+		let acumulado = 0;
+		inicios = [];
+		fins = [];
+		for (const fracao of fracoes) {
+			const comeco = acumulado;
+			acumulado += fracao;
+			const inicio = Math.min(emFracoes - 1, Math.floor(comeco + EPSILON));
+			const fim = Math.min(emFracoes - 1, Math.max(inicio, Math.ceil(acumulado - EPSILON) - 1));
+			inicios.push(amanha + inicio);
+			fins.push(amanha + fim);
+		}
+	} else {
+		let cursor = amanha;
+		inicios = [];
+		fins = [];
+		for (const duracao of duracoes) {
+			inicios.push(cursor);
+			fins.push(cursor + duracao - 1);
+			cursor += duracao;
+		}
+	}
+	const geral = avaliacaoGeral ?? (fins.length > 0 ? fins.at(-1)! + 1 : amanha);
+	const datas = modulos.map(
+		(modulo, indice): CalendarioModulo => ({
+			id: modulo.id,
+			inicio: dataDoNumero(inicios[indice]!),
+			fim: dataDoNumero(fins[indice]!),
+			avaliacao: dataDoNumero(Math.min(fins[indice]! + 1, geral)),
+		}),
+	);
 	return {
 		modulos: datas,
-		avaliacaoGeral: dataDoNumero(avaliacaoGeral ?? cursor),
+		avaliacaoGeral: dataDoNumero(geral),
 		...(horasPorSemanaNecessarias !== undefined ? { horasPorSemanaNecessarias } : {}),
+		...(horasPorDiaNecessarias !== undefined ? { horasPorDiaNecessarias } : {}),
 		avisos,
 	};
 }

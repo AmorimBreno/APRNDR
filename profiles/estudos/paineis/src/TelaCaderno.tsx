@@ -205,6 +205,10 @@ export function descreverEvento(evento: Evento): { icone: IconName; texto: strin
 			const detalhe = [modulos !== undefined ? `${modulos} ${modulos === 1 ? "módulo" : "módulos"}` : "", geral ? `avaliação geral em ${geral}` : ""].filter(Boolean).join(" · ");
 			return { icone: "flag", texto: `Curso criado: ${nomeDoCurso(evento)}`, ...(detalhe ? { detalhe } : {}) };
 		}
+		case "recalculou_calendario": {
+			const geral = typeof resultado.avaliacaoGeral === "string" && /^\d{4}-\d{2}-\d{2}$/.test(resultado.avaliacaoGeral) ? dataNumerica(resultado.avaliacaoGeral) : "";
+			return { icone: "refresh", texto: `Calendário recalculado: ${nomeDoCurso(evento)}`, ...(geral ? { detalhe: `avaliação geral em ${geral}` } : {}) };
+		}
 		case "concluiu_diagnostico": {
 			const { acertos, alternativas, dissertativas, nota } = resultado;
 			const detalhe = [

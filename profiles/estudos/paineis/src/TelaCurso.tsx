@@ -6,11 +6,14 @@
 // módulos em ModuleCard numa grade de 2 colunas (o primeiro como próximo, os
 // outros bloqueados; gerar o módulo é do item 6 e aparece como "Em breve"),
 // com o objetivo e as datas de cada um, e o calendário gravado no dia da
-// criação (o mesmo Calendario da etapa Esqueleto, só leitura).
+// criação (o mesmo Calendario da etapa Esqueleto, só leitura), com
+// "Recalcular o calendário" (recalcular_calendario, depois de confirmar no
+// modal): as datas passam a ser as de hoje, e os módulos ficam.
 
-import { Button, EmptyState, ModuleCard, Readout, SpecBox, Tag, type Tone } from "@estudos/design-system";
+import { Button, EmptyState, Modal, ModuleCard, Readout, SpecBox, Tag, type Tone } from "@estudos/design-system";
 import type { JanelaPerfilHook } from "@estudos/ui";
 import { motion } from "motion/react";
+import { useState } from "react";
 import { hojeLocal } from "../../lib/curso-tipos.ts";
 import { resumoDoEsqueleto, type ResumoEsqueleto } from "../../lib/esqueleto-tipos.ts";
 import type { Materia } from "../../lib/materia-tipos.ts";
@@ -34,9 +37,31 @@ export interface PropsTelaCurso {
 
 export function TelaCurso(props: PropsTelaCurso) {
 	const { materiaId, cursoId } = props;
-	const { curso, erro } = useCurso(props.janela, materiaId, cursoId);
+	const aberto = useCurso(props.janela, materiaId, cursoId);
+	const { curso, erro } = aberto;
 	const voltarAosCursos = () => props.navegar(`caderno/${materiaId}/cursos`);
 	const materia = props.materia?.nome ?? "Caderno";
+
+	// "Recalcular o calendário": o modal de confirmação, o pedido em andamento e o erro dele.
+	const [perguntarRecalcular, setPerguntarRecalcular] = useState(false);
+	const [recalculando, setRecalculando] = useState(false);
+	const [erroRecalcular, setErroRecalcular] = useState<string | undefined>(undefined);
+	const fecharRecalcular = () => {
+		if (recalculando) return;
+		setPerguntarRecalcular(false);
+		setErroRecalcular(undefined);
+	};
+	const recalcular = () => {
+		if (recalculando) return;
+		setRecalculando(true);
+		setErroRecalcular(undefined);
+		// A resposta é o "curso" com o calendário novo: a tela se atualiza por ele.
+		aberto
+			.recalcularCalendario()
+			.then(() => setPerguntarRecalcular(false))
+			.catch((falha: unknown) => setErroRecalcular(falha instanceof Error ? falha.message : String(falha)))
+			.finally(() => setRecalculando(false));
+	};
 
 	let resumo: ResumoEsqueleto | undefined;
 	if (curso?.esqueleto) {
@@ -157,6 +182,11 @@ export function TelaCurso(props: PropsTelaCurso) {
 						prazo={rotuloPrazo(curso.basico)}
 						{...(curso.basico ? { horasPorSemana: curso.basico.horasPorSemana } : {})}
 					/>
+					<div>
+						<Button variant="ghost" icon="refresh" onClick={() => setPerguntarRecalcular(true)} disabled={recalculando} aria-busy={recalculando}>
+							{recalculando ? "Recalculando…" : "Recalcular o calendário"}
+						</Button>
+					</div>
 				</section>
 			</>
 		);
@@ -183,6 +213,27 @@ export function TelaCurso(props: PropsTelaCurso) {
 				</span>
 			</header>
 			<div className="curso__corpo">{conteudo}</div>
+			<Modal
+				open={perguntarRecalcular}
+				onClose={fecharRecalcular}
+				kicker={curso?.nome ?? "Curso"}
+				title="Recalcular o calendário a partir de hoje?"
+				size="sm"
+				dismissible={!recalculando}
+				footer={
+					<>
+						<Button variant="secondary" onClick={fecharRecalcular} disabled={recalculando}>
+							Manter
+						</Button>
+						<Button variant="primary" icon="refresh" onClick={recalcular} disabled={recalculando} aria-busy={recalculando}>
+							{recalculando ? "Recalculando…" : "Recalcular"}
+						</Button>
+					</>
+				}
+			>
+				<p className="body">As datas mudam; os módulos ficam como estão.</p>
+				{erroRecalcular ? <p className="body-sm cursos__erro">{erroRecalcular}</p> : null}
+			</Modal>
 		</motion.section>
 	);
 }

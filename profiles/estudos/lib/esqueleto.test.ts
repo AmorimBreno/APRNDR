@@ -17,12 +17,14 @@ import {
 	conceitosParaOModelo,
 	consertarProposta,
 	criarCurso,
+	diasDeEstudo,
 	diasDoModulo,
 	diasEntre,
 	ErroEsqueleto,
 	type Esqueleto,
 	type EsqueletoEmAndamento,
 	gravarProposta,
+	horasDisponiveis,
 	type Modulo,
 	moverConceito,
 	moverModulo,
@@ -32,6 +34,7 @@ import {
 	NOMES_TIPO_MODULO,
 	podeCriar,
 	proximoIdModulo,
+	recalcularCalendario,
 	renomearModulo,
 	resumoDoEsqueleto,
 	salvarEdicao,
@@ -283,69 +286,143 @@ describe("calcularCalendario", () => {
 		expect(calendario.avisos).toEqual([]);
 	});
 
-	it("com prazo apertado: as durações encolhem na mesma proporção, e o aviso traz as horas por semana que o plano pede", () => {
-		// 14, 7 e 4 dias (25) em 10 disponíveis (27/10 a 05/11; a geral em 06/11, o prazo em 07/11): 6, 3 e 1.
+	it("com prazo apertado: o tempo é dividido na proporção das horas, em frações de dia, e o aviso traz as horas por dia e por semana", () => {
+		// 14, 7 e 4 dias (25) não cabem nos 10 dias de estudo (27/10 a 05/11; a geral em 06/11, o prazo em 07/11).
+		// 8, 4 e 2 h de 14: as frações acumuladas são 0; 5,71; 8,57 e 10 dias.
 		const calendario = calcularCalendario([modulo("m1", [], { horas: 8 }), modulo("m2", [], { horas: 4 }), modulo("m3", [], { horas: 2 })], { horasPorSemana: 4, prazo: "2026-11-07", hoje });
 		expect(calendario).toEqual({
 			modulos: [
 				{ id: "m1", inicio: "2026-10-27", fim: "2026-11-01", avaliacao: "2026-11-02" },
-				{ id: "m2", inicio: "2026-11-02", fim: "2026-11-04", avaliacao: "2026-11-05" },
-				{ id: "m3", inicio: "2026-11-05", fim: "2026-11-05", avaliacao: "2026-11-06" },
+				{ id: "m2", inicio: "2026-11-01", fim: "2026-11-04", avaliacao: "2026-11-05" },
+				{ id: "m3", inicio: "2026-11-04", fim: "2026-11-05", avaliacao: "2026-11-06" },
 			],
 			avaliacaoGeral: "2026-11-06",
+			// 14 h × 7 / 10 = 9,8 → 10; 14 h / 10 = 1,4.
 			horasPorSemanaNecessarias: 10,
-			avisos: ["No prazo, este plano pede cerca de 10 h por semana; você disse 4."],
+			horasPorDiaNecessarias: 1.4,
+			avisos: ["Até 06/11 (10 dias), este plano pede cerca de 1,4 h por dia (10 h por semana); você disse 4 h por semana."],
 		});
 	});
 
-	it("com prazo apertado: cada módulo fica com pelo menos 1 dia, e os números do aviso vão com vírgula", () => {
-		// 70, 4 e 4 dias em 5 disponíveis: os dois pequenos ficam com 1, o grande com 3; pede 11 h × 7 / 5 = 15,4 → 15,5.
+	it("com prazo apertado: vários módulos no mesmo dia, a avaliação nunca depois da geral, e os números do aviso com vírgula", () => {
+		// 10, 0,5 e 0,5 h em 5 dias de estudo (27/10 a 31/10): o grande vai de 0 a 4,55; os pequenos cabem os dois em 31/10.
 		const calendario = calcularCalendario([modulo("m1", [], { horas: 10 }), modulo("m2", [], { horas: 0.5 }), modulo("m3", [], { horas: 0.5 })], { horasPorSemana: 1, prazo: "2026-11-02", hoje });
-		expect(calendario.modulos.map((item) => diasEntre(item.inicio, item.fim) + 1)).toEqual([3, 1, 1]);
-		expect(calendario.modulos.at(-1)!.fim).toBe("2026-10-31");
+		expect(calendario.modulos).toEqual([
+			{ id: "m1", inicio: "2026-10-27", fim: "2026-10-31", avaliacao: "2026-11-01" },
+			{ id: "m2", inicio: "2026-10-31", fim: "2026-10-31", avaliacao: "2026-11-01" },
+			{ id: "m3", inicio: "2026-10-31", fim: "2026-10-31", avaliacao: "2026-11-01" },
+		]);
 		expect(calendario.avaliacaoGeral).toBe("2026-11-01");
+		// 11 h × 7 / 5 = 15,4 → 15,5; 11 h / 5 = 2,2.
 		expect(calendario.horasPorSemanaNecessarias).toBe(15.5);
-		expect(calendario.avisos).toEqual(["No prazo, este plano pede cerca de 15,5 h por semana; você disse 1."]);
+		expect(calendario.horasPorDiaNecessarias).toBe(2.2);
+		expect(calendario.avisos).toEqual(["Até 01/11 (5 dias), este plano pede cerca de 2,2 h por dia (15,5 h por semana); você disse 1 h por semana."]);
+		// 5 e 5 h em 11 dias: cada um com 5,5 dias, dividindo 01/11.
 		const fracionadas = calcularCalendario([modulo("m1", [], { horas: 5 }), modulo("m2", [], { horas: 5 })], { horasPorSemana: 2.5, prazo: "2026-11-08", hoje });
-		expect(fracionadas.avisos).toEqual(["No prazo, este plano pede cerca de 6,5 h por semana; você disse 2,5."]);
-		expect(fracionadas.modulos.map((item) => diasEntre(item.inicio, item.fim) + 1)).toEqual([6, 5]);
+		expect(fracionadas.avisos).toEqual(["Até 07/11 (11 dias), este plano pede cerca de 0,9 h por dia (6,5 h por semana); você disse 2,5 h por semana."]);
+		expect(fracionadas.modulos.map((item) => [item.inicio, item.fim])).toEqual([
+			["2026-10-27", "2026-11-01"],
+			["2026-11-01", "2026-11-06"],
+		]);
 	});
 
-	it("encolher só pelo arredondamento dos dias, sem pedir mais horas: sem aviso", () => {
-		// 3 módulos de 1 h com 4 h por semana: 2 dias cada (6), em 5 disponíveis; pede 3 × 7 / 5 = 4,2 → 4.
+	it("o curso do Breno: 12 módulos e 32,5 h em 8 dias de estudo, todos até 03/11, e a avaliação geral em 04/11", () => {
+		const horas = [2, 2.5, 3, 3.5, 3, 3.5, 3, 2.5, 3.5, 2, 1.5, 2.5];
+		const modulos = horas.map((valor, indice) => modulo(`m${indice + 1}`, [], { horas: valor }));
+		const calendario = calcularCalendario(modulos, { horasPorSemana: 4, prazo: "2026-11-05", hoje });
+		expect(calendario.avaliacaoGeral).toBe("2026-11-04");
+		expect(calendario.modulos.map((item) => [item.inicio, item.fim, item.avaliacao])).toEqual([
+			["2026-10-27", "2026-10-27", "2026-10-28"],
+			["2026-10-27", "2026-10-28", "2026-10-29"],
+			["2026-10-28", "2026-10-28", "2026-10-29"],
+			["2026-10-28", "2026-10-29", "2026-10-30"],
+			["2026-10-29", "2026-10-30", "2026-10-31"],
+			["2026-10-30", "2026-10-31", "2026-11-01"],
+			["2026-10-31", "2026-11-01", "2026-11-02"],
+			["2026-11-01", "2026-11-01", "2026-11-02"],
+			["2026-11-01", "2026-11-02", "2026-11-03"],
+			["2026-11-02", "2026-11-03", "2026-11-04"],
+			["2026-11-03", "2026-11-03", "2026-11-04"],
+			["2026-11-03", "2026-11-03", "2026-11-04"],
+		]);
+		for (const item of calendario.modulos) {
+			expect(item.fim <= "2026-11-03").toBe(true);
+			expect(item.inicio <= item.fim).toBe(true);
+			expect(item.avaliacao <= calendario.avaliacaoGeral).toBe(true);
+		}
+		// Os módulos seguem em ordem: cada um começa no dia em que o anterior acaba (ou no seguinte).
+		for (let indice = 1; indice < calendario.modulos.length; indice++) {
+			expect(diasEntre(calendario.modulos[indice - 1]!.fim, calendario.modulos[indice]!.inicio)).toBeGreaterThanOrEqual(0);
+			expect(diasEntre(calendario.modulos[indice - 1]!.fim, calendario.modulos[indice]!.inicio)).toBeLessThanOrEqual(1);
+		}
+		// 32,5 h / 8 dias = 4,06 → 4,1 h por dia; × 7 = 28,44 → 28,5 h por semana.
+		expect(calendario.horasPorDiaNecessarias).toBe(4.1);
+		expect(calendario.horasPorSemanaNecessarias).toBe(28.5);
+		expect(calendario.avisos).toEqual(["Até 04/11 (8 dias), este plano pede cerca de 4,1 h por dia (28,5 h por semana); você disse 4 h por semana."]);
+	});
+
+	it("frações só pelo arredondamento dos dias, sem pedir mais horas: sem aviso", () => {
+		// 3 módulos de 1 h com 4 h por semana: 2 dias cada (6), em 5 dias de estudo; pede 3 × 7 / 5 = 4,2 → 4.
 		const calendario = calcularCalendario([modulo("m1", [], { horas: 1 }), modulo("m2", [], { horas: 1 }), modulo("m3", [], { horas: 1 })], { horasPorSemana: 4, prazo: "2026-11-02", hoje });
-		expect(calendario.modulos.map((item) => diasEntre(item.inicio, item.fim) + 1)).toEqual([2, 2, 1]);
+		expect(calendario.modulos.map((item) => [item.inicio, item.fim])).toEqual([
+			["2026-10-27", "2026-10-28"],
+			["2026-10-28", "2026-10-30"],
+			["2026-10-30", "2026-10-31"],
+		]);
 		expect(calendario.avaliacaoGeral).toBe("2026-11-01");
 		expect(calendario.horasPorSemanaNecessarias).toBeUndefined();
+		expect(calendario.horasPorDiaNecessarias).toBeUndefined();
 		expect(calendario.avisos).toEqual([]);
 	});
 
-	it("prazo que já passou, que é hoje ou amanhã: aviso, e segue como sem prazo", () => {
+	it("prazo que já passou, que é hoje, amanhã ou depois de amanhã: aviso, e segue como sem prazo", () => {
 		const modulos = [modulo("m1", [], { horas: 4 })];
 		const semPrazo = calcularCalendario(modulos, { horasPorSemana: 4, prazo: null, hoje });
 		const casos: Array<[string, string]> = [
 			["2026-10-20", "O prazo (20/10/2026) já passou; o calendário segue sem prazo."],
 			["2026-10-26", "O prazo (26/10/2026) é hoje; o calendário segue sem prazo."],
 			["2026-10-27", "O prazo (27/10/2026) é amanhã e não deixa dias para os módulos; o calendário segue sem prazo."],
+			["2026-10-28", "O prazo (28/10/2026) é depois de amanhã: a avaliação geral fica amanhã, sem dias para os módulos; o calendário segue sem prazo."],
 		];
 		for (const [prazo, aviso] of casos) {
 			expect(calcularCalendario(modulos, { horasPorSemana: 4, prazo, hoje })).toEqual({ ...semPrazo, avisos: [aviso] });
 		}
+		// Sem módulos, a geral fica amanhã.
+		expect(calcularCalendario([], { horasPorSemana: 4, prazo: "2026-10-28", hoje }).avaliacaoGeral).toBe("2026-10-27");
+		expect(calcularCalendario([], { horasPorSemana: 4, prazo: null, hoje }).avaliacaoGeral).toBe("2026-10-27");
 	});
 
-	it("prazo que não deixa um dia para cada módulo antes da avaliação geral: aviso, e segue como sem prazo", () => {
+	it("mais módulos que dias de estudo: cabem em frações, nunca depois da avaliação geral", () => {
 		const modulos = [modulo("m1", [], { horas: 4 }), modulo("m2", [], { horas: 4 }), modulo("m3", [], { horas: 4 })];
 		// Prazo em 30/10: a geral em 29/10, só 27 e 28 para três módulos.
 		const calendario = calcularCalendario(modulos, { horasPorSemana: 4, prazo: "2026-10-30", hoje });
 		expect(calendario).toEqual({
-			...calcularCalendario(modulos, { horasPorSemana: 4, prazo: null, hoje }),
-			avisos: ["Até o prazo (30/10/2026) não há um dia para cada módulo antes da avaliação geral; o calendário segue sem prazo."],
+			modulos: [
+				{ id: "m1", inicio: "2026-10-27", fim: "2026-10-27", avaliacao: "2026-10-28" },
+				{ id: "m2", inicio: "2026-10-27", fim: "2026-10-28", avaliacao: "2026-10-29" },
+				{ id: "m3", inicio: "2026-10-28", fim: "2026-10-28", avaliacao: "2026-10-29" },
+			],
+			avaliacaoGeral: "2026-10-29",
+			horasPorSemanaNecessarias: 42,
+			horasPorDiaNecessarias: 6,
+			avisos: ["Até 29/10 (2 dias), este plano pede cerca de 6 h por dia (42 h por semana); você disse 4 h por semana."],
 		});
-		// Depois de amanhã: a geral cai amanhã, sem dia nenhum para os módulos.
-		expect(calcularCalendario(modulos, { horasPorSemana: 4, prazo: "2026-10-28", hoje }).avisos[0]).toMatch(/não há um dia para cada módulo/);
-		// Sem módulos, a geral fica no dia anterior ao prazo (ou amanhã, sem prazo).
-		expect(calcularCalendario([], { horasPorSemana: 4, prazo: "2026-10-28", hoje })).toEqual({ modulos: [], avaliacaoGeral: "2026-10-27", avisos: [] });
-		expect(calcularCalendario([], { horasPorSemana: 4, prazo: null, hoje }).avaliacaoGeral).toBe("2026-10-27");
+		// Um dia de estudo só: tudo nele, e a avaliação no dia seguinte, que é o da geral.
+		const umDia = calcularCalendario(modulos, { horasPorSemana: 4, prazo: "2026-10-29", hoje });
+		expect(umDia.modulos.every((item) => item.inicio === "2026-10-27" && item.fim === "2026-10-27" && item.avaliacao === "2026-10-28")).toBe(true);
+		expect(umDia.avaliacaoGeral).toBe("2026-10-28");
+		expect(umDia.avisos[0]).toBe("Até 28/10 (1 dia), este plano pede cerca de 12 h por dia (84 h por semana); você disse 4 h por semana.");
+	});
+
+	it("diasDeEstudo e horasDisponiveis: de amanhã até a véspera da avaliação geral", () => {
+		expect(diasDeEstudo("2026-11-05", hoje)).toBe(8);
+		expect(diasDeEstudo("2026-10-29", hoje)).toBe(1);
+		expect(diasDeEstudo("2026-10-28", hoje)).toBeNull();
+		expect(diasDeEstudo("2026-10-20", hoje)).toBeNull();
+		expect(diasDeEstudo(null, hoje)).toBeNull();
+		expect(horasDisponiveis({ prazo: "2026-11-05", horasPorSemana: 4 }, hoje)).toBeCloseTo(32 / 7);
+		expect(horasDisponiveis({ prazo: null, horasPorSemana: 4 }, hoje)).toBeNull();
+		expect(() => diasDeEstudo("2026-13-01", hoje)).toThrow(/O prazo precisa ser uma data/);
 	});
 
 	it("viradas de mês e de ano", () => {
@@ -619,6 +696,36 @@ describe("no disco", () => {
 		const criado = await criarCurso(dados, materia, CURSO, { agora: DEPOIS, hoje: "2026-11-19" });
 		expect(criado.esqueleto!.calendario.avisos).toEqual(["O prazo (20/11/2026) é amanhã e não deixa dias para os módulos; o calendário segue sem prazo."]);
 		expect(criado.esqueleto!.calendario.modulos[0]!.inicio).toBe("2026-11-20");
+	});
+
+	it("recalcularCalendario: o calendário com os dias de hoje em esqueleto.calendario, os módulos iguais, e o recalculou_calendario", async () => {
+		await expect(recalcularCalendario(dados, materia, CURSO, ctx)).rejects.toThrow("Só um curso criado tem calendário para recalcular.");
+		await gravarProposta(dados, materia, CURSO, MODULOS, { modelo: MODELO, custo: 0.02 }, ctx);
+		const criado = await criarCurso(dados, materia, CURSO, ctx);
+		const MAIS_TARDE = new Date("2026-11-10T12:00:00.000Z");
+		const novo = await recalcularCalendario(dados, materia, CURSO, { sessao: "s2", agora: MAIS_TARDE, hoje: "2026-11-10" });
+		const calendario = calcularCalendario(MODULOS, { horasPorSemana: 4, prazo: "2026-11-20", hoje: "2026-11-10" });
+		expect(novo.esqueleto).toEqual({ ...criado.esqueleto, calendario });
+		expect(novo.esqueleto!.calendario.modulos[0]!.inicio).toBe("2026-11-11");
+		// 3 h e 2 h (6 e 4 dias) não cabem nos 8 dias de estudo (11/11 a 18/11): frações, e o aviso.
+		const aviso = "Até 19/11 (8 dias), este plano pede cerca de 0,6 h por dia (4,5 h por semana); você disse 4 h por semana.";
+		expect(novo.esqueleto!.calendario.avaliacaoGeral).toBe("2026-11-19");
+		expect(novo.esqueleto!.calendario.avisos).toEqual([aviso]);
+		expect(novo.alteradoEm).toBe(MAIS_TARDE.toISOString());
+		expect({ ...novo, esqueleto: null, alteradoEm: "" }).toEqual({ ...criado, esqueleto: null, alteradoEm: "" });
+		expect(await lerCurso(dados, materia, CURSO)).toEqual(novo);
+		const eventos = await daMateria();
+		expect(eventos.map((item) => item.verbo)).toEqual(["gerou_esqueleto", "criou_curso", "recalculou_calendario"]);
+		expect(eventos[2]).toMatchObject({
+			sessao: "s2",
+			ts: MAIS_TARDE.toISOString(),
+			objeto: { materia, curso: CURSO },
+			resultado: { avaliacaoGeral: "2026-11-19", avisos: [aviso] },
+		});
+		// Com o prazo passado: o aviso vai no evento, e a geral vem depois do último módulo.
+		const vencido = await recalcularCalendario(dados, materia, CURSO, { agora: MAIS_TARDE, hoje: "2026-11-25" });
+		expect(vencido.esqueleto!.calendario.avisos).toEqual(["O prazo (20/11/2026) já passou; o calendário segue sem prazo."]);
+		expect((await daMateria()).at(-1)!.resultado).toEqual({ avaliacaoGeral: vencido.esqueleto!.calendario.avaliacaoGeral, avisos: vencido.esqueleto!.calendario.avisos });
 	});
 
 	it("ida e volta no disco: o esqueletoEmAndamento fica, antes do esqueleto", async () => {

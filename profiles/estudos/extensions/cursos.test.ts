@@ -10,12 +10,13 @@ import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Curso, MensagemCurso, MensagemListaCursos } from "../lib/curso-tipos.ts";
-import { confirmarNoDisco, lerCurso, pastaDoCurso } from "../lib/cursos.ts";
+import { confirmarNoDisco, gravarCurso, hojeLocal, lerCurso, pastaDoCurso } from "../lib/cursos.ts";
 import type { Diagnostico } from "../lib/diagnostico.ts";
+import { somarDias } from "../lib/esqueleto.ts";
 import { lerEventos } from "../lib/eventos.ts";
 import { gravarMapa, type MapaConteudo, mapaVazio, pastaExtraidoArquivo } from "../lib/mapa.ts";
 import { criarMateria, eventosAprendiz, eventosMateria } from "../lib/materias.ts";
-import cursos, { CAMINHO_PROMPT_CORRETOR, CAMINHO_PROMPT_DIAGNOSTICO, CAMINHO_PROMPT_ESQUELETO, hashDoPrompt, linhaDoPrazo, textoDoCurso } from "./cursos.ts";
+import cursos, { CAMINHO_PROMPT_CORRETOR, CAMINHO_PROMPT_DIAGNOSTICO, CAMINHO_PROMPT_ESQUELETO, hashDoPrompt, linhaDoPrazo, pedidoDoLimite, textoDoCurso } from "./cursos.ts";
 import { lerPromptMapeador } from "./mapa.ts";
 
 /** Os prompts de mentira, na pasta de dados do teste (com o nome dos de verdade). */
@@ -932,6 +933,76 @@ describe("esqueleto", () => {
 		expect(await doVerbo("gerou_esqueleto")).toHaveLength(0);
 	});
 
+	/** Muda o Básico do curso no disco para um prazo daqui a `dias` dias (pelo dia de hoje de verdade, o que a extensão usa). */
+	async function prazoDaquiA(id: string, dias: number, horasPorSemana = 4): Promise<void> {
+		const curso = await lerCurso(dados, materia, id);
+		await gravarCurso(dados, { ...curso, basico: { ...curso.basico!, prazo: somarDias(hojeLocal(), dias), horasPorSemana } });
+	}
+
+	/** Uma proposta com as horas dadas: c-1 e c-2 no primeiro módulo, c-3 no segundo. */
+	const propostaCom = (primeiro: number, segundo: number) =>
+		JSON.stringify({
+			modulos: [
+				{ nome: "A reta", objetivo: "Ajustar a reta.", conceitos: ["c-1", "c-2"], tipo: "normal", horas: primeiro },
+				{ nome: "O R²", objetivo: "Interpretar o R².", conceitos: ["c-3"], tipo: "normal", horas: segundo },
+			],
+		});
+
+	it("o limite de horas: a mensagem leva as horas disponíveis; acima de 1,5 vez, uma nova tentativa com a soma e o limite", async () => {
+		const id = await cursoNoEsqueleto();
+		// Prazo daqui a 10 dias com 4 h por semana: 8 dias de estudo, 4 × 8 / 7 = 4,57 h (cerca de 4,5); 1,5 vez = 6,86 h.
+		await prazoDaquiA(id, 10);
+		respostas.push(propostaCom(10, 6), propostaCom(3, 2));
+		acao("gerar_esqueleto", { curso: id, pedido: "l1" });
+		await respondeu("l1");
+		expect(erroDe("l1")).toBeUndefined();
+		expect(chamadas).toHaveLength(2);
+		const primeira = textoPedido(chamadas[0]!);
+		expect(primeira).toContain("Tempo disponível para os módulos: cerca de 4,5 h (4 h por semana × 8 dias).");
+		expect(primeira).toContain("Este tempo é o limite");
+		// A nova tentativa leva a resposta e o pedido com a soma e o limite.
+		expect(chamadas[1]!.contexto.messages).toHaveLength(3);
+		const pedido = textoDaChamada(chamadas[1]!, 2);
+		expect(pedido).toContain("A soma das horas dos módulos deu 16 h, mas o limite até o prazo é de cerca de 4,5 h (4 h por semana × 8 dias).");
+		expect(pedido).toContain("menos módulos e mais curtos");
+		expect((await propostaNoDisco(id))!.modulos.map((modulo) => modulo.horas)).toEqual([3, 2]);
+	});
+
+	it("o limite de horas pede de novo uma vez só: a segunda proposta acima do limite é aceita", async () => {
+		const id = await cursoNoEsqueleto();
+		await prazoDaquiA(id, 10);
+		respostas.push(propostaCom(10, 6), propostaCom(8, 4));
+		acao("gerar_esqueleto", { curso: id, pedido: "l2" });
+		await respondeu("l2");
+		expect(erroDe("l2")).toBeUndefined();
+		expect(chamadas).toHaveLength(2);
+		expect((await propostaNoDisco(id))!.modulos.map((modulo) => modulo.horas)).toEqual([8, 4]);
+	});
+
+	it("dentro de 1,5 vez o limite, ou sem prazo, não há nova tentativa", async () => {
+		const id = await cursoNoEsqueleto();
+		await prazoDaquiA(id, 10);
+		// 6,5 h ≤ 6,86 h.
+		await montar(id, "l3", propostaCom(4, 2.5));
+		expect(chamadas).toHaveLength(1);
+		const curso = await lerCurso(dados, materia, id);
+		await gravarCurso(dados, { ...curso, basico: { ...curso.basico!, prazo: null } });
+		await montar(id, "l4", propostaCom(30, 20));
+		expect(chamadas).toHaveLength(2);
+		expect(textoPedido(chamadas[1]!)).toContain("Prazo: sem prazo");
+	});
+
+	it("pedidoDoLimite: a frase só acima de 1,5 vez as horas disponíveis, e nada sem prazo ou sem dia de estudo", () => {
+		const hoje = "2026-10-26";
+		const basico = { prazo: "2026-11-05", horasPorSemana: 4 };
+		// 8 dias de estudo: 4,57 h; 1,5 vez = 6,86 h.
+		expect(pedidoDoLimite([{ horas: 4 }, { horas: 2.5 }], basico, hoje)).toBeUndefined();
+		expect(pedidoDoLimite([{ horas: 4 }, { horas: 3 }], basico, hoje)).toContain("deu 7 h, mas o limite até o prazo é de cerca de 4,5 h (4 h por semana × 8 dias)");
+		expect(pedidoDoLimite([{ horas: 32.5 }], basico, hoje)).toContain("deu 32,5 h");
+		expect(pedidoDoLimite([{ horas: 40 }], { prazo: null, horasPorSemana: 4 }, hoje)).toBeUndefined();
+		expect(pedidoDoLimite([{ horas: 40 }], { prazo: "2026-10-28", horasPorSemana: 4 }, hoje)).toBeUndefined();
+	});
+
 	it("gerar com outro em andamento no mesmo curso dá erro; abrir mostra gerandoEsqueleto; criar_curso espera", async () => {
 		const id = await cursoNoEsqueleto();
 		await montar(id, "e0");
@@ -1041,6 +1112,32 @@ describe("esqueleto", () => {
 		expect(await lerCurso(dados, materia, id)).toEqual(criado);
 		expect(await doVerbo("criou_curso")).toHaveLength(1);
 		expect(chamadas).toHaveLength(1);
+	});
+
+	it("recalcular_calendario: só no curso pronto; grava o calendário de hoje, manda o curso com o pedido e grava recalculou_calendario", async () => {
+		const id = await cursoNoEsqueleto();
+		await montar(id);
+		acao("recalcular_calendario", { curso: id, pedido: "r0" });
+		await respondeu("r0");
+		expect(erroDe("r0")).toMatchObject({ ao: "recalcular_calendario", materia, curso: id, mensagem: "Só um curso criado tem calendário para recalcular." });
+		acao("criar_curso", { curso: id, pedido: "c1" });
+		await respondeu("c1");
+		const criado = cursoDe("c1")!.curso;
+		// O prazo mudou no disco (como se fosse outro dia): o calendário recalculado segue o prazo de agora.
+		await prazoDaquiA(id, 10);
+		acao("recalcular_calendario", { curso: id, pedido: "r1" });
+		await respondeu("r1");
+		expect(erroDe("r1")).toBeUndefined();
+		const novo = cursoDe("r1")!.curso;
+		const geral = somarDias(hojeLocal(), 9);
+		expect(novo.esqueleto!.modulos).toEqual(criado.esqueleto!.modulos);
+		expect(novo.esqueleto!.calendario.avaliacaoGeral).toBe(geral);
+		expect(novo.esqueleto!.calendario.modulos.every((item) => item.fim < geral && item.avaliacao <= geral)).toBe(true);
+		expect(await lerCurso(dados, materia, id)).toEqual(novo);
+		const [evento] = await doVerbo("recalculou_calendario");
+		expect(evento).toMatchObject({ sessao: "sessao-1", objeto: { materia, curso: id }, resultado: { avaliacaoGeral: geral, avisos: novo.esqueleto!.calendario.avisos } });
+		// 3 h e 2 h (6 e 4 dias) não cabem nos 8 dias de estudo: frações, e o aviso (5 × 7 / 8 = 4,375 → 4,5 h por semana).
+		expect(novo.esqueleto!.calendario.avisos).toEqual(["Até " + `${geral.slice(8, 10)}/${geral.slice(5, 7)}` + " (8 dias), este plano pede cerca de 0,6 h por dia (4,5 h por semana); você disse 4 h por semana."]);
 	});
 
 	it("confirmar o esqueleto pela ação confirmar dá erro: ele vem por criar_curso", async () => {

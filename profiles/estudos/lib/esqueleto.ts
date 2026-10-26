@@ -2,7 +2,8 @@
 // "Parte C: o esqueleto e o curso pronto"): a proposta em edição fica no
 // curso.json, em esqueletoEmAndamento, gravado inteiro pela gravarCurso;
 // "Criar curso" confirma a etapa pela confirmarNoDisco, com o calendário do
-// dia, e o curso fica pronto. Os eventos gerou_esqueleto e criou_curso vão
+// dia, e o curso fica pronto. Os eventos gerou_esqueleto, criou_curso e
+// recalculou_calendario (recalcular o calendário de um curso pronto) vão
 // para o eventos.jsonl da matéria (editar a proposta não grava evento). As
 // regras são puras e ficam em esqueleto-tipos.ts. Sem dependências: o pi
 // carrega a extensão desta pasta. Quem chama segura a trava da matéria (a
@@ -124,6 +125,38 @@ export async function criarCurso(dados: string, materia: string, curso: string, 
 		),
 	);
 	return criado;
+}
+
+/**
+ * "Recalcular o calendário" de um curso pronto: calcula o calendário com as
+ * regras e os dias de hoje (calcularCalendario, com as horas por semana e o
+ * prazo do Básico) e grava em esqueleto.calendario; os módulos ficam como
+ * estão. Grava recalculou_calendario no eventos.jsonl da matéria (resultado
+ * {avaliacaoGeral, avisos}). Um rascunho, ou um curso sem esqueleto, ErroCurso.
+ */
+export async function recalcularCalendario(dados: string, materia: string, curso: string, contexto: ContextoCurso = {}): Promise<Curso> {
+	const atual = await lerCurso(dados, materia, curso);
+	if (atual.situacao !== "pronto" || !atual.esqueleto) throw new ErroCurso("Só um curso criado tem calendário para recalcular.");
+	if (!atual.basico) throw new ErroCurso("Falta a etapa Básico (as horas por semana e o prazo) para recalcular o calendário.");
+	const agora = contexto.agora ?? new Date();
+	const hoje = contexto.hoje ?? hojeLocal(agora);
+	const calendario = calcularCalendario(atual.esqueleto.modulos, { horasPorSemana: atual.basico.horasPorSemana, prazo: atual.basico.prazo, hoje });
+	const novo: Curso = { ...structuredClone(atual), alteradoEm: agora.toISOString() };
+	novo.esqueleto = { ...novo.esqueleto!, calendario };
+	await gravarCurso(dados, novo);
+	await acrescentarEvento(
+		eventosMateria(dados, materia),
+		criarEvento(
+			{
+				...daSessao(contexto),
+				verbo: "recalculou_calendario",
+				objeto: { materia, curso: atual.id },
+				resultado: { avaliacaoGeral: calendario.avaliacaoGeral, avisos: calendario.avisos },
+			},
+			agora,
+		),
+	);
+	return novo;
 }
 
 /** Um conceito do curso na mensagem do modelo do esqueleto. */

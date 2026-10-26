@@ -258,4 +258,13 @@ describe("descreverEvento do esqueleto", () => {
 			detalhe: "5 módulos · avaliação geral em 19/11",
 		});
 	});
+
+	it("recalculou_calendario: o curso e a avaliação geral nova", () => {
+		expect(descreverEvento(evento("recalculou_calendario", { avaliacaoGeral: "2026-11-04", avisos: ["Até 04/11 (8 dias), …"] }))).toEqual({
+			icone: "refresh",
+			texto: "Calendário recalculado: p1-regressao",
+			detalhe: "avaliação geral em 04/11",
+		});
+		expect(descreverEvento(evento("recalculou_calendario", {}))).toEqual({ icone: "refresh", texto: "Calendário recalculado: p1-regressao" });
+	});
 });

@@ -13,7 +13,8 @@
 // corrigindo (corrigindo), e um "erro" com ao gerar_diagnostico, corrigir ou
 // responder fica guardado (lerCursos, diagnosticos) até algo novo superá-lo.
 //
-// O esqueleto (parte C) usa gerar_esqueleto, editar_esqueleto e criar_curso.
+// O esqueleto (parte C) usa gerar_esqueleto, editar_esqueleto e criar_curso; o
+// curso pronto, recalcular_calendario.
 // Gerar corre em segundo plano como o diagnóstico (gerandoEsqueleto no
 // "curso", e o erro com ao gerar_esqueleto fica em esqueletos).
 
@@ -344,6 +345,8 @@ export interface CursoAberto {
 	editarEsqueleto(modulos: Modulo[]): Promise<MensagemCurso>;
 	/** Esqueleto: confirma a etapa com a proposta e o calendário de hoje; o curso fica pronto. */
 	criarCurso(): Promise<MensagemCurso>;
+	/** Curso pronto: recalcula o calendário a partir de hoje (os módulos ficam); resolve com o curso novo. */
+	recalcularCalendario(): Promise<MensagemCurso>;
 }
 
 /** Um curso da matéria: pede "abrir" ao montar, quando a sessão muda e quando o curso muda. */
@@ -369,7 +372,16 @@ export function useCurso(janela: JanelaPerfilHook, materiaId: string, cursoId: s
 	const esqueleto = (cursoId ? lido.esqueletos[cursoId] : undefined) ?? ESQUELETO_PARADO;
 	/** Uma ação do diagnóstico ou do esqueleto com pedido; resolve com a mensagem "curso". */
 	const doDiagnostico = async <
-		Acao extends "autoavaliar" | "gerar_diagnostico" | "responder" | "corrigir" | "concluir_diagnostico" | "gerar_esqueleto" | "editar_esqueleto" | "criar_curso",
+		Acao extends
+			| "autoavaliar"
+			| "gerar_diagnostico"
+			| "responder"
+			| "corrigir"
+			| "concluir_diagnostico"
+			| "gerar_esqueleto"
+			| "editar_esqueleto"
+			| "criar_curso"
+			| "recalcular_calendario",
 	>(
 		acao: Acao,
 		resto: Omit<AcoesDaTela[Acao], "materia" | "curso" | "pedido">,
@@ -402,5 +414,6 @@ export function useCurso(janela: JanelaPerfilHook, materiaId: string, cursoId: s
 		gerarEsqueleto: () => doDiagnostico("gerar_esqueleto", {}),
 		editarEsqueleto: (modulos) => doDiagnostico("editar_esqueleto", { modulos }),
 		criarCurso: () => doDiagnostico("criar_curso", {}),
+		recalcularCalendario: () => doDiagnostico("recalcular_calendario", {}),
 	};
 }

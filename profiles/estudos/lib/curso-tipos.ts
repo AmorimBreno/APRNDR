@@ -187,6 +187,8 @@ export interface AcoesCursos {
 	editar_esqueleto: { materia: string; curso: string; pedido: string; modulos: Modulo[] };
 	/** Esqueleto: confirma a etapa com a proposta e o calendário de hoje; o curso fica pronto. */
 	criar_curso: { materia: string; curso: string; pedido: string };
+	/** Curso pronto: recalcula o calendário com as regras e os dias de hoje e grava em esqueleto.calendario (os módulos ficam). */
+	recalcular_calendario: { materia: string; curso: string; pedido: string };
 }
 
 export type AcaoCursos = keyof AcoesCursos;
@@ -520,10 +522,15 @@ function validarCalendario(valor: unknown, modulos: readonly Modulo[]): Calendar
 	if (necessarias !== undefined && (typeof necessarias !== "number" || !Number.isFinite(necessarias))) {
 		throw new ErroEsqueleto(`As horas por semana que o plano pede precisam ser um número (veio "${mostrar(necessarias)}").`);
 	}
+	const porDia = valor.horasPorDiaNecessarias;
+	if (porDia !== undefined && (typeof porDia !== "number" || !Number.isFinite(porDia))) {
+		throw new ErroEsqueleto(`As horas por dia que o plano pede precisam ser um número (veio "${mostrar(porDia)}").`);
+	}
 	return {
 		modulos: datas,
 		avaliacaoGeral: valor.avaliacaoGeral,
 		...(necessarias !== undefined ? { horasPorSemanaNecessarias: necessarias } : {}),
+		...(porDia !== undefined ? { horasPorDiaNecessarias: porDia } : {}),
 		avisos: [...(valor.avisos as string[])],
 	};
 }

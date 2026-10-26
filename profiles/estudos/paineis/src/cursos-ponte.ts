@@ -34,13 +34,8 @@ import type { Confianca, NivelAutoavaliacao } from "../../lib/diagnostico-tipos.
 
 export { PAINEL_CURSOS };
 
-/**
- * As ações da tela: as da lib e "corrigir", que tenta de novo a correção de
- * uma dissertativa que falhou (a extensão a atende pelo mesmo contrato).
- */
-export type AcoesDaTela = AcoesCursos & {
-	corrigir: { materia: string; curso: string; pedido: string; questao: string };
-};
+/** As ações da tela: as da ponte "cursos" da lib (inclusive "corrigir"). */
+export type AcoesDaTela = AcoesCursos;
 
 /** Um erro que a extensão mandou, como a tela o guarda: a chave da ação recebida identifica este erro (para dispensá-lo). */
 export interface ErroDoDiagnostico {

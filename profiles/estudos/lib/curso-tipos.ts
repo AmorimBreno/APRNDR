@@ -168,6 +168,8 @@ export interface AcoesCursos {
 	responder: { materia: string; curso: string; pedido: string; questao: string; confianca: Confianca; escolha?: number; texto?: string; tempoMs: number };
 	/** Diagnóstico: exige todas as questões respondidas e corrigidas; confirma a etapa. */
 	concluir_diagnostico: { materia: string; curso: string; pedido: string };
+	/** Tenta de novo a correção de uma dissertativa que falhou. */
+	corrigir: { materia: string; curso: string; pedido: string; questao: string };
 }
 
 export type AcaoCursos = keyof AcoesCursos;
@@ -212,6 +214,8 @@ export interface MensagemErroCursos {
 	materia?: string;
 	curso?: string;
 	pedido?: string;
+	/** A questão, num erro de correção (ao: "corrigir"). */
+	questao?: string;
 }
 
 /** As mensagens da extensão para a tela (interface:mostrar, painel cursos, sempre gravar: false). */

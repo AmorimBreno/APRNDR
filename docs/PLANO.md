@@ -216,4 +216,30 @@ Código e vetores nas questões e na conversa (2026-10-26, pedido do Breno com a
 - O prompt do diagnóstico e o AGENTS.md do perfil passaram a pedir código sempre em bloco ou em linha, e vetores e matrizes nos blocos novos.
 Conferido no navegador na questão do Word2Vec do diagnóstico em andamento do Breno, só olhando.
 
-Depois: o item 6 da seção 10 da especificação, a geração de módulo sob demanda, depois de o Breno aprovar a parte C no app.
+Ajustes da questão do diagnóstico (pedidos pelo Breno em 2026-10-26): a folha do guia ocupa uns 80% da janela (o body tem zoom 0,9, por isso calc(80vw / 0.9)); o título da questão (os conceitos) fica no alto da coluna do contexto; a pergunta fica alinhada com a caixa do contexto; sem rolagem numa janela de 1568 × 928 (vãos menores nas etapas largas); o texto do contexto tem o peso e o tamanho da coluna da pergunta.
+
+O resultado do diagnóstico refeito (2026-10-26; o Breno achou a tela confusa, com tudo junto): duas colunas. À esquerda, o índice fixo com o placar e os assuntos, com as questões de cada um. À direita, a faixa do assunto (o que ele disse e a frase de calibração) e uma questão por vez, num cartão tingido pelo resultado (sálvia, tijolo, âmbar), com blocos separados: contexto e pergunta, alternativas com o gabarito, "Sua resposta", "Por que você pode ter errado" e a explicação; na dissertativa, a resposta, a nota e cada critério com os trechos. Embaixo, Anterior e Próxima. Em tela estreita, as fichas ficam por cima.
+
+O primeiro curso de verdade (2026-10-26): o Breno criou pelo guia o "Estudo de Ciência de Dados para Atividade" (68 conceitos, só o material, misto, prazo 05/11, 4 h por semana; 12 módulos e 32,5 h) e pediu para seguir para o item 6.
+Achado no curso dele: com 10 dias e 12 módulos, o calendário ignorava o prazo (a avaliação geral foi para 31/12). Correção aprovada por ele:
+- com prazo apertado, o tempo é dividido em frações de dia (vários módulos no mesmo dia);
+- a avaliação de um módulo nunca passa da avaliação geral;
+- o aviso diz as horas por dia e por semana que o plano pede;
+- o prompt do esqueleto trata as horas disponíveis como limite (uma nova tentativa quando passa de 1,5 vez);
+- "Recalcular o calendário" num curso pronto (evento recalculou_calendario).
+No curso dele, recalcular põe tudo de 27/10 a 03/11 e a avaliação geral em 04/11, com o aviso de cerca de 4,1 h por dia. Chamada real com 10 dias e 4 h por semana: 6 módulos somando 4,5 h, sem nova tentativa (US$ 0,012).
+
+R$ no Markdown do app (2026-10-26; o Breno, estudando economia, viu "R$ 20 … R$ 19" virar fórmula): uma extensão do micromark (packages/ui/src/visual/remark-dinheiro.ts) faz o $ logo depois de uma letra, ou seguido de espaço, ser texto. Dentro de código nada muda. As fórmulas de verdade continuam.
+
+Plano do item 6 aprovado pelo Breno em 2026-10-26: só o próximo módulo pode ser gerado; o modelo é o GPT-6.1 Sol; duas partes, A (a geração, o formulário, os estados e o aguardando material) e B (a visão do módulo). Contrato em docs/modulos.md.
+
+Item 6, parte A, feita (2026-10-26, aguarda o roteiro docs/teste-etapa-6a.md). Um commit por parte:
+- Lógica em profiles/estudos/lib/modulo-tipos.ts e lib/modulos.ts: o arquivo modulos/<m>.json, o próximo módulo, o nível de cada conceito pelo diagnóstico (o menor entre o que ele disse e o que acertou), licoesPorHoras, a validação e o conserto do plano e das lições, as referências conferidas como no mapa e os eventos gerou_modulo e marcou_aguardando_material.
+- Extensão extensions/modulos.ts (painel "modulos"): espera os materiais do formulário ficarem prontos e entrarem no mapa; o plano e uma chamada por lição; os estados no card; cancelar; aguardando material com o aviso de material novo; a ferramenta ler_modulo, sem gabarito por padrão. Os prompts prompts/modulo-plano.md e modulo-licao.md: o formato da explicação pelo nível, a skill teach, a prática nunca repete os dados do exemplo.
+- Um leitor único do JSON dos modelos (lib/json-do-modelo.ts). Ele também corrigiu o diagnóstico, o esqueleto e o mapa quando a resposta tem código entre crases dentro do texto.
+- Tela: o "Gerar módulo" na visão do curso, o formulário (ModalGerarModulo.tsx) e os estados no card.
+- Chamada real (scripts/testar-modulo.ts): um módulo de 2 h com 3 conceitos de TF-IDF virou 2 lições, 15 blocos e 7 questões em 110 s por US$ 0,092; as explicações saíram no formato do nível de cada conceito, e as referências estavam todas válidas.
+Conferido no navegador numa matéria de teste montada pela lib (sem material, sem gravar nada no aprendiz/eventos.jsonl; apagada depois): o card com "Gerar módulo", o formulário, a geração com "Planejando as lições…" e o Parar, o card "Gerado · 1 lição · 2 questões" com Gerar de novo, o módulo 2 virando o próximo, e o m1.json (1 lição, 8 blocos, US$ 0,048; problema_aberto no conceito que ele dizia dominar e acertou, exemplo_resolvido no que errou; a observação "quero um exemplo com código em Python" seguida). Não conferi: o formulário com material novo esperando o mapa, o aguardando material, o erro, o fechar e voltar no meio e o professor com ler_modulo (estão no roteiro).
+Limite conhecido: um material mandado pelo formulário que já estava pronto, mas nunca foi mapeado, faz a geração esperar o tempo limite (30 min) e seguir com o aviso "entrou sem referências".
+
+Depois: o item 6, parte B (a visão do módulo gerado), depois de o Breno aprovar a parte A no app.

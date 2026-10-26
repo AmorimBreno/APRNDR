@@ -229,15 +229,18 @@ Como no diagnóstico, a proposta em edição fica em `esqueletoEmAndamento`; "Cr
 Calculado pelo código, nunca pelo modelo, a partir de `horas`, de `basico.horasPorSemana`, de `basico.prazo` e de hoje (funções puras, as mesmas na tela e na extensão):
 - os módulos vão em sequência a partir de amanhã; cada um dura `ceil(horas / horasPorSemana × 7)` dias corridos (pelo menos 1);
 - a avaliação de cada módulo fica disponível no dia seguinte ao fim dele (8.5: medir retenção, não memória recente);
-- com prazo: a avaliação geral fica no dia anterior ao prazo; se a soma não cabe antes dela, as durações são encolhidas na mesma proporção (cada módulo com pelo menos 1 dia) e o calendário leva um aviso com as horas por semana que o plano pede ("No prazo, este plano pede cerca de 7 h por semana; você disse 4.");
+- com prazo: a avaliação geral fica no dia anterior ao prazo; os dias de estudo vão de amanhã até o dia anterior à avaliação geral. Se a soma das durações não cabe nesses dias, o tempo é dividido na proporção das horas de cada módulo, em frações de dia: um módulo pode começar e terminar no mesmo dia, e vários módulos podem caber num dia (decisão de 2026-10-26: antes, sem um dia inteiro por módulo, o calendário ignorava o prazo e passava da prova). O aviso diz o que o plano pede: "Até 04/11 (9 dias), este plano pede cerca de 3,6 h por dia (25 h por semana); você disse 4 h por semana." Ele aparece sempre que o pedido passa das horas por semana informadas;
+- a avaliação de um módulo nunca passa da avaliação geral: se o dia seguinte ao fim cair nela ou depois, fica no próprio dia da avaliação geral;
 - sem prazo: a avaliação geral fica no dia seguinte ao fim do último módulo;
-- prazo que já passou ou é amanhã: aviso, e o calendário segue como sem prazo.
+- prazo que já passou, é hoje ou é amanhã (não sobra nenhum dia de estudo antes da avaliação geral): aviso, e o calendário segue como sem prazo.
 
-O resultado (`{modulos: [{id, inicio, fim, avaliacao}], avaliacaoGeral, horasPorSemanaNecessarias?, avisos}`) não é gravado no em andamento; ele é gravado em `esqueleto.calendario` ao criar o curso (a foto do dia da criação).
+O resultado (`{modulos: [{id, inicio, fim, avaliacao}], avaliacaoGeral, horasPorSemanaNecessarias?, horasPorDiaNecessarias?, avisos}`) não é gravado no em andamento; ele é gravado em `esqueleto.calendario` ao criar o curso (a foto do dia da criação). Um curso pronto pode recalcular o calendário com as regras de hoje e os dias de hoje ("Recalcular o calendário" na visão do curso; ação `recalcular_calendario {materia, curso, pedido}`; evento `recalculou_calendario` com `{avaliacaoGeral, avisos}`).
 
 ### O modelo
 
 `prompts/esqueleto.md`, `model: openrouter/openai/gpt-6.1-sol`, chamado pela extensão como o diagnóstico. A mensagem leva: os conceitos do curso na ordem (id, nome, descrição, prioridade), o resumo do diagnóstico por conceito (o nível que ele disse e o resultado), o tipo, o escopo e o motivo, as horas por semana e os dias até o prazo. O modelo devolve `{"modulos": [{"nome", "objetivo", "conceitos": [ids], "tipo", "horas"}]}`. O código valida: ids só do curso; um conceito repetido fica no primeiro módulo; um conceito que faltou entra no módulo do conceito anterior a ele na ordem do curso (ou no primeiro); módulos vazios saem; tipo e horas fora do permitido viram `normal` e 2; e reatribui os ids. Entre 2 e 12 módulos; fora disso é erro (e uma nova tentativa).
+
+O tempo disponível é um limite, não uma sugestão (2026-10-26): a mensagem leva as horas disponíveis até o prazo (horas por semana × dias de estudo / 7), e o prompt pede que a soma das horas fique dentro delas; com pouco tempo, menos módulos e mais curtos, os conceitos de prioridade alta e os que o diagnóstico mostrou fracos com mais tempo, e os de prioridade baixa ou já dominados juntos em módulos curtos ou de revisão. Se a proposta passar de 1,5 vez as horas disponíveis, o código pede uma nova tentativa dizendo a soma e o limite (uma vez; depois aceita e o calendário avisa).
 
 ### Eventos (na matéria)
 

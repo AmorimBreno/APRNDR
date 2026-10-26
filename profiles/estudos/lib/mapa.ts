@@ -6,8 +6,9 @@
 // dependências: o pi carrega a extensão desta pasta.
 
 import type { Dirent } from "node:fs";
-import { mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { gravarDeUmaVez } from "./arquivos.ts";
 import { acrescentarEvento, criarEvento } from "./eventos.ts";
 import { type Conceito, ErroMapa, LIMITE_PARTE, type MapaConteudo, mapaVazio, type TipoOperacao, type TrechoDoArquivo, VERSAO_MAPA } from "./mapa-tipos.ts";
 import { eventosMateria, pastaMateria } from "./materias.ts";
@@ -86,9 +87,7 @@ export async function gravarMapa(dados: string, materia: string, mapa: MapaConte
 		arquivos: mapa.arquivos,
 	};
 	await mkdir(dirname(arquivo), { recursive: true });
-	const temporario = `${arquivo}.${process.pid}.tmp`;
-	await writeFile(temporario, `${JSON.stringify(naOrdem, null, "\t")}\n`, "utf8");
-	await rename(temporario, arquivo);
+	await gravarDeUmaVez(arquivo, `${JSON.stringify(naOrdem, null, "\t")}\n`);
 }
 
 /** O texto do .md de um trecho, sem o cabeçalho ---…--- (o mesmo corpoDoTrecho de packages/core/src/materiais/extraido.ts). */

@@ -5,7 +5,7 @@
 // etapa invalida) são puras e ficam em curso-tipos.ts. Sem dependências: o pi
 // carrega a extensão desta pasta.
 
-import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import {
 	type ArquivoDoCurso,
@@ -22,6 +22,7 @@ import {
 	validarEtapa,
 	VERSAO_CURSO,
 } from "./curso-tipos.ts";
+import { gravarDeUmaVez } from "./arquivos.ts";
 import { acrescentarEvento, criarEvento } from "./eventos.ts";
 import { lerMapa, listarManifestos } from "./mapa.ts";
 import { arquivoMateria, eventosMateria, idLivre, pastaMateria } from "./materias.ts";
@@ -157,9 +158,7 @@ export async function lerCurso(dados: string, materia: string, curso: string): P
 export async function gravarCurso(dados: string, curso: Curso): Promise<void> {
 	const arquivo = caminhoDoCurso(dados, conferirId(curso.materia, "matéria"), conferirId(curso.id, "curso"));
 	await mkdir(dirname(arquivo), { recursive: true });
-	const temporario = `${arquivo}.${process.pid}.tmp`;
-	await writeFile(temporario, `${JSON.stringify(cursoNaOrdem(curso), null, "\t")}\n`, "utf8");
-	await rename(temporario, arquivo);
+	await gravarDeUmaVez(arquivo, `${JSON.stringify(cursoNaOrdem(curso), null, "\t")}\n`);
 }
 
 /**

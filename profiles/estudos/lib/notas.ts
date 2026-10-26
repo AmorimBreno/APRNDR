@@ -10,8 +10,9 @@
 // desta pasta.
 
 import { createHash } from "node:crypto";
-import { mkdir, readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { gravarDeUmaVez, renomearComInsistencia } from "./arquivos.ts";
 import { acrescentarEvento, criarEvento } from "./eventos.ts";
 import { ErroMaterias, arquivoMateria, eventosMateria, pastaMateria } from "./materias.ts";
 import { conferirTitulo, type ListaNotas, type NotaAberta, previaDaNota, type ResumoNota } from "./nota-tipos.ts";
@@ -95,12 +96,9 @@ export async function lerNota(dados: string, id: string, bruto: string): Promise
 	return { materia: id, titulo, conteudo, versao: versaoDe(conteudo), modificadaEm: info.mtime.toISOString() };
 }
 
-/** Grava o arquivo de uma vez: escreve ao lado (escondido, fora da lista) e renomeia por cima. */
+/** Grava o arquivo de uma vez: escreve ao lado (escondido, fora da lista) e renomeia por cima, com insistência. */
 async function gravarArquivo(arquivo: string, conteudo: string): Promise<void> {
-	const pasta = join(arquivo, "..");
-	const temporario = join(pasta, `.${process.pid}-${Date.now().toString(36)}.tmp`);
-	await writeFile(temporario, conteudo, "utf8");
-	await rename(temporario, arquivo);
+	await gravarDeUmaVez(arquivo, conteudo);
 }
 
 /** Cria a nota vazia (e a pasta notas/, se faltar) e grava criou_nota. */
@@ -187,10 +185,10 @@ export async function renomearNota(
 	const destino = arquivoNota(dados, id, para);
 	if (ocupado === de) {
 		const meio = join(pastaNotas(dados, id), `.${process.pid}-${Date.now().toString(36)}.renomeando`);
-		await rename(origem, meio);
-		await rename(meio, destino);
+		await renomearComInsistencia(origem, meio);
+		await renomearComInsistencia(meio, destino);
 	} else {
-		await rename(origem, destino);
+		await renomearComInsistencia(origem, destino);
 	}
 	const mencoesAtualizadas = await atualizarMencoes(dados, id, de, para);
 	await acrescentarEvento(

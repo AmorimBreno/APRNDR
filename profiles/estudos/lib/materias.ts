@@ -4,8 +4,9 @@
 // seguintes. Toda criação ou mudança grava um evento no eventos.jsonl da
 // matéria (eventos.ts). Sem dependências: o pi carrega a extensão desta pasta.
 
-import { mkdir, readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
+import { gravarDeUmaVez } from "./arquivos.ts";
 import { acrescentarEvento, criarEvento, type Evento, lerEventos } from "./eventos.ts";
 import { CORES_MATERIA, type CorMateria, type EntradaMateria, GLIFOS_MATERIA, type ListaMaterias, type Materia, type Prova } from "./materia-tipos.ts";
 
@@ -123,9 +124,7 @@ export async function listarMaterias(dados: string): Promise<ListaMaterias> {
 /** Grava o materia.json de uma vez (escreve ao lado e renomeia, para não sobrar arquivo pela metade). */
 async function gravarMateria(dados: string, materia: Materia): Promise<void> {
 	const arquivo = arquivoMateria(dados, materia.id);
-	const temporario = `${arquivo}.${process.pid}.tmp`;
-	await writeFile(temporario, `${JSON.stringify(materia, null, "\t")}\n`, "utf8");
-	await rename(temporario, arquivo);
+	await gravarDeUmaVez(arquivo, `${JSON.stringify(materia, null, "\t")}\n`);
 }
 
 /** Cria a matéria (pasta, materia.json e o evento criou_materia). */

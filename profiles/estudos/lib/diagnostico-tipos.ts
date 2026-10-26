@@ -318,10 +318,10 @@ export function escolherConceitos(
 	return { alternativas: naOrdemDoCurso(comAlternativa), dissertativas: naOrdemDoCurso([...soDissertativa, ...dissertativasTambem]) };
 }
 
-type QuestaoSemId = Omit<QuestaoAlternativa, "id"> | Omit<QuestaoDissertativa, "id">;
+export type QuestaoSemId = Omit<QuestaoAlternativa, "id"> | Omit<QuestaoDissertativa, "id">;
 
-/** Lê uma questão do modelo: a questão limpa, ou o motivo do descarte. */
-function lerQuestao(item: unknown, permitidos: ReadonlySet<string>): { questao: QuestaoSemId } | { motivo: string } {
+/** Lê uma questão do modelo: a questão limpa, ou o motivo do descarte. As questões dos módulos (modulo-tipos.ts) usam a mesma leitura. */
+export function lerQuestao(item: unknown, permitidos: ReadonlySet<string>): { questao: QuestaoSemId } | { motivo: string } {
 	if (!ehObjeto(item)) return { motivo: "não é um objeto" };
 	if (item.tipo !== "alternativa" && item.tipo !== "dissertativa") return { motivo: `tipo desconhecido ("${mostrar(item.tipo)}")` };
 	const enunciado = textoLimpo(item.enunciado);

@@ -42,6 +42,9 @@ export type VerboEvento =
 	| "gerou_esqueleto"
 	// "Recalcular o calendário" num curso pronto (docs/cursos.md, "O calendário"), também na matéria.
 	| "recalculou_calendario"
+	// Os módulos gerados sob demanda (item 6): docs/modulos.md, "Eventos (na matéria)".
+	| "gerou_modulo"
+	| "marcou_aguardando_material"
 	// Aprendizagem (seção 9.2), usados a partir dos itens 7 e 8:
 	| "pediu_reexplicacao"
 	| "pediu_outro_jeito"

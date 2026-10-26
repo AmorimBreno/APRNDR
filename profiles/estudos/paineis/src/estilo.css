@@ -496,7 +496,7 @@
 .guia__titulo { margin: 0; overflow-wrap: anywhere; }
 .guia__trilho { padding: 0 var(--space-8) var(--space-5); border-bottom: var(--border-hair) solid var(--line); }
 .guia__trilho .ap-step__label { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.guia__corpo { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-6) var(--space-8) var(--space-5); scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+.guia__corpo { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-4) var(--space-8) var(--space-5); scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
 .guia__coluna { display: flex; flex-direction: column; gap: var(--space-6); max-width: var(--measure-read); margin: 0 auto; }
 /* A etapa Mapa usa a folha inteira, como a lista da seção Mapa de conteúdo (a descrição vai até a prioridade). */
 /* As etapas largas (Mapa, Diagnóstico, Esqueleto) com vão menor: a questão do diagnóstico cabe sem rolar numa janela comum. */
@@ -576,7 +576,7 @@
 /* O título da questão (os conceitos), no alto da coluna do contexto. */
 .diag__titulo { margin: 0; color: var(--ink-muted); }
 .diag__contexto-dentro { padding: var(--space-4) var(--space-5); border-radius: var(--radius-md); background: var(--surface-raised); scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
-.diag__direita { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
+.diag__direita { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
 .diag__direita > .diag__resposta, .diag__direita .ap-quiz { display: contents; }
 .diag__direita > *, .diag__direita .ap-quiz > * { order: 4; }
 .diag__direita .ap-quiz > .ap-quiz__head { order: 1; }
@@ -586,6 +586,8 @@
 @container (min-width: 720px) {
 	.diag__colunas { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: stretch; }
 	.diag__contexto { min-height: 16rem; }
+	/* A pergunta começa na altura da caixa do contexto: desce o título (a linha do overline, 16px) e o vão até a caixa. */
+	.diag__direita { padding-top: calc(16px + var(--space-3)); }
 	.diag__contexto-caixa { position: relative; flex: 1; min-height: 0; }
 	.diag__contexto-caixa > .diag__contexto-dentro { position: absolute; top: 0; left: 0; right: 0; max-height: 100%; overflow-y: auto; }
 }

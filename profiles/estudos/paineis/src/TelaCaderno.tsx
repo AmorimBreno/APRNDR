@@ -15,7 +15,9 @@
 // Caminho: caderno/<matéria>/<seção> (sem a seção, a linha do tempo);
 // caderno/<matéria>/notas/<título> abre uma nota; caderno/<matéria>/cursos/novo
 // e caderno/<matéria>/cursos/<curso>/guia[/<etapa>] abrem o guia de criação de
-// curso (TelaGuiaCurso) no lugar do índice e da seção, com a aba no topo.
+// curso (TelaGuiaCurso) no lugar do índice e da seção, com a aba no topo;
+// caderno/<matéria>/cursos/<curso> abre a visão do curso pronto (TelaCurso), do
+// mesmo jeito.
 
 import { Button, EmptyState, Icon, type IconName, NotebookCover, type OrnamentGlyph, pad2 } from "@estudos/design-system";
 import { type JanelaPerfilHook, type PropsTelaInicial, semEsperar } from "@estudos/ui";
@@ -33,7 +35,9 @@ import { SecaoMapa } from "./SecaoMapa.tsx";
 import { SecaoNotas, useListaNotas } from "./SecaoNotas.tsx";
 import { useCursos } from "./cursos-ponte.ts";
 import { numeroCurto } from "./diagnostico-tela.ts";
+import { dataNumerica } from "./guia-curso.ts";
 import { SecaoCursos } from "./SecaoCursos.tsx";
+import { TelaCurso } from "./TelaCurso.tsx";
 import { TelaGuiaCurso } from "./TelaGuiaCurso.tsx";
 
 interface Secao {
@@ -189,6 +193,18 @@ export function descreverEvento(evento: Evento): { icone: IconName; texto: strin
 			const detalhe = [questoes !== undefined ? `${questoes} ${questoes === 1 ? "questão" : "questões"}` : "", custo].filter(Boolean).join(" · ");
 			return { icone: "checklist", texto: `Diagnóstico preparado: ${nomeDoCurso(evento)}`, ...(detalhe ? { detalhe } : {}) };
 		}
+		case "gerou_esqueleto": {
+			const modulos = typeof resultado.modulos === "number" ? resultado.modulos : Array.isArray(resultado.modulos) ? resultado.modulos.length : undefined;
+			const custo = typeof resultado.custo === "number" && resultado.custo > 0 ? formatarDolar(resultado.custo) : "";
+			const detalhe = [modulos !== undefined ? `${modulos} ${modulos === 1 ? "módulo" : "módulos"}` : "", custo].filter(Boolean).join(" · ");
+			return { icone: "list", texto: `Esqueleto proposto: ${nomeDoCurso(evento)}`, ...(detalhe ? { detalhe } : {}) };
+		}
+		case "criou_curso": {
+			const modulos = typeof resultado.modulos === "number" ? resultado.modulos : Array.isArray(resultado.modulos) ? resultado.modulos.length : undefined;
+			const geral = typeof resultado.avaliacaoGeral === "string" && /^\d{4}-\d{2}-\d{2}$/.test(resultado.avaliacaoGeral) ? dataNumerica(resultado.avaliacaoGeral) : "";
+			const detalhe = [modulos !== undefined ? `${modulos} ${modulos === 1 ? "módulo" : "módulos"}` : "", geral ? `avaliação geral em ${geral}` : ""].filter(Boolean).join(" · ");
+			return { icone: "flag", texto: `Curso criado: ${nomeDoCurso(evento)}`, ...(detalhe ? { detalhe } : {}) };
+		}
 		case "concluiu_diagnostico": {
 			const { acertos, alternativas, dissertativas, nota } = resultado;
 			const detalhe = [
@@ -237,6 +253,8 @@ export interface PropsTelaCaderno extends PropsTelaInicial {
 	material?: string;
 	/** O guia de criação de curso: sem curso, o de um curso novo; a etapa vem da rota. */
 	guia?: { curso?: string; etapa?: string };
+	/** A visão do curso pronto: o id do curso. */
+	curso?: string;
 }
 
 export function TelaCaderno(props: PropsTelaCaderno) {
@@ -274,7 +292,7 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 	const mapa = useMapa(props.janela, materiaId);
 	// Os cursos (a contagem do índice, a seção e o guia); de novo ao trocar de tela (voltar do guia traz a lista nova).
 	const guia = props.guia;
-	const cursos = useCursos(props.janela, materiaId, `${secao.id}/${guia ? (guia.curso ?? "novo") : ""}`);
+	const cursos = useCursos(props.janela, materiaId, `${secao.id}/${guia ? (guia.curso ?? "novo") : ""}/${props.curso ?? ""}`);
 	// Os títulos para as menções do editor (o mesmo array enquanto a lista não muda).
 	const titulosNotas = useMemo(() => notas?.notas.map((nota) => nota.titulo), [notas]);
 	// Os arquivos de material para as menções do editor (só os desta matéria).
@@ -339,6 +357,16 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 						{erro}
 					</EmptyState>
 				</div>
+			) : props.curso && !guia ? (
+				<TelaCurso
+					key={props.curso}
+					janela={props.janela}
+					materiaId={materiaId}
+					{...(materia ? { materia } : {})}
+					cursoId={props.curso}
+					navegar={props.navegar}
+					tom={tom}
+				/>
 			) : guia ? (
 				<TelaGuiaCurso
 					key={guia.curso ?? "novo"}
@@ -429,6 +457,7 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 									tom={tom}
 									novoCurso={() => props.navegar(`caderno/${materiaId}/cursos/novo`)}
 									continuar={(curso) => props.navegar(`caderno/${materiaId}/cursos/${curso.id}/guia`)}
+									abrir={(curso) => props.navegar(`caderno/${materiaId}/cursos/${curso.id}`)}
 								/>
 							) : secao.id === "mapa" ? (
 								<SecaoMapa

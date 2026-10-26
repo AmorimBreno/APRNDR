@@ -10,7 +10,12 @@
 // a etapa pela extensão dos cursos (cursos-ponte.ts) e anda para a próxima.
 // Confirmar com algo diferente avisa antes o que a mudança descarta
 // (oQueInvalida). A etapa Diagnóstico (parte B) fica em EtapaDiagnostico.tsx,
-// que dá o corpo, o primário e o "Voltar" dela; o Esqueleto chega na parte C.
+// que dá o corpo, o primário e o "Voltar" dela; a etapa Esqueleto (parte C),
+// em EtapaEsqueleto.tsx, que dá o corpo e o primário ("Criar curso").
+//
+// O guia de um curso pronto abre só para leitura: todas as etapas feitas, sem
+// primários, os campos inertes e, em cima, "Este curso já foi criado." com o
+// caminho para a visão do curso (TelaCurso.tsx); "Sair" volta para ela.
 
 import { Button, Callout, EmptyState, Icon, Modal, pad2, RadioGroup, TextArea, TextField, type Tone } from "@estudos/design-system";
 import type { DadosAvatarAgente, JanelaPerfilHook, SituacaoMaterial } from "@estudos/ui";
@@ -57,6 +62,7 @@ import {
 } from "./guia-curso.ts";
 import type { MapaDaMateria } from "./mapa-ponte.ts";
 import { useEtapaDiagnostico } from "./EtapaDiagnostico.tsx";
+import { useEtapaEsqueleto } from "./EtapaEsqueleto.tsx";
 import { ConteudoMateriais } from "./ModalMateriais.tsx";
 import { AvisosMapa, ConceitoNovo, ForaDoMapa, ListaConceitos, ProgressoMapa, useOperarMapa } from "./SecaoMapa.tsx";
 
@@ -109,6 +115,8 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 	const operar = useOperarMapa(mapa);
 	const irPara = (etapa: Etapa) => (curso ? props.navegar(caminhoDoGuia(materiaId, curso.id, etapa)) : undefined);
 	const voltarAosCursos = () => props.navegar(`caderno/${materiaId}/cursos`);
+	const pronto = curso?.situacao === "pronto";
+	const abrirVisao = (id: string) => props.navegar(`caderno/${materiaId}/cursos/${id}`);
 
 	// Os campos de cada etapa; voltam ao salvo quando a etapa em vista muda ou o curso muda (uma confirmação).
 	const [basico, setBasico] = useState<FormBasico>(() => formBasico(curso, provas));
@@ -135,6 +143,14 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 		ativo: vista === "diagnostico",
 		mostrarErro: setErro,
 		seguir: (novo) => props.navegar(caminhoDoGuia(materiaId, novo.id, etapaDepois(novo, "diagnostico"))),
+	});
+	const esqueleto = useEtapaEsqueleto({
+		curso,
+		aberto,
+		mapa,
+		...(props.agente ? { agente: props.agente } : {}),
+		mostrarErro: setErro,
+		abrirCurso: (novo) => abrirVisao(novo.id),
 	});
 
 	const reverter = () => {
@@ -191,6 +207,7 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 
 	const entrada = entradaBasico(basico, provas);
 	const sujo = (() => {
+		if (pronto) return false;
 		if (vista === "basico") return curso?.basico ? !iguais("basico", curso.basico, entrada) || basico.nome.trim() !== curso.nome : mexido;
 		if (vista === "objetivo") return curso?.objetivo ? !iguais("objetivo", curso.objetivo, objetivo) : mexido;
 		if (vista === "mapa") return curso?.mapa ? !iguais("mapa", curso.mapa, { conceitos: marcadosIds }) : mexido;
@@ -258,7 +275,7 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 		}
 	};
 
-	const sair = () => (sujo ? setPerguntarSair(true) : voltarAosCursos());
+	const sair = () => (sujo ? setPerguntarSair(true) : pronto && curso ? abrirVisao(curso.id) : voltarAosCursos());
 	const indice = ETAPAS.indexOf(vista);
 	const anterior = indice > 0 ? ETAPAS[indice - 1] : undefined;
 
@@ -487,20 +504,33 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 	} else if (vista === "diagnostico" && curso) {
 		corpo = diagnostico.corpo;
 		primario = diagnostico.primario;
-	} else {
+	} else if (vista === "esqueleto" && curso) {
+		corpo = esqueleto.corpo;
+		primario = esqueleto.primario;
+	}
+
+	// Curso pronto: só leitura. As etapas com formulário ficam inertes (o Diagnóstico e o Esqueleto já se mostram só para leitura).
+	if (pronto && curso) {
+		primario = undefined;
+		const comFormulario = vista !== "diagnostico" && vista !== "esqueleto";
 		corpo = (
-			<EmptyState
-				glyph="問"
-				tone={props.tom}
-				title="O esqueleto chega na próxima parte"
-				action={
-					<Button variant="primary" icon="arrow-left" onClick={voltarAosCursos}>
-						Voltar para os cursos
-					</Button>
-				}
-			>
-				Seu rascunho está salvo; você pode sair e voltar depois.
-			</EmptyState>
+			<>
+				<Callout tone="cream" label="Curso pronto" icon="check" quote={false}>
+					<p>Este curso já foi criado.</p>
+					<div className="diag__botoes">
+						<Button variant="secondary" size="sm" iconRight="arrow-right" onClick={() => abrirVisao(curso.id)}>
+							Abrir o curso
+						</Button>
+					</div>
+				</Callout>
+				{comFormulario ? (
+					<div className="guia__leitura" inert>
+						{corpo}
+					</div>
+				) : (
+					corpo
+				)}
+			</>
 		);
 	}
 
@@ -522,7 +552,7 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 				</header>
 				<TrilhoGuia curso={curso} vista={vista} abrir={irPara} />
 				<div className="guia__corpo">
-					<motion.div key={`${vista}|${curso?.id ?? "novo"}`} className={`guia__coluna${vista === "mapa" || vista === "diagnostico" ? " guia__coluna--larga" : ""}`} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} transition={MOLA}>
+					<motion.div key={`${vista}|${curso?.id ?? "novo"}`} className={`guia__coluna${vista === "mapa" || vista === "diagnostico" || vista === "esqueleto" ? " guia__coluna--larga" : ""}`} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} transition={MOLA}>
 						{erro ? (
 							<Callout tone="amber" label="Não deu certo" icon="alert" quote={false}>
 								<p>{erro}</p>
@@ -588,6 +618,7 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 				<p className="body">{ultimoAviso.current?.etapas.length === 1 ? "A etapa descartada volta a ficar por fazer." : "As etapas descartadas voltam a ficar por fazer."} O resto do rascunho fica como está.</p>
 			</Modal>
 			{diagnostico.modal}
+			{esqueleto.modal}
 			<Modal
 				open={perguntarSair}
 				onClose={() => setPerguntarSair(false)}

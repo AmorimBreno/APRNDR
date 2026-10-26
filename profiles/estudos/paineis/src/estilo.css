@@ -602,3 +602,110 @@
 	.diag__tecla, .diag__item-cabeca { transition: none; }
 	.diag__tecla:active { transform: none; }
 }
+
+/* ── A etapa Esqueleto do guia (EtapaEsqueleto.tsx, item 5, parte C): os módulos à esquerda, no
+ * ritmo das linhas do mapa, e o calendário à direita, fixo ao rolar o corpo do guia (embaixo, quando
+ * a coluna é estreita). ── */
+.esq__topo { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-4); }
+.esq__conta { color: var(--ink-muted); }
+.esq { container-type: inline-size; }
+.esq__grade { display: grid; grid-template-columns: minmax(0, 62fr) minmax(0, 38fr); align-items: start; gap: var(--space-6); }
+.esq__modulos { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.esq__lista { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.esq__modulo { position: relative; display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3) var(--space-3) var(--space-4) var(--space-4); border: var(--border-control) solid transparent; border-radius: var(--radius-md); background: var(--surface-raised); transition: border-color .16s ease-out; }
+.esq__modulo:hover { border-color: var(--line-strong); }
+/* Os menus (tipo, "Mover para…") ficam por cima dos módulos de baixo. */
+.esq__modulo:focus-within { z-index: 3; }
+.esq__modulo--vazio { border-style: dashed; border-color: var(--line-strong); }
+.esq__cabeca { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: var(--space-2) var(--space-3); }
+.esq__titulos { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.esq__numero { color: var(--ink-subtle); }
+.esq__nome { overflow-wrap: anywhere; }
+.esq__objetivo { color: var(--ink-muted); }
+.esq__titulos .mapa__campo { width: calc(100% + 12px); margin: 0 -6px; }
+.esq__controles { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-1) var(--space-2); }
+.esq__tipo .menu-agente { left: auto; right: 0; min-width: 160px; }
+.esq__tipo-botao { display: inline-flex; align-items: center; gap: 2px; min-height: var(--control-sm); padding: 0 2px 0 6px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink-muted); cursor: pointer; transition: background-color .12s ease-out; }
+.esq__tipo-botao:hover, .esq__tipo-botao[aria-expanded="true"] { background: var(--surface-hover); color: var(--ink); }
+.esq__tipo-botao:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.esq__tipo-texto, .esq__horas-texto { color: var(--ink-muted); }
+.esq__horas { display: inline-flex; align-items: center; gap: var(--space-1); }
+.esq__horas-campo { width: 76px; }
+.esq__horas-campo .ap-input { min-height: var(--control-sm); padding: 0 var(--space-2); border-radius: var(--radius-sm); background: var(--surface-panel); }
+.esq__horas-campo .ap-input input { height: calc(var(--control-sm) - 3px); }
+.esq__horas-unidade { color: var(--ink-muted); }
+.esq__acoes { display: inline-flex; gap: 2px; transition: opacity .12s ease-out; }
+.esq__descer .ap-icon { transform: rotate(180deg); }
+/* As ações só aparecem no hover e no foco do módulo (continuam alcançáveis por Tab). */
+.esq__modulo:not(:hover):not(:focus-within) .esq__acoes { opacity: 0; }
+.esq__conceitos { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.esq__conceito-botao { display: inline-flex; align-items: center; gap: 0; max-width: 100%; padding: 0 4px 0 0; border: 0; border-radius: var(--radius-full); background: transparent; color: var(--ink-muted); cursor: pointer; transition: transform .3s var(--mola); }
+.esq__conceito-botao:hover { transform: translateY(-1px); color: var(--ink); }
+.esq__conceito-botao:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.esq__vazio { margin: 0; color: var(--ink-muted); }
+.esq__novo { display: flex; }
+
+/* O calendário: um painel ao lado, fixo no alto do corpo do guia enquanto os módulos rolam. */
+.esq__lado { position: sticky; top: 0; min-width: 0; }
+.esq__calendario { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-4) var(--space-5) var(--space-5); border-radius: var(--radius-md); background: var(--surface-raised); }
+.esq__calendario .ap-callout { margin: 0; }
+.esq__cal-topo { display: flex; flex-direction: column; gap: 2px; }
+.esq__cal-topo .overline, .esq__cal-meta { color: var(--ink-muted); }
+.esq__cal-lista { position: relative; display: flex; flex-direction: column; gap: var(--space-4); margin: 0; padding: 0; list-style: none; }
+.esq__cal-lista::before { content: ""; position: absolute; top: 14px; bottom: 14px; left: 13px; border-left: var(--border-strong) dashed var(--line-strong); }
+.esq__cal-item { position: relative; display: grid; grid-template-columns: 28px minmax(0, 1fr); align-items: start; gap: var(--space-3); }
+.esq__cal-marca { position: relative; z-index: 1; display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--radius-full); background: var(--surface-panel); color: var(--amber); font-size: 12px; box-shadow: inset 0 0 0 var(--border-control) var(--line-strong); }
+.esq__cal-item--geral .esq__cal-marca { background: var(--amber); color: var(--on-amber); box-shadow: var(--key-lip); }
+.esq__cal-texto { display: flex; flex-direction: column; gap: 2px; padding-top: 3px; min-width: 0; overflow-wrap: anywhere; }
+.esq__cal-datas { display: inline-flex; align-items: center; gap: 4px; color: var(--ink-muted); }
+.esq__cal-datas .ap-icon { flex: none; color: var(--ink-subtle); }
+.esq__cal-resumo { margin: 0; padding-top: var(--space-3); border-top: var(--border-hair) solid var(--line); color: var(--ink-muted); }
+
+/* Coluna estreita: o calendário vai para baixo dos módulos e deixa de ficar fixo. */
+@container (max-width: 720px) {
+	.esq__grade { grid-template-columns: minmax(0, 1fr); }
+	.esq__lado { position: static; }
+}
+@media (max-width: 760px) {
+	.esq__cabeca { grid-template-columns: minmax(0, 1fr); }
+	.esq__controles { justify-content: flex-start; }
+}
+@media (prefers-reduced-motion: reduce) {
+	.esq__modulo, .esq__tipo-botao, .esq__conceito-botao, .esq__acoes { transition: none; }
+	.esq__conceito-botao:hover { transform: none; }
+}
+
+/* O guia de um curso pronto: as etapas com formulário ficam inertes, um pouco apagadas. */
+.guia__leitura { display: flex; flex-direction: column; gap: var(--space-6); opacity: .8; }
+
+/* ── A visão do curso pronto (TelaCurso.tsx, item 5, parte C): no lugar do índice e da seção, a ficha
+ * das leituras, os módulos em ModuleCard (grade de 2 colunas, como o README do ModuleCard pede) e o
+ * calendário gravado. ── */
+.curso { display: flex; flex-direction: column; min-height: 0; overflow: hidden; border-radius: var(--radius-lg); background: var(--surface-panel); }
+.curso__cabeca { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: var(--space-4); padding: var(--space-6) var(--space-8) var(--space-5); border-bottom: var(--border-hair) solid var(--line); }
+.curso__titulos { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.curso__titulos .overline { color: var(--ink-muted); }
+.curso__titulo { margin: 0; overflow-wrap: anywhere; }
+.curso__botoes { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
+.curso__corpo { display: flex; flex-direction: column; gap: var(--space-8); flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-6) var(--space-8) var(--space-8); scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+.curso__corpo .ap-empty { max-width: 760px; background: var(--surface-raised); }
+.curso__ficha { color: var(--ink); }
+.curso__leituras { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-3) var(--space-8); }
+.curso__leitura .ap-readout__label { display: flex; flex-direction: column; }
+.curso__leitura-detalhe { color: var(--ink-muted); }
+.curso__leitura--texto .ap-readout__value { line-height: 1.6; }
+.curso__parte { display: flex; flex-direction: column; gap: var(--space-4); }
+.curso__parte-titulo { margin: 0; color: var(--ink-muted); }
+.curso__modulos { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 28px 24px; margin: 0; padding: 0; list-style: none; }
+.curso__modulo { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.curso__modulo-texto { display: flex; flex-direction: column; gap: 2px; padding: 0 var(--space-2); }
+.curso__objetivo { margin: 0; color: var(--ink); }
+.curso__datas { margin: 0; color: var(--ink-muted); }
+.curso__acao { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.curso__parte--calendario { max-width: var(--measure-read); }
+.cursos__item--abre { cursor: pointer; }
+
+@media (max-width: 900px) {
+	.curso__cabeca, .curso__corpo { padding-left: var(--space-5); padding-right: var(--space-5); }
+	.curso__modulos { grid-template-columns: minmax(0, 1fr); }
+}

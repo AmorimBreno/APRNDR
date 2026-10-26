@@ -14,7 +14,8 @@
 // As peças (os avisos, o andamento, a lista, "Conceito novo" e "Fora do
 // mapa") são exportadas: a etapa Mapa do guia de criação de curso
 // (TelaGuiaCurso.tsx) monta a mesma lista, com uma caixa de marcar em cada
-// conceito de dentro (o modo de seleção da ListaConceitos).
+// conceito de dentro (o modo de seleção da ListaConceitos). O CampoNoLugar
+// também: a etapa Esqueleto edita com ele o nome e o objetivo dos módulos.
 
 import { Button, Callout, Checkbox, EmptyState, Icon, Modal, pad2, Tag, type Tone } from "@estudos/design-system";
 import { MenuSuspenso } from "@estudos/ui";
@@ -592,7 +593,7 @@ function LinhaConceito(props: PropsLinha) {
 	);
 }
 
-interface PropsCampo {
+export interface PropsCampo {
 	valor: string;
 	rotulo: string;
 	classe: string;
@@ -606,7 +607,7 @@ interface PropsCampo {
 }
 
 /** Um texto que vira campo ao clicar: Enter ou sair salva, Esc desiste. */
-function CampoNoLugar(props: PropsCampo) {
+export function CampoNoLugar(props: PropsCampo) {
 	const [editando, setEditando] = useState(false);
 	const [texto, setTexto] = useState(props.valor);
 	// Já terminou (Enter, Esc ou sair): o blur que vem quando o campo some não salva de novo.

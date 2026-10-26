@@ -199,9 +199,9 @@ export function motivoMapaParado(estado: Pick<EstadoMapa, "andamento" | "fila" |
 
 // --- A lista da seção Cursos ----------------------------------------------------
 
-/** A etiqueta da situação: "Rascunho · parou em Mapa" (âmbar) ou "Pronto" (sálvia). */
-export function rotuloCurso(curso: Pick<ResumoCurso, "situacao" | "etapa">): { texto: string; tom: "amber" | "sage" } {
-	if (curso.situacao === "pronto") return { texto: "Pronto", tom: "sage" };
+/** A etiqueta da situação: "Rascunho · parou em Mapa" (âmbar) ou "Pronto", com "· 6 módulos" quando se sabe quantos (sálvia). */
+export function rotuloCurso(curso: Pick<ResumoCurso, "situacao" | "etapa">, modulos?: number): { texto: string; tom: "amber" | "sage" } {
+	if (curso.situacao === "pronto") return { texto: modulos !== undefined ? `Pronto · ${modulos} ${modulos === 1 ? "módulo" : "módulos"}` : "Pronto", tom: "sage" };
 	return { texto: `Rascunho · parou em ${nomeDaEtapa(curso.etapa)}`, tom: "amber" };
 }
 

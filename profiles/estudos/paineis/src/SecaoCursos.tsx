@@ -2,8 +2,9 @@
 // matéria, na ordem de criação, e "Novo curso", que abre o guia de criação
 // (TelaGuiaCurso.tsx) em caderno/<matéria>/cursos/novo. Um rascunho mostra a
 // etapa onde parou, "Continuar" (volta ao guia) e "Descartar" (com
-// confirmação: a pasta do curso é apagada). Um curso pronto é só a linha por
-// enquanto: a visão do curso chega na parte C.
+// confirmação: a pasta do curso é apagada). Um curso pronto mostra quantos
+// módulos tem e abre a visão do curso (TelaCurso.tsx), pela linha inteira ou
+// por "Abrir".
 
 import { Button, Callout, EmptyState, Icon, Modal, Tag, type Tone } from "@estudos/design-system";
 import { motion } from "motion/react";
@@ -20,6 +21,8 @@ export interface PropsSecaoCursos {
 	tom: Tone;
 	novoCurso(): void;
 	continuar(curso: ResumoCurso): void;
+	/** Abre a visão de um curso pronto. */
+	abrir(curso: ResumoCurso): void;
 }
 
 export function SecaoCursos(props: PropsSecaoCursos) {
@@ -91,11 +94,13 @@ export function SecaoCursos(props: PropsSecaoCursos) {
 			</div>
 			<ul className="cursos__lista">
 				{lista.map((curso, indice) => {
-					const rotulo = rotuloCurso(curso);
+					const rotulo = rotuloCurso(curso, props.cursos.modulos[curso.id]);
+					const pronto = curso.situacao === "pronto";
 					return (
 						<motion.li
 							key={curso.id}
-							className="cursos__item"
+							className={`cursos__item${pronto ? " cursos__item--abre" : ""}`}
+							{...(pronto ? { onClick: () => props.abrir(curso) } : {})}
 							initial={{ opacity: 0, y: 8 }}
 							animate={{ opacity: 1, y: 0 }}
 							transition={{ type: "spring", stiffness: 420, damping: 32, delay: Math.min(indice, 10) * 0.03 }}
@@ -128,7 +133,21 @@ export function SecaoCursos(props: PropsSecaoCursos) {
 										Continuar
 									</Button>
 								</span>
-							) : null}
+							) : (
+								<span className="cursos__acoes">
+									<Button
+										variant="secondary"
+										size="sm"
+										iconRight="arrow-right"
+										onClick={(evento) => {
+											evento.stopPropagation();
+											props.abrir(curso);
+										}}
+									>
+										Abrir
+									</Button>
+								</span>
+							)}
 						</motion.li>
 					);
 				})}

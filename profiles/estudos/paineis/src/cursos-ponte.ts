@@ -12,6 +12,10 @@
 // segundo plano: o "curso" diz se está gerando (gerandoDiagnostico) ou
 // corrigindo (corrigindo), e um "erro" com ao gerar_diagnostico, corrigir ou
 // responder fica guardado (lerCursos, diagnosticos) até algo novo superá-lo.
+//
+// O esqueleto (parte C) usa gerar_esqueleto, editar_esqueleto e criar_curso.
+// Gerar corre em segundo plano como o diagnóstico (gerandoEsqueleto no
+// "curso", e o erro com ao gerar_esqueleto fica em esqueletos).
 
 import { type AcaoRecebida, type JanelaPerfilHook, semEsperar } from "@estudos/ui";
 import { useCallback, useEffect, useMemo, useRef } from "react";
@@ -31,6 +35,7 @@ import {
 	resumoDoCurso,
 } from "../../lib/curso-tipos.ts";
 import type { Confianca, NivelAutoavaliacao } from "../../lib/diagnostico-tipos.ts";
+import type { Modulo } from "../../lib/esqueleto-tipos.ts";
 
 export { PAINEL_CURSOS };
 
@@ -59,6 +64,16 @@ export interface AndamentoDiagnostico {
 
 const ANDAMENTO_VAZIO: AndamentoDiagnostico = { gerando: false, corrigindo: [] };
 
+/** O que corre em segundo plano no esqueleto de um curso. */
+export interface AndamentoEsqueleto {
+	/** A proposta está sendo gerada. */
+	gerando: boolean;
+	/** O último erro de gerar a proposta, até um "curso" dizer que está gerando de novo. */
+	erroGerar?: ErroDoDiagnostico;
+}
+
+const ESQUELETO_PARADO: AndamentoEsqueleto = { gerando: false };
+
 /** O que a extensão mandou sobre os cursos de uma matéria. */
 export interface LidoCursos {
 	/** A última lista, com os cursos que chegaram depois dela atualizados (ou acrescentados) e sem os descartados depois dela. */
@@ -73,6 +88,10 @@ export interface LidoCursos {
 	errosAbrir: Record<string, string>;
 	/** O que corre em segundo plano no diagnóstico de cada curso (pelo último "curso" e os erros depois dele). */
 	diagnosticos: Record<string, AndamentoDiagnostico>;
+	/** O que corre em segundo plano no esqueleto de cada curso. */
+	esqueletos: Record<string, AndamentoEsqueleto>;
+	/** Quantos módulos tem o esqueleto de cada curso pronto que chegou inteiro (a lista não traz). */
+	modulos: Record<string, number>;
 }
 
 /** Lê, em ordem, o que chegou ao painel "cursos" para a matéria. Um erro sem matéria também conta (só estas telas ouvem o painel). */
@@ -83,6 +102,8 @@ export function lerCursos(recebidas: readonly AcaoRecebida[], materia: string): 
 	const prontos: Record<string, ArquivoDoCurso[]> = {};
 	const errosAbrir: Record<string, string> = {};
 	const diagnosticos: Record<string, AndamentoDiagnostico> = {};
+	const esqueletos: Record<string, AndamentoEsqueleto> = {};
+	const modulos: Record<string, number> = {};
 	for (const recebida of recebidas) {
 		if (recebida.acao === "lista") {
 			const dados = recebida.dados as MensagemListaCursos | undefined;
@@ -105,6 +126,11 @@ export function lerCursos(recebidas: readonly AcaoRecebida[], materia: string): 
 				...(antes?.erroGerar && !gerando ? { erroGerar: antes.erroGerar } : {}),
 				...(antes?.erroCorrigir && corrigindo.length === 0 ? { erroCorrigir: antes.erroCorrigir } : {}),
 			};
+			const esqueletoAntes = esqueletos[curso.id];
+			const gerandoEsqueleto = dados.gerandoEsqueleto === true;
+			esqueletos[curso.id] = { gerando: gerandoEsqueleto, ...(esqueletoAntes?.erroGerar && !gerandoEsqueleto ? { erroGerar: esqueletoAntes.erroGerar } : {}) };
+			if (curso.esqueleto && Array.isArray(curso.esqueleto.modulos)) modulos[curso.id] = curso.esqueleto.modulos.length;
+			else delete modulos[curso.id];
 			if (lista) {
 				const resumo = resumoDoCurso(curso);
 				const indice = lista.findIndex((item) => item.id === curso.id);
@@ -117,6 +143,8 @@ export function lerCursos(recebidas: readonly AcaoRecebida[], materia: string): 
 			delete cursos[dados.curso];
 			delete prontos[dados.curso];
 			delete diagnosticos[dados.curso];
+			delete esqueletos[dados.curso];
+			delete modulos[dados.curso];
 			if (lista) lista = lista.filter((item) => item.id !== dados.curso);
 		} else if (recebida.acao === "erro") {
 			const dados = recebida.dados as MensagemErroCursos | undefined;
@@ -124,6 +152,9 @@ export function lerCursos(recebidas: readonly AcaoRecebida[], materia: string): 
 			const mensagem = dados.mensagem || "Erro desconhecido.";
 			if (dados.ao === "listar") erroLista = mensagem;
 			else if (dados.ao === "abrir" && dados.curso) errosAbrir[dados.curso] = mensagem;
+			else if (dados.ao === "gerar_esqueleto" && dados.curso) {
+				esqueletos[dados.curso] = { gerando: false, erroGerar: { chave: recebida.chave, mensagem } };
+			}
 			else if (dados.curso && (dados.ao === "gerar_diagnostico" || dados.ao === "corrigir" || dados.ao === "responder")) {
 				const antes = diagnosticos[dados.curso] ?? ANDAMENTO_VAZIO;
 				const daQuestao = (dados as { questao?: unknown }).questao;
@@ -138,7 +169,7 @@ export function lerCursos(recebidas: readonly AcaoRecebida[], materia: string): 
 			}
 		}
 	}
-	return { ...(lista ? { lista } : {}), ...(erroLista ? { erroLista } : {}), cursos, prontos, errosAbrir, diagnosticos };
+	return { ...(lista ? { lista } : {}), ...(erroLista ? { erroLista } : {}), cursos, prontos, errosAbrir, diagnosticos, esqueletos, modulos };
 }
 
 // --- A espera pelo pedido ----------------------------------------------------
@@ -244,6 +275,8 @@ export interface CursosDaMateria {
 	/** undefined até a primeira lista chegar. */
 	lista?: ResumoCurso[];
 	erroLista?: string;
+	/** Quantos módulos tem cada curso pronto da lista, quando já se sabe (pelo curso inteiro). */
+	modulos: Record<string, number>;
 	/** Cria o rascunho com o Básico confirmado; resolve com o curso. */
 	comecar(basico: EntradaBasico): Promise<Curso>;
 	/** Descarta um rascunho (a pasta é apagada). */
@@ -271,10 +304,24 @@ export function useCursos(janela: JanelaPerfilHook, materiaId: string, vez?: str
 	const ultima = useRef<{ materia: string; lista: ResumoCurso[] } | undefined>(undefined);
 	if (lido.lista) ultima.current = { materia: materiaId, lista: lido.lista };
 	const lista = lido.lista ?? (ultima.current?.materia === materiaId ? ultima.current.lista : undefined);
+	// A lista não diz quantos módulos tem um curso pronto: pede cada um inteiro uma vez (por sessão).
+	const pedidos = useRef<{ sessao: string | undefined; ids: Set<string> }>({ sessao: undefined, ids: new Set() });
+	const faltam = (lista ?? []).filter((item) => item.situacao === "pronto" && lido.modulos[item.id] === undefined).map((item) => item.id);
+	const chaveFaltam = faltam.join("\n");
+	useEffect(() => {
+		if (!sessaoId) return;
+		if (pedidos.current.sessao !== sessaoId) pedidos.current = { sessao: sessaoId, ids: new Set() };
+		for (const curso of faltam) {
+			if (pedidos.current.ids.has(`${materiaId}/${curso}`)) continue;
+			pedidos.current.ids.add(`${materiaId}/${curso}`);
+			semEsperar(acoes.acaoDaInterface(PAINEL_CURSOS, "abrir", { materia: materiaId, curso } satisfies AcoesCursos["abrir"]));
+		}
+	}, [sessaoId, acoes, materiaId, chaveFaltam]);
 	const mandar = useMandarComPedido(janela);
 	return {
 		...(lista ? { lista } : {}),
 		...(lido.erroLista ? { erroLista: lido.erroLista } : {}),
+		modulos: lido.modulos,
 		listar,
 		comecar: async (basico) => {
 			const resposta = await mandar("comecar", { materia: materiaId, pedido: crypto.randomUUID(), basico });
@@ -311,6 +358,14 @@ export interface CursoAberto {
 	corrigir(questao: string): Promise<MensagemCurso>;
 	/** Diagnóstico: confirma a etapa (todas as questões respondidas e corrigidas). */
 	concluirDiagnostico(): Promise<MensagemCurso>;
+	/** O que corre em segundo plano no esqueleto (gerando e o erro de gerar). */
+	esqueleto: AndamentoEsqueleto;
+	/** Esqueleto: gera a proposta (de novo, substitui a anterior); resolve quando ela chega. */
+	gerarEsqueleto(): Promise<MensagemCurso>;
+	/** Esqueleto: grava a proposta editada inteira. */
+	editarEsqueleto(modulos: Modulo[]): Promise<MensagemCurso>;
+	/** Esqueleto: confirma a etapa com a proposta e o calendário de hoje; o curso fica pronto. */
+	criarCurso(): Promise<MensagemCurso>;
 }
 
 /** Um curso da matéria: pede "abrir" ao montar, quando a sessão muda e quando o curso muda. */
@@ -333,8 +388,11 @@ export function useCurso(janela: JanelaPerfilHook, materiaId: string, cursoId: s
 	const prontos = prontosDoServidor ?? (cursoId && ultimosProntos.current?.curso === cursoId ? ultimosProntos.current.prontos : undefined);
 	const mandar = useMandarComPedido(janela);
 	const diagnostico = (cursoId ? lido.diagnosticos[cursoId] : undefined) ?? ANDAMENTO_VAZIO;
-	/** Uma ação do diagnóstico com pedido; resolve com a mensagem "curso". */
-	const doDiagnostico = async <Acao extends "autoavaliar" | "gerar_diagnostico" | "responder" | "corrigir" | "concluir_diagnostico">(
+	const esqueleto = (cursoId ? lido.esqueletos[cursoId] : undefined) ?? ESQUELETO_PARADO;
+	/** Uma ação do diagnóstico ou do esqueleto com pedido; resolve com a mensagem "curso". */
+	const doDiagnostico = async <
+		Acao extends "autoavaliar" | "gerar_diagnostico" | "responder" | "corrigir" | "concluir_diagnostico" | "gerar_esqueleto" | "editar_esqueleto" | "criar_curso",
+	>(
 		acao: Acao,
 		resto: Omit<AcoesDaTela[Acao], "materia" | "curso" | "pedido">,
 	): Promise<MensagemCurso> => {
@@ -362,5 +420,9 @@ export function useCurso(janela: JanelaPerfilHook, materiaId: string, cursoId: s
 		responder: (resposta) => doDiagnostico("responder", resposta),
 		corrigir: (questao) => doDiagnostico("corrigir", { questao }),
 		concluirDiagnostico: () => doDiagnostico("concluir_diagnostico", {}),
+		esqueleto,
+		gerarEsqueleto: () => doDiagnostico("gerar_esqueleto", {}),
+		editarEsqueleto: (modulos) => doDiagnostico("editar_esqueleto", { modulos }),
+		criarCurso: () => doDiagnostico("criar_curso", {}),
 	};
 }

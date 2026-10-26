@@ -891,7 +891,7 @@ function CartaoDaQuestao(props: {
 					Anterior
 				</Button>
 				<span className="data diag__cartao-posicao">
-					{props.posicao} de {props.total} no índice
+					{props.posicao} de {props.total}
 				</span>
 				<Button variant="secondary" size="sm" iconRight="arrow-right" disabled={!props.proxima} onClick={props.proxima}>
 					Próxima

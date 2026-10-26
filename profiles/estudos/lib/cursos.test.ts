@@ -60,14 +60,20 @@ const MATERIAIS = { arquivos: [{ arquivo: "aula-04.pdf", hash: "h4" }] };
 const OBJETIVO = { escopo: "material_base" as const, tipo: "misto" as const, motivo: "Passar na P1." };
 const MAPA = { conceitos: ["c-a", "c-b"] };
 
-/** Um curso com as seis etapas confirmadas (diagnóstico e esqueleto com conteúdo de mentira: confirmarEtapa não valida; o diagnóstico de verdade está em diagnostico.test.ts). */
+/**
+ * Um curso com as seis etapas confirmadas (diagnóstico e esqueleto com
+ * conteúdo de mentira: confirmarEtapa não valida; os de verdade estão em
+ * diagnostico.test.ts e esqueleto.test.ts). Confirmar o Esqueleto deixa o
+ * curso pronto, e um curso pronto não aceita confirmar etapa; para conferir a
+ * tabela, ele volta a rascunho aqui.
+ */
 function cursoCompleto(): Curso {
 	let curso = novoCurso("p1-regressao", "calculo-i", BASICO, AGORA);
 	curso = confirmarEtapa(curso, "materiais", MATERIAIS, AGORA).curso;
 	curso = confirmarEtapa(curso, "objetivo", OBJETIVO, AGORA).curso;
 	curso = confirmarEtapa(curso, "mapa", MAPA, AGORA).curso;
 	curso = confirmarEtapa(curso, "diagnostico", { nivel: 1 } as never, AGORA).curso;
-	return confirmarEtapa(curso, "esqueleto", { modulos: 2 }, AGORA).curso;
+	return { ...confirmarEtapa(curso, "esqueleto", { modulos: 2 } as never, AGORA).curso, situacao: "rascunho" };
 }
 
 describe("validarEtapa", () => {
@@ -133,9 +139,10 @@ describe("validarEtapa", () => {
 		expect(() => validarEtapa("mapa", { conceitos: ["c-x", "c-f"] }, { mapa })).toThrow(/não estão dentro do mapa.*c-x, c-f/);
 	});
 
-	it("Diagnóstico sem o em andamento completo (diagnostico.test.ts) e Esqueleto: parte C", () => {
+	it("Diagnóstico e Esqueleto sem o em andamento completo (diagnostico.test.ts e esqueleto.test.ts)", () => {
 		expect(() => validarEtapa("diagnostico", {})).toThrow(/autoavaliação, das questões e das respostas/);
-		expect(() => validarEtapa("esqueleto", {})).toThrow(/parte C/);
+		expect(() => validarEtapa("esqueleto", {})).toThrow(/Falta o Mapa do curso/);
+		expect(() => validarEtapa("esqueleto", {}, { curso: { materiais: null, mapa: MAPA } })).toThrow(/Monte o esqueleto/);
 		expect(() => validarEtapa("outra" as Etapa, {})).toThrow(/Etapa desconhecida/);
 	});
 
@@ -208,7 +215,6 @@ describe("oQueInvalida e confirmarEtapa pela tabela", () => {
 			["objetivo", { motivo: "Passar na P1.  ", tipo: "misto", escopo: "material_base" }],
 			["mapa", MAPA],
 			["diagnostico", { nivel: 1 }],
-			["esqueleto", { modulos: 2 }],
 		];
 		for (const [etapa, dados] of mesmas) {
 			expect(oQueInvalida(curso, etapa, dados as never)).toEqual([]);

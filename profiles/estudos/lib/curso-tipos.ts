@@ -9,6 +9,8 @@
 // Só tipos de diagnostico-tipos.ts (apagados na compilação): os valores vão no
 // sentido contrário (diagnostico-tipos importa daqui), sem ciclo ao carregar.
 import type { Confianca, Diagnostico, DiagnosticoEmAndamento, NivelAutoavaliacao, RespostaDissertativa } from "./diagnostico-tipos.ts";
+// Do mesmo jeito, só tipos de esqueleto-tipos.ts (ele importa os valores daqui).
+import type { CalendarioCurso, Esqueleto, EsqueletoEmAndamento, Modulo, TipoModulo } from "./esqueleto-tipos.ts";
 import type { MapaConteudo } from "./mapa-tipos.ts";
 
 /** Muda quando o formato do curso.json mudar. */
@@ -71,8 +73,8 @@ export interface DadosMapa {
 
 /** A etapa Diagnóstico (parte B, docs/cursos.md): o diagnóstico concluído, com concluidoEm (diagnostico-tipos.ts). */
 export type DadosDiagnostico = Diagnostico;
-/** Parte C: o formato chega com ela. */
-export type DadosEsqueleto = Record<string, unknown>;
+/** A etapa Esqueleto (parte C, docs/cursos.md): o esqueleto do curso criado, com criadoEm e o calendário (esqueleto-tipos.ts). */
+export type DadosEsqueleto = Esqueleto;
 
 /** O que cada etapa guarda no curso.json. */
 export interface DadosDasEtapas {
@@ -121,6 +123,13 @@ export interface Curso {
 	 */
 	diagnosticoEmAndamento?: DiagnosticoEmAndamento | null;
 	diagnostico: DadosDiagnostico | null;
+	/**
+	 * A proposta de esqueleto em edição (a etapa esqueleto continua null): os
+	 * módulos, com geradoEm, modelo e custo. "Criar curso" a transforma na
+	 * etapa (e o curso fica pronto); tudo o que invalida a etapa esqueleto a
+	 * apaga. Ausente (ou null) quando não há.
+	 */
+	esqueletoEmAndamento?: EsqueletoEmAndamento | null;
 	esqueleto: DadosEsqueleto | null;
 }
 
@@ -170,6 +179,12 @@ export interface AcoesCursos {
 	concluir_diagnostico: { materia: string; curso: string; pedido: string };
 	/** Tenta de novo a correção de uma dissertativa que falhou. */
 	corrigir: { materia: string; curso: string; pedido: string; questao: string };
+	/** Esqueleto: exige o diagnóstico concluído; gera a proposta (gerar de novo substitui a anterior). */
+	gerar_esqueleto: { materia: string; curso: string; pedido: string };
+	/** Esqueleto: grava a proposta editada inteira (validarModulos: sem conserto, um conceito faltando ou repetido é erro). */
+	editar_esqueleto: { materia: string; curso: string; pedido: string; modulos: Modulo[] };
+	/** Esqueleto: confirma a etapa com a proposta e o calendário de hoje; o curso fica pronto. */
+	criar_curso: { materia: string; curso: string; pedido: string };
 }
 
 export type AcaoCursos = keyof AcoesCursos;
@@ -197,6 +212,8 @@ export interface MensagemCurso {
 	gerandoDiagnostico?: boolean;
 	/** As dissertativas do diagnóstico que estão sendo corrigidas agora. */
 	corrigindo?: string[];
+	/** Enquanto a proposta de esqueleto está sendo gerada. */
+	gerandoEsqueleto?: boolean;
 }
 
 /** A mensagem "descartado". */
@@ -386,6 +403,147 @@ export function podeConcluir(emAndamento: DiagnosticoEmAndamento | null | undefi
 
 const listaDeIds = (ids: string[]) => ids.join(", ");
 
+// --- O esqueleto (parte C) -------------------------------------------------------
+// Ficam aqui, e não em esqueleto-tipos.ts, porque validarEtapa usa; o
+// esqueleto-tipos.ts reexporta.
+
+/** Os tipos de módulo: normal; curto (o que o diagnóstico mostrou que ele já domina: menos explicação, mais prática); revisão (só retomar e praticar). */
+export const TIPOS_MODULO = ["normal", "curto", "revisao"] as const;
+/** As horas de um módulo: de 0,5 a 40, no passo de 0,5. */
+export const HORAS_MODULO_MINIMAS = 0.5;
+export const HORAS_MODULO_MAXIMAS = 40;
+export const PASSO_HORAS_MODULO = 0.5;
+/** Quantos módulos a proposta do modelo pode ter (a edição aceita a partir de 1). */
+export const MODULOS_MINIMOS = 2;
+export const MODULOS_MAXIMOS = 12;
+
+/** Um ErroCurso (a extensão mostra a frase como está), com o nome próprio do esqueleto. */
+export class ErroEsqueleto extends ErroCurso {
+	constructor(mensagem: string) {
+		super(mensagem);
+		this.name = "ErroEsqueleto";
+	}
+}
+
+export const ehTipoModulo = (valor: unknown): valor is TipoModulo => (TIPOS_MODULO as readonly unknown[]).includes(valor);
+
+/** Horas de módulo permitidas: um número de 0,5 a 40, múltiplo de 0,5. */
+export const ehHorasModulo = (valor: unknown): valor is number =>
+	typeof valor === "number" && Number.isFinite(valor) && valor >= HORAS_MODULO_MINIMAS && valor <= HORAS_MODULO_MAXIMAS && Number.isInteger(valor / PASSO_HORAS_MODULO);
+
+/** O id de um módulo: m seguido de um número (m1, m2…). */
+export const ehIdModulo = (valor: unknown): valor is string => typeof valor === "string" && /^m[1-9]\d*$/.test(valor);
+
+/**
+ * Confere os módulos que a tela manda (editar_esqueleto) sem consertar nada:
+ * uma lista de 1 a 12 módulos, cada um com id m<número> sem repetir, nome não
+ * vazio, objetivo em texto (pode ser vazio), tipo e horas permitidos e pelo
+ * menos um conceito; todo conceito do curso em exatamente um módulo, e nenhum
+ * de fora do curso. Devolve os módulos limpos (nome e objetivo sem espaços
+ * sobrando, campos na ordem do formato), na ordem recebida. Problema,
+ * ErroEsqueleto com a frase para a tela.
+ */
+export function validarModulos(modulos: unknown, conceitosDoCurso: readonly string[]): Modulo[] {
+	if (!Array.isArray(modulos)) throw new ErroEsqueleto("O esqueleto precisa da lista de módulos.");
+	if (modulos.length === 0) throw new ErroEsqueleto("O esqueleto precisa de pelo menos um módulo.");
+	if (modulos.length > MODULOS_MAXIMOS) throw new ErroEsqueleto(`O esqueleto pode ter até ${MODULOS_MAXIMOS} módulos (tem ${modulos.length}).`);
+	const doCurso = new Set(conceitosDoCurso);
+	const ids = new Set<string>();
+	const ondeEsta = new Map<string, number>();
+	const saida: Modulo[] = [];
+	for (const [indice, item] of (modulos as unknown[]).entries()) {
+		const numero = indice + 1;
+		if (!ehObjeto(item)) throw new ErroEsqueleto(`O módulo ${numero} não está no formato.`);
+		if (!ehIdModulo(item.id)) throw new ErroEsqueleto(`O módulo ${numero} está sem id válido (veio "${mostrar(item.id)}").`);
+		if (ids.has(item.id)) throw new ErroEsqueleto(`Dois módulos com o mesmo id (${item.id}).`);
+		ids.add(item.id);
+		const nome = typeof item.nome === "string" ? limparTexto(item.nome) : "";
+		if (!nome) throw new ErroEsqueleto(`Dê um nome ao módulo ${numero}.`);
+		if (item.objetivo !== undefined && item.objetivo !== null && typeof item.objetivo !== "string") {
+			throw new ErroEsqueleto(`O objetivo do módulo ${numero} precisa ser um texto (veio "${mostrar(item.objetivo)}").`);
+		}
+		const objetivo = typeof item.objetivo === "string" ? limparTexto(item.objetivo) : "";
+		if (!ehTipoModulo(item.tipo)) throw new ErroEsqueleto(`O tipo do módulo ${numero} precisa ser um de: ${TIPOS_MODULO.join(", ")} (veio "${mostrar(item.tipo)}").`);
+		if (!ehHorasModulo(item.horas)) {
+			throw new ErroEsqueleto(
+				`As horas do módulo ${numero} precisam ser de ${String(HORAS_MODULO_MINIMAS).replace(".", ",")} a ${HORAS_MODULO_MAXIMAS}, no passo de ${String(PASSO_HORAS_MODULO).replace(".", ",")} (veio "${mostrar(item.horas)}").`,
+			);
+		}
+		if (!Array.isArray(item.conceitos) || !(item.conceitos as unknown[]).every((id) => typeof id === "string")) {
+			throw new ErroEsqueleto(`O módulo ${numero} precisa da lista dos ids dos conceitos dele.`);
+		}
+		const conceitos = (item.conceitos as string[]).map((id) => id.trim());
+		if (conceitos.length === 0) throw new ErroEsqueleto(`O módulo ${numero} ("${nome}") está sem conceitos. Mova conceitos para ele ou apague-o.`);
+		const fora = conceitos.filter((id) => !doCurso.has(id));
+		if (fora.length > 0) {
+			throw new ErroEsqueleto(`O módulo ${numero} tem ${fora.length === 1 ? "um conceito que não é" : "conceitos que não são"} do curso: ${listaDeIds(fora)}.`);
+		}
+		for (const id of conceitos) {
+			const antes = ondeEsta.get(id);
+			if (antes !== undefined) {
+				throw new ErroEsqueleto(
+					antes === numero ? `O conceito ${id} aparece duas vezes no módulo ${numero}.` : `O conceito ${id} está em dois módulos (${antes} e ${numero}); ele precisa ficar em um só.`,
+				);
+			}
+			ondeEsta.set(id, numero);
+		}
+		saida.push({ id: item.id, nome, objetivo, conceitos, tipo: item.tipo, horas: item.horas });
+	}
+	const semModulo = [...new Set(conceitosDoCurso)].filter((id) => !ondeEsta.has(id));
+	if (semModulo.length > 0) {
+		throw new ErroEsqueleto(`${semModulo.length === 1 ? "Um conceito do curso está" : `${semModulo.length} conceitos do curso estão`} sem módulo: ${listaDeIds(semModulo)}.`);
+	}
+	return saida;
+}
+
+/** Confere o calendário que vem com o esqueleto ao criar o curso: as datas e um item por módulo, na ordem dos módulos. */
+function validarCalendario(valor: unknown, modulos: readonly Modulo[]): CalendarioCurso {
+	if (!ehObjeto(valor) || !Array.isArray(valor.modulos) || !Array.isArray(valor.avisos)) {
+		throw new ErroEsqueleto("Falta o calendário do curso (os módulos, a avaliação geral e os avisos).");
+	}
+	const itens = valor.modulos as unknown[];
+	if (itens.length !== modulos.length || !itens.every((item, indice) => ehObjeto(item) && item.id === modulos[indice]!.id)) {
+		throw new ErroEsqueleto("O calendário não é o dos módulos do esqueleto (um item por módulo, na mesma ordem).");
+	}
+	const datas = itens.map((item) => {
+		const { id, inicio, fim, avaliacao } = item as Record<string, unknown>;
+		if (![inicio, fim, avaliacao].every((data) => typeof data === "string" && ehData(data))) {
+			throw new ErroEsqueleto(`O calendário do módulo ${String(id)} precisa das datas de início, fim e avaliação em AAAA-MM-DD.`);
+		}
+		return { id: id as string, inicio: inicio as string, fim: fim as string, avaliacao: avaliacao as string };
+	});
+	if (typeof valor.avaliacaoGeral !== "string" || !ehData(valor.avaliacaoGeral)) throw new ErroEsqueleto("O calendário precisa da data da avaliação geral em AAAA-MM-DD.");
+	if (!(valor.avisos as unknown[]).every((aviso) => typeof aviso === "string")) throw new ErroEsqueleto("Os avisos do calendário precisam ser textos.");
+	const necessarias = valor.horasPorSemanaNecessarias;
+	if (necessarias !== undefined && (typeof necessarias !== "number" || !Number.isFinite(necessarias))) {
+		throw new ErroEsqueleto(`As horas por semana que o plano pede precisam ser um número (veio "${mostrar(necessarias)}").`);
+	}
+	return {
+		modulos: datas,
+		avaliacaoGeral: valor.avaliacaoGeral,
+		...(necessarias !== undefined ? { horasPorSemanaNecessarias: necessarias } : {}),
+		avisos: [...(valor.avisos as string[])],
+	};
+}
+
+/**
+ * O Esqueleto: o conteúdo do esqueletoEmAndamento (módulos válidos pela
+ * validarModulos contra o Mapa do curso, com geradoEm, modelo e custo) mais o
+ * calendário de hoje (calendario) vira o esqueleto do curso criado, com
+ * criadoEm (o que já vier, ou agora).
+ */
+function validarEsqueleto(dados: Record<string, unknown>, contexto: ContextoValidacao): Esqueleto {
+	const conceitos = contexto.curso?.mapa?.conceitos;
+	if (!conceitos) throw new ErroEsqueleto("Falta o Mapa do curso para conferir os módulos do esqueleto.");
+	if (typeof dados.geradoEm !== "string" || typeof dados.modelo !== "string" || typeof dados.custo !== "number") {
+		throw new ErroEsqueleto("Monte o esqueleto antes de criar o curso.");
+	}
+	const modulos = validarModulos(dados.modulos, conceitos);
+	const calendario = validarCalendario(dados.calendario, modulos);
+	const criadoEm = typeof dados.criadoEm === "string" && dados.criadoEm ? dados.criadoEm : (contexto.agora ?? new Date()).toISOString();
+	return structuredClone({ modulos, geradoEm: dados.geradoEm, modelo: dados.modelo, custo: dados.custo, criadoEm, calendario });
+}
+
 /**
  * O Diagnóstico: o conteúdo do diagnosticoEmAndamento, com podeConcluir
  * verdadeiro, vira o diagnóstico concluído (com concluidoEm: o que já vier, ou
@@ -432,13 +590,13 @@ function validarDiagnostico(dados: Record<string, unknown>, contexto: ContextoVa
 /**
  * Confere os dados de uma etapa e devolve eles limpos (espaços nas pontas,
  * campos na ordem do formato; Materiais em ordem de caminho e sem repetir;
- * Mapa na ordem do mapa e sem repetir; Diagnóstico com concluidoEm). Um
+ * Mapa na ordem do mapa e sem repetir; Diagnóstico com concluidoEm;
+ * Esqueleto com os módulos limpos, o calendário e criadoEm). Um
  * problema é um ErroCurso com a frase para a tela. Não confere a ordem das
  * etapas: isso é conferirOrdem.
  */
 export function validarEtapa<E extends Etapa>(etapa: E, dados: unknown, contexto: ContextoValidacao = {}): EntradasDasEtapas[E] {
 	if (!ehEtapa(etapa)) throw new ErroCurso(`Etapa desconhecida: "${mostrar(etapa)}".`);
-	if (etapa === "esqueleto") throw new ErroCurso("A etapa Esqueleto chega na parte C do item 5.");
 	if (!ehObjeto(dados)) throw new ErroCurso(`Os dados da etapa ${nomeDaEtapa(etapa)} vieram vazios.`);
 	switch (etapa) {
 		case "basico":
@@ -449,6 +607,8 @@ export function validarEtapa<E extends Etapa>(etapa: E, dados: unknown, contexto
 			return validarObjetivo(dados, contexto) as EntradasDasEtapas[E];
 		case "diagnostico":
 			return validarDiagnostico(dados, contexto) as EntradasDasEtapas[E];
+		case "esqueleto":
+			return validarEsqueleto(dados, contexto) as EntradasDasEtapas[E];
 		default:
 			return validarMapa(dados, contexto) as EntradasDasEtapas[E];
 	}
@@ -511,7 +671,8 @@ const DEPENDENTES: Record<Etapa, readonly Etapa[]> = {
  * mudou de ou para livre. Em Materiais, o Objetivo entra também se a lista
  * ficou vazia e o Objetivo confirmado é só o material. O Diagnóstico entra
  * também quando só há o diagnóstico em andamento (diagnosticoEmAndamento),
- * que a confirmação apagaria.
+ * que a confirmação apagaria; e o Esqueleto, quando só há a proposta em
+ * andamento (esqueletoEmAndamento).
  */
 export function oQueInvalida<E extends Etapa>(curso: Curso, etapa: E, dados: EntradasDasEtapas[E] | DadosDasEtapas[E]): Etapa[] {
 	const atual = curso[etapa];
@@ -523,8 +684,9 @@ export function oQueInvalida<E extends Etapa>(curso: Curso, etapa: E, dados: Ent
 		if (antes !== depois) alvo.add("mapa");
 	}
 	if (etapa === "materiais" && curso.objetivo?.escopo === "so_material" && !(dados as DadosMateriais | null)?.arquivos?.length) alvo.add("objetivo");
-	const emAndamento = curso.diagnosticoEmAndamento !== null && curso.diagnosticoEmAndamento !== undefined;
-	return ETAPAS.filter((item) => alvo.has(item) && ((curso[item] !== null && curso[item] !== undefined) || (item === "diagnostico" && emAndamento)));
+	const existe = (valor: unknown) => valor !== null && valor !== undefined;
+	const emAndamento: Partial<Record<Etapa, boolean>> = { diagnostico: existe(curso.diagnosticoEmAndamento), esqueleto: existe(curso.esqueletoEmAndamento) };
+	return ETAPAS.filter((item) => alvo.has(item) && (existe(curso[item]) || emAndamento[item] === true));
 }
 
 /** A primeira etapa não confirmada; com todas confirmadas, esqueleto. */
@@ -544,8 +706,11 @@ export function conferirOrdem(curso: Curso, etapa: Etapa): void {
  * etapa, apaga as que ela invalida (oQueInvalida), recalcula `etapa` e, se
  * algo mudou, alteradoEm. No Básico, o nome que vier troca o nome do curso
  * (o id fica). Confirmar o Diagnóstico tira o diagnosticoEmAndamento, e
- * invalidar o Diagnóstico também o apaga. Confirmar com a mesma coisa não
- * muda nada. Se uma etapa anterior não está confirmada, ErroCurso.
+ * invalidar o Diagnóstico também o apaga; do mesmo jeito com o Esqueleto e o
+ * esqueletoEmAndamento. Confirmar o Esqueleto é "Criar curso": a situação
+ * passa a pronto (mesmo com o mesmo esqueleto). Fora isso, confirmar com a
+ * mesma coisa não muda nada. Se uma etapa anterior não está confirmada, ou se
+ * o curso já está pronto, ErroCurso.
  */
 export function confirmarEtapa<E extends Etapa>(
 	curso: Curso,
@@ -553,6 +718,7 @@ export function confirmarEtapa<E extends Etapa>(
 	dados: EntradasDasEtapas[E] | DadosDasEtapas[E],
 	agora: Date = new Date(),
 ): { curso: Curso; invalidadas: Etapa[] } {
+	if (curso.situacao === "pronto") throw new ErroCurso("O curso já foi criado; mudar um curso pronto fica para depois.");
 	conferirOrdem(curso, etapa);
 	const invalidadas = oQueInvalida(curso, etapa, dados);
 	const novo = structuredClone(curso);
@@ -566,6 +732,8 @@ export function confirmarEtapa<E extends Etapa>(
 	if (atual === null || atual === undefined || !iguais(etapa, atual, valor)) (novo as unknown as Record<Etapa, unknown>)[etapa] = valor;
 	for (const item of invalidadas) novo[item] = null;
 	if (etapa === "diagnostico" || invalidadas.includes("diagnostico")) delete novo.diagnosticoEmAndamento;
+	if (etapa === "esqueleto" || invalidadas.includes("esqueleto")) delete novo.esqueletoEmAndamento;
+	if (etapa === "esqueleto") novo.situacao = "pronto";
 	novo.etapa = etapaDoCurso(novo);
 	if (JSON.stringify(novo) !== JSON.stringify(curso)) novo.alteradoEm = agora.toISOString();
 	return { curso: novo, invalidadas };

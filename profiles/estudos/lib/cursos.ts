@@ -67,14 +67,16 @@ function cursoLido(valor: unknown, materia: string, pasta: string): Curso {
 		const dados = curso[etapa];
 		if (dados !== undefined && dados !== null && (typeof dados !== "object" || Array.isArray(dados))) throw new Error(`a etapa ${etapa} não é um objeto`);
 	}
-	const emAndamento = curso.diagnosticoEmAndamento;
-	if (emAndamento !== undefined && emAndamento !== null && (typeof emAndamento !== "object" || Array.isArray(emAndamento))) {
-		throw new Error("o diagnosticoEmAndamento não é um objeto");
+	for (const campo of ["diagnosticoEmAndamento", "esqueletoEmAndamento"] as const) {
+		const emAndamento = curso[campo];
+		if (emAndamento !== undefined && emAndamento !== null && (typeof emAndamento !== "object" || Array.isArray(emAndamento))) {
+			throw new Error(`o ${campo} não é um objeto`);
+		}
 	}
 	return cursoNaOrdem(curso as Curso);
 }
 
-/** O curso com os campos na ordem do formato (etapas ausentes como null; o diagnosticoEmAndamento só quando há). */
+/** O curso com os campos na ordem do formato (etapas ausentes como null; o diagnosticoEmAndamento e o esqueletoEmAndamento só quando há). */
 function cursoNaOrdem(curso: Curso): Curso {
 	const basico: DadosBasico | null = curso.basico
 		? { prazo: curso.basico.prazo ?? null, ...(curso.basico.prova ? { prova: curso.basico.prova } : {}), horasPorSemana: curso.basico.horasPorSemana }
@@ -94,6 +96,7 @@ function cursoNaOrdem(curso: Curso): Curso {
 		mapa: curso.mapa ?? null,
 		...(curso.diagnosticoEmAndamento ? { diagnosticoEmAndamento: curso.diagnosticoEmAndamento } : {}),
 		diagnostico: curso.diagnostico ?? null,
+		...(curso.esqueletoEmAndamento ? { esqueletoEmAndamento: curso.esqueletoEmAndamento } : {}),
 		esqueleto: curso.esqueleto ?? null,
 	};
 }

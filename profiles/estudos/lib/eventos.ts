@@ -37,6 +37,9 @@ export type VerboEvento =
 	| "gerou_diagnostico"
 	| "concluiu_diagnostico"
 	| "autoavaliou_conceito"
+	// O esqueleto do guia de cursos (item 5, parte C): docs/cursos.md, "Parte C", "Eventos (na matéria)".
+	// gerou_esqueleto vai para o eventos.jsonl da matéria, como o criou_curso (acima).
+	| "gerou_esqueleto"
 	// Aprendizagem (seção 9.2), usados a partir dos itens 7 e 8:
 	| "pediu_reexplicacao"
 	| "pediu_outro_jeito"

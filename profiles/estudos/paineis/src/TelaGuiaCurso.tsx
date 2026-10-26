@@ -9,11 +9,11 @@
 // rodapé com "Voltar" (só troca a etapa em vista) e o primário, que confirma
 // a etapa pela extensão dos cursos (cursos-ponte.ts) e anda para a próxima.
 // Confirmar com algo diferente avisa antes o que a mudança descarta
-// (oQueInvalida). Nesta parte, as etapas Diagnóstico e Esqueleto ainda não
-// existem: depois do Mapa, o guia diz que o rascunho está salvo.
+// (oQueInvalida). A etapa Diagnóstico (parte B) fica em EtapaDiagnostico.tsx,
+// que dá o corpo, o primário e o "Voltar" dela; o Esqueleto chega na parte C.
 
 import { Button, Callout, EmptyState, Icon, Modal, pad2, RadioGroup, TextArea, TextField, type Tone } from "@estudos/design-system";
-import type { JanelaPerfilHook, SituacaoMaterial } from "@estudos/ui";
+import type { DadosAvatarAgente, JanelaPerfilHook, SituacaoMaterial } from "@estudos/ui";
 import { motion } from "motion/react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -56,6 +56,7 @@ import {
 	valorDaProva,
 } from "./guia-curso.ts";
 import type { MapaDaMateria } from "./mapa-ponte.ts";
+import { useEtapaDiagnostico } from "./EtapaDiagnostico.tsx";
 import { ConteudoMateriais } from "./ModalMateriais.tsx";
 import { AvisosMapa, ConceitoNovo, ForaDoMapa, ListaConceitos, ProgressoMapa, useOperarMapa } from "./SecaoMapa.tsx";
 
@@ -84,13 +85,16 @@ export interface PropsGuiaCurso {
 	navegar(caminho: string): void;
 	/** Cor da capa, para os blocos de ideograma. */
 	tom: Tone;
+	/** O agente da sessão (a foto enquanto o diagnóstico é gerado). */
+	agente?: { nome: string; avatar?: DadosAvatarAgente };
 }
 
 type ErrosBasico = Partial<Record<"nome" | "prazo" | "horas", string>>;
 
 export function TelaGuiaCurso(props: PropsGuiaCurso) {
 	const { materiaId, mapa } = props;
-	const { curso, erro: erroAbrir, prontos, pedirProntos, confirmar } = useCurso(props.janela, materiaId, props.cursoId);
+	const aberto = useCurso(props.janela, materiaId, props.cursoId);
+	const { curso, erro: erroAbrir, prontos, pedirProntos, confirmar } = aberto;
 	const provas = useMemo(() => provasFuturas(props.materia, new Date()), [props.materia]);
 	const vista = etapaEmVista(curso, props.etapa);
 	const materiais = props.materiais ?? [];
@@ -122,6 +126,16 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 	// O último aviso: o texto do modal continua enquanto ele fecha.
 	const ultimoAviso = useRef(aviso);
 	if (aviso) ultimoAviso.current = aviso;
+
+	const diagnostico = useEtapaDiagnostico({
+		curso,
+		aberto,
+		mapa,
+		...(props.agente ? { agente: props.agente } : {}),
+		ativo: vista === "diagnostico",
+		mostrarErro: setErro,
+		seguir: (novo) => props.navegar(caminhoDoGuia(materiaId, novo.id, etapaDepois(novo, "diagnostico"))),
+	});
 
 	const reverter = () => {
 		setBasico(formBasico(curso, provas));
@@ -251,7 +265,8 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 	// --- O corpo e o primário de cada etapa ---------------------------------------
 
 	let corpo: ReactNode;
-	let primario: { texto: string; desligado?: string } | undefined;
+	/** acao: no lugar de continuar (a etapa Diagnóstico); ocupado: o botão mostra "Salvando…". */
+	let primario: { texto: string; desligado?: string; acao?: () => void; ocupado?: boolean } | undefined;
 	const materia = props.materia?.nome ?? "a matéria";
 
 	if (props.cursoId && !curso) {
@@ -469,12 +484,15 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 			const parado = motivoMapaParado(estadoMapa, marcadosIds.length);
 			primario = { texto: textoPrimarioMapa(estadoMapa.mapa), ...(parado ? { desligado: parado } : {}) };
 		}
+	} else if (vista === "diagnostico" && curso) {
+		corpo = diagnostico.corpo;
+		primario = diagnostico.primario;
 	} else {
 		corpo = (
 			<EmptyState
 				glyph="問"
 				tone={props.tom}
-				title="O diagnóstico chega na próxima parte"
+				title="O esqueleto chega na próxima parte"
 				action={
 					<Button variant="primary" icon="arrow-left" onClick={voltarAosCursos}>
 						Voltar para os cursos
@@ -504,7 +522,7 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 				</header>
 				<TrilhoGuia curso={curso} vista={vista} abrir={irPara} />
 				<div className="guia__corpo">
-					<motion.div key={`${vista}|${curso?.id ?? "novo"}`} className={`guia__coluna${vista === "mapa" ? " guia__coluna--larga" : ""}`} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} transition={MOLA}>
+					<motion.div key={`${vista}|${curso?.id ?? "novo"}`} className={`guia__coluna${vista === "mapa" || vista === "diagnostico" ? " guia__coluna--larga" : ""}`} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} transition={MOLA}>
 						{erro ? (
 							<Callout tone="amber" label="Não deu certo" icon="alert" quote={false}>
 								<p>{erro}</p>
@@ -515,7 +533,12 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 				</div>
 				<footer className="guia__rodape">
 					{anterior && curso ? (
-						<Button variant="secondary" icon="arrow-left" onClick={() => irPara(anterior)} disabled={salvando}>
+						<Button
+							variant="secondary"
+							icon="arrow-left"
+							onClick={() => (vista === "diagnostico" && diagnostico.voltar ? diagnostico.voltar() : irPara(anterior))}
+							disabled={salvando}
+						>
 							Voltar
 						</Button>
 					) : (
@@ -527,11 +550,11 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 							<Button
 								variant="primary"
 								iconRight="arrow-right"
-								onClick={continuar}
-								disabled={salvando || Boolean(primario.desligado)}
-								aria-busy={salvando}
+								onClick={primario.acao ?? continuar}
+								disabled={salvando || Boolean(primario.ocupado) || Boolean(primario.desligado)}
+								aria-busy={salvando || Boolean(primario.ocupado)}
 							>
-								{salvando ? "Salvando…" : primario.texto}
+								{salvando || primario.ocupado ? "Salvando…" : primario.texto}
 							</Button>
 						</span>
 					) : null}
@@ -564,6 +587,7 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 			>
 				<p className="body">{ultimoAviso.current?.etapas.length === 1 ? "A etapa descartada volta a ficar por fazer." : "As etapas descartadas voltam a ficar por fazer."} O resto do rascunho fica como está.</p>
 			</Modal>
+			{diagnostico.modal}
 			<Modal
 				open={perguntarSair}
 				onClose={() => setPerguntarSair(false)}

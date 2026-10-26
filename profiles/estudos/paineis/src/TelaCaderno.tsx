@@ -32,6 +32,7 @@ import { ConteudoMateriais, custoDaVisao, formatarDolar } from "./ModalMateriais
 import { SecaoMapa } from "./SecaoMapa.tsx";
 import { SecaoNotas, useListaNotas } from "./SecaoNotas.tsx";
 import { useCursos } from "./cursos-ponte.ts";
+import { numeroCurto } from "./diagnostico-tela.ts";
 import { SecaoCursos } from "./SecaoCursos.tsx";
 import { TelaGuiaCurso } from "./TelaGuiaCurso.tsx";
 
@@ -88,6 +89,12 @@ const NOMES_TIPO: Record<string, string> = { pdf: "PDF", python: "Python", noteb
 const NOMES_CAMPO: Record<string, string> = { nome: "nome", cor: "cor da capa", glifo: "ideograma", provas: "provas" };
 
 /** Uma linha da linha do tempo: o ícone, a frase e o detalhe. */
+/** O nome do curso de um evento: o do resultado, se veio; senão o id do objeto. */
+function nomeDoCurso(evento: Evento): string {
+	const resultado = (evento.resultado ?? {}) as Record<string, unknown>;
+	return typeof resultado.nome === "string" ? resultado.nome : typeof evento.objeto.curso === "string" ? evento.objeto.curso : "um curso";
+}
+
 export function descreverEvento(evento: Evento): { icone: IconName; texto: string; detalhe?: string } {
 	const resultado = (evento.resultado ?? {}) as Record<string, unknown>;
 	const arquivo = typeof evento.objeto.arquivo === "string" ? evento.objeto.arquivo : "um arquivo";
@@ -176,6 +183,24 @@ export function descreverEvento(evento: Evento): { icone: IconName; texto: strin
 			return { icone: "flag", texto: `Curso começado: ${typeof resultado.nome === "string" ? resultado.nome : String(evento.objeto.curso ?? "um curso")}` };
 		case "descartou_curso":
 			return { icone: "close", texto: `Rascunho descartado: ${typeof resultado.nome === "string" ? resultado.nome : String(evento.objeto.curso ?? "um curso")}` };
+		case "gerou_diagnostico": {
+			const questoes = typeof resultado.questoes === "number" ? resultado.questoes : Array.isArray(resultado.questoes) ? resultado.questoes.length : undefined;
+			const custo = typeof resultado.custo === "number" && resultado.custo > 0 ? formatarDolar(resultado.custo) : "";
+			const detalhe = [questoes !== undefined ? `${questoes} ${questoes === 1 ? "questão" : "questões"}` : "", custo].filter(Boolean).join(" · ");
+			return { icone: "checklist", texto: `Diagnóstico preparado: ${nomeDoCurso(evento)}`, ...(detalhe ? { detalhe } : {}) };
+		}
+		case "concluiu_diagnostico": {
+			const { acertos, alternativas, dissertativas, nota } = resultado;
+			const detalhe = [
+				typeof acertos === "number" && typeof alternativas === "number" && alternativas > 0 ? `${acertos} de ${alternativas} ${alternativas === 1 ? "certa" : "certas"}` : "",
+				typeof nota === "number" && typeof dissertativas === "number" && dissertativas > 0
+					? `${dissertativas === 1 ? "dissertativa" : "dissertativas"} ${numeroCurto(nota * 10)}/10`
+					: "",
+			]
+				.filter(Boolean)
+				.join(" · ");
+			return { icone: "check", texto: `Diagnóstico concluído: ${nomeDoCurso(evento)}`, ...(detalhe ? { detalhe } : {}) };
+		}
 		case "aprovou_mapa": {
 			const conceitos = typeof resultado.conceitos === "number" ? resultado.conceitos : undefined;
 			return {
@@ -285,6 +310,9 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 	const irPara = (id: string) => props.navegar(id === SECOES[0]!.id ? `caderno/${materiaId}` : `caderno/${materiaId}/${id}`);
 	const abrirNota = (titulo: string) => props.navegar(`caderno/${materiaId}/notas/${titulo}`);
 	const tom = materia?.cor === "ink" || !materia ? "brick" : materia.cor;
+	// O agente da sessão (ou o padrão do perfil), para a foto no guia de curso.
+	const nomeAgente = estado.sessao?.agente ?? props.perfil?.agentePadrao;
+	const avatarAgente = nomeAgente ? props.perfil?.agentes.find((agente) => agente.nome === nomeAgente)?.avatar : undefined;
 	const notaAberta = secao.id === "notas" ? props.nota : undefined;
 
 	return (
@@ -324,6 +352,7 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 					{...(materiais ? { materiais } : {})}
 					navegar={props.navegar}
 					tom={tom}
+					{...(nomeAgente ? { agente: { nome: nomeAgente, ...(avatarAgente ? { avatar: avatarAgente } : {}) } } : {})}
 				/>
 			) : (
 				<div className="caderno">

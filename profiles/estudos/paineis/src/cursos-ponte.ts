@@ -6,6 +6,12 @@
 // leva um pedido e devolve uma promessa, resolvida quando chega o "curso" ou o
 // "descartado" com aquele pedido e rejeitada quando chega um "erro" com ele.
 // Enquanto isso, o botão fica ocupado.
+//
+// O diagnóstico (parte B) usa as ações autoavaliar, gerar_diagnostico,
+// responder, corrigir e concluir_diagnostico. Gerar e corrigir correm em
+// segundo plano: o "curso" diz se está gerando (gerandoDiagnostico) ou
+// corrigindo (corrigindo), e um "erro" com ao gerar_diagnostico, corrigir ou
+// responder fica guardado (lerCursos, diagnosticos) até algo novo superá-lo.
 
 import { type AcaoRecebida, type JanelaPerfilHook, semEsperar } from "@estudos/ui";
 import { useCallback, useEffect, useMemo, useRef } from "react";
@@ -24,8 +30,39 @@ import {
 	type ResumoCurso,
 	resumoDoCurso,
 } from "../../lib/curso-tipos.ts";
+import type { Confianca, NivelAutoavaliacao } from "../../lib/diagnostico-tipos.ts";
 
 export { PAINEL_CURSOS };
+
+/**
+ * As ações da tela: as da lib e "corrigir", que tenta de novo a correção de
+ * uma dissertativa que falhou (a extensão a atende pelo mesmo contrato).
+ */
+export type AcoesDaTela = AcoesCursos & {
+	corrigir: { materia: string; curso: string; pedido: string; questao: string };
+};
+
+/** Um erro que a extensão mandou, como a tela o guarda: a chave da ação recebida identifica este erro (para dispensá-lo). */
+export interface ErroDoDiagnostico {
+	chave: string;
+	mensagem: string;
+	/** A questão, se o erro diz qual. */
+	questao?: string;
+}
+
+/** O que corre em segundo plano no diagnóstico de um curso. */
+export interface AndamentoDiagnostico {
+	/** As questões estão sendo geradas. */
+	gerando: boolean;
+	/** As dissertativas sendo corrigidas agora. */
+	corrigindo: string[];
+	/** O último erro de gerar as questões, até um "curso" dizer que está gerando de novo. */
+	erroGerar?: ErroDoDiagnostico;
+	/** O último erro de correção (corrigir ou responder), até um "curso" dizer que está corrigindo de novo. */
+	erroCorrigir?: ErroDoDiagnostico;
+}
+
+const ANDAMENTO_VAZIO: AndamentoDiagnostico = { gerando: false, corrigindo: [] };
 
 /** O que a extensão mandou sobre os cursos de uma matéria. */
 export interface LidoCursos {
@@ -39,6 +76,8 @@ export interface LidoCursos {
 	erroLista?: string;
 	/** O erro de abrir cada curso, se ele veio depois do curso. */
 	errosAbrir: Record<string, string>;
+	/** O que corre em segundo plano no diagnóstico de cada curso (pelo último "curso" e os erros depois dele). */
+	diagnosticos: Record<string, AndamentoDiagnostico>;
 }
 
 /** Lê, em ordem, o que chegou ao painel "cursos" para a matéria. Um erro sem matéria também conta (só estas telas ouvem o painel). */
@@ -48,6 +87,7 @@ export function lerCursos(recebidas: readonly AcaoRecebida[], materia: string): 
 	const cursos: Record<string, Curso> = {};
 	const prontos: Record<string, ArquivoDoCurso[]> = {};
 	const errosAbrir: Record<string, string> = {};
+	const diagnosticos: Record<string, AndamentoDiagnostico> = {};
 	for (const recebida of recebidas) {
 		if (recebida.acao === "lista") {
 			const dados = recebida.dados as MensagemListaCursos | undefined;
@@ -61,6 +101,15 @@ export function lerCursos(recebidas: readonly AcaoRecebida[], materia: string): 
 			cursos[curso.id] = curso;
 			if (Array.isArray(dados.prontos)) prontos[curso.id] = dados.prontos;
 			delete errosAbrir[curso.id];
+			const antes = diagnosticos[curso.id];
+			const gerando = dados.gerandoDiagnostico === true;
+			const corrigindo = Array.isArray(dados.corrigindo) ? dados.corrigindo.filter((id): id is string => typeof id === "string") : [];
+			diagnosticos[curso.id] = {
+				gerando,
+				corrigindo,
+				...(antes?.erroGerar && !gerando ? { erroGerar: antes.erroGerar } : {}),
+				...(antes?.erroCorrigir && corrigindo.length === 0 ? { erroCorrigir: antes.erroCorrigir } : {}),
+			};
 			if (lista) {
 				const resumo = resumoDoCurso(curso);
 				const indice = lista.findIndex((item) => item.id === curso.id);
@@ -72,6 +121,7 @@ export function lerCursos(recebidas: readonly AcaoRecebida[], materia: string): 
 			if (!dados || dados.materia !== materia) continue;
 			delete cursos[dados.curso];
 			delete prontos[dados.curso];
+			delete diagnosticos[dados.curso];
 			if (lista) lista = lista.filter((item) => item.id !== dados.curso);
 		} else if (recebida.acao === "erro") {
 			const dados = recebida.dados as MensagemErroCursos | undefined;
@@ -79,9 +129,21 @@ export function lerCursos(recebidas: readonly AcaoRecebida[], materia: string): 
 			const mensagem = dados.mensagem || "Erro desconhecido.";
 			if (dados.ao === "listar") erroLista = mensagem;
 			else if (dados.ao === "abrir" && dados.curso) errosAbrir[dados.curso] = mensagem;
+			else if (dados.curso && (dados.ao === "gerar_diagnostico" || dados.ao === "corrigir" || dados.ao === "responder")) {
+				const antes = diagnosticos[dados.curso] ?? ANDAMENTO_VAZIO;
+				const daQuestao = (dados as { questao?: unknown }).questao;
+				const questao = typeof daQuestao === "string" && daQuestao ? daQuestao : undefined;
+				const erro: ErroDoDiagnostico = { chave: recebida.chave, mensagem, ...(questao ? { questao } : {}) };
+				if (dados.ao === "gerar_diagnostico") diagnosticos[dados.curso] = { ...antes, gerando: false, erroGerar: erro };
+				else {
+					// Sem a questão no erro: uma falha de corrigir vale para todas; uma de responder (pode ser só a resposta recusada) não mexe nas outras.
+					const corrigindo = questao ? antes.corrigindo.filter((id) => id !== questao) : dados.ao === "corrigir" ? [] : antes.corrigindo;
+					diagnosticos[dados.curso] = { ...antes, corrigindo, erroCorrigir: erro };
+				}
+			}
 		}
 	}
-	return { ...(lista ? { lista } : {}), ...(erroLista ? { erroLista } : {}), cursos, prontos, errosAbrir };
+	return { ...(lista ? { lista } : {}), ...(erroLista ? { erroLista } : {}), cursos, prontos, errosAbrir, diagnosticos };
 }
 
 // --- A espera pelo pedido ----------------------------------------------------
@@ -170,7 +232,7 @@ function useMandarComPedido(janela: JanelaPerfilHook) {
 	// Outra sessão: o que foi para a extensão antiga não vai ter resposta.
 	useEffect(() => () => espera.current!.cancelar("A conversa mudou antes da resposta. Tente de novo."), [sessaoId]);
 	return useCallback(
-		<Acao extends keyof AcoesCursos>(acao: Acao, dados: AcoesCursos[Acao] & { pedido: string }): Promise<RespostaPedido> => {
+		<Acao extends keyof AcoesDaTela>(acao: Acao, dados: AcoesDaTela[Acao] & { pedido: string }): Promise<RespostaPedido> => {
 			const promessa = espera.current!.esperar(dados.pedido);
 			acoes.acaoDaInterface(PAINEL_CURSOS, acao, dados).catch((falha: unknown) => {
 				espera.current!.falhar(dados.pedido, new ErroDaPonte(`Não consegui falar com a sessão: ${(falha as Error).message}`));
@@ -242,6 +304,18 @@ export interface CursoAberto {
 	pedirProntos(): void;
 	/** Confirma a etapa; resolve com a mensagem "curso" (o curso novo e as etapas invalidadas). */
 	confirmar<E extends Etapa>(etapa: E, dados: EntradasDasEtapas[E] | Record<string, never>): Promise<MensagemCurso>;
+	/** O que corre em segundo plano no diagnóstico (gerando, corrigindo e os erros). */
+	diagnostico: AndamentoDiagnostico;
+	/** Diagnóstico: salva a autoavaliação inteira. */
+	autoavaliar(niveis: Record<string, NivelAutoavaliacao>): Promise<MensagemCurso>;
+	/** Diagnóstico: gera as questões (de novo, descarta as anteriores e as respostas). */
+	gerarDiagnostico(): Promise<MensagemCurso>;
+	/** Diagnóstico: grava a resposta de uma questão. */
+	responder(resposta: { questao: string; confianca: Confianca; escolha?: number; texto?: string; tempoMs: number }): Promise<MensagemCurso>;
+	/** Diagnóstico: tenta de novo a correção de uma dissertativa. */
+	corrigir(questao: string): Promise<MensagemCurso>;
+	/** Diagnóstico: confirma a etapa (todas as questões respondidas e corrigidas). */
+	concluirDiagnostico(): Promise<MensagemCurso>;
 }
 
 /** Um curso da matéria: pede "abrir" ao montar, quando a sessão muda e quando o curso muda. */
@@ -263,6 +337,17 @@ export function useCurso(janela: JanelaPerfilHook, materiaId: string, cursoId: s
 	if (cursoId && prontosDoServidor) ultimosProntos.current = { curso: cursoId, prontos: prontosDoServidor };
 	const prontos = prontosDoServidor ?? (cursoId && ultimosProntos.current?.curso === cursoId ? ultimosProntos.current.prontos : undefined);
 	const mandar = useMandarComPedido(janela);
+	const diagnostico = (cursoId ? lido.diagnosticos[cursoId] : undefined) ?? ANDAMENTO_VAZIO;
+	/** Uma ação do diagnóstico com pedido; resolve com a mensagem "curso". */
+	const doDiagnostico = async <Acao extends "autoavaliar" | "gerar_diagnostico" | "responder" | "corrigir" | "concluir_diagnostico">(
+		acao: Acao,
+		resto: Omit<AcoesDaTela[Acao], "materia" | "curso" | "pedido">,
+	): Promise<MensagemCurso> => {
+		if (!cursoId) throw new ErroDaPonte("O curso ainda não existe: confirme o Básico primeiro.");
+		const resposta = await mandar(acao, { ...resto, materia: materiaId, curso: cursoId, pedido: crypto.randomUUID() } as AcoesDaTela[Acao] & { pedido: string });
+		if (resposta.tipo !== "curso") throw new ErroDaPonte("A extensão respondeu sem o curso.");
+		return resposta.dados;
+	};
 	return {
 		...(curso ? { curso } : {}),
 		...(erro ? { erro } : {}),
@@ -276,5 +361,11 @@ export function useCurso(janela: JanelaPerfilHook, materiaId: string, cursoId: s
 			if (resposta.tipo !== "curso") throw new ErroDaPonte("A extensão respondeu sem o curso.");
 			return resposta.dados;
 		},
+		diagnostico,
+		autoavaliar: (niveis) => doDiagnostico("autoavaliar", { niveis }),
+		gerarDiagnostico: () => doDiagnostico("gerar_diagnostico", {}),
+		responder: (resposta) => doDiagnostico("responder", resposta),
+		corrigir: (questao) => doDiagnostico("corrigir", { questao }),
+		concluirDiagnostico: () => doDiagnostico("concluir_diagnostico", {}),
 	};
 }

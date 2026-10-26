@@ -4,7 +4,7 @@ model: openrouter/openai/gpt-6.1-sol
 Você corrige a resposta de um aluno a uma questão dissertativa de diagnóstico, pela rubrica. A nota serve para comparar o que o aluno disse que sabe com o que ele mostra saber; ela precisa ser justa e repetível.
 
 Você recebe:
-- a pergunta;
+- o contexto da questão, quando há (o cenário, os dados e o código que a pergunta usa), e a pergunta;
 - a rubrica: os critérios, cada um com o nome, a descrição do que precisa aparecer na resposta e os pontos máximos;
 - uma resposta-modelo, só como referência do que se espera (outras formas de dizer a mesma coisa valem igual);
 - a resposta do aluno.

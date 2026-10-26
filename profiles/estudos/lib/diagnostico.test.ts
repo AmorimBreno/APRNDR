@@ -266,6 +266,21 @@ describe("validarQuestoes", () => {
 		expect(() => validarQuestoes(null, pedidos)).toThrow(ErroDiagnostico);
 	});
 
+	it("o contexto é opcional: aparado quando vem, fora quando vazio ou não é texto", () => {
+		const contexto = "  No modelo apresentado:\n\n```python\nlen(modelo.wv)\n```\n  ";
+		const questoes = validarQuestoes(
+			{ questoes: [alternativaDoModelo("c-a", { contexto }), alternativaDoModelo("c-b", { contexto: "   " }), dissertativaDoModelo("c-a", { contexto: 42 })] },
+			pedidos,
+		);
+		expect(questoes[0]).toEqual({ ...Q1, contexto: "No modelo apresentado:\n\n```python\nlen(modelo.wv)\n```" });
+		expect(questoes[1]).not.toHaveProperty("contexto");
+		expect(questoes[2]).not.toHaveProperty("contexto");
+		expect(validarQuestoes({ questoes: [dissertativaDoModelo("c-a", { contexto: "Dados: $x = 2$." }), alternativaDoModelo("c-a"), alternativaDoModelo("c-b")] }, pedidos)[2]).toEqual({
+			...Q3,
+			contexto: "Dados: $x = 2$.",
+		});
+	});
+
 	it("ErroDiagnostico é um ErroCurso (a extensão mostra a frase como está)", () => {
 		expect(new ErroDiagnostico("x")).toBeInstanceOf(ErroCurso);
 	});
@@ -445,6 +460,11 @@ describe("paraATela", () => {
 		let quase = aplicarResposta(emAndamento(), "q3", { confianca: 1, texto: "x", tempoMs: 1 });
 		quase = aplicarCorrecao(quase, "q3", CORRECAO);
 		expect(paraATela(quase).respostas.q3).toEqual({ confianca: 1, texto: "x", tempoMs: 1, respondidaEm: expect.any(String) });
+
+		// O contexto não é gabarito: fica na tela.
+		const comContexto = emAndamento();
+		comContexto.questoes[0]!.contexto = "```python\nlen(x)\n```";
+		expect(paraATela(comContexto).questoes[0]).toMatchObject({ contexto: "```python\nlen(x)\n```", enunciado: "Sobre c-a?" });
 
 		const completo = respondido();
 		expect(paraATela(completo)).toEqual(completo);

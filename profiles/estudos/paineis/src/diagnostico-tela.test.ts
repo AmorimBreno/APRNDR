@@ -15,9 +15,11 @@ import {
 	contarMarcados,
 	criarSalvadorAdiado,
 	criteriosDoFeedback,
+	dividirQuestao,
 	faseDoDiagnostico,
 	fraseDaConfusao,
 	niveisDoCurso,
+	partesDaQuestao,
 	numeroCurto,
 	situacaoDaCorrecao,
 	statusDaCorrecao,
@@ -255,5 +257,64 @@ describe("a linha do tempo do diagnóstico", () => {
 		expect(linha.texto).toBe("Diagnóstico concluído: p1-regressao");
 		expect(linha.detalhe).toBe("5 de 6 certas · dissertativa 7/10");
 		expect(descreverEvento(evento("concluiu_diagnostico", { acertos: 1, alternativas: 6, dissertativas: 2, nota: 0.75 })).detalhe).toBe("1 de 6 certas · dissertativas 7,5/10");
+	});
+});
+
+describe("o contexto e a pergunta (dividirQuestao)", () => {
+	it("a questão antiga do Word2Vec: o contexto com o código em blocos, a pergunta sozinha", () => {
+		const enunciado =
+			"No modelo Word2Vec apresentado, `len(model_CBOW.wv.index_to_key)` retorna 4240 e `len(model_CBOW.wv['bayer'])` retorna 50. Como interpretar conjuntamente esses resultados?";
+		expect(dividirQuestao(enunciado)).toEqual({
+			contexto: "No modelo Word2Vec apresentado,\n\n```\nlen(model_CBOW.wv.index_to_key)\n```\n\nretorna 4240 e\n\n```\nlen(model_CBOW.wv['bayer'])\n```\n\nretorna 50.",
+			pergunta: "Como interpretar conjuntamente esses resultados?",
+		});
+	});
+
+	it("sem código: só a divisão", () => {
+		expect(dividirQuestao("A reta ajustada passa pela origem. O resíduo médio é zero. O que isso diz sobre o intercepto?")).toEqual({
+			contexto: "A reta ajustada passa pela origem. O resíduo médio é zero.",
+			pergunta: "O que isso diz sobre o intercepto?",
+		});
+	});
+
+	it("sem frase interrogativa, ou sem nada antes dela: nada muda", () => {
+		expect(dividirQuestao("Explique a regressão linear em poucas frases.")).toEqual({ pergunta: "Explique a regressão linear em poucas frases." });
+		expect(dividirQuestao("Por que o R² nunca cai ao acrescentar uma variável?")).toEqual({ pergunta: "Por que o R² nunca cai ao acrescentar uma variável?" });
+		// A interrogação dentro do código não conta.
+		expect(dividirQuestao("O operador `a ? b : c` aparece no trecho. Explique o que ele faz.")).toEqual({ pergunta: "O operador `a ? b : c` aparece no trecho. Explique o que ele faz." });
+	});
+
+	it("código curto fica em linha; o que vem depois da interrogação vai com a pergunta", () => {
+		expect(dividirQuestao("A função `fit` ajusta o modelo, e `len(x)` dá 10. O que `fit` devolve? Justifique.")).toEqual({
+			contexto: "A função `fit` ajusta o modelo, e `len(x)` dá 10.",
+			pergunta: "O que `fit` devolve? Justifique.",
+		});
+		// Nome comprido sem cara de código (sem parênteses, ponto entre nomes, = ou ;) também fica.
+		expect(dividirQuestao("A coluna `preco_medio_por_bairro` tem nulos. O que fazer?").contexto).toBe("A coluna `preco_medio_por_bairro` tem nulos.");
+	});
+
+	it("LaTeX não é código: nem o ponto nem a interrogação dentro dele contam", () => {
+		expect(dividirQuestao("Considere $\\hat{y} = b_0 + b_1 x$ com $b_1 = 2.5$ e $f(x) = x^2$. O que $b_1$ mede?")).toEqual({
+			contexto: "Considere $\\hat{y} = b_0 + b_1 x$ com $b_1 = 2.5$ e $f(x) = x^2$.",
+			pergunta: "O que $b_1$ mede?",
+		});
+		expect(dividirQuestao("Vale $P(A?)$ aqui. Explique.")).toEqual({ pergunta: "Vale $P(A?)$ aqui. Explique." });
+	});
+
+	it("um bloco de código que já existe fica como está; código com três crases dentro usa cerca maior", () => {
+		const enunciado = "Rode o trecho:\n\n```python\nx = [1, 2]\nprint(x.count(1))\n```\n\nO que é impresso?";
+		expect(dividirQuestao(enunciado)).toEqual({ contexto: "Rode o trecho:\n\n```python\nx = [1, 2]\nprint(x.count(1))\n```", pergunta: "O que é impresso?" });
+		expect(dividirQuestao("Veja `` nome = f'`{x}`' ``. Qual é o tipo de nome?").contexto).toBe("Veja\n\n```\nnome = f'`{x}`'\n```");
+		expect(dividirQuestao("Veja ```` doc = '```x```' ````. Qual é o tipo de doc?").contexto).toBe("Veja\n\n````\ndoc = '```x```'\n````");
+		// A pontuação que ligava o código à frase sai; o resto da frase continua depois do bloco.
+		expect(dividirQuestao("Rodamos `modelo.fit(X, y)`, e depois `modelo.score(X, y)`. O que mede o segundo?").contexto).toBe(
+			"Rodamos\n\n```\nmodelo.fit(X, y)\n```\n\ne depois\n\n```\nmodelo.score(X, y)\n```",
+		);
+	});
+
+	it("partesDaQuestao: o contexto gravado vale; sem ele, o enunciado dividido", () => {
+		expect(partesDaQuestao({ contexto: "  ```python\nlen(x)\n```  ", enunciado: "O que dá? Mesmo." })).toEqual({ contexto: "```python\nlen(x)\n```", pergunta: "O que dá? Mesmo." });
+		expect(partesDaQuestao({ contexto: " ", enunciado: "A é B. O que é C?" })).toEqual({ contexto: "A é B.", pergunta: "O que é C?" });
+		expect(partesDaQuestao({ enunciado: "Explique." })).toEqual({ pergunta: "Explique." });
 	});
 });

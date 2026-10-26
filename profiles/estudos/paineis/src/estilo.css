@@ -565,6 +565,25 @@
 .diag__confianca { display: flex; flex-direction: column; gap: var(--space-3); }
 .diag__pergunta { margin: 0; }
 .diag__resposta--apagada .ap-quiz__options, .diag__resposta--apagada .ap-essay__box, .diag__resposta--apagada .ap-essay__foot { opacity: var(--opacity-disabled); }
+/* Com contexto: o contexto numa coluna e a questão na outra (embaixo, quando a coluna do guia é estreita).
+ * Na coluna da questão, a pergunta (o kicker e o prompt do QuizQuestion/EssayAnswer) sobe para cima da
+ * confiança: o invólucro e a section do quiz viram display: contents, e a ordem vem do order. */
+.diag__questao--contexto { container-type: inline-size; }
+.diag__colunas { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-6); }
+.diag__contexto { min-width: 0; }
+.diag__contexto-dentro { padding: var(--space-4) var(--space-5); border-radius: var(--radius-md); background: var(--surface-raised); scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+.diag__direita { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
+.diag__direita > .diag__resposta, .diag__direita .ap-quiz { display: contents; }
+.diag__direita > *, .diag__direita .ap-quiz > * { order: 4; }
+.diag__direita .ap-quiz > .ap-quiz__head { order: 1; }
+.diag__direita .ap-quiz > .ap-quiz__prompt { order: 2; }
+.diag__direita > .diag__confianca { order: 3; }
+/* Lado a lado, a coluna do contexto tem a altura da questão (pelo menos 16rem) e rola sozinha quando é mais alta. */
+@container (min-width: 720px) {
+	.diag__colunas { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: stretch; }
+	.diag__contexto { position: relative; min-height: 16rem; }
+	.diag__contexto > .diag__contexto-dentro { position: absolute; top: 0; left: 0; right: 0; max-height: 100%; overflow-y: auto; }
+}
 
 /* Resultado. */
 .diag__placar { display: flex; flex-direction: column; gap: var(--space-1); }

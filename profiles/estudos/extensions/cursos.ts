@@ -414,12 +414,14 @@ export function mensagemDoDiagnostico(entrada: {
 	].join("\n\n");
 }
 
-/** A mensagem do corretor: a pergunta, a rubrica, a resposta-modelo (referência) e a resposta do aluno. */
-export function mensagemDoCorretor(questao: Pick<QuestaoDissertativa, "enunciado" | "rubrica" | "respostaModelo">, texto: string): string {
+/** A mensagem do corretor: o contexto (quando há), a pergunta, a rubrica, a resposta-modelo (referência) e a resposta do aluno. */
+export function mensagemDoCorretor(questao: Pick<QuestaoDissertativa, "contexto" | "enunciado" | "rubrica" | "respostaModelo">, texto: string): string {
 	const rubrica = questao.rubrica.map(
 		(item, indice) => `${indice + 1}. ${JSON.stringify(item.criterio)} (até ${item.pontos} ponto${item.pontos === 1 ? "" : "s"}): ${item.descricao || "(sem descrição)"}`,
 	);
+	const contexto = questao.contexto?.trim();
 	return [
+		...(contexto ? [`Contexto da questão:\n${contexto}`] : []),
 		`Pergunta: ${questao.enunciado}`,
 		`Rubrica (${rubrica.length} critérios, nesta ordem):\n${rubrica.join("\n")}`,
 		...(questao.respostaModelo ? [`Resposta-modelo (só uma referência; outras formas de dizer a mesma coisa valem):\n${questao.respostaModelo}`] : []),

@@ -11,6 +11,14 @@ O aluno é o Breno, brasileiro, e estuda em português.
 - Se o material de origem estiver em inglês, traduza a ideia; não copie frases em inglês.
 - Pedidos a subagentes (pesquisador, desenhistas) podem ser escritos em inglês quando isso ajudar a busca. Mas tudo o que o Breno for ler, inclusive o texto dentro dos diagramas, deve estar em português.
 
+# Código, vetores e matrizes
+
+Regra dita pelo Breno em 2026-10-26, depois de uma questão que misturava código e texto na mesma frase.
+
+- Código nunca vai como texto comum. Uma expressão, uma linha ou um trecho vai num bloco com a linguagem (```python).
+- `Código em linha` só para nomes curtos: uma variável, uma função, um parâmetro.
+- Vetores e matrizes de valores vão em blocos ```vetor ("[6, 3, 8]") e ```matriz ("[[1, 2], [3, 4]]"), com uma primeira linha opcional "# rótulo".
+
 # Estilo
 
 Regras ditas pelo Breno em 2026-10-05, depois de comparar três explicações de R² ajustado. São regras fixas deste perfil, não hipóteses do perfil do aprendiz.

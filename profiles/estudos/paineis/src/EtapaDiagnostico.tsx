@@ -43,6 +43,7 @@ import {
 	niveisDoCurso,
 	NOMES_FASE,
 	numeroCurto,
+	partesDaQuestao,
 	type SalvadorAdiado,
 	situacaoDaCorrecao,
 	statusDaCorrecao,
@@ -425,7 +426,12 @@ function Teclas<V extends number>(props: { rotulo: string; opcoes: Array<{ valor
 	);
 }
 
-/** A questão em vista: a confiança primeiro; só com ela marcada, as alternativas (ou o campo) ficam ativas. */
+/**
+ * A questão em vista: a confiança primeiro; só com ela marcada, as alternativas
+ * (ou o campo) ficam ativas. Com contexto, o contexto vai numa coluna e a
+ * pergunta, a confiança, as alternativas e o Responder na outra, nessa ordem
+ * (o CSS põe a pergunta do QuizQuestion acima da confiança, estilo.css).
+ */
 function QuestaoAtual(props: {
 	questao: QuestaoNaTela;
 	kicker: string;
@@ -447,9 +453,11 @@ function QuestaoAtual(props: {
 			.catch(props.aoFalhar)
 			.finally(() => setEnviando(false));
 	};
-	const enunciado = <Markdown texto={questao.enunciado} emLinha />;
-	return (
-		<div className="diag__questao">
+	// Com contexto (gravado, ou o enunciado antigo dividido), duas colunas: o contexto e, ao lado, a pergunta, a confiança e as alternativas.
+	const partes = partesDaQuestao(questao);
+	const enunciado = <Markdown texto={partes.pergunta} emLinha />;
+	const conteudo = (
+		<>
 			<div className="diag__confianca">
 				<p className="body-strong diag__pergunta">Antes de responder: quanto você confia que vai acertar?</p>
 				<Teclas<Confianca>
@@ -489,6 +497,19 @@ function QuestaoAtual(props: {
 					/>
 				)}
 			</div>
+		</>
+	);
+	if (!partes.contexto) return <div className="diag__questao">{conteudo}</div>;
+	return (
+		<div className="diag__questao diag__questao--contexto">
+			<div className="diag__colunas">
+				<div className="diag__contexto" role="region" aria-label="Contexto da questão">
+					<div className="ap-prose body diag__contexto-dentro">
+						<Markdown texto={partes.contexto} />
+					</div>
+				</div>
+				<div className="diag__direita">{conteudo}</div>
+			</div>
 		</div>
 	);
 }
@@ -505,7 +526,14 @@ function QuestaoResultado(props: {
 	const { questao, resposta } = props;
 	const [aberta, setAberta] = useState(false);
 	const dobra = useId();
-	const enunciado = <Markdown texto={questao.enunciado} emLinha />;
+	const partes = partesDaQuestao(questao);
+	const enunciado = <Markdown texto={partes.pergunta} emLinha />;
+	// O contexto, quando há, vem acima da pergunta, numa coluna só.
+	const contexto = partes.contexto ? (
+		<div className="ap-prose body diag__contexto-dentro">
+			<Markdown texto={partes.contexto} />
+		</div>
+	) : null;
 
 	let etiqueta: ReactNode = null;
 	let conteudo: ReactNode = null;
@@ -524,17 +552,20 @@ function QuestaoResultado(props: {
 			</Tag>
 		);
 		conteudo = (
-			<QuizQuestion
-				prompt={enunciado}
-				options={questao.alternativas.map((alternativa, indice) => ({ id: String(indice), label: <Markdown texto={alternativa.texto} emLinha /> }))}
-				value={daAlternativa ? String(daAlternativa.escolha) : null}
-				{...(correta >= 0 ? { correctId: String(correta) } : {})}
-			>
-				<QuizFeedback status={acertou ? "correct" : "incorrect"}>
-					{confusao ? <p>{fraseDaConfusao(confusao)}</p> : null}
-					{questao.explicacao ? <Markdown texto={questao.explicacao} /> : null}
-				</QuizFeedback>
-			</QuizQuestion>
+			<>
+				{contexto}
+				<QuizQuestion
+					prompt={enunciado}
+					options={questao.alternativas.map((alternativa, indice) => ({ id: String(indice), label: <Markdown texto={alternativa.texto} emLinha /> }))}
+					value={daAlternativa ? String(daAlternativa.escolha) : null}
+					{...(correta >= 0 ? { correctId: String(correta) } : {})}
+				>
+					<QuizFeedback status={acertou ? "correct" : "incorrect"}>
+						{confusao ? <p>{fraseDaConfusao(confusao)}</p> : null}
+						{questao.explicacao ? <Markdown texto={questao.explicacao} /> : null}
+					</QuizFeedback>
+				</QuizQuestion>
+			</>
 		);
 	} else {
 		const daDissertativa = resposta as RespostaDissertativa | undefined;
@@ -565,6 +596,7 @@ function QuestaoResultado(props: {
 		}
 		conteudo = (
 			<div className="diag__dissertativa">
+				{contexto}
 				<h3 className="ap-quiz__prompt heading">{enunciado}</h3>
 				{daDissertativa ? (
 					<StudentNote label="Sua resposta" className="diag__sua-resposta">

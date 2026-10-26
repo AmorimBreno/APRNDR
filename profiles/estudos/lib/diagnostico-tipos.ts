@@ -71,6 +71,9 @@ export interface QuestaoAlternativa {
 	tipo: "alternativa";
 	/** Os ids dos conceitos do curso que a questão cobre. */
 	conceitos: string[];
+	/** O cenário da questão, em markdown: os dados, o código, os vetores. Falta nas questões antigas (e nas que não precisam). */
+	contexto?: string;
+	/** A pergunta direta, numa frase (nas questões antigas, sem contexto, pode trazer o cenário junto). */
 	enunciado: string;
 	/** Na ordem de exibição (o modelo já embaralha); exatamente uma correta. */
 	alternativas: AlternativaDaQuestao[];
@@ -88,6 +91,8 @@ export interface QuestaoDissertativa {
 	id: string;
 	tipo: "dissertativa";
 	conceitos: string[];
+	/** Como em QuestaoAlternativa. */
+	contexto?: string;
 	enunciado: string;
 	/** De 3 a 5 critérios. */
 	rubrica: CriterioRubrica[];
@@ -173,6 +178,9 @@ export interface ResultadoGerador {
 	questoes: Array<{
 		tipo: "alternativa" | "dissertativa";
 		conceitos: string[];
+		/** Opcional: o cenário, os dados e o código, em markdown. */
+		contexto?: string;
+		/** Só a pergunta. */
 		enunciado: string;
 		/** Na alternativa. */
 		alternativas?: Array<{ texto: string; correta?: boolean; confusao?: string }>;
@@ -323,6 +331,9 @@ function lerQuestao(item: unknown, permitidos: ReadonlySet<string>): { questao: 
 	if (conceitos.length === 0) return { motivo: "sem conceitos" };
 	const fora = conceitos.filter((id) => !permitidos.has(id));
 	if (fora.length > 0) return { motivo: `cita conceito fora dos pedidos (${fora.join(", ")})` };
+	// O contexto é opcional: vazio (ou que não é texto) some, para a questão ficar só com a pergunta.
+	const contexto = textoLimpo(item.contexto);
+	const comContexto = contexto ? { contexto } : {};
 
 	if (item.tipo === "alternativa") {
 		const lista = item.alternativas;
@@ -344,7 +355,7 @@ function lerQuestao(item: unknown, permitidos: ReadonlySet<string>): { questao: 
 			alternativas.push({ texto, confusao });
 		}
 		if (corretas !== 1) return { motivo: corretas === 0 ? "nenhuma alternativa correta" : `${corretas} alternativas corretas (precisa de exatamente uma)` };
-		return { questao: { tipo: "alternativa", conceitos, enunciado, alternativas, explicacao: textoLimpo(item.explicacao) } };
+		return { questao: { tipo: "alternativa", conceitos, ...comContexto, enunciado, alternativas, explicacao: textoLimpo(item.explicacao) } };
 	}
 
 	const lista = item.rubrica;
@@ -361,7 +372,7 @@ function lerQuestao(item: unknown, permitidos: ReadonlySet<string>): { questao: 
 		}
 		rubrica.push({ criterio, descricao: textoLimpo((entrada as Record<string, unknown>).descricao), pontos });
 	}
-	return { questao: { tipo: "dissertativa", conceitos, enunciado, rubrica, respostaModelo: textoLimpo(item.respostaModelo) } };
+	return { questao: { tipo: "dissertativa", conceitos, ...comContexto, enunciado, rubrica, respostaModelo: textoLimpo(item.respostaModelo) } };
 }
 
 /**
@@ -370,7 +381,8 @@ function lerQuestao(item: unknown, permitidos: ReadonlySet<string>): { questao: 
  * alternativa por conceito de `alternativas` e uma dissertativa por conceito
  * de `dissertativas`, nessa ordem, com ids q1, q2… dados aqui.
  *
- * Uma questão vale com: enunciado; conceitos, todos entre os pedidos; na
+ * Uma questão vale com: enunciado; conceitos, todos entre os pedidos; o
+ * contexto é opcional (aparado; vazio, sai); na
  * alternativa, de 3 a 5 opções com texto, exatamente uma correta e toda
  * errada com a confusão; na dissertativa, rubrica de 3 a 5 critérios com nome
  * e pontos maiores que zero. Para cada conceito pedido vai a primeira questão
@@ -628,7 +640,8 @@ export interface DiagnosticoNaTela extends Omit<DiagnosticoEmAndamento, "questoe
  * A cópia do diagnóstico em andamento que a tela pode ver (docs/cursos.md,
  * "Ponte"): enquanto alguma questão está sem resposta, sem correta e confusao
  * das alternativas, explicacao, respostaModelo e rubrica, e sem correta,
- * confusao e correcao das respostas (o pré-teste não mostra o gabarito). Com
+ * confusao e correcao das respostas (o pré-teste não mostra o gabarito). O
+ * contexto da questão fica (é parte da pergunta, não do gabarito). Com
  * todas respondidas (ou sem questões ainda), a cópia inteira.
  */
 export function paraATela(emAndamento: DiagnosticoEmAndamento): DiagnosticoNaTela {

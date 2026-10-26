@@ -428,6 +428,7 @@ const alternativa = (conceito: string, correta = 1) => ({
 const DISSERTATIVA = {
 	tipo: "dissertativa",
 	conceitos: ["c-1"],
+	contexto: "Os dados: as colunas `x` e `y` de uma tabela.",
 	enunciado: "Explique a regressão linear.",
 	rubrica: [
 		{ criterio: "Reta", descricao: "Diz que ajusta uma reta.", pontos: 2 },
@@ -476,6 +477,7 @@ describe("diagnóstico", () => {
 		const questoes = lerPromptMapeador(await readFile(CAMINHO_PROMPT_DIAGNOSTICO, "utf8"));
 		expect(questoes.modelo).toBe("openrouter/openai/gpt-6.1-sol");
 		expect(questoes.instrucoes).toContain('"questoes"');
+		expect(questoes.instrucoes).toContain('"contexto"');
 		const corretor = lerPromptMapeador(await readFile(CAMINHO_PROMPT_CORRETOR, "utf8"));
 		expect(corretor.modelo).toBe("openrouter/openai/gpt-6.1-sol");
 		expect(corretor.instrucoes).toContain('"criterios"');
@@ -667,6 +669,8 @@ describe("diagnóstico", () => {
 		expect(corretor.opcoes.temperature).toBe(0);
 		expect(textoDaChamada(corretor)).toContain(TEXTO);
 		expect(textoDaChamada(corretor)).toContain("Mínimos quadrados");
+		// O contexto vai antes da pergunta (a chamada vem em JSON, com as quebras de linha escapadas).
+		expect(textoDaChamada(corretor)).toContain(JSON.stringify("Contexto da questão:\nOs dados: as colunas `x` e `y` de uma tabela.\n\nPergunta: Explique a regressão linear.").slice(1, -1));
 		const [evento] = await doAprendiz("respondeu_dissertativa");
 		expect(evento).toMatchObject({
 			objeto: { materia, curso: id, conceitos: ["c-1"], questao: "q4" },

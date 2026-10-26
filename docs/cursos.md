@@ -116,7 +116,8 @@ Enquanto o diagnóstico não termina, o progresso fica em `diagnosticoEmAndament
 			"id": "q1",
 			"tipo": "alternativa",
 			"conceitos": ["c-…"],
-			"enunciado": "…",
+			"contexto": "No modelo *Word2Vec* apresentado,\n\n```python\nlen(model.wv.index_to_key)\n```\n\nretorna 4240.",
+			"enunciado": "Como interpretar esse resultado?",
 			"alternativas": [
 				{ "texto": "…", "correta": true },
 				{ "texto": "…", "confusao": "Confunde correlação com causalidade." }
@@ -147,6 +148,7 @@ Enquanto o diagnóstico não termina, o progresso fica em `diagnosticoEmAndament
 ```
 
 - `autoavaliacao`: um nível por conceito do curso: 0 = nunca vi, 1 = já ouvi falar, 2 = sei explicar, 3 = sei aplicar.
+- `contexto` e `enunciado` de cada questão: o `contexto` (opcional) é o cenário em markdown: a situação, os dados, o código (em bloco com a linguagem, como ```` ```python ````; `código em linha` só para nomes curtos), os vetores e as matrizes (blocos ```` ```vetor ```` com `[6, 3, 8]` e ```` ```matriz ```` com `[[1, 2], [3, 4]]`, com uma primeira linha opcional `# rótulo`). O `enunciado` é só a pergunta, direta, numa frase. As questões antigas não têm `contexto` e trazem o cenário no `enunciado`: elas continuam valendo, e a tela as divide só para mostrar (abaixo, "A tela"); nada é regravado. O `contexto` não é gabarito: a tela o recebe durante as questões.
 - `questoes`: geradas de uma vez, depois da autoavaliação. Cada alternativa errada leva a `confusao` que ela representa (8.5). A ordem das alternativas é a de exibição (o modelo já embaralha; o código confere que há exatamente uma correta).
 - `respostas`: `confianca` de 1 a 4 (1 = chute, 2 = pouca, 3 = boa, 4 = certeza), marcada antes de responder; `escolha` é o índice da alternativa; `tempoMs` do momento em que a questão apareceu até a resposta.
 - `correcao` da dissertativa: uma chamada só, pela rubrica, primeiro extraindo da resposta os trechos de cada critério e só depois pontuando (8.5). As rodadas repetidas, a mediana e a concordância com a nota do Breno ficam para o item 8.
@@ -157,7 +159,7 @@ Escolhidos pelo código, não pelo modelo: até 8 conceitos do curso. Primeiro o
 
 ### O modelo
 
-`prompts/diagnostico.md` (as questões) e `prompts/corretor.md` (a dissertativa), os dois com `model: openrouter/openai/gpt-6.1-sol`, chamados pela extensão de cursos como o mapeador (temperatura 0 no corretor; uma nova tentativa com JSON inválido). A mensagem das questões leva: o nome, a descrição e a autoavaliação de cada conceito escolhido, o tipo e o escopo do curso, o motivo e, nos escopos com material, até uns 6 mil caracteres por conceito dos trechos do `.extraido` citados nas referências dele (40 mil no total). No escopo "só o material", as questões só cobram o que está nesses trechos.
+`prompts/diagnostico.md` (as questões) e `prompts/corretor.md` (a dissertativa), os dois com `model: openrouter/openai/gpt-6.1-sol`, chamados pela extensão de cursos como o mapeador (temperatura 0 no corretor; uma nova tentativa com JSON inválido). A mensagem das questões leva: o nome, a descrição e a autoavaliação de cada conceito escolhido, o tipo e o escopo do curso, o motivo e, nos escopos com material, até uns 6 mil caracteres por conceito dos trechos do `.extraido` citados nas referências dele (40 mil no total). No escopo "só o material", as questões só cobram o que está nesses trechos. A mensagem do corretor leva o contexto da questão (quando há) antes da pergunta, a rubrica, a resposta-modelo e a resposta do aluno.
 
 ### Eventos
 
@@ -190,6 +192,7 @@ O `contexto.prompt` dos eventos é `{nome, hash}`: o nome do arquivo e os 12 pri
 
 - Autoavaliação: a lista dos conceitos do curso, cada um com os 4 níveis; "Gerar as questões" quando todos têm nível.
 - Questões, uma por vez, com o placar do QuizProgress: primeiro a confiança (1 a 4), e só então as alternativas (QuizQuestion) ou o campo (EssayAnswer); sem gabarito durante as questões.
+- Questão com contexto: com a coluna do guia de pelo menos 720 px, duas colunas: à esquerda o contexto (rola sozinho quando é mais alto que a questão), à direita os conceitos, a pergunta, a confiança, as alternativas (ou o campo) e o envio; mais estreita, uma coluna, com o contexto em cima. Sem contexto, uma coluna, como antes. Numa questão antiga, sem `contexto`, a tela divide o `enunciado` (dividirQuestao, em `paineis/src/diagnostico-tela.ts`): a última frase interrogativa (até o fim) vira a pergunta e o que vem antes vira o contexto, com o código em linha que parece código (parênteses, colchetes, `=`, `;` ou ponto entre nomes, com mais de 12 caracteres) em bloco; sem frase interrogativa, ou sem nada antes dela, fica tudo como pergunta. No resultado, o contexto aparece acima da pergunta.
 - Resultado: por conceito, o que ele disse e o que acertou; cada questão com o gabarito, a confusão da alternativa errada escolhida e, na dissertativa, a nota por critério com os trechos; "Concluir diagnóstico".
 
 ## Parte C: o esqueleto e o curso pronto

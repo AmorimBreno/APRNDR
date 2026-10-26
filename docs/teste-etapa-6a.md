@@ -44,6 +44,7 @@ Nota: trocar de conversa durante a geração encerra a sessão do pi e para a ge
 8. No próximo módulo, clique em "Gerar módulo" e em "Gerar módulo" no formulário. Quando aparecer "Escrevendo a lição…", clique em "Parar". Por quê: cancelar. O que você deve ver: "Parando…" e depois o card como antes, com "Gerar módulo"; nenhum arquivo novo na pasta modulos para esse módulo.
 
 9. Gere de novo o mesmo módulo e, durante "Escrevendo a lição…", feche o app pelo atalho "Parar Estudos". Abra o app de novo pelo atalho "Estudos" e volte à visão do curso. Por quê: o estado depois de reabrir. O que você deve ver: o card como antes da geração (com "Gerar módulo"), sem ficar preso em "Escrevendo…"; o módulo anterior continua "Gerado".
+   Agora o caso comum: gere de novo e, durante "Escrevendo a lição…", feche só a janela do app (o X), sem o "Parar Estudos". Abra pelo atalho "Estudos" e volte à visão do curso. O que você deve ver: a geração continuou no servidor; o card mostra a etapa em que ela está (ou "Gerado", se já terminou).
 
 ### Aguardando material
 

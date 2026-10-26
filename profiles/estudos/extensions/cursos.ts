@@ -1,8 +1,9 @@
-// Cursos da matéria e o guia de criação (item 5, partes A e B, docs/cursos.md).
-// Arquivo do projeto, não do learn. As regras (validação, o que cada etapa
-// invalida, o diagnóstico) e o disco ficam em ../lib/curso-tipos.ts,
-// ../lib/cursos.ts, ../lib/diagnostico-tipos.ts e ../lib/diagnostico.ts; aqui
-// ficam:
+// Cursos da matéria e o guia de criação (item 5, partes A, B e C,
+// docs/cursos.md). Arquivo do projeto, não do learn. As regras (validação, o
+// que cada etapa invalida, o diagnóstico, o esqueleto e o calendário) e o
+// disco ficam em ../lib/curso-tipos.ts, ../lib/cursos.ts,
+// ../lib/diagnostico-tipos.ts, ../lib/diagnostico.ts, ../lib/esqueleto-tipos.ts
+// e ../lib/esqueleto.ts; aqui ficam:
 // - a ponte com a tela (painel "cursos", docs/ponte-de-eventos.md): listar,
 //   abrir, comecar, confirmar, descartar e prontos; a extensão responde com "lista",
 //   "curso", "descartado" e "erro", sempre passageiros (gravar: false). Uma
@@ -21,6 +22,12 @@
 //   pelo paraATela (sem o gabarito enquanto falta responder alguma questão) e
 //   diz se as questões estão sendo geradas (gerandoDiagnostico) e quais
 //   dissertativas estão sendo corrigidas (corrigindo);
+// - o esqueleto (parte C): gerar_esqueleto, editar_esqueleto e criar_curso. A
+//   proposta vem do modelo de ../prompts/esqueleto.md, chamado do mesmo jeito
+//   (fora da trava, com a nova tentativa), e é consertada pelo código
+//   (consertarProposta) antes de gravar; o calendário é sempre do código.
+//   Toda mensagem "curso" diz se a proposta está sendo montada
+//   (gerandoEsqueleto);
 // - a ferramenta só de leitura do professor, ler_curso. Numa conversa de
 //   caderno, ela fica na matéria da conversa.
 import { createHash } from "node:crypto";
@@ -50,6 +57,8 @@ import {
 	resumoDoCurso,
 	type TipoCurso,
 	type DadosObjetivo,
+	type DadosBasico,
+	hojeLocal,
 } from "../lib/cursos.ts";
 import {
 	autoavaliacaoCompleta,
@@ -76,6 +85,20 @@ import {
 	validarCorrecao,
 	validarQuestoes,
 } from "../lib/diagnostico.ts";
+import {
+	calcularCalendario,
+	type CalendarioCurso,
+	type ConceitoParaOModelo,
+	conceitosParaOModelo,
+	consertarProposta,
+	criarCurso,
+	diasEntre,
+	ErroEsqueleto,
+	gravarProposta,
+	type Modulo,
+	NOMES_TIPO_MODULO,
+	salvarEdicao,
+} from "../lib/esqueleto.ts";
 import { ErroMapa, lerMapa, type MapaConteudo } from "../lib/mapa.ts";
 import { arquivoMateria, ErroMaterias } from "../lib/materias.ts";
 import { lerPromptMapeador } from "./mapa.ts";
@@ -90,12 +113,16 @@ export const CAMINHO_PROMPT_DIAGNOSTICO = join(dirname(fileURLToPath(import.meta
 /** O prompt do corretor da dissertativa (mesmo formato). */
 export const CAMINHO_PROMPT_CORRETOR = join(dirname(fileURLToPath(import.meta.url)), "..", "prompts", "corretor.md");
 
+/** O prompt do esqueleto do curso (mesmo formato). */
+export const CAMINHO_PROMPT_ESQUELETO = join(dirname(fileURLToPath(import.meta.url)), "..", "prompts", "esqueleto.md");
+
 /** Uma chamada ao modelo que demora mais que isto é desistida. */
 export const TEMPO_CHAMADA_MS = 5 * 60_000;
 
 /** O teto de tokens da resposta (o modelo pode raciocinar antes de responder). */
 const MAX_TOKENS_QUESTOES = 32_000;
 const MAX_TOKENS_CORRECAO = 16_000;
+const MAX_TOKENS_ESQUELETO = 32_000;
 
 /**
  * As ações da tela: as da lib (AcoesCursos) e "corrigir {materia, curso,
@@ -116,6 +143,9 @@ const ACOES: ReadonlyArray<AcaoDaTela> = [
 	"responder",
 	"corrigir",
 	"concluir_diagnostico",
+	"gerar_esqueleto",
+	"editar_esqueleto",
+	"criar_curso",
 ];
 
 interface DadosAcao {
@@ -131,6 +161,7 @@ interface DadosAcao {
 	escolha?: unknown;
 	texto?: unknown;
 	tempoMs?: unknown;
+	modulos?: unknown;
 }
 
 const FRASES: Record<AcaoDaTela | "ler", string> = {
@@ -145,6 +176,9 @@ const FRASES: Record<AcaoDaTela | "ler", string> = {
 	responder: "gravar a resposta",
 	corrigir: "corrigir a dissertativa",
 	concluir_diagnostico: "concluir o diagnóstico",
+	gerar_esqueleto: "montar o esqueleto do curso",
+	editar_esqueleto: "salvar os módulos do esqueleto",
+	criar_curso: "criar o curso",
 	ler: "ler o curso",
 };
 
@@ -393,6 +427,79 @@ export function mensagemDoCorretor(questao: Pick<QuestaoDissertativa, "enunciado
 	].join("\n\n");
 }
 
+/** 7, 6,5: o número com vírgula, para os textos. */
+const numeroComVirgula = (numero: number) => String(numero).replace(".", ",");
+
+const NOMES_PRIORIDADE = { alta: "alta", normal: "normal", baixa: "baixa" } as const;
+const NOMES_RESULTADO = { certa: "certa", errada: "errada", parcial: "parcial" } as const;
+
+/**
+ * A linha do prazo para o modelo do esqueleto, com as mesmas contas do
+ * calcularCalendario: a avaliação geral fica na véspera do prazo e os módulos
+ * vão de amanhã até o dia anterior a ela; o tempo disponível é horas por
+ * semana × esses dias / 7 (arredondado a 0,5). Prazo que já passou, que é hoje
+ * ou amanhã, ou que não deixa dias para os módulos: o modelo trata como sem prazo.
+ */
+export function linhaDoPrazo(basico: Pick<DadosBasico, "prazo" | "horasPorSemana">, hoje: string): string {
+	if (!basico.prazo) return "Prazo: sem prazo (estime as horas pelo que o conteúdo pede).";
+	const dias = diasEntre(hoje, basico.prazo);
+	const semPrazo = "trate o curso como sem prazo";
+	if (dias < 0) return `Prazo: ${basico.prazo} (já passou; ${semPrazo}).`;
+	if (dias === 0) return `Prazo: ${basico.prazo} (é hoje; ${semPrazo}).`;
+	if (dias === 1) return `Prazo: ${basico.prazo} (é amanhã; ${semPrazo}).`;
+	const disponiveis = dias - 2;
+	if (disponiveis < 1) return `Prazo: ${basico.prazo}, daqui a ${dias} dias (não sobra dia para os módulos antes da avaliação geral; ${semPrazo}).`;
+	const horas = Math.round(((basico.horasPorSemana * disponiveis) / 7) * 2) / 2;
+	return [
+		`Prazo: ${basico.prazo}, daqui a ${dias} dias. A avaliação geral fica na véspera do prazo, e os módulos vão de amanhã até o dia anterior a ela: ${disponiveis} dia${disponiveis === 1 ? "" : "s"}.`,
+		`Tempo disponível para os módulos: cerca de ${numeroComVirgula(horas)} h (${numeroComVirgula(basico.horasPorSemana)} h por semana × ${disponiveis} dias).`,
+	].join("\n");
+}
+
+/**
+ * A mensagem do modelo do esqueleto (docs/cursos.md, parte C, "O modelo"): o
+ * curso (nome, tipo, escopo, motivo), as horas por semana e o prazo, e os
+ * conceitos do curso na ordem (id, nome, descrição, prioridade e o resumo do
+ * diagnóstico: o nível que ele disse, as questões e a calibração).
+ */
+export function mensagemDoEsqueleto(entrada: {
+	nome: string;
+	objetivo: DadosObjetivo;
+	basico: Pick<DadosBasico, "prazo" | "horasPorSemana">;
+	hoje: string;
+	conceitos: readonly ConceitoParaOModelo[];
+}): string {
+	const { objetivo, basico } = entrada;
+	const blocos = entrada.conceitos.map((conceito) => {
+		const linhas = [
+			`<conceito id=${JSON.stringify(conceito.id)}>`,
+			`Nome: ${conceito.nome}`,
+			`Descrição: ${conceito.descricao || "(sem descrição)"}`,
+			`Prioridade: ${NOMES_PRIORIDADE[conceito.prioridade] ?? conceito.prioridade}`,
+		];
+		const diagnostico = conceito.diagnostico;
+		if (!diagnostico) linhas.push("Diagnóstico: (sem diagnóstico)");
+		else {
+			const questoes = diagnostico.questoes.map(
+				(questao) =>
+					`${questao.id} (${questao.tipo}) ${NOMES_RESULTADO[questao.resultado]}${questao.nota ? `, ${numeroComVirgula(questao.nota.total)} de ${numeroComVirgula(questao.nota.max)} pontos` : ""}`,
+			);
+			linhas.push(`Diagnóstico: ${diagnostico.frase}`, `Questões sobre ele: ${questoes.length ? questoes.join("; ") : "nenhuma"}`);
+		}
+		linhas.push("</conceito>");
+		return linhas.join("\n");
+	});
+	return [
+		`Curso: ${entrada.nome}`,
+		`Tipo do curso: ${TIPOS[objetivo.tipo] ?? objetivo.tipo}`,
+		`Escopo: ${ESCOPOS[objetivo.escopo] ?? objetivo.escopo}`,
+		...(objetivo.motivo ? [`Motivo do aluno: ${objetivo.motivo}`] : []),
+		`Horas por semana: ${numeroComVirgula(basico.horasPorSemana)}`,
+		linhaDoPrazo(basico, entrada.hoje),
+		`Conceitos do curso (${blocos.length}, na ordem do curso):\n\n${blocos.join("\n\n")}`,
+	].join("\n\n");
+}
+
 // --- Texto para o professor ----------------------------------------------------
 
 const situacaoDo = (curso: Pick<Curso, "situacao" | "etapa">) =>
@@ -410,8 +517,6 @@ export function textoDaLista(materia: string, cursos: readonly Curso[], erros: R
 	if (erros.length) linhas.push("", "Pastas de curso que não deu para ler:", ...erros.map((erro) => `- ${erro.pasta}: ${erro.mensagem}`));
 	return linhas.join("\n");
 }
-
-const NOMES_RESULTADO = { certa: "certa", errada: "errada", parcial: "parcial" } as const;
 
 /**
  * O diagnóstico para o professor: a fase e a autoavaliação; com todas as
@@ -457,12 +562,58 @@ function linhasDoDiagnostico(curso: Curso, nomeDe: (id: string) => string): stri
 	return linhas;
 }
 
+/** Os módulos com os conceitos por nome e, com o calendário, as datas de cada um; no fim, o total de horas, a avaliação geral e os avisos. */
+function linhasDosModulos(modulos: readonly Modulo[], nomeDe: (id: string) => string, calendario: CalendarioCurso | null): string[] {
+	const datas = new Map((calendario?.modulos ?? []).map((item) => [item.id, item]));
+	const linhas = modulos.flatMap((modulo, indice) => {
+		const doModulo = [
+			`${indice + 1}. ${modulo.nome} (${modulo.id}; ${NOMES_TIPO_MODULO[modulo.tipo] ?? modulo.tipo}; ${numeroComVirgula(modulo.horas)} h)${modulo.objetivo ? `: ${modulo.objetivo}` : ""}`,
+			`   Conceitos: ${modulo.conceitos.map(nomeDe).join(", ")}.`,
+		];
+		const data = datas.get(modulo.id);
+		if (data) doModulo.push(`   De ${data.inicio} a ${data.fim}; avaliação do módulo em ${data.avaliacao}.`);
+		return doModulo;
+	});
+	const horas = modulos.reduce((soma, modulo) => soma + modulo.horas, 0);
+	linhas.push(`Total: ${numeroComVirgula(horas)} h em ${modulos.length} módulo${modulos.length === 1 ? "" : "s"}.`);
+	if (calendario) {
+		linhas.push(`Avaliação geral: ${calendario.avaliacaoGeral}.`);
+		for (const aviso of calendario.avisos) linhas.push(`Aviso: ${aviso}`);
+	}
+	return linhas;
+}
+
+/**
+ * O esqueleto para o professor: com o curso pronto, os módulos e o calendário
+ * gravado na criação; com a proposta em edição, os módulos e o calendário de
+ * hoje (calcularCalendario, o mesmo da tela).
+ */
+function linhasDoEsqueleto(curso: Curso, nomeDe: (id: string) => string, hoje: string): string[] {
+	if (curso.esqueleto) {
+		return [`Curso criado em ${curso.esqueleto.criadoEm.slice(0, 10)}; o calendário é o da criação.`, ...linhasDosModulos(curso.esqueleto.modulos, nomeDe, curso.esqueleto.calendario)];
+	}
+	const proposta = curso.esqueletoEmAndamento;
+	if (!proposta) return ["(ainda não montado)"];
+	let calendario: CalendarioCurso | null = null;
+	let problema = "";
+	try {
+		if (!curso.basico) throw new ErroEsqueleto("falta a etapa Básico");
+		calendario = calcularCalendario(proposta.modulos, { horasPorSemana: curso.basico.horasPorSemana, prazo: curso.basico.prazo, hoje });
+	} catch (erro) {
+		problema = (erro as Error).message;
+	}
+	return [
+		`Proposta em edição (gerada em ${proposta.geradoEm.slice(0, 10)}; o curso ainda não foi criado). ${calendario ? `O calendário é o de hoje (${hoje}).` : `Não deu para calcular o calendário: ${problema}`}`,
+		...linhasDosModulos(proposta.modulos, nomeDe, calendario),
+	];
+}
+
 /**
  * O texto de ler_curso com curso: o resumo do curso.json (básico, materiais,
  * objetivo, os nomes dos conceitos do curso lidos do mapa, o andamento do
- * diagnóstico) e o que falta.
+ * diagnóstico, o esqueleto) e o que falta.
  */
-export function textoDoCurso(curso: Curso, extra: { mapa?: MapaConteudo; prontos?: ReadonlyArray<{ arquivo: string; hash: string }> } = {}): string {
+export function textoDoCurso(curso: Curso, extra: { mapa?: MapaConteudo; prontos?: ReadonlyArray<{ arquivo: string; hash: string }>; hoje?: string } = {}): string {
 	const linhas = [`# Curso ${curso.nome} (id ${curso.id}, matéria ${curso.materia})`, `Situação: ${situacaoDo(curso)}.`];
 	const naoConfirmada = "ainda não confirmada";
 	const porId = new Map((extra.mapa?.conceitos ?? []).map((conceito) => [conceito.id, conceito]));
@@ -502,6 +653,9 @@ export function textoDoCurso(curso: Curso, extra: { mapa?: MapaConteudo; prontos
 	linhas.push("", "## Diagnóstico");
 	linhas.push(...linhasDoDiagnostico(curso, (id) => porId.get(id)?.nome ?? id));
 
+	linhas.push("", "## Esqueleto");
+	linhas.push(...linhasDoEsqueleto(curso, (id) => porId.get(id)?.nome ?? id, extra.hoje ?? hojeLocal()));
+
 	const faltam = ETAPAS.filter((etapa) => curso[etapa] === null || curso[etapa] === undefined);
 	linhas.push("", faltam.length ? `Falta confirmar: ${faltam.map(nomeDaEtapa).join(", ")}.` : "Todas as etapas estão confirmadas.");
 	const texto = linhas.join("\n");
@@ -515,6 +669,8 @@ export interface OpcoesCursos {
 	caminhoPromptDiagnostico?: string;
 	/** O corretor.md (nos testes, um prompt de mentira). */
 	caminhoPromptCorretor?: string;
+	/** O esqueleto.md (nos testes, um prompt de mentira). */
+	caminhoPromptEsqueleto?: string;
 }
 
 /** Uma dissertativa a corrigir: a questão e a resposta como foram gravadas. */
@@ -526,6 +682,7 @@ interface ParaCorrigir {
 export default function cursos(pi: ExtensionAPI, opcoes: OpcoesCursos = {}) {
 	const caminhoDiagnostico = opcoes.caminhoPromptDiagnostico ?? CAMINHO_PROMPT_DIAGNOSTICO;
 	const caminhoCorretor = opcoes.caminhoPromptCorretor ?? CAMINHO_PROMPT_CORRETOR;
+	const caminhoEsqueleto = opcoes.caminhoPromptEsqueleto ?? CAMINHO_PROMPT_ESQUELETO;
 	let pastaDados: string | undefined;
 	let sessao: string | undefined;
 	let registro: RegistroCursos | undefined;
@@ -533,6 +690,8 @@ export default function cursos(pi: ExtensionAPI, opcoes: OpcoesCursos = {}) {
 	const travas = new Map<string, Promise<unknown>>();
 	/** As gerações de questões em andamento, por "matéria/curso" (uma por curso). */
 	const gerando = new Map<string, AbortController>();
+	/** As propostas de esqueleto sendo montadas, por "matéria/curso" (uma por curso). */
+	const montando = new Map<string, AbortController>();
 	/** As correções em andamento, por "matéria/curso" e por questão. */
 	const corrigindo = new Map<string, Map<string, AbortController>>();
 
@@ -558,7 +717,8 @@ export default function cursos(pi: ExtensionAPI, opcoes: OpcoesCursos = {}) {
 
 	/**
 	 * Manda o curso (sempre pelo paraATela) com os materiais prontos de agora
-	 * e o que corre em segundo plano nele (gerandoDiagnostico, corrigindo).
+	 * e o que corre em segundo plano nele (gerandoDiagnostico, corrigindo,
+	 * gerandoEsqueleto).
 	 * Chamado dentro da trava, para um curso velho nunca chegar depois de um novo.
 	 */
 	const mostrarCurso = async (dados: string, materia: string, curso: Curso, extra: { pedido?: string; invalidadas?: Etapa[]; prontos?: MensagensCursos["curso"]["prontos"] } = {}) => {
@@ -574,6 +734,7 @@ export default function cursos(pi: ExtensionAPI, opcoes: OpcoesCursos = {}) {
 			...(extra.pedido ? { pedido: extra.pedido } : {}),
 			prontos,
 			...(gerando.has(chave) ? { gerandoDiagnostico: true } : {}),
+			...(montando.has(chave) ? { gerandoEsqueleto: true } : {}),
 			...(emCorrecao.length ? { corrigindo: emCorrecao } : {}),
 		});
 	};
@@ -741,18 +902,83 @@ export default function cursos(pi: ExtensionAPI, opcoes: OpcoesCursos = {}) {
 		}
 	};
 
+	/**
+	 * Monta a proposta de esqueleto (gerar_esqueleto): dentro da trava, confere
+	 * o rascunho e a ordem (o diagnóstico concluído), junta os conceitos para o
+	 * modelo (conceitosParaOModelo) e manda o curso com gerandoEsqueleto; fora
+	 * dela, chama o modelo, e a leitura conserta a proposta (consertarProposta:
+	 * fora de 2 a 12 módulos, ErroEsqueleto e a nova tentativa); dentro de novo,
+	 * grava (gravarProposta, que substitui a anterior e grava gerou_esqueleto) e
+	 * manda o curso com o pedido. Com erro, o erro (com o pedido) e o curso como
+	 * está. Depois do fim da sessão, nada.
+	 */
+	const gerarEsqueleto = async (dados: string, materia: string, curso: string, pedido: string | undefined) => {
+		const chave = chaveDo(materia, curso);
+		if (montando.has(chave)) throw new ErroEsqueleto("O esqueleto deste curso já está sendo montado. Espere terminar antes de pedir de novo.");
+		const controle = new AbortController();
+		montando.set(chave, controle);
+		const sinal = controle.signal;
+		const comPedido = pedido ? { pedido } : {};
+		let avisou = false;
+		try {
+			const { atual, conceitos } = await naTrava(materia, async () => {
+				const lido = await lerCurso(dados, materia, curso);
+				if (lido.situacao === "pronto") throw new ErroCurso("O curso já foi criado; mudar um curso pronto fica para depois.");
+				conferirOrdem(lido, "esqueleto");
+				const paraOModelo = await conceitosParaOModelo(dados, materia, lido);
+				await mostrarCurso(dados, materia, lido);
+				avisou = true;
+				return { atual: lido, conceitos: paraOModelo };
+			});
+			const prompt = await lerPrompt(caminhoEsqueleto);
+			if (!registro) throw new ErroEsqueleto("A sessão não tem o registro de modelos do pi; não dá para chamar o modelo do esqueleto.");
+			const modelo = resolverModelo(registro, prompt.modelo, "do esqueleto");
+			const doCurso = atual.mapa?.conceitos ?? [];
+			const mensagem = mensagemDoEsqueleto({ nome: atual.nome, objetivo: atual.objetivo!, basico: atual.basico!, hoje: hojeLocal(), conceitos });
+			// Fora da trava: a chamada pode levar minutos.
+			const resposta = await pedirJson(registro, modelo, prompt.instrucoes, mensagem, (texto) => consertarProposta(objetoDaResposta(texto), doCurso), sinal, {
+				maxTokens: MAX_TOKENS_ESQUELETO,
+				formato: '{"modulos": [...]}, de 2 a 12 módulos, com cada conceito do curso em exatamente um módulo',
+				oQue: "o esqueleto do curso",
+				depois: "O esqueleto não mudou.",
+			});
+			await naTrava(materia, async () => {
+				if (sinal.aborted) throw new Cancelado();
+				// Lido de novo: o Mapa do curso pode ter mudado durante a chamada.
+				const agora = await lerCurso(dados, materia, curso);
+				if (JSON.stringify(agora.mapa?.conceitos ?? []) !== JSON.stringify(doCurso)) {
+					throw new ErroEsqueleto("O Mapa do curso mudou enquanto o esqueleto era montado. Monte o esqueleto de novo.");
+				}
+				if (montando.get(chave) === controle) montando.delete(chave);
+				const novo = await gravarProposta(dados, materia, curso, resposta.resultado, { modelo: prompt.modelo, custo: resposta.custo }, { ...daSessao(), prompt: prompt.usado });
+				await mostrarCurso(dados, materia, novo, comPedido);
+			});
+		} catch (erro) {
+			if (montando.get(chave) === controle) montando.delete(chave);
+			if (pastaDados !== dados || erro instanceof Cancelado || sinal.aborted) return;
+			mostrar("erro", { mensagem: mensagemDe(erro, "gerar_esqueleto"), ao: "gerar_esqueleto", materia, curso, ...comPedido });
+			// O curso como está, sem gerandoEsqueleto.
+			if (avisou) await naTrava(materia, async () => mostrarCurso(dados, materia, await lerCurso(dados, materia, curso))).catch(() => undefined);
+		} finally {
+			if (montando.get(chave) === controle) montando.delete(chave);
+		}
+	};
+
 	pi.on("session_start", (_evento, ctx) => {
 		pastaDados = ctx.cwd;
 		sessao = ctx.sessionManager.getSessionId();
 		registro = ctx.modelRegistry;
 	});
 
-	// Fim da sessão (sair, recarregar, trocar de conversa): a geração e as
-	// correções em andamento param (nada é gravado) e a cópia fica calada.
+	// Fim da sessão (sair, recarregar, trocar de conversa): a geração das
+	// questões, as correções e a montagem do esqueleto em andamento param (nada
+	// é gravado) e a cópia fica calada.
 	pi.on("session_shutdown", () => {
 		pastaDados = undefined;
 		for (const controle of gerando.values()) controle.abort();
 		gerando.clear();
+		for (const controle of montando.values()) controle.abort();
+		montando.clear();
 		for (const doCurso of corrigindo.values()) for (const controle of doCurso.values()) controle.abort();
 		corrigindo.clear();
 	});
@@ -801,6 +1027,8 @@ export default function cursos(pi: ExtensionAPI, opcoes: OpcoesCursos = {}) {
 				} else if (ao === "confirmar") {
 					await naTrava(materia, async () => {
 						const etapa = dadosAcao.etapa as Parameters<typeof confirmarNoDisco>[3];
+						// O esqueleto só se confirma por criar_curso (o calendário de hoje e o evento criou_curso).
+						if (etapa === "esqueleto") throw new ErroEsqueleto('O esqueleto é confirmado por "Criar curso".');
 						// A foto dos materiais é a do disco na hora, nunca a que a tela mandou.
 						const prontos = await materiaisProntos(dados, materia);
 						const entrada = etapa === "materiais" ? { arquivos: prontos } : dadosAcao.dados;
@@ -869,6 +1097,21 @@ export default function cursos(pi: ExtensionAPI, opcoes: OpcoesCursos = {}) {
 						const resultado = await concluirDiagnostico(dados, materia, curso, contexto);
 						await mostrarCurso(dados, materia, resultado.curso, { invalidadas: resultado.invalidadas, ...comPedido });
 					});
+				} else if (ao === "gerar_esqueleto") {
+					await gerarEsqueleto(dados, materia, curso, pedido);
+				} else if (ao === "editar_esqueleto") {
+					await naTrava(materia, async () => {
+						const novo = await salvarEdicao(dados, materia, curso, dadosAcao.modulos, daSessao());
+						await mostrarCurso(dados, materia, novo, comPedido);
+					});
+				} else if (ao === "criar_curso") {
+					await naTrava(materia, async () => {
+						// Criar com a proposta velha enquanto a nova chega deixaria a nova sem lugar.
+						if (montando.has(chaveDo(materia, curso))) throw new ErroEsqueleto("O esqueleto ainda está sendo montado. Espere a proposta chegar antes de criar o curso.");
+						const criado = await criarCurso(dados, materia, curso, daSessao());
+						await mostrarCurso(dados, materia, criado, comPedido);
+						await mostrarLista(dados, materia);
+					});
 				}
 			} catch (erro) {
 				const doErro: MensagensCursos["erro"] = { mensagem: mensagemDe(erro, ao), ao, materia, ...comCurso, ...comPedido };
@@ -893,7 +1136,7 @@ export default function cursos(pi: ExtensionAPI, opcoes: OpcoesCursos = {}) {
 		name: "ler_curso",
 		label: "Ler curso",
 		description:
-			"Read a subject's courses (study plans the user builds in the notebook's course guide). Without `curso`, lists the subject's courses: name, id, status (draft and the step where it stopped, or ready) and deadline. With `curso`, summarizes that course: deadline and hours per week, chosen materials, scope, type and the user's goal, the concepts of the content map the course covers (in map order), the diagnostic pre-test (the user's self-assessment per concept, its phase and, once every question is answered, the result per concept; never the answer key) and which guide steps are still missing. In a notebook conversation, the subject is the conversation's. Read only: never change a course.",
+			"Read a subject's courses (study plans the user builds in the notebook's course guide). Without `curso`, lists the subject's courses: name, id, status (draft and the step where it stopped, or ready) and deadline. With `curso`, summarizes that course: deadline and hours per week, chosen materials, scope, type and the user's goal, the concepts of the content map the course covers (in map order), the diagnostic pre-test (the user's self-assessment per concept, its phase and, once every question is answered, the result per concept; never the answer key), the skeleton (the modules in study order, each with its type, hours, goal and concepts by name, plus the calendar: today's for a proposal still being edited, the one saved at creation for a ready course) and which guide steps are still missing. In a notebook conversation, the subject is the conversation's. Read only: never change a course.",
 		parameters: Type.Object({
 			materia: Type.Optional(Type.String({ description: "Subject id (from listar_materias). Not needed in a notebook conversation." })),
 			curso: Type.Optional(Type.String({ description: "Course id (from the list). Without it, lists the subject's courses." })),

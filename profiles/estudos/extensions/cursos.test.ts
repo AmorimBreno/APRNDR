@@ -10,15 +10,20 @@ import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Curso, MensagemCurso, MensagemListaCursos } from "../lib/curso-tipos.ts";
-import { lerCurso, pastaDoCurso } from "../lib/cursos.ts";
+import { confirmarNoDisco, lerCurso, pastaDoCurso } from "../lib/cursos.ts";
+import type { Diagnostico } from "../lib/diagnostico.ts";
 import { lerEventos } from "../lib/eventos.ts";
 import { gravarMapa, type MapaConteudo, mapaVazio, pastaExtraidoArquivo } from "../lib/mapa.ts";
 import { criarMateria, eventosAprendiz, eventosMateria } from "../lib/materias.ts";
-import cursos, { CAMINHO_PROMPT_CORRETOR, CAMINHO_PROMPT_DIAGNOSTICO, hashDoPrompt, textoDoCurso } from "./cursos.ts";
+import cursos, { CAMINHO_PROMPT_CORRETOR, CAMINHO_PROMPT_DIAGNOSTICO, CAMINHO_PROMPT_ESQUELETO, hashDoPrompt, linhaDoPrazo, textoDoCurso } from "./cursos.ts";
 import { lerPromptMapeador } from "./mapa.ts";
 
 /** Os prompts de mentira, na pasta de dados do teste (com o nome dos de verdade). */
-const opcoesDeTeste = () => ({ caminhoPromptDiagnostico: join(dados, "diagnostico.md"), caminhoPromptCorretor: join(dados, "corretor.md") });
+const opcoesDeTeste = () => ({
+	caminhoPromptDiagnostico: join(dados, "diagnostico.md"),
+	caminhoPromptCorretor: join(dados, "corretor.md"),
+	caminhoPromptEsqueleto: join(dados, "esqueleto.md"),
+});
 
 type Resultado = { content: Array<{ text: string }>; details: unknown; isError?: boolean };
 type Entrada = { type: string; customType?: string; data?: unknown };
@@ -99,6 +104,7 @@ beforeEach(async () => {
 	chamadas = [];
 	await writeFile(join(dados, "diagnostico.md"), "---\nmodel: teste/modelo-x\n---\nGere as questões.\n", "utf8");
 	await writeFile(join(dados, "corretor.md"), "---\nmodel: teste/modelo-x\n---\nCorrija pela rubrica.\n", "utf8");
+	await writeFile(join(dados, "esqueleto.md"), "---\nmodel: teste/modelo-x\n---\nMonte os módulos.\n", "utf8");
 	ctx = { cwd: dados, sessionManager: { getSessionId: () => "sessao-1", getBranch: () => entradas }, modelRegistry: registro };
 	barramento = new EventEmitter();
 	ferramentas = {};
@@ -114,13 +120,20 @@ afterEach(async () => {
 	await rm(dados, { recursive: true, force: true });
 });
 
-/** Espera até `condicao` valer (os tratadores são assíncronos). */
+/**
+ * Espera até `condicao` valer (os tratadores são assíncronos). Desiste em 2 s
+ * pelo relógio (e não por número de voltas: no Windows o setTimeout de 5 ms
+ * pode levar 15), antes do tempo limite de 5 s do teste, e diz os erros que a
+ * extensão mandou, para a falha mostrar a causa.
+ */
 async function esperar(condicao: () => boolean | Promise<boolean>): Promise<void> {
-	for (let tentativa = 0; tentativa < 400; tentativa++) {
+	const limite = Date.now() + 2000;
+	while (Date.now() < limite) {
 		if (await condicao()) return;
 		await new Promise((resolver) => setTimeout(resolver, 5));
 	}
-	throw new Error("não aconteceu");
+	if (await condicao()) return;
+	throw new Error(`não aconteceu; erros mandados: ${JSON.stringify(mostrados.filter((mensagem) => mensagem.acao === "erro").map((mensagem) => mensagem.dados))}`);
 }
 
 /** Um .extraido de mentira: só o manifesto (os cursos leem o arquivo e o hash). */
@@ -629,8 +642,12 @@ describe("diagnóstico", () => {
 		expect(cursoDe("r1")!.corrigindo).toEqual(["q4"]);
 		await esperar(() => chamadas.length === 2);
 		adiado.soltar(CORRECAO);
-		await esperar(async () => "correcao" in ((await emAndamento(id)).respostas.q4 ?? {}));
+		// Espera pela mensagem, nunca lendo o curso.json enquanto a extensão grava:
+		// no Windows, ler o arquivo na hora em que ela renomeia o novo por cima
+		// faz o rename falhar com EPERM (a correção se perdia e o teste esperava
+		// para sempre). A mensagem sem corrigindo sai depois de gravar.
 		await esperar(() => ultimoCurso().corrigindo === undefined);
+		expect(recebidas("erro")).toEqual([]);
 		const correcao = ((await emAndamento(id)).respostas.q4 as { correcao?: unknown }).correcao;
 		expect(correcao).toEqual({
 			criterios: [
@@ -761,5 +778,311 @@ describe("diagnóstico", () => {
 		await new Promise((resolver) => setTimeout(resolver, 30));
 		expect(comPedido("g1")).toHaveLength(0);
 		expect((await emAndamento(id)).questoes).toEqual([]);
+	});
+});
+
+// --- O esqueleto (parte C) -----------------------------------------------------------
+
+type QuestaoAlternativaSemId = Omit<Extract<Diagnostico["questoes"][number], { tipo: "alternativa" }>, "id">;
+
+/** Um diagnóstico concluído para os 3 conceitos do cursoNoDiagnostico: c-1 "sei aplicar" e acertou; c-2 "já ouvi falar" e errou; c-3 "nunca vi", sem questão. */
+const DIAGNOSTICO_CONCLUIDO: Diagnostico = {
+	autoavaliacao: { "c-1": 3, "c-2": 1, "c-3": 0 },
+	questoes: [
+		{ id: "q1", ...(alternativa("c-1") as QuestaoAlternativaSemId) },
+		{ id: "q2", ...(alternativa("c-2") as QuestaoAlternativaSemId) },
+	],
+	geradoEm: "2026-10-21T00:00:00.000Z",
+	modelo: "teste/modelo-x",
+	custo: 0.02,
+	respostas: {
+		q1: { confianca: 4, escolha: 1, correta: true, tempoMs: 1000, respondidaEm: "2026-10-21T00:01:00.000Z" },
+		q2: { confianca: 2, escolha: 0, correta: false, confusao: "Confusão 0 de c-2.", tempoMs: 1000, respondidaEm: "2026-10-21T00:02:00.000Z" },
+	},
+	concluidoEm: "2026-10-21T00:03:00.000Z",
+};
+
+/** Um curso com as etapas até o Diagnóstico confirmadas (etapa esqueleto); o diagnóstico concluído vai direto pela lib. */
+async function cursoNoEsqueleto(): Promise<string> {
+	const id = await cursoNoDiagnostico();
+	await confirmarNoDisco(dados, materia, id, "diagnostico", DIAGNOSTICO_CONCLUIDO);
+	return id;
+}
+
+const PROPOSTA = JSON.stringify({
+	modulos: [
+		{ nome: "A reta", objetivo: "Ajustar a reta.", conceitos: ["c-1", "c-2"], tipo: "curto", horas: 3 },
+		{ nome: "O R²", objetivo: "Interpretar o R².", conceitos: ["c-3"], tipo: "normal", horas: 2 },
+	],
+});
+const MODULOS_DA_PROPOSTA = [
+	{ id: "m1", nome: "A reta", objetivo: "Ajustar a reta.", conceitos: ["c-1", "c-2"], tipo: "curto", horas: 3 },
+	{ id: "m2", nome: "O R²", objetivo: "Interpretar o R².", conceitos: ["c-3"], tipo: "normal", horas: 2 },
+];
+
+const propostaNoDisco = async (id: string) => (await lerCurso(dados, materia, id)).esqueletoEmAndamento;
+
+/** O texto da primeira mensagem de uma chamada ao modelo. */
+const textoPedido = (pedido: Pedido) => (pedido.contexto.messages[0]!.content as Array<{ text: string }>)[0]!.text;
+
+/** Gera a proposta (a resposta do modelo já pronta) e devolve a mensagem com o pedido. */
+async function montar(id: string, pedido = "p-esq", resposta: string = PROPOSTA): Promise<MensagemCurso> {
+	respostas.push(resposta);
+	acao("gerar_esqueleto", { curso: id, pedido });
+	await respondeu(pedido);
+	const mensagem = cursoDe(pedido);
+	if (!mensagem) throw new Error(`não montou: ${JSON.stringify(erroDe(pedido))}`);
+	return mensagem;
+}
+
+describe("esqueleto", () => {
+	it("o prompt do perfil diz o modelo e o formato", async () => {
+		const esqueleto = lerPromptMapeador(await readFile(CAMINHO_PROMPT_ESQUELETO, "utf8"));
+		expect(esqueleto.modelo).toBe("openrouter/openai/gpt-6.1-sol");
+		expect(esqueleto.instrucoes).toContain('"modulos"');
+	});
+
+	it("gerar_esqueleto sem o diagnóstico concluído dá erro e não chama o modelo", async () => {
+		const id = await cursoNoDiagnostico();
+		respostas.push(PROPOSTA);
+		acao("gerar_esqueleto", { curso: id, pedido: "e1" });
+		await respondeu("e1");
+		expect(erroDe("e1")).toMatchObject({ ao: "gerar_esqueleto", materia, curso: id, pedido: "e1" });
+		expect(String(erroDe("e1")!.mensagem)).toContain("Diagnóstico");
+		expect(chamadas).toHaveLength(0);
+		expect(await propostaNoDisco(id)).toBeUndefined();
+	});
+
+	it("gerar_esqueleto chama o modelo, tenta de novo com proposta inválida, conserta, grava e grava gerou_esqueleto", async () => {
+		const id = await cursoNoEsqueleto();
+		// 1 módulo só: ErroEsqueleto na leitura e a nova tentativa. Na segunda, um conceito repetido, um faltando, um de fora e horas e tipo fora do permitido.
+		const umSo = JSON.stringify({ modulos: [{ nome: "Tudo", objetivo: "Tudo.", conceitos: ["c-1", "c-2", "c-3"], tipo: "normal", horas: 4 }] });
+		const consertavel = JSON.stringify({
+			modulos: [
+				{ nome: "  A   reta ", objetivo: " Ajustar a reta. ", conceitos: ["c-1", "c-9"], tipo: "curto", horas: 2.3 },
+				{ nome: "Resto", conceitos: ["c-1", "c-3"], tipo: "outro", horas: 99 },
+			],
+		});
+		respostas.push(umSo, consertavel);
+		acao("gerar_esqueleto", { curso: id, pedido: "e1" });
+		await respondeu("e1");
+		expect(erroDe("e1")).toBeUndefined();
+		// Antes: o curso com gerandoEsqueleto, sem o pedido; no fim, sem gerandoEsqueleto, com o pedido.
+		const doCurso = recebidas("curso").map((mensagem) => mensagem.dados as unknown as MensagemCurso);
+		const indiceGerando = doCurso.findIndex((mensagem) => mensagem.gerandoEsqueleto === true);
+		expect(indiceGerando).toBeGreaterThanOrEqual(0);
+		expect(doCurso[indiceGerando]!.pedido).toBeUndefined();
+		const final = cursoDe("e1")!;
+		expect(final.gerandoEsqueleto).toBeUndefined();
+		const esperado = [
+			{ id: "m1", nome: "A reta", objetivo: "Ajustar a reta.", conceitos: ["c-1", "c-2"], tipo: "curto", horas: 2.5 },
+			{ id: "m2", nome: "Resto", objetivo: "", conceitos: ["c-3"], tipo: "normal", horas: 2 },
+		];
+		expect(final.curso.esqueletoEmAndamento!.modulos).toEqual(esperado);
+		expect(await propostaNoDisco(id)).toMatchObject({ modulos: esperado, modelo: "teste/modelo-x", custo: 0.02 });
+		expect((await lerCurso(dados, materia, id)).situacao).toBe("rascunho");
+
+		// A mensagem ao modelo: os conceitos na ordem, a prioridade, o diagnóstico, as horas e o prazo.
+		expect(chamadas).toHaveLength(2);
+		expect(chamadas[0]!.contexto.systemPrompt).toBe("Monte os módulos.");
+		const mensagem = textoPedido(chamadas[0]!);
+		expect(mensagem).toContain("Curso: P1: probabilidade");
+		expect(mensagem).toContain("Horas por semana: 4");
+		expect(mensagem).toContain("Prazo: 2099-11-20, daqui a");
+		expect(mensagem).toContain("Tempo disponível para os módulos");
+		expect(mensagem.indexOf('id="c-1"')).toBeLessThan(mensagem.indexOf('id="c-2"'));
+		expect(mensagem.indexOf('id="c-2"')).toBeLessThan(mensagem.indexOf('id="c-3"'));
+		expect(mensagem).toContain("Nome: Regressão linear");
+		expect(mensagem).toContain("Prioridade: normal");
+		expect(mensagem).toContain('Disse "Sei aplicar"');
+		expect(mensagem).toContain("q1 (alternativa) certa");
+		expect(mensagem).toContain("q2 (alternativa) errada");
+		expect(mensagem).toContain("Questões sobre ele: nenhuma");
+		// A segunda tentativa leva a resposta ruim e o motivo.
+		expect(chamadas[1]!.contexto.messages).toHaveLength(3);
+		expect(textoDaChamada(chamadas[1]!, 2)).toContain("1 módulo");
+
+		const [evento] = await doVerbo("gerou_esqueleto");
+		expect(evento).toMatchObject({
+			sessao: "sessao-1",
+			objeto: { materia, curso: id },
+			resultado: { modulos: 2, custo: 0.02 },
+			contexto: { modelo: "teste/modelo-x", prompt: await promptDe("esqueleto.md") },
+		});
+
+		// Gerar de novo substitui a proposta.
+		await montar(id, "e2");
+		expect((await propostaNoDisco(id))!.modulos).toEqual(MODULOS_DA_PROPOSTA);
+		expect(await doVerbo("gerou_esqueleto")).toHaveLength(2);
+	});
+
+	it("o modelo que falha duas vezes vira erro com o pedido, e nada é gravado", async () => {
+		const id = await cursoNoEsqueleto();
+		respostas.push("não é JSON", '{"modulos": []}');
+		acao("gerar_esqueleto", { curso: id, pedido: "e1" });
+		await respondeu("e1");
+		expect(erroDe("e1")).toMatchObject({ ao: "gerar_esqueleto", materia, curso: id });
+		expect(String(erroDe("e1")!.mensagem)).toContain("segunda tentativa");
+		await esperar(() => ultimoCurso().gerandoEsqueleto === undefined);
+		expect(await propostaNoDisco(id)).toBeUndefined();
+		expect(await doVerbo("gerou_esqueleto")).toHaveLength(0);
+	});
+
+	it("gerar com outro em andamento no mesmo curso dá erro; abrir mostra gerandoEsqueleto; criar_curso espera", async () => {
+		const id = await cursoNoEsqueleto();
+		await montar(id, "e0");
+		const adiado = adiada();
+		respostas.push(adiado.resposta);
+		acao("gerar_esqueleto", { curso: id, pedido: "e1" });
+		await esperar(() => chamadas.length === 2);
+		acao("gerar_esqueleto", { curso: id, pedido: "e2" });
+		await respondeu("e2");
+		expect(String(erroDe("e2")!.mensagem)).toContain("já está sendo montado");
+		acao("abrir", { curso: id });
+		await esperar(() => ultimoCurso().gerandoEsqueleto === true && ultimoCurso().pedido === undefined);
+		acao("criar_curso", { curso: id, pedido: "c1" });
+		await respondeu("c1");
+		expect(erroDe("c1")).toMatchObject({ ao: "criar_curso", curso: id });
+		expect((await lerCurso(dados, materia, id)).situacao).toBe("rascunho");
+		adiado.soltar(JSON.stringify({ modulos: [{ nome: "Um", conceitos: ["c-1"], tipo: "normal", horas: 1 }, { nome: "Dois", conceitos: ["c-2", "c-3"], tipo: "normal", horas: 1 }] }));
+		await respondeu("e1");
+		expect(cursoDe("e1")!.curso.esqueletoEmAndamento!.modulos.map((modulo) => modulo.nome)).toEqual(["Um", "Dois"]);
+		expect(chamadas).toHaveLength(2);
+	});
+
+	it("depois de session_shutdown a montagem em andamento para sem gravar", async () => {
+		const id = await cursoNoEsqueleto();
+		const adiado = adiada();
+		respostas.push(adiado.resposta);
+		acao("gerar_esqueleto", { curso: id, pedido: "e1" });
+		await esperar(() => chamadas.length === 1);
+		tratadores.session_shutdown?.({}, ctx);
+		await new Promise((resolver) => setTimeout(resolver, 30));
+		expect(comPedido("e1")).toHaveLength(0);
+		expect(await propostaNoDisco(id)).toBeUndefined();
+	});
+
+	it("editar_esqueleto grava a proposta válida e recusa a inválida sem mudar nada", async () => {
+		const id = await cursoNoEsqueleto();
+		acao("editar_esqueleto", { curso: id, pedido: "s0", modulos: MODULOS_DA_PROPOSTA });
+		await respondeu("s0");
+		expect(String(erroDe("s0")!.mensagem)).toContain("Monte o esqueleto");
+		await montar(id);
+		const editados = [
+			{ ...MODULOS_DA_PROPOSTA[0]!, nome: " Reta e resíduo ", conceitos: ["c-2", "c-1"], horas: 4.5 },
+			{ ...MODULOS_DA_PROPOSTA[1]!, tipo: "revisao" },
+		];
+		acao("editar_esqueleto", { curso: id, pedido: "s1", modulos: editados });
+		await respondeu("s1");
+		expect(erroDe("s1")).toBeUndefined();
+		const gravado = await propostaNoDisco(id);
+		expect(gravado!.modulos).toEqual([
+			{ id: "m1", nome: "Reta e resíduo", objetivo: "Ajustar a reta.", conceitos: ["c-2", "c-1"], tipo: "curto", horas: 4.5 },
+			{ id: "m2", nome: "O R²", objetivo: "Interpretar o R².", conceitos: ["c-3"], tipo: "revisao", horas: 2 },
+		]);
+		expect(gravado).toMatchObject({ modelo: "teste/modelo-x", custo: 0.01 });
+		expect(cursoDe("s1")!.curso.esqueletoEmAndamento!.modulos).toEqual(gravado!.modulos);
+		// Um conceito faltando: erro, e nada muda.
+		acao("editar_esqueleto", { curso: id, pedido: "s2", modulos: [MODULOS_DA_PROPOSTA[0]] });
+		await respondeu("s2");
+		expect(erroDe("s2")).toMatchObject({ ao: "editar_esqueleto", materia, curso: id });
+		expect(String(erroDe("s2")!.mensagem)).toContain("sem módulo");
+		expect((await propostaNoDisco(id))!.modulos).toEqual(gravado!.modulos);
+		// Editar não grava evento.
+		expect(await doVerbo("gerou_esqueleto")).toHaveLength(1);
+	});
+
+	it("criar_curso deixa o curso pronto com o calendário, grava criou_curso e manda a lista; depois, mudar o curso dá erro", async () => {
+		const id = await cursoNoEsqueleto();
+		acao("criar_curso", { curso: id, pedido: "c0" });
+		await respondeu("c0");
+		expect(String(erroDe("c0")!.mensagem)).toContain("Monte o esqueleto");
+		await montar(id);
+		const antes = listas().length;
+		acao("criar_curso", { curso: id, pedido: "c1" });
+		await respondeu("c1");
+		await esperar(() => listas().length > antes);
+		const criado = cursoDe("c1")!.curso;
+		expect(criado).toMatchObject({ situacao: "pronto", etapa: "esqueleto", esqueleto: { modulos: MODULOS_DA_PROPOSTA, modelo: "teste/modelo-x", custo: 0.01 } });
+		expect(criado.esqueletoEmAndamento).toBeUndefined();
+		const calendario = criado.esqueleto!.calendario;
+		expect(calendario.modulos.map((modulo) => modulo.id)).toEqual(["m1", "m2"]);
+		// 3 h e 2 h com 4 h por semana: 6 e 4 dias seguidos.
+		const dia = (data: string) => Math.round(new Date(`${data}T00:00:00Z`).getTime() / 86_400_000);
+		expect(dia(calendario.modulos[0]!.fim) - dia(calendario.modulos[0]!.inicio) + 1).toBe(6);
+		expect(dia(calendario.modulos[1]!.inicio)).toBe(dia(calendario.modulos[0]!.fim) + 1);
+		expect(dia(calendario.modulos[1]!.fim) - dia(calendario.modulos[1]!.inicio) + 1).toBe(4);
+		expect(calendario.avaliacaoGeral).toBe("2099-11-19");
+		expect(await lerCurso(dados, materia, id)).toEqual(criado);
+		expect(listas().at(-1)!.cursos[0]).toMatchObject({ id, situacao: "pronto" });
+		const [evento] = await doVerbo("criou_curso");
+		expect(evento).toMatchObject({ sessao: "sessao-1", objeto: { materia, curso: id }, resultado: { nome: "P1: probabilidade", modulos: 2, prazo: "2099-11-20", avaliacaoGeral: "2099-11-19" } });
+
+		// Pronto: confirmar uma etapa, gerar, editar ou criar de novo dão erro, e nada muda.
+		await confirmar(id, "basico", { ...BASICO, horasPorSemana: 8 }, "d1");
+		expect(erroDe("d1")).toMatchObject({ ao: "confirmar", curso: id });
+		expect(String(erroDe("d1")!.mensagem)).toContain("já foi criado");
+		await confirmar(id, "esqueleto", criado.esqueleto, "d2");
+		expect(erroDe("d2")).toMatchObject({ ao: "confirmar", curso: id });
+		respostas.push(PROPOSTA);
+		acao("gerar_esqueleto", { curso: id, pedido: "d3" });
+		await respondeu("d3");
+		expect(String(erroDe("d3")!.mensagem)).toContain("já foi criado");
+		acao("editar_esqueleto", { curso: id, pedido: "d4", modulos: MODULOS_DA_PROPOSTA });
+		await respondeu("d4");
+		expect(String(erroDe("d4")!.mensagem)).toContain("já foi criado");
+		acao("criar_curso", { curso: id, pedido: "d5" });
+		await respondeu("d5");
+		expect(String(erroDe("d5")!.mensagem)).toContain("já foi criado");
+		expect(await lerCurso(dados, materia, id)).toEqual(criado);
+		expect(await doVerbo("criou_curso")).toHaveLength(1);
+		expect(chamadas).toHaveLength(1);
+	});
+
+	it("confirmar o esqueleto pela ação confirmar dá erro: ele vem por criar_curso", async () => {
+		const id = await cursoNoEsqueleto();
+		await montar(id);
+		const proposta = (await propostaNoDisco(id))!;
+		await confirmar(id, "esqueleto", { ...proposta, calendario: { modulos: [], avaliacaoGeral: "2099-11-19", avisos: [] } }, "x1");
+		expect(String(erroDe("x1")!.mensagem)).toContain("Criar curso");
+		expect((await lerCurso(dados, materia, id)).situacao).toBe("rascunho");
+	});
+
+	it("ler_curso mostra a proposta com o calendário de hoje e, pronto, o esqueleto com o calendário gravado", async () => {
+		const id = await cursoNoEsqueleto();
+		const semProposta = (await ferramentas.ler_curso!.execute("1", { materia, curso: id }, undefined, undefined, ctx)).content[0]!.text;
+		expect(semProposta).toContain("## Esqueleto\n(ainda não montado)");
+		await montar(id);
+		const proposta = (await ferramentas.ler_curso!.execute("2", { materia, curso: id }, undefined, undefined, ctx)).content[0]!.text;
+		expect(proposta).toContain("Proposta em edição");
+		expect(proposta).toContain("O calendário é o de hoje");
+		expect(proposta).toContain("1. A reta (m1; Curto; 3 h): Ajustar a reta.");
+		expect(proposta).toContain("   Conceitos: Regressão linear, Resíduo.");
+		expect(proposta).toContain("2. O R² (m2; Normal; 2 h): Interpretar o R².");
+		expect(proposta).toMatch(/ {3}De \d{4}-\d{2}-\d{2} a \d{4}-\d{2}-\d{2}; avaliação do módulo em \d{4}-\d{2}-\d{2}\./);
+		expect(proposta).toContain("Total: 5 h em 2 módulos.");
+		expect(proposta).toContain("Avaliação geral: 2099-11-19.");
+		expect(proposta).toContain("Falta confirmar: Esqueleto.");
+
+		acao("criar_curso", { curso: id, pedido: "c1" });
+		await respondeu("c1");
+		const calendario = cursoDe("c1")!.curso.esqueleto!.calendario;
+		const pronto = (await ferramentas.ler_curso!.execute("3", { materia, curso: id }, undefined, undefined, ctx)).content[0]!.text;
+		expect(pronto).toContain("Situação: pronto.");
+		expect(pronto).toContain("o calendário é o da criação");
+		expect(pronto).toContain(`   De ${calendario.modulos[1]!.inicio} a ${calendario.modulos[1]!.fim}; avaliação do módulo em ${calendario.modulos[1]!.avaliacao}.`);
+		expect(pronto).toContain("Todas as etapas estão confirmadas.");
+	});
+
+	it("linhaDoPrazo faz as contas do calendário: sem prazo, prazo passado ou perto, e o tempo disponível", () => {
+		expect(linhaDoPrazo({ prazo: null, horasPorSemana: 4 }, "2026-10-26")).toContain("sem prazo");
+		expect(linhaDoPrazo({ prazo: "2026-10-20", horasPorSemana: 4 }, "2026-10-26")).toContain("já passou");
+		expect(linhaDoPrazo({ prazo: "2026-10-27", horasPorSemana: 4 }, "2026-10-26")).toContain("é amanhã");
+		expect(linhaDoPrazo({ prazo: "2026-10-28", horasPorSemana: 4 }, "2026-10-26")).toContain("não sobra dia");
+		// 28 dias até o prazo: os módulos têm 26 (de amanhã até a véspera da avaliação geral); 4 × 26 / 7 = 14,86, cerca de 15 h.
+		const linha = linhaDoPrazo({ prazo: "2026-11-23", horasPorSemana: 4 }, "2026-10-26");
+		expect(linha).toContain("daqui a 28 dias");
+		expect(linha).toContain("26 dias");
+		expect(linha).toContain("cerca de 15 h (4 h por semana × 26 dias)");
 	});
 });

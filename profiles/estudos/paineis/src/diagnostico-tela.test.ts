@@ -22,6 +22,7 @@ import {
 	situacaoDaCorrecao,
 	statusDaCorrecao,
 	textoMarcados,
+	pontosDasDissertativas,
 	textoPlacar,
 } from "./diagnostico-tela.ts";
 import { descreverEvento } from "./TelaCaderno.tsx";
@@ -155,6 +156,15 @@ describe("o resultado", () => {
 		expect(textoPlacar({ acertos: 1, alternativas: 1, dissertativas: 2, nota: 0.75 })).toEqual({ alternativas: "Acertou 1 de 1 alternativa", dissertativa: "Dissertativas: 7,5/10" });
 		// Sem correção ainda, sem a linha da dissertativa.
 		expect(textoPlacar({ acertos: 0, alternativas: 6, dissertativas: 1, nota: null })).toEqual({ alternativas: "Acertou 0 de 6 alternativas" });
+		// Com os pontos, a escala da rubrica (a mesma de cada questão).
+		expect(textoPlacar({ acertos: 1, alternativas: 6, dissertativas: 1, nota: 0.75 }, { total: 6, max: 8 })).toEqual({ alternativas: "Acertou 1 de 6 alternativas", dissertativa: "Dissertativa: 6/8" });
+		const questoes = [
+			{ id: "q1", tipo: "alternativa" },
+			{ id: "q7", tipo: "dissertativa" },
+			{ id: "q8", tipo: "dissertativa" },
+		];
+		expect(pontosDasDissertativas({ questoes, respostas: { q7: { correcao: { total: 6, max: 8 } }, q8: { correcao: { total: 1.5, max: 5 } } } })).toEqual({ total: 7.5, max: 13 });
+		expect(pontosDasDissertativas({ questoes, respostas: {} })).toBeUndefined();
 		expect(textoPlacar({ acertos: 0, alternativas: 0, dissertativas: 0, nota: null })).toEqual({});
 	});
 

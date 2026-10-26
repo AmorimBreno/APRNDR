@@ -111,11 +111,36 @@ export function numeroCurto(valor: number): string {
 }
 
 /** O placar do topo do resultado: "Acertou 5 de 6 alternativas" e "Dissertativa: 7/10" (sem a linha quando não há o que mostrar). */
-export function textoPlacar(total: ResumoDiagnostico["total"]): { alternativas?: string; dissertativa?: string } {
+/**
+ * Os pontos somados das dissertativas já corrigidas, na escala das rubricas
+ * (a mesma que cada questão mostra, "6/8"). Contados pelas respostas, e não
+ * pelo resumo por conceito, porque uma dissertativa pode cobrir dois conceitos.
+ */
+export function pontosDasDissertativas(diagnostico: {
+	questoes: ReadonlyArray<{ id: string; tipo: string }>;
+	respostas: Readonly<Record<string, { correcao?: Pick<Correcao, "total" | "max"> } | undefined>>;
+}): { total: number; max: number } | undefined {
+	let total = 0;
+	let max = 0;
+	for (const questao of diagnostico.questoes) {
+		const correcao = questao.tipo === "dissertativa" ? diagnostico.respostas[questao.id]?.correcao : undefined;
+		if (!correcao) continue;
+		total += correcao.total;
+		max += correcao.max;
+	}
+	return max > 0 ? { total, max } : undefined;
+}
+
+export function textoPlacar(total: ResumoDiagnostico["total"], pontos?: { total: number; max: number }): { alternativas?: string; dissertativa?: string } {
 	const alternativas =
 		total.alternativas > 0 ? `Acertou ${total.acertos} de ${total.alternativas} ${total.alternativas === 1 ? "alternativa" : "alternativas"}` : undefined;
+	const nome = total.dissertativas === 1 ? "Dissertativa" : "Dissertativas";
 	const dissertativa =
-		total.dissertativas > 0 && total.nota !== null ? `${total.dissertativas === 1 ? "Dissertativa" : "Dissertativas"}: ${numeroCurto(total.nota * 10)}/10` : undefined;
+		total.dissertativas > 0 && total.nota !== null
+			? pontos
+				? `${nome}: ${numeroCurto(pontos.total)}/${numeroCurto(pontos.max)}`
+				: `${nome}: ${numeroCurto(total.nota * 10)}/10`
+			: undefined;
 	return { ...(alternativas ? { alternativas } : {}), ...(dissertativa ? { dissertativa } : {}) };
 }
 

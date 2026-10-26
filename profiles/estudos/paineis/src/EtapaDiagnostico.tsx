@@ -47,6 +47,7 @@ import {
 	situacaoDaCorrecao,
 	statusDaCorrecao,
 	textoMarcados,
+	pontosDasDissertativas,
 	textoPlacar,
 } from "./diagnostico-tela.ts";
 import type { MapaDaMateria } from "./mapa-ponte.ts";
@@ -279,7 +280,7 @@ export function useEtapaDiagnostico(props: PropsEtapaDiagnostico): EtapaDiagnost
 	} else if (diagnostico) {
 		const comoEmAndamento = diagnostico as unknown as DiagnosticoEmAndamento;
 		const resumo = resumoDoDiagnostico(comoEmAndamento, conceitos);
-		const placar = textoPlacar(resumo.total);
+		const placar = textoPlacar(resumo.total, pontosDasDissertativas(comoEmAndamento));
 		const pendentes = faltaCorrigir(comoEmAndamento);
 		const situacao = (id: string) =>
 			situacaoDaCorrecao({

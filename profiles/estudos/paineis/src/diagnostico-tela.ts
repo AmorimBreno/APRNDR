@@ -118,12 +118,13 @@ export function numeroCurto(valor: number): string {
  */
 export function pontosDasDissertativas(diagnostico: {
 	questoes: ReadonlyArray<{ id: string; tipo: string }>;
-	respostas: Readonly<Record<string, { correcao?: Pick<Correcao, "total" | "max"> } | undefined>>;
+	respostas: Readonly<Record<string, object | undefined>>;
 }): { total: number; max: number } | undefined {
 	let total = 0;
 	let max = 0;
 	for (const questao of diagnostico.questoes) {
-		const correcao = questao.tipo === "dissertativa" ? diagnostico.respostas[questao.id]?.correcao : undefined;
+		const resposta = questao.tipo === "dissertativa" ? (diagnostico.respostas[questao.id] as { correcao?: Pick<Correcao, "total" | "max"> } | undefined) : undefined;
+		const correcao = resposta?.correcao;
 		if (!correcao) continue;
 		total += correcao.total;
 		max += correcao.max;

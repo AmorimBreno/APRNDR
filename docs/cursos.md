@@ -174,9 +174,17 @@ Tela → extensão:
 - `autoavaliar {materia, curso, pedido, niveis}`: salva a autoavaliação (inteira) em andamento;
 - `gerar_diagnostico {materia, curso, pedido}`: exige a autoavaliação completa; gera as questões (estado `gerandoDiagnostico: true` na mensagem `curso` enquanto isso); gerar de novo descarta as questões e as respostas anteriores;
 - `responder {materia, curso, pedido, questao, confianca, escolha?, texto?, tempoMs}`: grava a resposta; na dissertativa, corrige em seguida (a mensagem `curso` leva `corrigindo: [questao]` enquanto isso);
+- `corrigir {materia, curso, pedido, questao}`: tenta de novo a correção de uma dissertativa respondida que ficou sem correção (a correção falhou); uma já corrigida, ou que está sendo corrigida agora, dá erro. Ainda não está em `AcoesCursos` (curso-tipos.ts): a extensão aceita os dados como chegam;
 - `concluir_diagnostico {materia, curso, pedido}`: exige todas as questões respondidas e corrigidas; confirma a etapa.
 
-Todas respondem com `curso`. Enquanto alguma questão estiver sem resposta, a tela não recebe `correta`, `confusao`, `explicacao`, `respostaModelo`, a `rubrica`, nem a `correta` e a `correcao` das respostas (o pré-teste não mostra o gabarito durante as questões); a extensão tira esses campos da mensagem. Com todas respondidas, a mensagem vai inteira (a fase Resultado).
+Todas respondem com `curso`. Onde vai o `pedido`:
+- `gerar_diagnostico`: primeiro um `curso` sem pedido, com `gerandoDiagnostico: true`; o pedido vai no `curso` com as questões geradas, ou no `erro` (`ao: "gerar_diagnostico"`). Um segundo `gerar_diagnostico` no mesmo curso, com outro em andamento, dá erro;
+- `responder`: o pedido vai no `curso` logo depois de gravar a resposta (na dissertativa, já com `corrigindo: [questao]`). A correção chega depois num `curso` sem pedido; se ela falhar, um `erro` sem pedido, com `ao: "corrigir"` e `questao`, e um `curso` sem `corrigindo` (a resposta fica gravada sem correção; `corrigir` tenta de novo). Um erro da própria resposta (já respondida, sem confiança) vem com o pedido, `ao: "responder"` e `questao`;
+- `corrigir`: primeiro um `curso` sem pedido, com `corrigindo`; o pedido vai no `curso` com a correção, ou no `erro` (`ao: "corrigir"`, com `questao`).
+
+`gerandoDiagnostico` e `corrigindo` vêm em toda mensagem `curso` (inclusive `abrir` e `prontos`) enquanto a geração ou a correção estão em andamento, para a tela reaberta saber. As chamadas aos modelos vão fora da trava da matéria; o fim da sessão as cancela sem gravar nada. Se a resposta da dissertativa mudou enquanto ela era corrigida (as questões foram geradas de novo), a correção é jogada fora.
+
+O `contexto.prompt` dos eventos é `{nome, hash}`: o nome do arquivo e os 12 primeiros hex do sha256 do conteúdo dele. `respondeu_dissertativa` leva o do `corretor.md`; os outros (`autoavaliou_conceito`, `gerou_diagnostico`, `respondeu_questao`, `concluiu_diagnostico`), o do `diagnostico.md` como ele está na hora do evento. Enquanto alguma questão estiver sem resposta, a tela não recebe `correta`, `confusao`, `explicacao`, `respostaModelo`, a `rubrica`, nem a `correta` e a `correcao` das respostas (o pré-teste não mostra o gabarito durante as questões); a extensão tira esses campos da mensagem. Com todas respondidas, a mensagem vai inteira (a fase Resultado).
 
 ### A tela (etapa Diagnóstico)
 

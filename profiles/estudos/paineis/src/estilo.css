@@ -821,6 +821,31 @@
 .curso__parte--calendario { max-width: var(--measure-read); }
 .cursos__item--abre { cursor: pointer; }
 
+/* ── Gerar módulo (item 6, parte A): o rodapé embaixo de cada card (a etapa, a barra e "Parar"; "Gerado";
+ * "Aguardando material"; o erro) e o formulário (ModalGerarModulo.tsx). ── */
+.mod__rodape { display: flex; flex-direction: column; gap: var(--space-3); padding: 0 var(--space-2); }
+.mod__linha { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); min-width: 0; }
+.mod__gerando { display: flex; flex-direction: column; gap: var(--space-2); }
+.mod__etapa { flex: 1; min-width: 0; margin: 0; color: var(--ink); }
+.mod__barra { display: block; height: 4px; overflow: hidden; border-radius: 2px; background: var(--surface-well); }
+.mod__barra > span { display: block; height: 100%; background: var(--amber); }
+.mod__resumo { color: var(--ink-muted); }
+.mod__de-novo { margin-left: auto; }
+.mod__nota { min-width: 0; color: var(--ink); overflow-wrap: anywhere; }
+.mod__rodape .ap-callout p { margin: 0; }
+.mod__erro { margin: 0; }
+.mod__erro-lista { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
+.mod__erro-lista .cursos__erro { margin: 0; }
+.mod__form { display: flex; flex-direction: column; gap: var(--space-5); }
+.mod__texto { margin: 0; color: var(--ink); max-width: var(--measure-read); }
+.mod__campos { display: flex; flex-direction: column; gap: var(--space-5); }
+.mod__materiais { display: flex; flex-direction: column; gap: var(--space-3); }
+.mod__rotulo { margin: 0; color: var(--ink-muted); }
+.mod__materiais .materiais__lista { max-height: 220px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+.mod__mandados { margin: 0; color: var(--ink-muted); overflow-wrap: anywhere; }
+.mod__aviso { margin: 0; color: var(--ink-muted); }
+.mod__custo { margin-right: auto; color: var(--ink-muted); }
+
 @media (max-width: 900px) {
 	.curso__cabeca, .curso__corpo { padding-left: var(--space-5); padding-right: var(--space-5); }
 	.curso__modulos { grid-template-columns: minmax(0, 1fr); }

@@ -193,6 +193,20 @@ export function descreverEvento(evento: Evento): { icone: IconName; texto: strin
 			const detalhe = [questoes !== undefined ? `${questoes} ${questoes === 1 ? "questão" : "questões"}` : "", custo].filter(Boolean).join(" · ");
 			return { icone: "checklist", texto: `Diagnóstico preparado: ${nomeDoCurso(evento)}`, ...(detalhe ? { detalhe } : {}) };
 		}
+		case "gerou_modulo": {
+			const modulo = typeof evento.objeto.modulo === "string" ? evento.objeto.modulo : "um módulo";
+			const curso = typeof evento.objeto.curso === "string" ? evento.objeto.curso : "um curso";
+			const licoes = typeof resultado.licoes === "number" ? `${resultado.licoes} ${resultado.licoes === 1 ? "lição" : "lições"}` : "";
+			const questoes = typeof resultado.questoes === "number" ? `${resultado.questoes} ${resultado.questoes === 1 ? "questão" : "questões"}` : "";
+			const custo = typeof resultado.custo === "number" && resultado.custo > 0 ? formatarDolar(resultado.custo) : "";
+			const detalhe = [licoes, questoes, custo].filter(Boolean).join(" · ");
+			return { icone: "book", texto: `Módulo gerado: ${modulo} de ${curso}`, ...(detalhe ? { detalhe } : {}) };
+		}
+		case "marcou_aguardando_material": {
+			const modulo = typeof evento.objeto.modulo === "string" ? evento.objeto.modulo : "um módulo";
+			const aviso = typeof resultado.nota === "string" && resultado.nota.trim() ? resultado.nota.trim() : "";
+			return { icone: "clock", texto: `Módulo aguardando material: ${modulo}`, ...(aviso ? { detalhe: aviso } : {}) };
+		}
 		case "gerou_esqueleto": {
 			const modulos = typeof resultado.modulos === "number" ? resultado.modulos : Array.isArray(resultado.modulos) ? resultado.modulos.length : undefined;
 			const custo = typeof resultado.custo === "number" && resultado.custo > 0 ? formatarDolar(resultado.custo) : "";
@@ -370,6 +384,7 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 					cursoId={props.curso}
 					navegar={props.navegar}
 					tom={tom}
+					{...(nomeAgente ? { agente: { nome: nomeAgente, ...(avatarAgente ? { avatar: avatarAgente } : {}) } } : {})}
 				/>
 			) : guia ? (
 				<TelaGuiaCurso

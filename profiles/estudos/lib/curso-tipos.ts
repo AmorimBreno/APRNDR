@@ -142,6 +142,8 @@ export interface ResumoCurso {
 	/** O prazo do Básico, ou null. */
 	prazo: string | null;
 	alteradoEm: string;
+	/** Quantos módulos tem o esqueleto do curso criado (só num curso com a etapa esqueleto). */
+	modulos?: number;
 }
 
 export interface ListaCursos {
@@ -763,7 +765,15 @@ export function novoCurso(id: string, materia: string, basico: EntradaBasico, ag
 
 /** O curso na lista do caderno. */
 export function resumoDoCurso(curso: Curso): ResumoCurso {
-	return { id: curso.id, nome: curso.nome, situacao: curso.situacao, etapa: curso.etapa, prazo: curso.basico?.prazo ?? null, alteradoEm: curso.alteradoEm };
+	return {
+		id: curso.id,
+		nome: curso.nome,
+		situacao: curso.situacao,
+		etapa: curso.etapa,
+		prazo: curso.basico?.prazo ?? null,
+		alteradoEm: curso.alteradoEm,
+		...(curso.esqueleto && Array.isArray(curso.esqueleto.modulos) ? { modulos: curso.esqueleto.modulos.length } : {}),
+	};
 }
 
 /**

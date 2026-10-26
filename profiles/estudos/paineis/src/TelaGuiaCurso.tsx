@@ -130,7 +130,11 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 	const [erro, setErro] = useState<string | undefined>(undefined);
 	const [salvando, setSalvando] = useState(false);
 	const [aviso, setAviso] = useState<{ etapas: Etapa[]; seguir(): void } | undefined>(undefined);
-	const [perguntarSair, setPerguntarSair] = useState(false);
+	/** Para onde ir depois de confirmar a saída (Sair; no Esqueleto com edições sem salvar, também Voltar e o trilho). */
+	const [saida, setSaida] = useState<{ seguir(): void; esqueleto: boolean } | undefined>(undefined);
+	// A última saída pedida: o texto do modal continua enquanto ele fecha.
+	const ultimaSaida = useRef(saida);
+	if (saida) ultimaSaida.current = saida;
 	// O último aviso: o texto do modal continua enquanto ele fecha.
 	const ultimoAviso = useRef(aviso);
 	if (aviso) ultimoAviso.current = aviso;
@@ -275,7 +279,15 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 		}
 	};
 
-	const sair = () => (sujo ? setPerguntarSair(true) : pronto && curso ? abrirVisao(curso.id) : voltarAosCursos());
+	// O Esqueleto com edições que só ficaram na tela (módulo vazio ou sem nome não vão para a extensão): sair as perde.
+	const esqueletoNaoSalvo = vista === "esqueleto" && esqueleto.naoSalvo;
+	/** Vai para `destino`, perguntando antes quando algo nesta etapa se perderia. */
+	const sairPara = (destino: () => void, sempre = false) => {
+		if (esqueletoNaoSalvo) setSaida({ seguir: destino, esqueleto: true });
+		else if (sempre && sujo) setSaida({ seguir: destino, esqueleto: false });
+		else destino();
+	};
+	const sair = () => sairPara(() => (pronto && curso ? abrirVisao(curso.id) : voltarAosCursos()), true);
 	const indice = ETAPAS.indexOf(vista);
 	const anterior = indice > 0 ? ETAPAS[indice - 1] : undefined;
 
@@ -550,7 +562,7 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 						Sair
 					</Button>
 				</header>
-				<TrilhoGuia curso={curso} vista={vista} abrir={irPara} />
+				<TrilhoGuia curso={curso} vista={vista} abrir={(etapa) => sairPara(() => irPara(etapa))} />
 				<div className="guia__corpo">
 					<motion.div key={`${vista}|${curso?.id ?? "novo"}`} className={`guia__coluna${vista === "mapa" || vista === "diagnostico" || vista === "esqueleto" ? " guia__coluna--larga" : ""}`} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} transition={MOLA}>
 						{erro ? (
@@ -566,7 +578,7 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 						<Button
 							variant="secondary"
 							icon="arrow-left"
-							onClick={() => (vista === "diagnostico" && diagnostico.voltar ? diagnostico.voltar() : irPara(anterior))}
+							onClick={() => (vista === "diagnostico" && diagnostico.voltar ? diagnostico.voltar() : sairPara(() => irPara(anterior)))}
 							disabled={salvando}
 						>
 							Voltar
@@ -620,21 +632,22 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 			{diagnostico.modal}
 			{esqueleto.modal}
 			<Modal
-				open={perguntarSair}
-				onClose={() => setPerguntarSair(false)}
+				open={Boolean(saida)}
+				onClose={() => setSaida(undefined)}
 				kicker={curso?.nome ?? "Novo curso"}
-				title="Sair sem confirmar esta etapa?"
+				title={ultimaSaida.current?.esqueleto ? "Sair sem salvar?" : "Sair sem confirmar esta etapa?"}
 				size="sm"
 				footer={
 					<>
-						<Button variant="secondary" onClick={() => setPerguntarSair(false)}>
+						<Button variant="secondary" onClick={() => setSaida(undefined)}>
 							Continuar aqui
 						</Button>
 						<Button
 							variant="danger"
 							onClick={() => {
-								setPerguntarSair(false);
-								voltarAosCursos();
+								const destino = saida?.seguir;
+								setSaida(undefined);
+								destino?.();
 							}}
 						>
 							Sair
@@ -642,7 +655,11 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 					</>
 				}
 			>
-				<p className="body">O que já foi confirmado fica salvo.</p>
+				<p className="body">
+					{ultimaSaida.current?.esqueleto
+						? "As mudanças do esqueleto que ainda não foram salvas se perdem (um módulo vazio ou sem nome não é salvo)."
+						: "O que já foi confirmado fica salvo."}
+				</p>
 			</Modal>
 		</div>
 	);

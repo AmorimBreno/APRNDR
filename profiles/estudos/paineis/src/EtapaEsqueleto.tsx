@@ -86,6 +86,8 @@ export interface EtapaEsqueleto {
 	/** O primário do rodapé ("Montar o esqueleto" ou "Criar curso"); sem ele, o rodapé fica sem primário. */
 	primario?: { texto: string; desligado?: string; acao(): void; ocupado?: boolean };
 	modal: ReactNode;
+	/** Há edições só nesta tela (a proposta não passa na validação, e por isso não foi salva): sair as perde. */
+	naoSalvo: boolean;
 }
 
 /** A edição que vai para a extensão: os módulos e a geração das edições (as de uma geração velha não saem). */
@@ -200,7 +202,10 @@ export function useEtapaEsqueleto(props: PropsEtapaEsqueleto): EtapaEsqueleto {
 		else setApagando({ id: modulo.id, indice, nome: modulo.nome });
 	};
 
-	if (!curso) return { corpo: null, modal: null };
+	const naoSalvo = Boolean(
+		!pronto && emAndamento && locais && locais.geradoEm === emAndamento.geradoEm && problemaDosModulos(locais.modulos, conceitos),
+	);
+	if (!curso) return { corpo: null, modal: null, naoSalvo: false };
 
 	// --- O calendário: o gravado no curso pronto; senão, o de hoje ---------------------
 	const basico = curso.basico;
@@ -351,7 +356,7 @@ export function useEtapaEsqueleto(props: PropsEtapaEsqueleto): EtapaEsqueleto {
 		</>
 	);
 
-	return { corpo, ...(primario ? { primario } : {}), modal };
+	return { corpo, ...(primario ? { primario } : {}), modal, naoSalvo };
 }
 
 function ErroGerar({ mensagem, tentar }: { mensagem: string; tentar(): void }) {

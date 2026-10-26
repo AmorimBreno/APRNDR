@@ -90,8 +90,6 @@ export interface LidoCursos {
 	diagnosticos: Record<string, AndamentoDiagnostico>;
 	/** O que corre em segundo plano no esqueleto de cada curso. */
 	esqueletos: Record<string, AndamentoEsqueleto>;
-	/** Quantos módulos tem o esqueleto de cada curso pronto que chegou inteiro (a lista não traz). */
-	modulos: Record<string, number>;
 }
 
 /** Lê, em ordem, o que chegou ao painel "cursos" para a matéria. Um erro sem matéria também conta (só estas telas ouvem o painel). */
@@ -103,7 +101,6 @@ export function lerCursos(recebidas: readonly AcaoRecebida[], materia: string): 
 	const errosAbrir: Record<string, string> = {};
 	const diagnosticos: Record<string, AndamentoDiagnostico> = {};
 	const esqueletos: Record<string, AndamentoEsqueleto> = {};
-	const modulos: Record<string, number> = {};
 	for (const recebida of recebidas) {
 		if (recebida.acao === "lista") {
 			const dados = recebida.dados as MensagemListaCursos | undefined;
@@ -129,8 +126,6 @@ export function lerCursos(recebidas: readonly AcaoRecebida[], materia: string): 
 			const esqueletoAntes = esqueletos[curso.id];
 			const gerandoEsqueleto = dados.gerandoEsqueleto === true;
 			esqueletos[curso.id] = { gerando: gerandoEsqueleto, ...(esqueletoAntes?.erroGerar && !gerandoEsqueleto ? { erroGerar: esqueletoAntes.erroGerar } : {}) };
-			if (curso.esqueleto && Array.isArray(curso.esqueleto.modulos)) modulos[curso.id] = curso.esqueleto.modulos.length;
-			else delete modulos[curso.id];
 			if (lista) {
 				const resumo = resumoDoCurso(curso);
 				const indice = lista.findIndex((item) => item.id === curso.id);
@@ -144,7 +139,6 @@ export function lerCursos(recebidas: readonly AcaoRecebida[], materia: string): 
 			delete prontos[dados.curso];
 			delete diagnosticos[dados.curso];
 			delete esqueletos[dados.curso];
-			delete modulos[dados.curso];
 			if (lista) lista = lista.filter((item) => item.id !== dados.curso);
 		} else if (recebida.acao === "erro") {
 			const dados = recebida.dados as MensagemErroCursos | undefined;
@@ -169,7 +163,7 @@ export function lerCursos(recebidas: readonly AcaoRecebida[], materia: string): 
 			}
 		}
 	}
-	return { ...(lista ? { lista } : {}), ...(erroLista ? { erroLista } : {}), cursos, prontos, errosAbrir, diagnosticos, esqueletos, modulos };
+	return { ...(lista ? { lista } : {}), ...(erroLista ? { erroLista } : {}), cursos, prontos, errosAbrir, diagnosticos, esqueletos };
 }
 
 // --- A espera pelo pedido ----------------------------------------------------
@@ -275,8 +269,6 @@ export interface CursosDaMateria {
 	/** undefined até a primeira lista chegar. */
 	lista?: ResumoCurso[];
 	erroLista?: string;
-	/** Quantos módulos tem cada curso pronto da lista, quando já se sabe (pelo curso inteiro). */
-	modulos: Record<string, number>;
 	/** Cria o rascunho com o Básico confirmado; resolve com o curso. */
 	comecar(basico: EntradaBasico): Promise<Curso>;
 	/** Descarta um rascunho (a pasta é apagada). */
@@ -304,24 +296,10 @@ export function useCursos(janela: JanelaPerfilHook, materiaId: string, vez?: str
 	const ultima = useRef<{ materia: string; lista: ResumoCurso[] } | undefined>(undefined);
 	if (lido.lista) ultima.current = { materia: materiaId, lista: lido.lista };
 	const lista = lido.lista ?? (ultima.current?.materia === materiaId ? ultima.current.lista : undefined);
-	// A lista não diz quantos módulos tem um curso pronto: pede cada um inteiro uma vez (por sessão).
-	const pedidos = useRef<{ sessao: string | undefined; ids: Set<string> }>({ sessao: undefined, ids: new Set() });
-	const faltam = (lista ?? []).filter((item) => item.situacao === "pronto" && lido.modulos[item.id] === undefined).map((item) => item.id);
-	const chaveFaltam = faltam.join("\n");
-	useEffect(() => {
-		if (!sessaoId) return;
-		if (pedidos.current.sessao !== sessaoId) pedidos.current = { sessao: sessaoId, ids: new Set() };
-		for (const curso of faltam) {
-			if (pedidos.current.ids.has(`${materiaId}/${curso}`)) continue;
-			pedidos.current.ids.add(`${materiaId}/${curso}`);
-			semEsperar(acoes.acaoDaInterface(PAINEL_CURSOS, "abrir", { materia: materiaId, curso } satisfies AcoesCursos["abrir"]));
-		}
-	}, [sessaoId, acoes, materiaId, chaveFaltam]);
 	const mandar = useMandarComPedido(janela);
 	return {
 		...(lista ? { lista } : {}),
 		...(lido.erroLista ? { erroLista: lido.erroLista } : {}),
-		modulos: lido.modulos,
 		listar,
 		comecar: async (basico) => {
 			const resposta = await mandar("comecar", { materia: materiaId, pedido: crypto.randomUUID(), basico });

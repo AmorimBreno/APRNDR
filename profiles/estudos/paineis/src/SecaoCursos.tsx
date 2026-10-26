@@ -94,7 +94,7 @@ export function SecaoCursos(props: PropsSecaoCursos) {
 			</div>
 			<ul className="cursos__lista">
 				{lista.map((curso, indice) => {
-					const rotulo = rotuloCurso(curso, props.cursos.modulos[curso.id]);
+					const rotulo = rotuloCurso(curso, curso.modulos);
 					const pronto = curso.situacao === "pronto";
 					return (
 						<motion.li

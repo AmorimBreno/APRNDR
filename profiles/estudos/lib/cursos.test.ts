@@ -284,6 +284,10 @@ describe("resumo e avisos", () => {
 		const curso = cursoCompleto();
 		expect(resumoDoCurso(curso)).toEqual({ id: "p1-regressao", nome: "P1: regressão", situacao: "rascunho", etapa: "esqueleto", prazo: "2026-11-20", alteradoEm: AGORA.toISOString() });
 		expect(resumoDoCurso(novoCurso("x", "m", { nome: "X", prazo: null, horasPorSemana: 1 }, AGORA)).prazo).toBeNull();
+		// Com o esqueleto criado, o resumo diz quantos módulos ele tem (sem esqueleto, o campo não aparece).
+		const comEsqueleto = { ...curso, situacao: "pronto", esqueleto: { modulos: [{ id: "m1" }, { id: "m2" }, { id: "m3" }] } } as unknown as Curso;
+		expect(resumoDoCurso(comEsqueleto).modulos).toBe(3);
+		expect("modulos" in resumoDoCurso(curso)).toBe(false);
 		expect(ETAPAS.map(nomeDaEtapa)).toEqual(["Básico", "Materiais", "Objetivo", "Mapa", "Diagnóstico", "Esqueleto"]);
 	});
 

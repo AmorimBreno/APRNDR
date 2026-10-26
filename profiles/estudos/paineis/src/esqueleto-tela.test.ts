@@ -210,11 +210,10 @@ describe("o que a ponte guarda do esqueleto", () => {
 	const recebida = (acao: string, dados: unknown): AcaoRecebida => ({ chave: `k${++contador}`, acao, dados });
 	const materia = "ciencia-de-dados";
 
-	it("gerandoEsqueleto, o erro de gerar até gerar de novo, e os módulos do curso pronto", () => {
+	it("gerandoEsqueleto, o erro de gerar até gerar de novo, e os módulos do curso pronto na lista", () => {
 		const rascunho = cursoPronto({ situacao: "rascunho", esqueleto: null });
 		let lido = lerCursos([recebida("curso", { materia, curso: rascunho, gerandoEsqueleto: true })], materia);
 		expect(lido.esqueletos[rascunho.id]).toEqual({ gerando: true });
-		expect(lido.modulos[rascunho.id]).toBeUndefined();
 
 		const erro = recebida("erro", { materia, curso: rascunho.id, ao: "gerar_esqueleto", mensagem: "O modelo não respondeu." });
 		lido = lerCursos([recebida("curso", { materia, curso: rascunho, gerandoEsqueleto: true }), erro], materia);
@@ -226,8 +225,10 @@ describe("o que a ponte guarda do esqueleto", () => {
 		lido = lerCursos([erro, recebida("curso", { materia, curso: rascunho, gerandoEsqueleto: true })], materia);
 		expect(lido.esqueletos[rascunho.id]).toEqual({ gerando: true });
 
-		lido = lerCursos([recebida("curso", { materia, curso: cursoPronto() })], materia);
-		expect(lido.modulos).toEqual({ "p1-regressao": 2 });
+		// O curso pronto que chega atualiza a linha da lista, com quantos módulos ele tem (resumoDoCurso).
+		const lista = recebida("lista", { materia, cursos: [{ id: "p1-regressao", nome: "P1: regressão", situacao: "rascunho", etapa: "esqueleto", prazo: null, alteradoEm: "2026-10-26T10:00:00.000Z" }] });
+		lido = lerCursos([lista, recebida("curso", { materia, curso: cursoPronto() })], materia);
+		expect(lido.lista?.[0]?.modulos).toBe(2);
 		expect(lido.esqueletos["p1-regressao"]).toEqual({ gerando: false });
 	});
 

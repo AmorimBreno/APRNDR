@@ -817,7 +817,6 @@
 .curso__modulo-texto { display: flex; flex-direction: column; gap: 2px; padding: 0 var(--space-2); }
 .curso__objetivo { margin: 0; color: var(--ink); }
 .curso__datas { margin: 0; color: var(--ink-muted); }
-.curso__acao { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .curso__parte--calendario { max-width: var(--measure-read); }
 .cursos__item--abre { cursor: pointer; }
 
@@ -849,4 +848,91 @@
 @media (max-width: 900px) {
 	.curso__cabeca, .curso__corpo { padding-left: var(--space-5); padding-right: var(--space-5); }
 	.curso__modulos { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ── A visão do módulo gerado (TelaModulo.tsx, item 6, parte B): a CourseBar no lugar da aba do caderno
+ * e, embaixo, o índice das lições à esquerda (fixo ao rolar) e a lição à direita, com a SectionRuler na
+ * margem e os blocos na coluna de leitura. No contêiner estreito, o índice vira fichas por cima. ── */
+.aba-modulo .ap-cbar__track { min-width: 0; }
+.aba-modulo .ap-cbar__kicker { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.modulo__corpo { container-type: inline-size; }
+.modulo__grade { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: var(--space-6); }
+
+/* O índice. */
+.modulo__indice { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.modulo__indice-titulo { margin: 0 var(--space-3); color: var(--ink-muted); }
+.modulo__licoes { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.modulo__item { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: baseline; gap: var(--space-3); width: 100%; min-height: var(--control-md); padding: var(--space-2) var(--space-3); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink); text-align: left; cursor: pointer; transition: background-color .12s ease-out; }
+.modulo__item:hover { background: var(--surface-hover); }
+.modulo__item:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.modulo__item--atual, .modulo__item--atual:hover { background: var(--surface-raised); }
+.modulo__item--atual::before { content: ""; position: absolute; top: 6px; bottom: 6px; left: 0; width: 3px; border-radius: var(--radius-full); background: var(--amber); }
+.modulo__item-num { color: var(--ink-subtle); }
+.modulo__item--atual .modulo__item-num { color: var(--amber); }
+.modulo__item-titulo { min-width: 0; overflow-wrap: anywhere; }
+.modulo__resumo { margin: var(--space-2) var(--space-3) 0; color: var(--ink-muted); }
+
+/* A lição: a régua na margem e a coluna de leitura (o número de cada bloco fica na margem, à esquerda dela). */
+.modulo__leitura { display: grid; grid-template-columns: 24px minmax(0, var(--measure-read)); column-gap: 96px; align-items: start; min-width: 0; }
+.modulo__regua { position: sticky; top: 35%; }
+.modulo__licao { display: flex; flex-direction: column; gap: var(--space-6); min-width: 0; padding-bottom: var(--space-8); }
+.modulo__aviso { position: relative; }
+.modulo__aviso .ap-callout p { margin: 0; }
+.modulo__aviso-fechar { position: absolute; top: -4px; right: 0; }
+.modulo__cabeca { display: flex; flex-direction: column; gap: var(--space-1); }
+.modulo__cabeca p, .modulo__cabeca h2 { margin: 0; }
+.modulo__cabeca-rotulo { color: var(--ink-muted); }
+.modulo__titulo { overflow-wrap: anywhere; }
+.modulo__objetivo { color: var(--ink-muted); }
+.modulo__blocos { display: flex; flex-direction: column; gap: 44px; padding-top: var(--space-4); }
+.modulo__bloco { display: flex; flex-direction: column; gap: var(--space-3); scroll-margin-top: var(--space-6); }
+.modulo__bloco .modulo__bloco-cabeca { flex-wrap: wrap; margin: 0 0 var(--space-3); }
+.modulo__questao { display: flex; flex-direction: column; gap: var(--space-4); }
+.modulo__questao .ap-quiz { max-width: none; }
+.modulo__questao .ap-opt, .modulo__questao .ap-opt:hover { cursor: default; }
+.modulo__questao .ap-opt--idle:hover { background: var(--surface-raised); }
+.modulo__questao .ap-opt__label { display: flex; flex-direction: column; gap: 2px; }
+.modulo__confusao { color: var(--ink-muted); }
+.modulo__contexto { padding: var(--space-4) var(--space-5); border-radius: var(--radius-md); background: var(--surface-well); }
+.modulo__contexto > :last-child { margin-bottom: 0; }
+.modulo__revelado { display: flex; flex-direction: column; gap: var(--space-4); margin-top: var(--space-4); }
+.modulo__gabarito > :last-child { margin-bottom: 0; }
+.modulo__bloco .modulo__gabarito-rotulo { margin: 0 0 var(--space-2); color: var(--ink-muted); }
+.modulo__gabarito--recuado { padding-left: var(--space-4); border-left: var(--border-strong) solid var(--steel); }
+.modulo__bloco .modulo__rubrica { display: flex; flex-direction: column; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+.modulo__bloco .modulo__criterio + .modulo__criterio { margin-top: 0; padding-top: var(--space-3); border-top: var(--border-hair) solid var(--line); }
+.modulo__bloco .modulo__criterio p { margin: 0; }
+.modulo__criterio-pontos, .modulo__criterio-descricao { color: var(--ink-muted); }
+.modulo__referencias { margin-top: 0; }
+.modulo__pe { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); padding-top: var(--space-5); border-top: var(--border-hair) solid var(--line); }
+.modulo__erro { max-width: var(--measure-read); }
+.modulo__erro .ap-callout p { margin: 0; }
+.modulo__erro-botoes { display: flex; gap: var(--space-2); margin-top: var(--space-3); }
+
+/* Largo: o índice à esquerda (≈260 px), fixo no alto do corpo que rola. */
+@container (min-width: 900px) {
+	.modulo__grade { grid-template-columns: 260px minmax(0, 1fr); gap: var(--space-8); }
+	.modulo__indice { position: sticky; top: 0; }
+}
+
+/* Estreito: o índice vira uma faixa de fichas (o número e o título, cortado) por cima da lição; sem a régua. */
+@container (max-width: 899.98px) {
+	.modulo__indice { gap: var(--space-2); }
+	.modulo__indice-titulo { margin: 0; }
+	.modulo__licoes { flex-direction: row; gap: var(--space-1); overflow-x: auto; padding-bottom: var(--space-2); scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+	.modulo__licoes > li { flex: none; }
+	.modulo__item { display: inline-flex; align-items: center; gap: var(--space-2); width: auto; max-width: 240px; min-height: var(--control-sm); padding: 0 var(--space-3); background: var(--surface-raised); }
+	.modulo__item-titulo { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+	.modulo__item--atual, .modulo__item--atual:hover { background: var(--amber-tint); box-shadow: inset 0 0 0 var(--border-hair) var(--amber); }
+	.modulo__item--atual::before { display: none; }
+	.modulo__item--atual:focus-visible { box-shadow: inset 0 0 0 var(--border-hair) var(--amber), var(--focus-ring); }
+	.modulo__resumo { margin: 0; }
+	.modulo__leitura { grid-template-columns: minmax(0, 1fr); padding-left: 64px; }
+	.modulo__regua { display: none; }
+}
+@media (max-width: 640px) {
+	.modulo__leitura { padding-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+	.modulo__item { transition: none; }
 }

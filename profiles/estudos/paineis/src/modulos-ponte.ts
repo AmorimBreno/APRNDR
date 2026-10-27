@@ -7,10 +7,14 @@
 // (a geração começou, ou o módulo passou a aguardar) e rejeitada quando chega
 // um "erro" com ele. Cancelar não tem pedido na ponte: a promessa resolve
 // quando a ação sai, e o estado novo diz que a geração parou.
+//
+// A visão do módulo gerado (TelaModulo.tsx, parte B) usa useModuloAberto:
+// manda "abrir" e lê o "modulo" (ou o "erro" do abrir) que voltou.
 
 import { type AcaoRecebida, type JanelaPerfilHook, semEsperar } from "@estudos/ui";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type AcoesModulos, type MensagemErroModulos, type MensagemEstadoModulos, PAINEL_MODULOS } from "../../lib/modulo-tipos.ts";
+import { type AcoesModulos, type MensagemErroModulos, type MensagemEstadoModulos, type MensagemModulo, PAINEL_MODULOS } from "../../lib/modulo-tipos.ts";
+import type { LidoModuloAberto } from "./modulo-tela.ts";
 import { type CamposPedido, estaGerando } from "./modulos-tela.ts";
 
 export { PAINEL_MODULOS };
@@ -61,13 +65,60 @@ export function lerModulos(recebidas: readonly AcaoRecebida[], materia: string, 
 			}
 		} else if (recebida.acao === "erro") {
 			const dados = recebida.dados as MensagemErroModulos | undefined;
-			if (!dados || !doCurso(dados, materia, curso) || dados.pedido) continue;
+			// Os erros do abrir são da visão do módulo (lerModuloAberto), não do card.
+			if (!dados || !doCurso(dados, materia, curso) || dados.pedido || dados.ao === "abrir") continue;
 			const erro: ErroVistoModulo = { chave: recebida.chave, mensagem: dados.mensagem || "Erro desconhecido.", ...(dados.ao ? { ao: dados.ao } : {}) };
 			if (dados.modulo && dados.ao !== "listar") errosModulo[dados.modulo] = erro;
 			else erroLista = erro;
 		}
 	}
 	return { ...(estado ? { estado } : {}), ...(erroLista ? { erroLista } : {}), errosModulo };
+}
+
+// --- O módulo aberto (parte B) ----------------------------------------------
+
+/**
+ * Lê, em ordem, a resposta ao "abrir" do módulo: o último "modulo" daquele
+ * módulo do curso, ou o último "erro" do abrir dele (o que veio por último
+ * vale). Nada ainda, vazio.
+ */
+export function lerModuloAberto(recebidas: readonly AcaoRecebida[], materia: string, curso: string, modulo: string): LidoModuloAberto {
+	let lido: LidoModuloAberto = {};
+	for (const recebida of recebidas) {
+		if (recebida.acao === "modulo") {
+			const dados = recebida.dados as MensagemModulo | undefined;
+			if (!dados || dados.materia !== materia || dados.curso !== curso || dados.modulo?.id !== modulo || !Array.isArray(dados.modulo.licoes)) continue;
+			lido = { modulo: dados.modulo };
+		} else if (recebida.acao === "erro") {
+			const dados = recebida.dados as MensagemErroModulos | undefined;
+			if (!dados || dados.ao !== "abrir" || dados.modulo !== modulo || !doCurso(dados, materia, curso)) continue;
+			lido = { erro: dados.mensagem || "Erro desconhecido." };
+		}
+	}
+	return lido;
+}
+
+/**
+ * O módulo gerado aberto: manda "abrir" ao montar, quando a sessão muda, quando
+ * o módulo muda e em `abrirDeNovo`. Trocar de sessão zera as ações da ponte;
+ * até a nova resposta chegar, vale a última do mesmo módulo.
+ */
+export function useModuloAberto(janela: JanelaPerfilHook, materia: string, curso: string, modulo: string): LidoModuloAberto & { abrirDeNovo(): void } {
+	const { estado: estadoJanela, acoes } = janela;
+	const sessaoId = estadoJanela.sessao?.sessaoId;
+	const abrir = useCallback(() => {
+		semEsperar(acoes.acaoDaInterface(PAINEL_MODULOS, "abrir", { materia, curso, modulo } satisfies AcoesModulos["abrir"]));
+	}, [acoes, materia, curso, modulo]);
+	useEffect(() => {
+		if (sessaoId) abrir();
+	}, [sessaoId, abrir]);
+	const recebidas = estadoJanela.acoesPorPainel[PAINEL_MODULOS];
+	const lido = useMemo(() => lerModuloAberto(recebidas ?? [], materia, curso, modulo), [recebidas, materia, curso, modulo]);
+	const ultimo = useRef<{ chave: string; lido: LidoModuloAberto } | undefined>(undefined);
+	const chave = `${materia}/${curso}/${modulo}`;
+	if (lido.modulo || lido.erro !== undefined) ultimo.current = { chave, lido };
+	const valendo = lido.modulo || lido.erro !== undefined ? lido : ultimo.current?.chave === chave ? ultimo.current.lido : {};
+	return { ...valendo, abrirDeNovo: abrir };
 }
 
 // --- A espera pelo pedido ----------------------------------------------------

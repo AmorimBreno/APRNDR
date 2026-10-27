@@ -14,8 +14,8 @@
 // do módulo (modulos-tela.ts, cardsDosModulos): o próximo tem "Gerar módulo",
 // que abre o formulário (ModalGerarModulo); durante a geração, o card fica em
 // curso e embaixo dele aparecem a etapa, uma barra e "Parar"; o gerado diz
-// "Gerado" com as lições e as questões, "Abrir" (parte B, "Em breve") e
-// "Gerar de novo" (com confirmação); o aguardando material tem a etiqueta, a
+// "Gerado" com as lições e as questões, "Abrir" (a visão do módulo gerado,
+// parte B, TelaModulo.tsx) e "Gerar de novo" (com confirmação); o aguardando material tem a etiqueta, a
 // nota e "Gerar agora"; o erro, a mensagem e "Tentar de novo". Os módulos
 // depois do próximo continuam bloqueados.
 
@@ -32,6 +32,7 @@ import { Calendario } from "./EtapaEsqueleto.tsx";
 import { datasDoCard, leiturasDoCurso, rotuloPrazo } from "./esqueleto-tela.ts";
 import { caminhoDoGuia } from "./guia-curso.ts";
 import { ModalGerarModulo } from "./ModalGerarModulo.tsx";
+import { caminhoDoModulo } from "./modulo-tela.ts";
 import { useModulos } from "./modulos-ponte.ts";
 import {
 	acaoDoCard,
@@ -241,21 +242,12 @@ export function TelaCurso(props: PropsTelaCurso) {
 												: { label: "Conceitos", value: String(modulo.conceitos) },
 											{ label: "Horas", value: numeroCurto(modulo.horas), unit: "h" },
 										]}
-										{...(card.tipo === "gerado"
-											? {
-													action: (
-														<span className="curso__acao">
-															{acao}
-															<Tag size="sm" tone="outline" icon="clock">
-																Em breve
-															</Tag>
-														</span>
-													),
-												}
-											: acao
-												? { action: acao }
+										{...(acao ? { action: acao } : {})}
+										{...(abreFormulario
+											? { onOpen: () => abrirFormulario(modulo.id) }
+											: card.tipo === "gerado"
+												? { onOpen: () => props.navegar(caminhoDoModulo(materiaId, cursoId, modulo.id)) }
 												: {})}
-										{...(abreFormulario ? { onOpen: () => abrirFormulario(modulo.id) } : {})}
 									/>
 									<RodapeModulo
 										card={card}

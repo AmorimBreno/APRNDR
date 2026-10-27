@@ -17,7 +17,8 @@
 // e caderno/<matéria>/cursos/<curso>/guia[/<etapa>] abrem o guia de criação de
 // curso (TelaGuiaCurso) no lugar do índice e da seção, com a aba no topo;
 // caderno/<matéria>/cursos/<curso> abre a visão do curso pronto (TelaCurso), do
-// mesmo jeito.
+// mesmo jeito; caderno/<matéria>/cursos/<curso>/modulos/<módulo>[/<lição>]
+// abre a visão do módulo gerado (TelaModulo), com a CourseBar no lugar da aba.
 
 import { Button, EmptyState, Icon, type IconName, NotebookCover, type OrnamentGlyph, pad2 } from "@estudos/design-system";
 import { type JanelaPerfilHook, type PropsTelaInicial, semEsperar } from "@estudos/ui";
@@ -39,6 +40,7 @@ import { dataNumerica } from "./guia-curso.ts";
 import { SecaoCursos } from "./SecaoCursos.tsx";
 import { TelaCurso } from "./TelaCurso.tsx";
 import { TelaGuiaCurso } from "./TelaGuiaCurso.tsx";
+import { TelaModulo } from "./TelaModulo.tsx";
 
 interface Secao {
 	id: string;
@@ -273,6 +275,8 @@ export interface PropsTelaCaderno extends PropsTelaInicial {
 	guia?: { curso?: string; etapa?: string };
 	/** A visão do curso pronto: o id do curso. */
 	curso?: string;
+	/** A visão do módulo gerado: o curso, o módulo e a lição (sem ela, a primeira). */
+	modulo?: { curso: string; modulo: string; licao?: string };
 }
 
 export function TelaCaderno(props: PropsTelaCaderno) {
@@ -351,8 +355,25 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 	const avatarAgente = nomeAgente ? props.perfil?.agentes.find((agente) => agente.nome === nomeAgente)?.avatar : undefined;
 	const notaAberta = secao.id === "notas" ? props.nota : undefined;
 
+	// O módulo gerado: a CourseBar faz o papel da aba (TelaModulo desenha as duas linhas da tela).
+	const moduloAberto = props.modulo;
 	return (
 		<div className="tela-caderno">
+			{moduloAberto ? (
+				<TelaModulo
+					key={`${moduloAberto.curso}/${moduloAberto.modulo}`}
+					janela={props.janela}
+					materiaId={materiaId}
+					{...(materia ? { materia } : {})}
+					{...(numero ? { numero } : {})}
+					cursoId={moduloAberto.curso}
+					moduloId={moduloAberto.modulo}
+					{...(moduloAberto.licao ? { licaoId: moduloAberto.licao } : {})}
+					navegar={props.navegar}
+					tom={tom}
+				/>
+			) : (
+			<>
 			<AbaCaderno
 				{...(materia ? { materia } : {})}
 				{...(numero ? { numero } : {})}
@@ -503,6 +524,8 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 						)}
 					</motion.section>
 				</div>
+			)}
+			</>
 			)}
 			{materia ? (
 				<ModalMateria

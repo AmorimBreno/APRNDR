@@ -382,7 +382,7 @@ const VAO_MAIS = 6;
  * o "−" fecha de novo. Quantos cabem é medido numa cópia escondida da
  * etiqueta, de novo sempre que a largura da linha muda.
  */
-function EtiquetaReferencia(props: { arquivo: string; locais: string[]; abrir(): void }) {
+export function EtiquetaReferencia(props: { arquivo: string; locais: string[]; abrir(): void }) {
 	const { arquivo, locais } = props;
 	const [aberta, setAberta] = useState(false);
 	const [cabem, setCabem] = useState(locais.length);

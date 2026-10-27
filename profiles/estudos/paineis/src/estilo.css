@@ -3,7 +3,7 @@
 
 /* A largura da coluna de leitura do perfil: a lição do módulo e a página da nota (mais larga que o
  * measure-read do design system, de 720 px, para o texto usar melhor a tela). */
-:root { --largura-leitura-estudos: 860px; }
+:root { --largura-leitura-estudos: 1000px; }
 
 .quiz { display: flex; flex-direction: column; gap: var(--space-6); }
 .quiz__vazio { margin: 0; color: var(--ink-muted); }
@@ -876,11 +876,12 @@
 .modulo__item-titulo { min-width: 0; overflow-wrap: anywhere; }
 .modulo__resumo { margin: var(--space-2) var(--space-3) 0; color: var(--ink-muted); }
 
-/* A lição: a coluna de leitura (--largura-leitura-estudos) centrada no espaço ao lado do índice, com a
- * régua na margem esquerda dela, a 96 px (o número de cada bloco fica nesse vão). A primeira trilha
- * guarda pelo menos a régua e o vão; as duas de fora dividem o que sobra. */
+/* A lição: a coluna de leitura (--largura-leitura-estudos) centrada no espaço ao lado do índice, e a
+ * régua no começo da primeira trilha, logo depois do índice. A primeira trilha guarda pelo menos a
+ * régua e o número de cada bloco; as duas de fora dividem o que sobra. */
 .modulo__leitura { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(0, var(--largura-leitura-estudos)) minmax(0, 1fr); align-items: start; min-width: 0; }
-.modulo__regua { position: sticky; top: 35%; grid-row: 1; grid-column: 1; justify-self: end; margin-right: 96px; }
+/* A régua no começo da área de leitura, perto do índice (pedido do Breno: no meio da tela, ela disputava com o texto). */
+.modulo__regua { position: sticky; top: 35%; grid-row: 1; grid-column: 1; justify-self: start; margin-left: var(--space-6); }
 .modulo__licao { display: flex; flex-direction: column; gap: var(--space-6); grid-row: 1; grid-column: 2; min-width: 0; padding-bottom: var(--space-8); }
 .modulo__aviso { position: relative; }
 .modulo__aviso .ap-callout p { margin: 0; }

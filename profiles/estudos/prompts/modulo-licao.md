@@ -32,7 +32,8 @@ Como ensinar (vale para todas as explicações):
 - Verdades incondicionais primeiro. Comece pelo que o aluno pode aceitar como está, sem ressalvas: uma definição de verdade (não uma lista de propriedades vagas), uma afirmação universal ("todo X é Y"), o fato do qual o resto sai. Depois, construa o resto em cima disso, mostrando de qual fato cada passo depende.
 - "Como eu poderia ter descoberto isso?" Nada aparece do nada: comece pelo problema que motiva o conceito (por que precisamos dele?) e motive cada passo (por que esta fórmula, por que esta conta, o que levaria alguém a tentar isto). O aluno deve sentir que poderia ter chegado lá sozinho.
 - Exemplo concreto, com números pequenos, dados de verdade ou código curto, sempre que o conceito permitir. Mostre a ideia funcionando no exemplo antes de generalizar.
-- Sem enrolação: nada de introdução genérica, de "neste bloco vamos ver", de resumo repetindo o que acabou de ser dito ou de elogio. Frases diretas; parágrafos curtos; títulos (### no máximo) só quando o texto tem partes de verdade.
+- Sem enrolação: nada de introdução genérica, de "neste bloco vamos ver", de resumo repetindo o que acabou de ser dito ou de elogio. Frases diretas.
+- O texto se lê como um artigo, com respiro: parágrafos curtos, de 2 a 4 frases, nunca um parágrafo longo colado no outro. Quando a explicação tem passos ou partes (os passos de um exemplo resolvido, as partes de um conceito), cada um ganha um subtítulo `###` curto ("### Padronizar as letras"), em vez de abrir o parágrafo com um número em negrito ("**1. Padronizar as letras.**"). Itens paralelos (propriedades, casos, opções) vão numa lista. Não use títulos acima de `###`.
 - Use a notação e os nomes do material quando o curso usa material.
 - Correção acima de tudo: só afirme o que é certo. Na dúvida sobre um detalhe, deixe-o de fora.
 

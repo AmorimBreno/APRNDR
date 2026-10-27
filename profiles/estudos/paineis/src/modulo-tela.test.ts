@@ -1,7 +1,7 @@
 // As partes puras da visão do módulo gerado (modulo-tela.ts): a rota com e
 // sem lição, o rótulo e o ícone de cada bloco pelo tipo e pelo formato, as
 // estações da trilha, o "Próximo" da CourseBar, o índice das lições (as
-// fichas no estreito), o resumo, a confusão no gabarito e o aviso; e a
+// fichas no estreito), o resumo, a linha de dados da lição, a confusão no gabarito e o aviso; e a
 // leitura da resposta ao "abrir" na ponte (modulos-ponte.ts).
 
 import type { AcaoRecebida } from "@estudos/ui";
@@ -12,6 +12,7 @@ import {
 	avisoFechado,
 	caminhoDoModulo,
 	CHAVE_AVISO,
+	dadosDaLicao,
 	diaEMes,
 	ehComplemento,
 	fraseDaConfusao,
@@ -221,6 +222,12 @@ describe("o índice das lições", () => {
 		expect(resumoDoIndice(modulo)).toBe("2 lições · 3 questões · gerado em 26/10");
 		expect(resumoDoIndice({ licoes: [licao("l1", "Um", [explicacao("l1-b1", "conceito"), alternativa("l1-b2")])] })).toBe("1 lição · 1 questão");
 		expect(diaEMes("nada")).toBe("");
+	});
+
+	it("a linha de dados da lição: os blocos e as questões (sem questão, só os blocos)", () => {
+		expect(dadosDaLicao(licao("l1", "Um", [explicacao("l1-b1", "conceito"), verificacao("l1-b2"), alternativa("l1-b3"), dissertativa("l1-b4")]))).toBe("4 blocos · 2 questões");
+		expect(dadosDaLicao(licao("l1", "Um", [explicacao("l1-b1", "conceito"), alternativa("l1-b2")]))).toBe("2 blocos · 1 questão");
+		expect(dadosDaLicao(licao("l1", "Um", [explicacao("l1-b1", "conceito")]))).toBe("1 bloco");
 	});
 });
 

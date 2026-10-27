@@ -1,6 +1,10 @@
 /* Estilos dos painéis do perfil de estudos, por cima do design system APRNDR
  * (as alternativas usam as classes ap-quiz e ap-opt do QuizQuestion). */
 
+/* A largura da coluna de leitura do perfil: a lição do módulo e a página da nota (mais larga que o
+ * measure-read do design system, de 720 px, para o texto usar melhor a tela). */
+:root { --largura-leitura-estudos: 860px; }
+
 .quiz { display: flex; flex-direction: column; gap: var(--space-6); }
 .quiz__vazio { margin: 0; color: var(--ink-muted); }
 .quiz__item { position: relative; display: flex; flex-direction: column; gap: var(--space-4); }
@@ -162,14 +166,14 @@
 .notas__quando { padding-top: 2px; color: var(--ink-subtle); white-space: nowrap; }
 
 /* A página da nota, como no Notion: uma faixa fina em cima (voltar e a situação), e a coluna de
- * leitura no meio, com o título grande no topo. A margem esquerda da coluna guarda as alças dos blocos. */
+ * leitura (--largura-leitura-estudos) no meio, com o título grande no topo. A margem esquerda da coluna guarda as alças dos blocos. */
 .editor-nota__barra { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding: var(--space-3) var(--space-6); border-bottom: var(--border-hair) solid var(--line); }
 .editor-nota__voltar { display: inline-flex; align-items: center; gap: 6px; padding: 2px 0; border: 0; background: none; color: var(--ink-muted); cursor: pointer; }
 .editor-nota__voltar:hover { color: var(--amber); }
 .editor-nota__voltar:focus-visible { outline: none; border-radius: 2px; box-shadow: var(--focus-ring); }
 .editor-nota__situacao { color: var(--ink-muted); white-space: nowrap; }
 .editor-nota__corpo { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-8) var(--space-4) 30vh; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
-.editor-nota__pagina { position: relative; display: flex; flex-direction: column; gap: var(--space-4); box-sizing: content-box; max-width: var(--measure-read, 720px); margin: 0 auto; padding: 0 var(--space-6) 0 56px; }
+.editor-nota__pagina { position: relative; display: flex; flex-direction: column; gap: var(--space-4); box-sizing: content-box; max-width: var(--largura-leitura-estudos); margin: 0 auto; padding: 0 var(--space-6) 0 56px; }
 .editor-nota__titulo { display: block; width: 100%; margin: 0 0 var(--space-2); padding: 0; overflow: hidden; border: 0; background: none; color: var(--ink); font-family: var(--font-sans); font-size: 36px; line-height: 44px; font-weight: 750; letter-spacing: -.01em; resize: none; }
 .editor-nota__titulo::placeholder { color: var(--ink-subtle); }
 .editor-nota__titulo:focus { outline: none; }
@@ -851,8 +855,8 @@
 }
 
 /* ── A visão do módulo gerado (TelaModulo.tsx, item 6, parte B): a CourseBar no lugar da aba do caderno
- * e, embaixo, o índice das lições à esquerda (fixo ao rolar) e a lição à direita, com a SectionRuler na
- * margem e os blocos na coluna de leitura. No contêiner estreito, o índice vira fichas por cima. ── */
+ * e, embaixo, o índice das lições à esquerda (fixo ao rolar) e a lição à direita, centrada, com a
+ * SectionRuler na margem e os blocos na coluna de leitura. No contêiner estreito, o índice vira fichas por cima. ── */
 .aba-modulo .ap-cbar__track { min-width: 0; }
 .aba-modulo .ap-cbar__kicker { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .modulo__corpo { container-type: inline-size; }
@@ -872,22 +876,51 @@
 .modulo__item-titulo { min-width: 0; overflow-wrap: anywhere; }
 .modulo__resumo { margin: var(--space-2) var(--space-3) 0; color: var(--ink-muted); }
 
-/* A lição: a régua na margem e a coluna de leitura (o número de cada bloco fica na margem, à esquerda dela). */
-.modulo__leitura { display: grid; grid-template-columns: 24px minmax(0, var(--measure-read)); column-gap: 96px; align-items: start; min-width: 0; }
-.modulo__regua { position: sticky; top: 35%; }
-.modulo__licao { display: flex; flex-direction: column; gap: var(--space-6); min-width: 0; padding-bottom: var(--space-8); }
+/* A lição: a coluna de leitura (--largura-leitura-estudos) centrada no espaço ao lado do índice, com a
+ * régua na margem esquerda dela, a 96 px (o número de cada bloco fica nesse vão). A primeira trilha
+ * guarda pelo menos a régua e o vão; as duas de fora dividem o que sobra. */
+.modulo__leitura { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(0, var(--largura-leitura-estudos)) minmax(0, 1fr); align-items: start; min-width: 0; }
+.modulo__regua { position: sticky; top: 35%; grid-row: 1; grid-column: 1; justify-self: end; margin-right: 96px; }
+.modulo__licao { display: flex; flex-direction: column; gap: var(--space-6); grid-row: 1; grid-column: 2; min-width: 0; padding-bottom: var(--space-8); }
 .modulo__aviso { position: relative; }
 .modulo__aviso .ap-callout p { margin: 0; }
 .modulo__aviso-fechar { position: absolute; top: -4px; right: 0; }
-.modulo__cabeca { display: flex; flex-direction: column; gap: var(--space-1); }
+
+/* O cabeçalho da lição, como o de um artigo: onde estou, o título grande (Archivo, sem caixa-alta), o
+ * objetivo e a linha de dados; 48 px até o primeiro bloco (o vão da lição e o respiro dos blocos). */
+.modulo__cabeca { display: flex; flex-direction: column; gap: var(--space-3); }
 .modulo__cabeca p, .modulo__cabeca h2 { margin: 0; }
 .modulo__cabeca-rotulo { color: var(--ink-muted); }
-.modulo__titulo { overflow-wrap: anywhere; }
+.modulo__titulo { font-size: 32px; line-height: 40px; letter-spacing: -.01em; overflow-wrap: anywhere; }
 .modulo__objetivo { color: var(--ink-muted); }
-.modulo__blocos { display: flex; flex-direction: column; gap: 44px; padding-top: var(--space-4); }
-.modulo__bloco { display: flex; flex-direction: column; gap: var(--space-3); scroll-margin-top: var(--space-6); }
-.modulo__bloco .modulo__bloco-cabeca { flex-wrap: wrap; margin: 0 0 var(--space-3); }
-.modulo__questao { display: flex; flex-direction: column; gap: var(--space-4); }
+.modulo__dados { color: var(--ink-muted); }
+
+/* Os blocos: 72 px entre um e o próximo, com um fio fino no meio do vão. */
+.modulo__blocos { --vao-blocos: calc(var(--space-12) + var(--space-6)); display: flex; flex-direction: column; gap: var(--vao-blocos); padding-top: var(--space-6); }
+.modulo__bloco { position: relative; display: flex; flex-direction: column; gap: var(--space-5); scroll-margin-top: var(--space-6); }
+.modulo__bloco + .modulo__bloco::before { content: ""; position: absolute; top: calc(var(--vao-blocos) / -2); left: 0; right: 0; border-top: var(--border-hair) solid var(--line); pointer-events: none; }
+/* O rótulo (o tipo e o "Além do material") numa linha só dele, 16 px antes do conteúdo; o número fica na margem, na mesma linha. */
+.modulo__bloco .modulo__bloco-cabeca { flex-wrap: wrap; margin: 0 0 var(--space-4); }
+
+/* O texto da lição (lesson-body, 19/32), com respiro de artigo: parágrafos e listas a 1,1em, itens
+ * de lista separados, subtítulos com mais espaço em cima que embaixo, código e vetores a 24 px. */
+.modulo__bloco .ap-block__body > :is(p, ul, ol, blockquote, table) { margin: 0 0 1.1em; }
+.modulo__bloco .ap-block__body li + li { margin-top: .6em; }
+.modulo__bloco .ap-block__body li > :is(ul, ol) { margin-top: .6em; }
+.modulo__bloco .ap-block__body > :is(h2, h3, h4) { margin: 1.6em 0 .5em; font-family: var(--font-sans); font-weight: 700; letter-spacing: 0; color: var(--ink); }
+.modulo__bloco .ap-block__body > h4 { font-size: 18px; line-height: 26px; }
+.modulo__bloco .ap-block__body > :is(.codigo, .estrutura, pre), .modulo__bloco .ap-block__body .katex-display { margin-top: var(--space-6); margin-bottom: var(--space-6); }
+.modulo__bloco .ap-block__body > .modulo__bloco-cabeca + * { margin-top: 0; }
+.modulo__bloco .ap-block__body > :last-child { margin-bottom: 0; }
+
+/* A prática (pergunta, questão, dissertativa) num cartão: o rótulo, o contexto e a pergunta, as
+ * alternativas na largura toda e os botões no pé; o que se revela fica embaixo de um fio. */
+.modulo__cartao { padding: var(--space-8); border: var(--border-hair) solid var(--line); border-radius: var(--radius-lg); background: var(--surface-raised); }
+.modulo__cartao > .ap-block__num { top: calc(var(--space-8) + 3px); }
+.modulo__cartao > .ap-block__actions { margin-top: var(--space-2); }
+.modulo__cartao .modulo__revelado { margin-top: var(--space-6); padding-top: var(--space-6); border-top: var(--border-hair) solid var(--line); }
+
+.modulo__questao { display: flex; flex-direction: column; gap: var(--space-5); }
 .modulo__questao .ap-quiz { max-width: none; }
 .modulo__questao .ap-opt, .modulo__questao .ap-opt:hover { cursor: default; }
 .modulo__questao .ap-opt--idle:hover { background: var(--surface-raised); }
@@ -895,7 +928,7 @@
 .modulo__confusao { color: var(--ink-muted); }
 .modulo__contexto { padding: var(--space-4) var(--space-5); border-radius: var(--radius-md); background: var(--surface-well); }
 .modulo__contexto > :last-child { margin-bottom: 0; }
-.modulo__revelado { display: flex; flex-direction: column; gap: var(--space-4); margin-top: var(--space-4); }
+.modulo__revelado { display: flex; flex-direction: column; gap: var(--space-5); margin-top: var(--space-4); }
 .modulo__gabarito > :last-child { margin-bottom: 0; }
 .modulo__bloco .modulo__gabarito-rotulo { margin: 0 0 var(--space-2); color: var(--ink-muted); }
 .modulo__gabarito--recuado { padding-left: var(--space-4); border-left: var(--border-strong) solid var(--steel); }
@@ -904,7 +937,7 @@
 .modulo__bloco .modulo__criterio p { margin: 0; }
 .modulo__criterio-pontos, .modulo__criterio-descricao { color: var(--ink-muted); }
 .modulo__referencias { margin-top: 0; }
-.modulo__pe { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); padding-top: var(--space-5); border-top: var(--border-hair) solid var(--line); }
+.modulo__pe { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-12); padding-top: var(--space-5); border-top: var(--border-hair) solid var(--line); }
 .modulo__erro { max-width: var(--measure-read); }
 .modulo__erro .ap-callout p { margin: 0; }
 .modulo__erro-botoes { display: flex; gap: var(--space-2); margin-top: var(--space-3); }
@@ -928,10 +961,12 @@
 	.modulo__item--atual:focus-visible { box-shadow: inset 0 0 0 var(--border-hair) var(--amber), var(--focus-ring); }
 	.modulo__resumo { margin: 0; }
 	.modulo__leitura { grid-template-columns: minmax(0, 1fr); padding-left: 64px; }
+	.modulo__licao { grid-column: 1; }
 	.modulo__regua { display: none; }
 }
 @media (max-width: 640px) {
 	.modulo__leitura { padding-left: 0; }
+	.modulo__cartao { padding: var(--space-5); }
 }
 @media (prefers-reduced-motion: reduce) {
 	.modulo__item { transition: none; }

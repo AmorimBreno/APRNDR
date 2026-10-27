@@ -2,8 +2,8 @@
 // a rota caderno/<matéria>/cursos/<curso>/modulos/<módulo>[/<lição>], a lição
 // aberta, o rótulo e o ícone de cada bloco pelo tipo e pelo formato, a trilha
 // dos módulos na CourseBar, o "Próximo" da barra, o índice das lições (a lista
-// no largo e as fichas no estreito), o resumo embaixo do índice, a frase da
-// confusão no gabarito e o aviso de visualização (lembrado no localStorage).
+// no largo e as fichas no estreito), o resumo embaixo do índice, a linha de
+// dados do cabeçalho da lição, a frase da confusão no gabarito e o aviso de visualização (lembrado no localStorage).
 // Sem React e sem o design system (só os tipos): os testes
 // (modulo-tela.test.ts) rodam no Node.
 
@@ -178,6 +178,15 @@ export function itensDoIndice(licoes: ReadonlyArray<Pick<Licao, "id" | "titulo">
 
 const contar = (quantos: number, um: string, varios: string) => `${quantos} ${quantos === 1 ? um : varios}`;
 
+/** Questões são as alternativas e as dissertativas (as verificações são perguntas rápidas). */
+const ehQuestao = (bloco: Pick<Bloco, "tipo">) => bloco.tipo === "alternativa" || bloco.tipo === "dissertativa";
+
+/** A linha de dados do cabeçalho da lição: "8 blocos · 2 questões"; sem questão, só os blocos. */
+export function dadosDaLicao(licao: Pick<Licao, "blocos">): string {
+	const questoes = licao.blocos.filter(ehQuestao).length;
+	return [contar(licao.blocos.length, "bloco", "blocos"), questoes > 0 ? contar(questoes, "questão", "questões") : ""].filter(Boolean).join(" · ");
+}
+
 /** "dd/mm" de um ISO 8601, no fuso do computador; inválido, "". */
 export function diaEMes(iso: string | undefined): string {
 	if (!iso) return "";
@@ -189,7 +198,7 @@ export function diaEMes(iso: string | undefined): string {
 /** "4 lições · 9 questões · gerado em 26/10" (questões são as alternativas e as dissertativas). */
 export function resumoDoIndice(modulo: Pick<Modulo, "licoes"> & { geradoEm?: string }): string {
 	const blocos = modulo.licoes.flatMap((licao) => licao.blocos);
-	const questoes = blocos.filter((bloco) => bloco.tipo === "alternativa" || bloco.tipo === "dissertativa").length;
+	const questoes = blocos.filter(ehQuestao).length;
 	const dia = diaEMes(modulo.geradoEm);
 	return [contar(modulo.licoes.length, "lição", "lições"), contar(questoes, "questão", "questões"), dia ? `gerado em ${dia}` : ""].filter(Boolean).join(" · ");
 }

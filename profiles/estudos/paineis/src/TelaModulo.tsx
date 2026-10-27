@@ -9,10 +9,13 @@
 //
 // Embaixo, duas colunas (a partir de 900 px do contêiner; abaixo, o índice
 // vira fichas por cima): à esquerda, fixo, o índice das lições e o resumo do
-// módulo; à direita, o aviso de visualização (dá para fechar; lembrado no
-// localStorage), o cabeçalho da lição e os blocos, cada um num LessonBlock
-// na coluna de leitura, com a SectionRuler na margem (o bloco atual é o que
-// está no meio da tela). As questões mostram o gabarito só quando pedido
+// módulo; à direita, centrada no espaço que sobra, a coluna de leitura
+// (--largura-leitura-estudos), com a SectionRuler na margem esquerda dela (o
+// bloco atual é o que está no meio da tela): o aviso de visualização (dá para
+// fechar; lembrado no localStorage), o cabeçalho da lição (o título, o
+// objetivo e "N blocos · M questões") e os blocos, cada um num LessonBlock,
+// separados por um fio. As explicações ficam soltas, como texto de artigo; a
+// prática (pergunta, questão, dissertativa) vai num cartão. As questões mostram o gabarito só quando pedido
 // ("Ver gabarito", "Ver resposta", "Ver rubrica e resposta-modelo"); as
 // referências abrem o material. Responder e pedir outra explicação chegam
 // com a aula (item 7). No pé, a lição anterior e a próxima.
@@ -48,6 +51,7 @@ import {
 	aberturaDoModulo,
 	avisoFechado,
 	caminhoDoModulo,
+	dadosDaLicao,
 	ehComplemento,
 	fraseDaConfusao,
 	ID_AVALIACAO_GERAL,
@@ -342,7 +346,8 @@ function LicaoAberta(props: {
 							<h2 id="modulo-licao-titulo" className="heading modulo__titulo">
 								{licao.titulo}
 							</h2>
-							{licao.objetivo ? <p className="body modulo__objetivo">{licao.objetivo}</p> : null}
+							{licao.objetivo ? <p className="body-lg modulo__objetivo">{licao.objetivo}</p> : null}
+							<p className="data modulo__dados">{dadosDaLicao(licao)}</p>
 						</header>
 						<div className="modulo__blocos">
 							{licao.blocos.map((bloco, posicao) => (
@@ -381,6 +386,8 @@ export function BlocoDaLicao(props: { bloco: Bloco; numero: number; abrirMateria
 	const [aberto, setAberto] = useState(false);
 	const { rotulo, icone } = rotuloDoBloco(bloco);
 	const referencias = "referencias" in bloco ? agruparReferencias(bloco.referencias) : [];
+	// A prática (pergunta rápida, questão e dissertativa) vai num cartão; a explicação, solta, como texto de artigo.
+	const pratica = bloco.tipo !== "explicacao";
 
 	let conteudo: ReactNode;
 	let gabarito: ReactNode = null;
@@ -407,9 +414,10 @@ export function BlocoDaLicao(props: { bloco: Bloco; numero: number; abrirMateria
 	}
 
 	return (
-		<div className="modulo__bloco" data-bloco={bloco.id}>
+		<div className={`modulo__bloco${pratica ? " modulo__bloco--pratica" : ""}`} data-bloco={bloco.id}>
 			<LessonBlock
 				index={props.numero}
+				{...(pratica ? { className: "modulo__cartao" } : {})}
 				{...(botao
 					? {
 							actions: (

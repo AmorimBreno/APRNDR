@@ -47,7 +47,20 @@ Duas partes, cada uma aprovada no app: A (o arquivo, a geração, o formulário,
 
 ## Qual módulo pode ser gerado
 
-Só o próximo: o primeiro módulo do esqueleto, na ordem, que não está `gerado` nem `aguardando_material`. Um módulo aguardando material não segura os seguintes. Os gerados podem ser gerados de novo (com confirmação; a versão anterior é substituída). Um módulo aguardando pode ser gerado assim que o Breno quiser.
+Só o próximo, e só quando o Breno chega nele (8.3: "gerado quando o usuário chega nele"; correção de 2026-10-27, depois que o módulo 2 ficou liberado logo que o 1 foi gerado): o primeiro módulo do esqueleto, na ordem, que não está `gerado` nem `aguardando_material`, e só se todo módulo gerado antes dele está concluído. Um módulo aguardando material não segura os seguintes. Os gerados podem ser gerados de novo (com confirmação; a versão anterior é substituída) enquanto não estão concluídos. Um módulo aguardando pode ser gerado assim que o Breno quiser.
+
+### Concluir um módulo
+
+O módulo gerado ganha `concluidoEm` (ISO 8601) quando o Breno o conclui. Por enquanto, a conclusão é manual: "Concluir o módulo", no pé da última lição da visão do módulo, com confirmação ("Concluir o módulo NN? O próximo módulo fica liberado para gerar."). A partir do item 7, o progresso da aula também conclui. Evento `concluiu_modulo` (objeto `{materia, curso, modulo}`; resultado `{licoes, questoes}`), na matéria. Ação da ponte `concluir {materia, curso, modulo, pedido}`. Concluído não volta atrás (desfazer fica para depois).
+
+### O estado do card
+
+- concluído: `done` (o vinil holográfico com o carimbo), ação "Rever" (abre a visão do módulo);
+- o primeiro módulo gerado e não concluído: `current` ("Em curso"), ação "Abrir"; o "Gerar de novo" fica embaixo do card;
+- gerando: `current`, com a etapa embaixo;
+- o próximo a gerar (pela regra acima): `next`, ação "Gerar módulo";
+- aguardando material: `next`, com a etiqueta e a nota;
+- os outros: `locked` ("Abre depois do Módulo NN").
 
 ## O nível de cada conceito
 

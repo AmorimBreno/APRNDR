@@ -73,6 +73,7 @@ Questão dissertativa:
 ## Formatação
 
 - O texto é markdown. Código nunca vai como texto comum: um trecho de código vai num bloco com a linguagem (```python numa linha, o código nas linhas seguintes e ``` numa linha sozinha no fim); `código em linha` (entre crases) só para nomes curtos (uma variável, uma função, um parâmetro). Nas alternativas, o código curto também vai em `código em linha`.
+- Quando o texto falar de uma parte de um bloco de código ou de um elemento de um vetor ou de uma lista, cite essa parte em `código em linha` exatamente como ela aparece no bloco: os mesmos nomes, os mesmos espaços e as mesmas aspas (`each not in stop_words_port`, `doc.lower()`, `'escola'`). O app usa a citação para destacar o trecho no código.
 - Um vetor de valores vai num bloco ```vetor, com os valores entre colchetes, separados por vírgula: [6, 3, 8]. Uma matriz vai num bloco ```matriz, como uma lista de linhas: [[1, 2], [3, 4]]. Os dois podem ter uma primeira linha opcional com o rótulo, como "# pesos".
 - Fórmulas e símbolos em LaTeX: $...$ na frase, com o $ colado no primeiro caractere da conta ($\hat{y} = \beta_0 + \beta_1 x$, $R^2$), e $$...$$ num bloco para uma fórmula em destaque. O $ é só para fórmula: dinheiro se escreve normalmente, como R$ 20 ou US$ 3 (o app não confunde com fórmula).
 - Dentro do JSON, as quebras de linha vão como \n e a barra invertida do LaTeX vai dobrada ("$\\frac{a}{b}$"), como manda o JSON.

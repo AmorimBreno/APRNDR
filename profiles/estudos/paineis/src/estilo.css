@@ -912,14 +912,34 @@
 
 /* O texto da lição (lesson-body, 19/32), com respiro de artigo: parágrafos e listas a 1,1em, itens
  * de lista separados, subtítulos com mais espaço em cima que embaixo, código e vetores a 24 px. */
-.modulo__bloco .ap-block__body > :is(p, ul, ol, blockquote, table) { margin: 0 0 1.1em; }
+.modulo__bloco :is(.ap-block__body, .modulo__explicacao, .modulo__texto) > :is(p, ul, ol, blockquote, table) { margin: 0 0 1.1em; }
 .modulo__bloco .ap-block__body li + li { margin-top: .6em; }
 .modulo__bloco .ap-block__body li > :is(ul, ol) { margin-top: .6em; }
-.modulo__bloco .ap-block__body > :is(h2, h3, h4) { margin: 1.6em 0 .5em; font-family: var(--font-sans); font-weight: 700; letter-spacing: 0; color: var(--ink); }
-.modulo__bloco .ap-block__body > h4 { font-size: 18px; line-height: 26px; }
-.modulo__bloco .ap-block__body > :is(.codigo, .estrutura, pre), .modulo__bloco .ap-block__body .katex-display { margin-top: var(--space-6); margin-bottom: var(--space-6); }
-.modulo__bloco .ap-block__body > .modulo__bloco-cabeca + * { margin-top: 0; }
-.modulo__bloco .ap-block__body > :last-child { margin-bottom: 0; }
+.modulo__bloco :is(.ap-block__body, .modulo__explicacao, .modulo__texto) > :is(h2, h3, h4) { margin: 1.6em 0 .5em; font-family: var(--font-sans); font-weight: 700; letter-spacing: 0; color: var(--ink); }
+.modulo__bloco :is(.ap-block__body, .modulo__explicacao, .modulo__texto) > h4 { font-size: 18px; line-height: 26px; }
+.modulo__bloco :is(.ap-block__body, .modulo__explicacao, .modulo__texto) > :is(.codigo, .estrutura, pre), .modulo__bloco .ap-block__body .katex-display { margin-top: var(--space-6); margin-bottom: var(--space-6); }
+.modulo__bloco .ap-block__body > .modulo__bloco-cabeca + *, .modulo__bloco :is(.modulo__explicacao, .modulo__texto) > :first-child { margin-top: 0; }
+.modulo__bloco :is(.ap-block__body, .modulo__explicacao, .modulo__texto) > :last-child { margin-bottom: 0; }
+
+/* O código ao lado (CodigoCitado.tsx): na explicação com código principal e largura para isso, o texto à
+ * esquerda (≈56 %) e os blocos principais à direita (≈44 %), empilhados numa coluna fixa no alto da área
+ * que rola enquanto a explicação está à vista, com rolagem própria quando passa da altura da tela. A
+ * altura máxima é a da área que rola (--altura-codigo-lado, medida no CodigoCitado.tsx); sem a medida, a
+ * da janela (o vh é medido antes do zoom 0,9 do body, por isso a divisão) menos a CourseBar e os respiros. */
+.modulo__explicacao--lado-a-lado { display: grid; grid-template-columns: minmax(0, 56fr) minmax(0, 44fr); align-items: start; gap: var(--space-8); }
+.modulo__codigo-lado { position: sticky; top: 0; display: flex; flex-direction: column; gap: var(--space-4); max-height: var(--altura-codigo-lado, calc(100vh / 0.9 - var(--course-bar) - var(--space-6) - var(--space-8))); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+.modulo__codigo-lado > .codigo { flex: none; margin: 0; }
+
+/* O destaque do código citado: o `código em linha` do texto que casa com um trecho do código entra no
+ * Tab; passar o mouse (ou focar) nele põe um retângulo claro por cima de cada lugar do trecho no código
+ * (uma camada dentro do pre, que rola com ele) e marca as caixas dos vetores e matrizes que casam. */
+.modulo__bloco { --destaque-codigo: color-mix(in srgb, var(--cream-pastel) 22%, transparent); }
+.modulo__bloco code.codigo-citado:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.modulo__bloco .codigo__pre { position: relative; }
+.codigo__destaques { position: absolute; top: 0; left: 0; pointer-events: none; }
+.codigo__destaque { position: absolute; border-radius: var(--radius-xs); background: var(--destaque-codigo); animation: destaque-aparece .12s ease-out; }
+@keyframes destaque-aparece { from { opacity: 0; } }
+.modulo__bloco :is(.vetor__valor, .matriz__valor).valor--destacado { border-color: var(--amber); background-image: linear-gradient(var(--destaque-codigo), var(--destaque-codigo)); box-shadow: 0 0 0 var(--border-hair) var(--amber); }
 
 /* A prática (pergunta, questão, dissertativa) num cartão: o rótulo, o contexto e a pergunta, as
  * alternativas na largura toda e os botões no pé; o que se revela fica embaixo de um fio. */
@@ -982,5 +1002,6 @@
 }
 @media (prefers-reduced-motion: reduce) {
 	.modulo__item { transition: none; }
+	.codigo__destaque { animation: none; }
 	.ap-module.mod__card--enchendo::before { transition: none; }
 }

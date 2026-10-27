@@ -15,7 +15,9 @@
 // fechar; lembrado no localStorage), o cabeçalho da lição (o título, o
 // objetivo e "N blocos · M questões") e os blocos, cada um num LessonBlock,
 // separados por um fio. As explicações ficam soltas, como texto de artigo; a
-// prática (pergunta, questão, dissertativa) vai num cartão. As questões mostram o gabarito só quando pedido
+// prática (pergunta, questão, dissertativa) vai num cartão. Numa explicação
+// com código principal, o código fica ao lado do texto, fixo, e o `código em
+// linha` do texto destaca no código o trecho citado (CodigoCitado.tsx). As questões mostram o gabarito só quando pedido
 // ("Ver gabarito", "Ver resposta", "Ver rubrica e resposta-modelo"); as
 // referências abrem o material. Responder e pedir outra explicação chegam
 // com a aula (item 7). No pé, a lição anterior e a próxima; na última lição
@@ -47,6 +49,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { Materia } from "../../lib/materia-tipos.ts";
 import type { Bloco, BlocoAlternativa, BlocoDissertativa, BlocoVerificacao, EstadoModuloNaTela, Licao, Modulo } from "../../lib/modulo-tipos.ts";
+import { ExplicacaoComCodigo } from "./CodigoCitado.tsx";
 import { rotuloCapa } from "./comum.ts";
 import { useCurso } from "./cursos-ponte.ts";
 import { numeroCurto, partesDaQuestao } from "./diagnostico-tela.ts";
@@ -469,7 +472,7 @@ export function BlocoDaLicao(props: { bloco: Bloco; numero: number; abrirMateria
 	let gabarito: ReactNode = null;
 	let botao: { ver: string; esconder: string } | undefined;
 	if (bloco.tipo === "explicacao") {
-		conteudo = <Markdown texto={bloco.texto} />;
+		conteudo = <ExplicacaoComCodigo texto={bloco.texto} />;
 	} else if (bloco.tipo === "verificacao") {
 		conteudo = <Markdown texto={bloco.pergunta} />;
 		botao = { ver: "Ver resposta", esconder: "Esconder resposta" };

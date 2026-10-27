@@ -890,7 +890,7 @@
  * margens dividem o resto, e a da esquerda tem pelo menos o lugar da régua e do número do bloco. */
 .modulo__leitura { display: grid; grid-template-columns: minmax(96px, 1fr) minmax(0, 18fr) minmax(0, 1fr); align-items: start; min-width: 0; }
 /* A régua no começo da área de leitura, perto do índice (pedido do Breno: no meio da tela, ela disputava com o texto). */
-.modulo__regua { position: sticky; top: 35%; grid-row: 1; grid-column: 1; justify-self: start; margin-left: var(--space-6); }
+.modulo__regua { position: sticky; top: 35%; grid-row: 1; grid-column: 1; justify-self: start; margin-left: calc(-1 * var(--space-3)); }
 .modulo__licao { display: flex; flex-direction: column; gap: var(--space-6); grid-row: 1; grid-column: 2; min-width: 0; padding-bottom: var(--space-8); }
 .modulo__aviso { position: relative; }
 .modulo__aviso .ap-callout p { margin: 0; }

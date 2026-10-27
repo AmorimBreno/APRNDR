@@ -242,4 +242,18 @@ Item 6, parte A, feita (2026-10-26, aguarda o roteiro docs/teste-etapa-6a.md). U
 Conferido no navegador numa matéria de teste montada pela lib (sem material, sem gravar nada no aprendiz/eventos.jsonl; apagada depois): o card com "Gerar módulo", o formulário, a geração com "Planejando as lições…" e o Parar, o card "Gerado · 1 lição · 2 questões" com Gerar de novo, o módulo 2 virando o próximo, e o m1.json (1 lição, 8 blocos, US$ 0,048; problema_aberto no conceito que ele dizia dominar e acertou, exemplo_resolvido no que errou; a observação "quero um exemplo com código em Python" seguida). Não conferi: o formulário com material novo esperando o mapa, o aguardando material, o erro, o fechar e voltar no meio e o professor com ler_modulo (estão no roteiro).
 Limite conhecido: um material mandado pelo formulário que já estava pronto, mas nunca foi mapeado, faz a geração esperar o tempo limite (30 min) e seguir com o aviso "entrou sem referências".
 
-Depois: o item 6, parte B (a visão do módulo gerado), depois de o Breno aprovar a parte A no app.
+Em 2026-10-26 o Breno pediu para seguir para a parte B.
+
+Item 6, parte B, feita (2026-10-27, aguarda o roteiro docs/teste-etapa-6b.md): a visão do módulo gerado em caderno/<m>/cursos/<c>/modulos/<módulo>[/<lição>] (TelaModulo.tsx, modulo-tela.ts e o useModuloAberto em modulos-ponte.ts).
+- No lugar da aba do caderno, a CourseBar do design system, com a trilha dos módulos.
+- O índice das lições à esquerda.
+- Uma lição por vez em LessonBlocks na coluna de leitura, com a SectionRuler na margem.
+- Os rótulos pelo tipo do bloco e pelo formato da explicação; "Além do material" nos complementos.
+- As questões só para ver: o gabarito, a confusão de cada errada e a explicação; a resposta da pergunta rápida; a rubrica e a resposta-modelo da dissertativa.
+- As etiquetas de referência do mapa.
+- O aviso de que a aula interativa é o item 7.
+- O "Abrir" do card gerado na visão do curso passou a funcionar.
+Conferido no navegador numa matéria de teste com um módulo escrito à mão pela lib (sem chamar o modelo e sem gravar nada no aprendiz/eventos.jsonl; apagada depois), com todos os tipos de bloco: as fórmulas (6, nenhuma com erro), o código com cores, o vetor em caixas, o R$ 46 como texto, o "Ver gabarito" com a confusão e a explicação, o "Ver resposta", a "Próxima lição" mudando a rota para …/m1/l2, a dissertativa com "Ver rubrica e resposta-modelo" e as fichas das lições num painel estreito. Não conferi: a régua seguindo a leitura e a trilha levando a outro módulo (estão no roteiro).
+Achado no caminho, que não é do app: o shell desta máquina come uma barra invertida dos comandos (um \beta escrito num script pelo terminal chegou ao arquivo como um caractere de controle). Scripts com LaTeX devem ser escritos em arquivo, não colados no terminal.
+
+Depois: o item 7 da seção 10 da especificação, a sessão de estudo (a aula interativa com a barra de ações na seleção e o painel do curso), depois de o Breno aprovar o item 6 no app.

@@ -886,7 +886,9 @@
 /* A lição: a coluna de leitura (--largura-leitura-estudos) centrada no espaço ao lado do índice, e a
  * régua no começo da primeira trilha, logo depois do índice. A primeira trilha guarda pelo menos a
  * régua e o número de cada bloco; as duas de fora dividem o que sobra. */
-.modulo__leitura { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(0, var(--largura-leitura-estudos)) minmax(0, 1fr); align-items: start; min-width: 0; }
+/* A coluna da lição usa 90% da área ao lado do índice (pedido do Breno com o código ao lado: 18 de 20 partes); as
+ * margens dividem o resto, e a da esquerda tem pelo menos o lugar da régua e do número do bloco. */
+.modulo__leitura { display: grid; grid-template-columns: minmax(96px, 1fr) minmax(0, 18fr) minmax(0, 1fr); align-items: start; min-width: 0; }
 /* A régua no começo da área de leitura, perto do índice (pedido do Breno: no meio da tela, ela disputava com o texto). */
 .modulo__regua { position: sticky; top: 35%; grid-row: 1; grid-column: 1; justify-self: start; margin-left: var(--space-6); }
 .modulo__licao { display: flex; flex-direction: column; gap: var(--space-6); grid-row: 1; grid-column: 2; min-width: 0; padding-bottom: var(--space-8); }

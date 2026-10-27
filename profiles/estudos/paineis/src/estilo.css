@@ -918,7 +918,9 @@
 .modulo__cartao { padding: var(--space-8); border: var(--border-hair) solid var(--line); border-radius: var(--radius-lg); background: var(--surface-raised); }
 .modulo__cartao > .ap-block__num { top: calc(var(--space-8) + 3px); }
 .modulo__cartao > .ap-block__actions { margin-top: var(--space-2); }
-.modulo__cartao .modulo__revelado { margin-top: var(--space-6); padding-top: var(--space-6); border-top: var(--border-hair) solid var(--line); }
+.modulo__cartao .modulo__revelado { margin-top: var(--space-6); padding-top: var(--space-6); border-top: var(--border-hair) solid var(--line-strong); }
+/* Dentro do cartão (surface-raised), as alternativas num tom mais fundo, para se destacarem do cartão e não só pela borda. */
+.modulo__cartao .ap-opt { background: var(--surface-panel); }
 
 .modulo__questao { display: flex; flex-direction: column; gap: var(--space-5); }
 .modulo__questao .ap-quiz { max-width: none; }

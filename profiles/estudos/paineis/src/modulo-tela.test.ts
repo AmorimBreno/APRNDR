@@ -24,9 +24,12 @@ import {
 	kickerDaBarra,
 	lembrarAvisoFechado,
 	passosDaTrilha,
+	perguntaConcluir,
+	podeConcluir,
 	proximoDaBarra,
 	resumoDoIndice,
 	rotaDoModulo,
+	rotuloConcluido,
 	rotuloDoBloco,
 	tituloDoModulo,
 } from "./modulo-tela.ts";
@@ -228,6 +231,21 @@ describe("o índice das lições", () => {
 		expect(dadosDaLicao(licao("l1", "Um", [explicacao("l1-b1", "conceito"), verificacao("l1-b2"), alternativa("l1-b3"), dissertativa("l1-b4")]))).toBe("4 blocos · 2 questões");
 		expect(dadosDaLicao(licao("l1", "Um", [explicacao("l1-b1", "conceito"), alternativa("l1-b2")]))).toBe("2 blocos · 1 questão");
 		expect(dadosDaLicao(licao("l1", "Um", [explicacao("l1-b1", "conceito")]))).toBe("1 bloco");
+	});
+});
+
+describe("concluir o módulo", () => {
+	it("o modal, quem pode concluir e a etiqueta Concluído em dd/mm", () => {
+		expect(perguntaConcluir(3)).toEqual({ titulo: "Concluir o módulo 03?", texto: "A recomendação passa para o próximo." });
+		const modulo = gerado([licao("l1", "Um", [explicacao("l1-b1", "conceito"), alternativa("l1-b2")])]);
+		expect(podeConcluir(modulo)).toBe(true);
+		expect(rotuloConcluido(modulo)).toBe("");
+		const concluido = { ...modulo, concluidoEm: "2026-10-27T15:00:00" } as Modulo;
+		expect(podeConcluir(concluido)).toBe(false);
+		expect(rotuloConcluido(concluido)).toBe("Concluído em 27/10");
+		const aguardando: Modulo = { versao: 1, id: "m3", curso: "curso", materia: "materia", situacao: "aguardando_material", aguardando: { nota: "", desde: "2026-10-26T15:00:00", prontos: [] }, licoes: [] };
+		expect(podeConcluir(aguardando)).toBe(false);
+		expect(rotuloConcluido(aguardando)).toBe("");
 	});
 });
 

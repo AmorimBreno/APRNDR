@@ -3,7 +3,7 @@
 // conceitos, o conserto do plano, a conferência das lições) e o disco ficam em
 // ../lib/modulo-tipos.ts e ../lib/modulos.ts; aqui ficam:
 // - a ponte com a tela (painel "modulos", docs/ponte-de-eventos.md): listar,
-//   gerar, aguardar, cancelar e abrir; a extensão responde com "estado",
+//   gerar, aguardar, cancelar, abrir e concluir; a extensão responde com "estado",
 //   "modulo" e "erro", sempre passageiros (gravar: false). Uma trava por
 //   matéria para todo ler-gravar dos módulos;
 // - a geração: espera os materiais mandados pelo formulário ficarem prontos
@@ -17,8 +17,9 @@
 //   geração por curso de cada vez; cancelar para a geração e o que estava
 //   gravado fica;
 // - o estado de cada módulo na tela (a_gerar, esperando_materiais,
-//   planejando, escrevendo, gerado, aguardando_material, erro), com o próximo
-//   módulo e o aviso de material novo nos que aguardam;
+//   planejando, escrevendo, gerado, aguardando_material, erro), com o
+//   concluido dos gerados, o módulo recomendado (proximo) e o aviso de
+//   material novo nos que aguardam;
 // - a ferramenta só de leitura do professor, ler_modulo. Numa conversa de
 //   caderno, ela fica na matéria da conversa.
 import { readFile, stat } from "node:fs/promises";
@@ -35,6 +36,7 @@ import { arquivoMateria, ErroMaterias } from "../lib/materias.ts";
 import {
 	type AcoesModulos,
 	type Bloco,
+	concluirModulo,
 	type ConceitoDoModulo,
 	type EntradaLicao,
 	type EntradaPlano,
@@ -83,7 +85,7 @@ const MAX_TOKENS_LICAO = 32_000;
 /** Até quantos caracteres ler_modulo devolve de uma vez (as explicações vão inteiras). */
 const LIMITE_LEITURA = 100_000;
 
-const ACOES: ReadonlyArray<keyof AcoesModulos> = ["listar", "gerar", "aguardar", "cancelar", "abrir"];
+const ACOES: ReadonlyArray<keyof AcoesModulos> = ["listar", "gerar", "aguardar", "cancelar", "abrir", "concluir"];
 
 interface DadosAcao {
 	materia?: unknown;
@@ -102,6 +104,7 @@ const FRASES: Record<keyof AcoesModulos | "ler", string> = {
 	aguardar: "marcar o módulo como aguardando material",
 	cancelar: "parar a geração do módulo",
 	abrir: "abrir o módulo",
+	concluir: "concluir o módulo",
 	ler: "ler o módulo",
 };
 
@@ -119,10 +122,9 @@ const mensagemDe = (erro: unknown, acao: keyof typeof FRASES) =>
 export type EstadoModulo = EstadoModuloNaTela & { aviso?: string };
 
 /**
- * A mensagem "estado" com o próximo módulo do curso (proximoModulo: o
- * primeiro que não está gerado nem aguardando; null com todos gerados ou
- * aguardando) e os módulos com o aviso. MensagemEstadoModulos ainda não tem
- * esses campos.
+ * A mensagem "estado" com o módulo recomendado do curso (proximoModulo: o
+ * primeiro que não está concluído nem aguardando; null com todos concluídos
+ * ou aguardando), sempre presente, e os módulos com o aviso.
  */
 export type MensagemEstado = Omit<MensagensModulos["estado"], "modulos"> & { modulos: EstadoModulo[]; proximo: string | null };
 
@@ -344,7 +346,7 @@ export function textoDoModulo(modulo: Modulo, extra: { nome?: string; nomeDe?: (
 	}
 	const resumo = resumoDoModulo(modulo);
 	linhas.push(
-		`Situação: gerado em ${modulo.geradoEm.slice(0, 10)}; ${resumo.licoes} ${resumo.licoes === 1 ? "lição" : "lições"}, ${resumo.blocos} blocos, ${resumo.questoes} ${resumo.questoes === 1 ? "questão" : "questões"}.`,
+		`Situação: gerado em ${modulo.geradoEm.slice(0, 10)}${modulo.concluidoEm ? `, concluído pelo aluno em ${modulo.concluidoEm.slice(0, 10)}` : ", ainda não concluído"}; ${resumo.licoes} ${resumo.licoes === 1 ? "lição" : "lições"}, ${resumo.blocos} blocos, ${resumo.questoes} ${resumo.questoes === 1 ? "questão" : "questões"}.`,
 		comGabarito ? "Com o gabarito." : "Sem o gabarito (as respostas das questões e das verificações ficam de fora).",
 	);
 	for (const licao of modulo.licoes) {
@@ -454,8 +456,9 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 	/**
 	 * O estado de todos os módulos do curso, na ordem do esqueleto: a geração
 	 * em andamento, o erro da última geração (com os dados da versão gravada,
-	 * quando há), o arquivo ilegível (erro), o gravado (gerado ou aguardando,
-	 * com materialNovo) ou a_gerar. Curso que não está pronto: nenhum módulo.
+	 * quando há), o arquivo ilegível (erro), o gravado (gerado, com concluido e
+	 * concluidoEm, ou aguardando, com materialNovo) ou a_gerar; e o
+	 * recomendado (proximo). Curso que não está pronto: nenhum módulo.
 	 */
 	const estadoDoCurso = async (dados: string, materia: string, curso: string): Promise<{ modulos: EstadoModulo[]; proximo: string | null }> => {
 		const atual = await lerCurso(dados, materia, curso);
@@ -483,7 +486,15 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 			let doGravado: Partial<EstadoModuloNaTela> = {};
 			if (gravado?.situacao === "gerado") {
 				const resumo = resumoDoModulo(gravado);
-				doGravado = { geradoEm: gravado.geradoEm, custo: gravado.custo, licoesGeradas: resumo.licoes, blocos: resumo.blocos, questoes: resumo.questoes };
+				doGravado = {
+					geradoEm: gravado.geradoEm,
+					custo: gravado.custo,
+					licoesGeradas: resumo.licoes,
+					blocos: resumo.blocos,
+					questoes: resumo.questoes,
+					concluido: Boolean(gravado.concluidoEm),
+					...(gravado.concluidoEm ? { concluidoEm: gravado.concluidoEm } : {}),
+				};
 			} else if (gravado?.situacao === "aguardando_material") {
 				doGravado = { nota: gravado.aguardando.nota, materialNovo: materialNovo(gravado.aguardando, prontos) };
 			}
@@ -493,7 +504,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 			if (gravado) return { id, situacao: gravado.situacao, ...doGravado, ...(aviso ? { aviso } : {}) };
 			return { id, situacao: "a_gerar" };
 		});
-		return { modulos: lista, proximo: proximoModulo(atual.esqueleto, lidos.situacoes) };
+		return { modulos: lista, proximo: proximoModulo(atual.esqueleto, lidos.situacoes, lidos.concluidos) };
 	};
 
 	/** Manda o estado do curso. Chamado dentro da trava, para um estado velho nunca chegar depois de um novo. */
@@ -645,8 +656,8 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 
 			const escopo = await naTrava(materia, async () => {
 				const atual = await lerCurso(dados, materia, curso);
-				const { situacoes } = await situacoesDoCurso(dados, materia, curso);
-				podeGerar(atual, situacoes, modulo);
+				const { situacoes, concluidos } = await situacoesDoCurso(dados, materia, curso);
+				podeGerar(atual, situacoes, modulo, concluidos);
 				// Um arquivo ilegível no lugar é ErroModulo (gravarModuloGerado também recusaria no fim).
 				await lerModulo(dados, materia, curso, modulo);
 				if (materiaisNovos.length > 0) {
@@ -875,6 +886,19 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 						if (!lido) throw new ErroModulo(`O módulo ${modulo} ainda não foi gerado.`);
 						mostrar("modulo", { materia, curso, modulo: lido });
 					});
+				} else if (ao === "concluir") {
+					// Na trava do curso (a da matéria): grava o concluidoEm e o
+					// concluiu_modulo, manda o módulo novo (para a visão dele) e o
+					// estado com o pedido (a resposta da tela).
+					await naTrava(materia, async () => {
+						const emAndamento = geracoes.get(chaveDo(materia, curso));
+						if (emAndamento?.modulo === modulo) throw new ErroModulo("Este módulo está sendo gerado. Pare a geração antes de concluí-lo.");
+						const concluido = await concluirModulo(dados, materia, curso, modulo, daSessao());
+						erros.delete(chaveDoModulo(materia, curso, modulo));
+						avisos.delete(chaveDoModulo(materia, curso, modulo));
+						mostrar("modulo", { materia, curso, modulo: concluido });
+						await mostrarEstado(dados, materia, curso, pedido);
+					});
 				}
 			} catch (erro) {
 				mostrar("erro", { mensagem: mensagemDe(erro, ao), ao, materia, curso, ...comModulo, ...comPedido });
@@ -897,7 +921,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 		name: "ler_modulo",
 		label: "Ler módulo",
 		description:
-			"Read a generated module of a course (from ler_curso's skeleton: module ids m1, m2…): its lessons (title, goal, concepts) and every block as text, in order — the explanations in full (with their format: worked example, example with steps to complete, open problem or concept presentation, and whether it goes beyond the material), the comprehension checks and the questions (context, question, options), with the material references. By default the answer key is left out (expected answers, the correct option, the misconception behind each wrong option, rubrics and model answers); pass comGabarito: true only when you need it, e.g. to discuss a question the user already answered. A module not generated yet (or waiting for material) says so. In a notebook conversation, the subject is the conversation's. Read only: never change a module.",
+			"Read a generated module of a course (from ler_curso's skeleton: module ids m1, m2…): whether the user has concluded it, its lessons (title, goal, concepts) and every block as text, in order — the explanations in full (with their format: worked example, example with steps to complete, open problem or concept presentation, and whether it goes beyond the material), the comprehension checks and the questions (context, question, options), with the material references. By default the answer key is left out (expected answers, the correct option, the misconception behind each wrong option, rubrics and model answers); pass comGabarito: true only when you need it, e.g. to discuss a question the user already answered. A module not generated yet (or waiting for material) says so. In a notebook conversation, the subject is the conversation's. Read only: never change a module.",
 		parameters: Type.Object({
 			materia: Type.Optional(Type.String({ description: "Subject id (from listar_materias). Not needed in a notebook conversation." })),
 			curso: Type.String({ description: "Course id (from ler_curso)." }),
@@ -924,7 +948,11 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 				const mapa = await lerMapa(ctx.cwd, materia);
 				const nomes = new Map(mapa.conceitos.map((conceito) => [conceito.id, conceito.nome]));
 				const texto = textoDoModulo(lido, { nome: doEsqueleto.nome, nomeDe: (id) => nomes.get(id) ?? id, comGabarito: params.comGabarito === true });
-				return { content: [{ type: "text", text: texto }], details: { materia, curso: curso.id, modulo: lido.id, situacao: lido.situacao, comGabarito: params.comGabarito === true } };
+				const concluido = lido.situacao === "gerado" && Boolean(lido.concluidoEm);
+				return {
+					content: [{ type: "text", text: texto }],
+					details: { materia, curso: curso.id, modulo: lido.id, situacao: lido.situacao, concluido, comGabarito: params.comGabarito === true },
+				};
 			} catch (erro) {
 				return { content: [{ type: "text", text: mensagemDe(erro, "ler") }], details: undefined, isError: true };
 			}

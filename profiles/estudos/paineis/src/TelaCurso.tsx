@@ -9,20 +9,23 @@
 // "Recalcular o calendário" (recalcular_calendario, depois de confirmar no
 // modal): as datas passam a ser as de hoje, e os módulos ficam.
 //
-// Os módulos são gerados sob demanda (item 6, parte A, docs/modulos.md, "A
-// tela"), pela ponte "modulos" (modulos-ponte.ts). Cada card mostra o estado
-// do módulo (modulos-tela.ts, cardsDosModulos): o próximo tem "Gerar módulo",
-// que abre o formulário (ModalGerarModulo); durante a geração, o card fica em
-// curso e embaixo dele aparecem a etapa, uma barra e "Parar"; o gerado diz
-// "Gerado" com as lições e as questões, "Abrir" (a visão do módulo gerado,
-// parte B, TelaModulo.tsx) e "Gerar de novo" (com confirmação); o aguardando material tem a etiqueta, a
-// nota e "Gerar agora"; o erro, a mensagem e "Tentar de novo". Os módulos
-// depois do próximo continuam bloqueados.
+// Os módulos são gerados sob demanda (item 6, docs/modulos.md, "A tela" e "O
+// card de cada módulo"), pela ponte "modulos" (modulos-ponte.ts). Cada card
+// mostra o estado do módulo (modulos-tela.ts, cardsDosModulos), com as
+// classes do perfil por cima do ModuleCard (classesDoCard): o não gerado é
+// preto, com "Gerar módulo", que abre o formulário (ModalGerarModulo);
+// durante a geração, o card preto se enche de musgo pelo progresso e embaixo
+// dele aparecem a etapa e "Parar"; o gerado é musgo, com "Abrir" (a visão do
+// módulo gerado, TelaModulo.tsx) e, embaixo, "Gerado" com as lições e as
+// questões e "Gerar de novo" (com confirmação); o concluído é o holográfico,
+// com "Rever"; o aguardando material é preto, com a etiqueta, a nota e "Gerar
+// agora"; o erro, a mensagem e "Tentar de novo". Só o recomendado leva a
+// etiqueta "Próximo". Nenhum card fica bloqueado.
 
 import { Button, Callout, EmptyState, Modal, ModuleCard, Readout, SpecBox, Tag, type Tone } from "@estudos/design-system";
-import { AgenteAnimado, type DadosAvatarAgente, type JanelaPerfilHook, semMovimento } from "@estudos/ui";
+import { AgenteAnimado, type DadosAvatarAgente, type JanelaPerfilHook } from "@estudos/ui";
 import { AnimatePresence, motion } from "motion/react";
-import { type ReactNode, useState } from "react";
+import { type CSSProperties, type ReactNode, useState } from "react";
 import { hojeLocal } from "../../lib/curso-tipos.ts";
 import { resumoDoEsqueleto, type ResumoEsqueleto } from "../../lib/esqueleto-tipos.ts";
 import { type Materia, pastaMateriaisRelativa } from "../../lib/materia-tipos.ts";
@@ -39,8 +42,9 @@ import {
 	type CamposPedido,
 	type CardModulo,
 	cardsDosModulos,
+	classesDoCard,
+	estiloDoCard,
 	PERGUNTA_GERAR_DE_NOVO,
-	progressoDaEtapa,
 	resumoDoGerado,
 	textoDaEtapa,
 } from "./modulos-tela.ts";
@@ -218,10 +222,11 @@ export function TelaCurso(props: PropsTelaCurso) {
 					) : null}
 					<ul className="curso__modulos">
 						{resumo.modulos.map((modulo, indice) => {
-							const card: CardModulo = cards[modulo.id] ?? { tipo: "bloqueado", state: "locked" };
+							const card: CardModulo = cards[modulo.id] ?? { tipo: "carregando", state: "next", cor: "preto", recomendado: false };
 							const estado = card.modulo;
 							const abreFormulario = card.tipo === "gerar" || card.tipo === "aguardando" || card.tipo === "erro";
-							const acao = acaoDoCard(card.tipo);
+							const abreModulo = card.tipo === "gerado" || card.tipo === "concluido";
+							const estilo = estiloDoCard(card);
 							const erroModulo = errosParar[modulo.id] ?? modulos.errosModulo[modulo.id]?.mensagem;
 							return (
 								<motion.li
@@ -233,19 +238,21 @@ export function TelaCurso(props: PropsTelaCurso) {
 								>
 									<ModuleCard
 										as="div"
+										className={classesDoCard(card)}
+										{...(estilo ? { style: estilo as CSSProperties } : {})}
 										state={card.state}
 										number={modulo.numero}
 										title={modulo.nome}
 										readings={[
-											card.tipo === "gerado" && typeof estado?.licoesGeradas === "number"
+											abreModulo && typeof estado?.licoesGeradas === "number"
 												? { label: "Lições", value: String(estado.licoesGeradas) }
 												: { label: "Conceitos", value: String(modulo.conceitos) },
 											{ label: "Horas", value: numeroCurto(modulo.horas), unit: "h" },
 										]}
-										{...(acao ? { action: acao } : {})}
+										action={acaoDoCard(card.tipo)}
 										{...(abreFormulario
 											? { onOpen: () => abrirFormulario(modulo.id) }
-											: card.tipo === "gerado"
+											: abreModulo
 												? { onOpen: () => props.navegar(caminhoDoModulo(materiaId, cursoId, modulo.id)) }
 												: {})}
 									/>
@@ -376,9 +383,10 @@ export function TelaCurso(props: PropsTelaCurso) {
 
 /**
  * O que fica embaixo do card, pelo estado do módulo: durante a geração, a
- * etapa, a barra e "Parar"; no gerado, "Gerado", as lições e as questões e
- * "Gerar de novo"; no aguardando material, a etiqueta, a nota e o aviso de
- * material novo; no erro, a mensagem.
+ * etapa e "Parar" (o progresso é o enchimento do card); no gerado, "Gerado",
+ * as lições e as questões e "Gerar de novo"; no aguardando material, a
+ * etiqueta, a nota e o aviso de material novo; no erro, a mensagem; no
+ * concluído, nada.
  */
 function RodapeModulo(props: {
 	card: CardModulo;
@@ -393,7 +401,6 @@ function RodapeModulo(props: {
 	const estado = card.modulo;
 	let conteudo: ReactNode = null;
 	if (card.tipo === "gerando" && estado) {
-		const progresso = progressoDaEtapa(estado) ?? 0;
 		conteudo = (
 			<div className="mod__gerando">
 				<div className="mod__linha">
@@ -405,16 +412,6 @@ function RodapeModulo(props: {
 						{props.parando ? "Parando…" : "Parar"}
 					</Button>
 				</div>
-				<span
-					className="mod__barra"
-					role="progressbar"
-					aria-label="Geração do módulo"
-					aria-valuemin={0}
-					aria-valuemax={100}
-					aria-valuenow={Math.round(progresso * 100)}
-				>
-					<motion.span initial={false} animate={{ width: `${Math.round(progresso * 100)}%` }} transition={semMovimento() ? { duration: 0 } : { type: "spring", stiffness: 200, damping: 30 }} />
-				</span>
 			</div>
 		);
 	} else if (card.tipo === "gerado") {

@@ -824,14 +824,20 @@
 .curso__parte--calendario { max-width: var(--measure-read); }
 .cursos__item--abre { cursor: pointer; }
 
-/* ── Gerar módulo (item 6, parte A): o rodapé embaixo de cada card (a etapa, a barra e "Parar"; "Gerado";
+/* ── O card de cada módulo (item 6, docs/modulos.md, "O card de cada módulo"): classes do perfil por cima do
+ * ModuleCard no state next (o musgo do gerado). O não gerado é preto (o fundo do painel, borda cheia); durante a
+ * geração, uma camada de musgo sobe de baixo para cima pela --mod-enchimento (0 a 1). Só o recomendado mostra a
+ * etiqueta "Próximo" do state next. ── */
+.ap-module.mod__card--preto { isolation: isolate; padding: calc(var(--space-6) - var(--border-strong)); border: var(--border-strong) solid var(--line-strong); background: var(--surface-panel); color: var(--ink); }
+.ap-module.mod__card--enchendo::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: calc(var(--radius-lg) - var(--border-strong)); background: var(--moss); clip-path: inset(calc((1 - var(--mod-enchimento, 0)) * 100%) 0 0 0); transition: clip-path .7s cubic-bezier(.2, .7, .2, 1); }
+.mod__card--sem-proximo .ap-module__tag { display: none; }
+
+/* ── Gerar módulo (item 6, parte A): o rodapé embaixo de cada card (a etapa e "Parar"; "Gerado";
  * "Aguardando material"; o erro) e o formulário (ModalGerarModulo.tsx). ── */
 .mod__rodape { display: flex; flex-direction: column; gap: var(--space-3); padding: 0 var(--space-2); }
 .mod__linha { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); min-width: 0; }
 .mod__gerando { display: flex; flex-direction: column; gap: var(--space-2); }
 .mod__etapa { flex: 1; min-width: 0; margin: 0; color: var(--ink); }
-.mod__barra { display: block; height: 4px; overflow: hidden; border-radius: 2px; background: var(--surface-well); }
-.mod__barra > span { display: block; height: 100%; background: var(--amber); }
 .mod__resumo { color: var(--ink-muted); }
 .mod__de-novo { margin-left: auto; }
 .mod__nota { min-width: 0; color: var(--ink); overflow-wrap: anywhere; }
@@ -865,6 +871,7 @@
 /* O índice. */
 .modulo__indice { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
 .modulo__indice-titulo { margin: 0 var(--space-3); color: var(--ink-muted); }
+.modulo__concluido { align-self: flex-start; margin: 0 var(--space-3); }
 .modulo__licoes { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; }
 .modulo__item { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: baseline; gap: var(--space-3); width: 100%; min-height: var(--control-md); padding: var(--space-2) var(--space-3); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink); text-align: left; cursor: pointer; transition: background-color .12s ease-out; }
 .modulo__item:hover { background: var(--surface-hover); }
@@ -940,6 +947,7 @@
 .modulo__bloco .modulo__criterio p { margin: 0; }
 .modulo__criterio-pontos, .modulo__criterio-descricao { color: var(--ink-muted); }
 .modulo__referencias { margin-top: 0; }
+.modulo__pe-fim { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
 .modulo__pe { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-12); padding-top: var(--space-5); border-top: var(--border-hair) solid var(--line); }
 .modulo__erro { max-width: var(--measure-read); }
 .modulo__erro .ap-callout p { margin: 0; }
@@ -955,6 +963,7 @@
 @container (max-width: 899.98px) {
 	.modulo__indice { gap: var(--space-2); }
 	.modulo__indice-titulo { margin: 0; }
+	.modulo__concluido { margin: 0; }
 	.modulo__licoes { flex-direction: row; gap: var(--space-1); overflow-x: auto; padding-bottom: var(--space-2); scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
 	.modulo__licoes > li { flex: none; }
 	.modulo__item { display: inline-flex; align-items: center; gap: var(--space-2); width: auto; max-width: 240px; min-height: var(--control-sm); padding: 0 var(--space-3); background: var(--surface-raised); }
@@ -973,4 +982,5 @@
 }
 @media (prefers-reduced-motion: reduce) {
 	.modulo__item { transition: none; }
+	.ap-module.mod__card--enchendo::before { transition: none; }
 }

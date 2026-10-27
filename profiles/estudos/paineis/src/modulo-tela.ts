@@ -3,7 +3,9 @@
 // aberta, o rótulo e o ícone de cada bloco pelo tipo e pelo formato, a trilha
 // dos módulos na CourseBar, o "Próximo" da barra, o índice das lições (a lista
 // no largo e as fichas no estreito), o resumo embaixo do índice, a linha de
-// dados do cabeçalho da lição, a frase da confusão no gabarito e o aviso de visualização (lembrado no localStorage).
+// dados do cabeçalho da lição, a frase da confusão no gabarito, o concluir
+// (o modal e a etiqueta "Concluído em dd/mm") e o aviso de visualização
+// (lembrado no localStorage).
 // Sem React e sem o design system (só os tipos): os testes
 // (modulo-tela.test.ts) rodam no Node.
 
@@ -201,6 +203,21 @@ export function resumoDoIndice(modulo: Pick<Modulo, "licoes"> & { geradoEm?: str
 	const questoes = blocos.filter(ehQuestao).length;
 	const dia = diaEMes(modulo.geradoEm);
 	return [contar(modulo.licoes.length, "lição", "lições"), contar(questoes, "questão", "questões"), dia ? `gerado em ${dia}` : ""].filter(Boolean).join(" · ");
+}
+
+// --- Concluir o módulo -------------------------------------------------------------------
+
+/** O modal de "Concluir o módulo" (docs/modulos.md, "Concluir um módulo"): o título e o texto. */
+export const perguntaConcluir = (numero: number) => ({ titulo: `Concluir o módulo ${pad2(numero)}?`, texto: "A recomendação passa para o próximo." }) as const;
+
+/** "Concluir o módulo" aparece só num módulo gerado e ainda não concluído. */
+export const podeConcluir = (modulo: Modulo): boolean => modulo.situacao === "gerado" && !modulo.concluidoEm;
+
+/** A Tag do topo do índice de um módulo concluído: "Concluído em 27/10"; não concluído, "". */
+export function rotuloConcluido(modulo: Modulo): string {
+	if (modulo.situacao !== "gerado" || !modulo.concluidoEm) return "";
+	const dia = diaEMes(modulo.concluidoEm);
+	return dia ? `Concluído em ${dia}` : "Concluído";
 }
 
 // --- O aviso de visualização ---------------------------------------------------------

@@ -288,7 +288,7 @@ async function gerarM1(pedido = "p-gerar", extra: Record<string, unknown> = {}) 
 describe("ponte", () => {
 	beforeEach(() => ligar());
 
-	it("listar manda o estado de todos os módulos com o próximo", async () => {
+	it("listar manda o estado de todos os módulos com o recomendado (proximo)", async () => {
 		acao("listar", { pedido: "l1" });
 		await respondeu("l1");
 		expect(ultimo()).toEqual({
@@ -332,8 +332,10 @@ describe("ponte", () => {
 		expect(gravado.licoes[0]!.blocos[0]).toMatchObject({ formato: "conceito", referencias: [ref(1)] });
 
 		const fim = doModulo(ultimo(), "m1")!;
-		expect(fim).toMatchObject({ situacao: "gerado", licoesGeradas: 2, blocos: 6, questoes: 2, geradoEm: gravado.geradoEm });
-		expect(ultimo()!.proximo).toBe("m2");
+		expect(fim).toMatchObject({ situacao: "gerado", licoesGeradas: 2, blocos: 6, questoes: 2, geradoEm: gravado.geradoEm, concluido: false });
+		expect(fim.concluidoEm).toBeUndefined();
+		// Gerado e não concluído, m1 continua o recomendado.
+		expect(ultimo()!.proximo).toBe("m1");
 
 		const eventos = await doVerbo("gerou_modulo");
 		expect(eventos).toHaveLength(1);
@@ -393,14 +395,64 @@ describe("ponte", () => {
 		expect(situacaoDe("m1")).toBe("gerado");
 	});
 
-	it("gerar um módulo que não é o próximo é erro, sem chamar o modelo", async () => {
+	it("qualquer módulo pode ser gerado, fora de ordem", async () => {
+		respostas.push(
+			JSON.stringify({ licoes: [{ titulo: "Cosseno", objetivo: "Comparar.", conceitos: ["c-cos"], roteiro: ["explicacao", "alternativa"] }] }),
+			JSON.stringify({ blocos: [explicacao("c-cos", "problema_aberto", "página 3"), alternativa("c-cos")] }),
+		);
 		acao("gerar", { modulo: "m2", pedido: "p-m2" });
 		await respondeu("p-m2");
-		expect(erroDe("p-m2")).toMatchObject({ ao: "gerar", modulo: "m2", mensagem: "Só o próximo módulo pode ser gerado." });
-		expect(chamadas).toHaveLength(0);
-		acao("listar", { pedido: "l" });
-		await respondeu("l");
-		expect(situacaoDe("m2")).toBe("a_gerar");
+		expect(erroDe("p-m2")).toBeUndefined();
+		await esperar(() => situacaoDe("m2") === "gerado" || situacaoDe("m2") === "erro");
+		expect(situacaoDe("m2")).toBe("gerado");
+		expect(situacaoDe("m1")).toBe("a_gerar");
+		expect(ultimo()!.proximo).toBe("m1");
+	});
+
+	it("concluir: grava o concluidoEm e o evento, manda o módulo e o estado com o pedido; a recomendação passa; gerar de novo e concluir de novo são erro", async () => {
+		acao("concluir", { modulo: "m1", pedido: "c0" });
+		await respondeu("c0");
+		expect(erroDe("c0")).toMatchObject({ ao: "concluir", modulo: "m1", mensagem: expect.stringMatching(/ainda não foi gerado/) });
+
+		geracaoQueDaCerto();
+		await gerarM1();
+		acao("concluir", { modulo: "m1", pedido: "c1" });
+		await respondeu("c1");
+		expect(erroDe("c1")).toBeUndefined();
+		const resposta = comPedido("c1")[0]!;
+		expect(resposta.acao).toBe("estado");
+		const estado = resposta.dados as unknown as MensagemEstado;
+		const gravado = (await lerModulo(dados, materia, CURSO, "m1")) as ModuloGerado;
+		expect(typeof gravado.concluidoEm).toBe("string");
+		expect(doModulo(estado, "m1")).toMatchObject({ situacao: "gerado", concluido: true, concluidoEm: gravado.concluidoEm });
+		expect(estado.proximo).toBe("m2");
+		expect(recebidas("modulo").at(-1)!.dados).toMatchObject({ materia, curso: CURSO, modulo: { id: "m1", concluidoEm: gravado.concluidoEm } });
+		const eventos = await doVerbo("concluiu_modulo");
+		expect(eventos).toHaveLength(1);
+		expect(eventos[0]).toMatchObject({ sessao: "sessao-1", objeto: { materia, curso: CURSO, modulo: "m1" }, resultado: { licoes: 2, questoes: 2 } });
+
+		acao("concluir", { modulo: "m1", pedido: "c2" });
+		await respondeu("c2");
+		expect(erroDe("c2")).toMatchObject({ ao: "concluir", mensagem: "O módulo já foi concluído." });
+		const antes = chamadas.length;
+		acao("gerar", { modulo: "m1", pedido: "g-de-novo" });
+		await respondeu("g-de-novo");
+		expect(erroDe("g-de-novo")?.mensagem).toMatch(/já foi concluído/);
+		expect(chamadas).toHaveLength(antes);
+		expect(await doVerbo("concluiu_modulo")).toHaveLength(1);
+	});
+
+	it("concluir um módulo que está sendo gerado de novo é erro", async () => {
+		geracaoQueDaCerto();
+		await gerarM1("g1");
+		const adiado = adiada();
+		respostas.push(adiado.resposta);
+		acao("gerar", { modulo: "m1", pedido: "g2" });
+		await respondeu("g2");
+		acao("concluir", { modulo: "m1", pedido: "c" });
+		await respondeu("c");
+		expect(erroDe("c")?.mensagem).toBe("Este módulo está sendo gerado. Pare a geração antes de concluí-lo.");
+		expect(((await lerModulo(dados, materia, CURSO, "m1")) as ModuloGerado).concluidoEm).toBeUndefined();
 	});
 
 	it("uma geração por curso de cada vez", async () => {
@@ -607,6 +659,7 @@ describe("ler_modulo", () => {
 		await gerarM1();
 		const sem = (await ferramentas.ler_modulo!.execute("2", { materia, curso: CURSO, modulo: "m1" }, undefined, undefined, ctx)).content[0]!.text;
 		expect(sem).toContain("# Módulo m1: Pesos dos termos");
+		expect(sem).toContain(", ainda não concluído;");
 		expect(sem).toContain("## Lição l1: Contando termos");
 		expect(sem).toContain("### l1-b1 · Explicação (apresentação do conceito)");
 		expect(sem).toContain("Texto sobre c-tf.");
@@ -627,6 +680,13 @@ describe("ler_modulo", () => {
 		expect(com).toContain("Explicação: São duas ocorrências.");
 		expect(com).toContain("- Raridade (2 pontos): Diz que poucos documentos têm o termo.");
 		expect(com).toContain("Resposta-modelo: Porque distinguem documentos.");
+
+		acao("concluir", { modulo: "m1", pedido: "c" });
+		await respondeu("c");
+		const concluido = await ferramentas.ler_modulo!.execute("4", { materia, curso: CURSO, modulo: "m1" }, undefined, undefined, ctx);
+		const data = ((await lerModulo(dados, materia, CURSO, "m1")) as ModuloGerado).concluidoEm!.slice(0, 10);
+		expect(concluido.content[0]!.text).toContain(`, concluído pelo aluno em ${data};`);
+		expect(concluido.details).toMatchObject({ situacao: "gerado", concluido: true });
 	});
 
 	it("numa conversa de caderno fica na matéria da conversa; módulo fora do esqueleto é erro", async () => {

@@ -6,12 +6,15 @@
 
 import type { AcaoRecebida } from "@estudos/ui";
 import { describe, expect, it } from "vitest";
+import type { Evento } from "../../lib/eventos.ts";
 import type { EstadoModuloNaTela, MensagemEstadoModulos } from "../../lib/modulo-tipos.ts";
 import { ErroDosModulos, EsperaDosModulos, lerModulos, respostaModulos } from "./modulos-ponte.ts";
 import {
 	acaoDoCard,
 	camposDoPedido,
 	cardsDosModulos,
+	classesDoCard,
+	estiloDoCard,
 	listarNomes,
 	nomesMandados,
 	primarioDoFormulario,
@@ -21,66 +24,94 @@ import {
 	textoDaEtapa,
 	tituloDoFormulario,
 } from "./modulos-tela.ts";
+import { descreverEvento } from "./TelaCaderno.tsx";
 
 const ORDEM = ["m1", "m2", "m3", "m4"];
 const estado = (...modulos: EstadoModuloNaTela[]) => ({ modulos });
 const m = (id: string, situacao: EstadoModuloNaTela["situacao"], extra: Partial<EstadoModuloNaTela> = {}): EstadoModuloNaTela => ({ id, situacao, ...extra });
 
 describe("cardsDosModulos", () => {
-	it("sem estado: o primeiro carregando como próximo, os outros bloqueados", () => {
+	const GERADO_EM = "2026-10-26T12:00:00.000Z";
+
+	it("sem estado: todos carregando, pretos e sem etiqueta; nada bloqueado", () => {
 		const cards = cardsDosModulos(ORDEM, undefined);
-		expect(cards.m1).toEqual({ tipo: "carregando", state: "next" });
-		expect(cards.m2).toEqual({ tipo: "bloqueado", state: "locked" });
-		expect(cards.m4).toEqual({ tipo: "bloqueado", state: "locked" });
+		for (const id of ORDEM) expect(cards[id]).toEqual({ tipo: "carregando", state: "next", cor: "preto", recomendado: false });
 	});
 
-	it("nada gerado: o primeiro é o próximo (Gerar módulo) e os seguintes ficam bloqueados", () => {
+	it("nada gerado: todos pretos com Gerar módulo; só o primeiro é o recomendado", () => {
 		const cards = cardsDosModulos(ORDEM, estado(m("m1", "a_gerar"), m("m2", "a_gerar"), m("m3", "a_gerar"), m("m4", "a_gerar")));
-		expect(cards.m1).toMatchObject({ tipo: "gerar", state: "next" });
-		expect(cards.m2).toMatchObject({ tipo: "bloqueado", state: "locked" });
-		expect(cards.m3).toMatchObject({ tipo: "bloqueado", state: "locked" });
+		expect(cards.m1).toMatchObject({ tipo: "gerar", state: "next", cor: "preto", recomendado: true });
+		for (const id of ["m2", "m3", "m4"]) expect(cards[id]).toMatchObject({ tipo: "gerar", state: "next", cor: "preto", recomendado: false });
 	});
 
-	it("gerado e aguardando ficam liberados; o próximo é o primeiro sem arquivo", () => {
-		const cards = cardsDosModulos(ORDEM, estado(m("m1", "gerado", { licoesGeradas: 3, questoes: 8 }), m("m2", "aguardando_material", { nota: "Quinta" }), m("m3", "a_gerar"), m("m4", "a_gerar")));
-		expect(cards.m1).toMatchObject({ tipo: "gerado", state: "next" });
+	it("o curso do Breno: m1 gerado e não concluído é musgo e recomendado; os outros, pretos com Gerar módulo e sem etiqueta", () => {
+		const cards = cardsDosModulos(ORDEM, estado(m("m1", "gerado", { licoesGeradas: 3, questoes: 8, concluido: false }), m("m2", "a_gerar"), m("m3", "a_gerar"), m("m4", "a_gerar")));
+		expect(cards.m1).toMatchObject({ tipo: "gerado", state: "next", cor: "musgo", recomendado: true });
 		expect(cards.m1!.modulo?.licoesGeradas).toBe(3);
-		expect(cards.m2).toMatchObject({ tipo: "aguardando", state: "next" });
-		expect(cards.m3).toMatchObject({ tipo: "gerar", state: "next" });
-		expect(cards.m4).toMatchObject({ tipo: "bloqueado", state: "locked" });
+		for (const id of ["m2", "m3", "m4"]) expect(cards[id]).toMatchObject({ tipo: "gerar", cor: "preto", recomendado: false });
 	});
 
-	it("durante a geração o card fica em curso, e os seguintes continuam bloqueados", () => {
-		for (const situacao of ["esperando_materiais", "planejando", "escrevendo"] as const) {
-			const cards = cardsDosModulos(ORDEM, estado(m("m1", "gerado"), m("m2", situacao), m("m3", "a_gerar")));
-			expect(cards.m2).toMatchObject({ tipo: "gerando", state: "current" });
-			expect(cards.m3).toMatchObject({ tipo: "bloqueado", state: "locked" });
-		}
+	it("concluído: done (holográfico, Rever), nunca recomendado; a recomendação passa para o seguinte, gerado ou não", () => {
+		const cards = cardsDosModulos(ORDEM, estado(m("m1", "gerado", { concluido: true }), m("m2", "gerado"), m("m3", "a_gerar")));
+		expect(cards.m1).toMatchObject({ tipo: "concluido", state: "done", cor: "holografico", recomendado: false });
+		expect(cards.m2).toMatchObject({ tipo: "gerado", cor: "musgo", recomendado: true });
+		expect(cards.m3).toMatchObject({ tipo: "gerar", cor: "preto", recomendado: false });
+		const depois = cardsDosModulos(ORDEM, estado(m("m1", "gerado", { concluido: true }), m("m2", "a_gerar"), m("m3", "gerado")));
+		expect(depois.m2).toMatchObject({ tipo: "gerar", recomendado: true });
+		expect(depois.m3).toMatchObject({ tipo: "gerado", cor: "musgo", recomendado: false });
 	});
 
-	it("erro: liberado, com a mensagem; os seguintes continuam bloqueados", () => {
-		const cards = cardsDosModulos(ORDEM, estado(m("m1", "erro", { mensagem: "O modelo não respondeu." }), m("m2", "a_gerar")));
-		expect(cards.m1).toMatchObject({ tipo: "erro", state: "next" });
+	it("aguardando material: preto, com a nota, e não é recomendado", () => {
+		const cards = cardsDosModulos(ORDEM, estado(m("m1", "aguardando_material", { nota: "Quinta" }), m("m2", "a_gerar")));
+		expect(cards.m1).toMatchObject({ tipo: "aguardando", state: "next", cor: "preto", recomendado: false });
+		expect(cards.m1!.modulo?.nota).toBe("Quinta");
+		expect(cards.m2).toMatchObject({ recomendado: true });
+	});
+
+	it("durante a geração: preto enchendo de musgo pelo progresso, de qualquer módulo", () => {
+		const cards = cardsDosModulos(ORDEM, estado(m("m1", "gerado"), m("m3", "escrevendo", { licao: 2, licoes: 4 })));
+		expect(cards.m3).toMatchObject({ tipo: "gerando", state: "next", cor: "preto", recomendado: false });
+		expect(cards.m3!.enchimento).toBeCloseTo(0.1 + 0.9 * (1 / 4));
+		const planejando = cardsDosModulos(ORDEM, estado(m("m1", "planejando", { geradoEm: GERADO_EM })));
+		expect(planejando.m1).toMatchObject({ tipo: "gerando", cor: "preto", enchimento: 0.1, recomendado: true });
+	});
+
+	it("erro: musgo se há a versão gravada, senão preto; Tentar de novo", () => {
+		const cards = cardsDosModulos(ORDEM, estado(m("m1", "erro", { mensagem: "O modelo não respondeu.", geradoEm: GERADO_EM }), m("m2", "erro", { mensagem: "Falhou." })));
+		expect(cards.m1).toMatchObject({ tipo: "erro", cor: "musgo", recomendado: true });
 		expect(cards.m1!.modulo?.mensagem).toBe("O modelo não respondeu.");
-		expect(cards.m2).toMatchObject({ tipo: "bloqueado", state: "locked" });
+		expect(cards.m2).toMatchObject({ tipo: "erro", cor: "preto", recomendado: false });
 	});
 
-	it("gerar de novo um módulo gerado (com geradoEm) não bloqueia o próximo", () => {
-		const atual = estado(m("m1", "planejando", { geradoEm: "2026-10-26T12:00:00.000Z" }), m("m2", "a_gerar"));
-		expect(proximoDaTela(ORDEM, atual)).toBe("m2");
-		const cards = cardsDosModulos(ORDEM, atual);
-		expect(cards.m1).toMatchObject({ tipo: "gerando", state: "current" });
-		expect(cards.m2).toMatchObject({ tipo: "gerar", state: "next" });
+	it("o recomendado da extensão (proximo) vale sobre o da tela; null, nenhum", () => {
+		const atual = { modulos: [m("m1", "planejando"), m("m2", "a_gerar")], proximo: "m2" };
+		expect(proximoDaTela(ORDEM, atual)).toBe("m1");
+		expect(cardsDosModulos(ORDEM, atual).m2).toMatchObject({ recomendado: true });
+		expect(cardsDosModulos(ORDEM, atual).m1).toMatchObject({ recomendado: false });
+		const nenhum = cardsDosModulos(ORDEM, { modulos: [m("m1", "a_gerar")], proximo: null });
+		expect(Object.values(nenhum).some((card) => card.recomendado)).toBe(false);
 	});
 
-	it("módulo que não veio no estado conta como sem arquivo", () => {
-		const cards = cardsDosModulos(ORDEM, estado(m("m1", "gerado")));
-		expect(cards.m2).toMatchObject({ tipo: "gerar", state: "next" });
-		expect(cards.m3).toMatchObject({ tipo: "bloqueado", state: "locked" });
+	it("módulo que não veio no estado conta como não gerado", () => {
+		const cards = cardsDosModulos(ORDEM, estado(m("m1", "gerado", { concluido: true })));
+		expect(cards.m2).toMatchObject({ tipo: "gerar", cor: "preto", recomendado: true });
+		expect(cards.m3).toMatchObject({ tipo: "gerar", cor: "preto", recomendado: false });
 	});
 
-	it("todos com arquivo: nenhum próximo", () => {
-		expect(proximoDaTela(["m1", "m2"], estado(m("m1", "gerado"), m("m2", "aguardando_material")))).toBeNull();
+	it("todos concluídos ou aguardando: nenhum recomendado", () => {
+		expect(proximoDaTela(["m1", "m2"], estado(m("m1", "gerado", { concluido: true }), m("m2", "aguardando_material")))).toBeNull();
+		expect(proximoDaTela(["m1", "m2"], estado(m("m1", "gerado"), m("m2", "aguardando_material")))).toBe("m1");
+	});
+
+	it("as classes do perfil e o enchimento", () => {
+		expect(classesDoCard({ state: "next", cor: "musgo", recomendado: true })).toBe("mod__card");
+		expect(classesDoCard({ state: "next", cor: "musgo", recomendado: false })).toBe("mod__card mod__card--sem-proximo");
+		expect(classesDoCard({ state: "next", cor: "preto", recomendado: false })).toBe("mod__card mod__card--preto mod__card--sem-proximo");
+		expect(classesDoCard({ state: "next", cor: "preto", recomendado: true, enchimento: 0.4 })).toBe("mod__card mod__card--preto mod__card--enchendo");
+		expect(classesDoCard({ state: "done", cor: "holografico", recomendado: false })).toBe("mod__card");
+		expect(estiloDoCard({})).toBeUndefined();
+		expect(estiloDoCard({ enchimento: 0.325 })).toEqual({ "--mod-enchimento": "0.325" });
+		expect(estiloDoCard({ enchimento: 2 })).toEqual({ "--mod-enchimento": "1" });
 	});
 });
 
@@ -97,14 +128,15 @@ describe("textos dos cards", () => {
 		expect(textoDaEtapa(m("m1", "gerado"))).toBeUndefined();
 	});
 
-	it("o progresso anda com a etapa e fica entre 0 e 1", () => {
+	it("o progresso anda com a etapa (5 %, 10 %, 10 + 90 × (i − 1) / n %) e fica entre 0 e 1", () => {
 		const esperando = progressoDaEtapa(m("m1", "esperando_materiais"))!;
 		const planejando = progressoDaEtapa(m("m1", "planejando"))!;
 		const licao1 = progressoDaEtapa(m("m1", "escrevendo", { licao: 1, licoes: 4 }))!;
 		const licao4 = progressoDaEtapa(m("m1", "escrevendo", { licao: 4, licoes: 4 }))!;
-		expect(esperando).toBeLessThan(planejando);
-		expect(planejando).toBeLessThanOrEqual(licao1);
-		expect(licao1).toBeLessThan(licao4);
+		expect(esperando).toBe(0.05);
+		expect(planejando).toBe(0.1);
+		expect(licao1).toBeCloseTo(0.1);
+		expect(licao4).toBeCloseTo(0.1 + 0.9 * 0.75);
 		expect(licao4).toBeLessThan(1);
 		expect(progressoDaEtapa(m("m1", "escrevendo", { licao: 9, licoes: 4 }))).toBeLessThanOrEqual(1);
 		expect(progressoDaEtapa(m("m1", "gerado"))).toBeUndefined();
@@ -121,7 +153,7 @@ describe("textos dos cards", () => {
 		expect(acaoDoCard("aguardando")).toBe("Gerar agora");
 		expect(acaoDoCard("erro")).toBe("Tentar de novo");
 		expect(acaoDoCard("gerado")).toBe("Abrir");
-		expect(acaoDoCard("bloqueado")).toBeUndefined();
+		expect(acaoDoCard("concluido")).toBe("Rever");
 	});
 
 	it("listarNomes junta com vírgula e \"e\"", () => {
@@ -156,6 +188,16 @@ describe("o formulário", () => {
 			materiaisNovos: ["aula-05.pdf"],
 		});
 		expect(camposDoPedido({ informacoes: "", observacoes: "", materiaisNovos: [] })).toEqual({});
+	});
+});
+
+describe("a linha do tempo do caderno", () => {
+	it("concluiu_modulo: o módulo, o curso, as lições e as questões", () => {
+		const evento = (resultado: Record<string, unknown>) =>
+			({ id: "e", ts: "2026-10-27T13:00:00.000Z", verbo: "concluiu_modulo", objeto: { materia: "x", curso: "p1-busca", modulo: "m1" }, resultado }) as unknown as Evento;
+		expect(descreverEvento(evento({ licoes: 3, questoes: 8 }))).toEqual({ icone: "check", texto: "Módulo concluído: m1 de p1-busca", detalhe: "3 lições · 8 questões" });
+		expect(descreverEvento(evento({ licoes: 1, questoes: 1 })).detalhe).toBe("1 lição · 1 questão");
+		expect(descreverEvento(evento({})).detalhe).toBeUndefined();
 	});
 });
 

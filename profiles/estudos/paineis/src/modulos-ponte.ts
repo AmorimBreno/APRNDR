@@ -2,14 +2,16 @@
 // (extensions/modulos.ts, docs/modulos.md, "Ponte") atende, e a leitura do
 // que ela mandou. A visão do curso (TelaCurso.tsx) usa o hook.
 //
-// Sem mudança otimista, como cursos-ponte: gerar e aguardar levam um pedido e
-// devolvem uma promessa, resolvida quando chega o "estado" com aquele pedido
-// (a geração começou, ou o módulo passou a aguardar) e rejeitada quando chega
-// um "erro" com ele. Cancelar não tem pedido na ponte: a promessa resolve
+// Sem mudança otimista, como cursos-ponte: gerar, aguardar e concluir levam
+// um pedido e devolvem uma promessa, resolvida quando chega o "estado" com
+// aquele pedido (a geração começou, o módulo passou a aguardar ou foi
+// concluído) e rejeitada quando chega um "erro" com ele. Cancelar não tem
+// pedido na ponte: a promessa resolve
 // quando a ação sai, e o estado novo diz que a geração parou.
 //
 // A visão do módulo gerado (TelaModulo.tsx, parte B) usa useModuloAberto:
-// manda "abrir" e lê o "modulo" (ou o "erro" do abrir) que voltou.
+// manda "abrir" e lê o "modulo" (ou o "erro" do abrir) que voltou; e o
+// concluir do useModulos.
 
 import { type AcaoRecebida, type JanelaPerfilHook, semEsperar } from "@estudos/ui";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -46,7 +48,7 @@ const doCurso = (dados: { materia?: string; curso?: string } | undefined, materi
 /**
  * Lê, em ordem, o que chegou ao painel "modulos" para o curso. Um erro sem
  * matéria ou sem curso também conta (só esta tela ouve o painel). Os erros
- * com pedido são a resposta de gerar ou aguardar: quem mostra é o formulário,
+ * com pedido são a resposta de gerar, aguardar ou concluir: quem mostra é quem pediu,
  * pela promessa.
  */
 export function lerModulos(recebidas: readonly AcaoRecebida[], materia: string, curso: string): LidoModulos {
@@ -203,6 +205,8 @@ export interface ModulosDoCurso {
 	gerar(modulo: string, campos: CamposPedido): Promise<MensagemEstadoModulos>;
 	/** Marca o módulo como aguardando material; resolve com o estado novo. */
 	aguardar(modulo: string, nota?: string): Promise<MensagemEstadoModulos>;
+	/** Conclui o módulo gerado; resolve com o estado novo (a recomendação já passou para o seguinte). */
+	concluir(modulo: string): Promise<MensagemEstadoModulos>;
 	/** Para a geração (o que estava gravado antes fica); resolve quando a ação sai. */
 	cancelar(modulo: string): Promise<void>;
 }
@@ -238,7 +242,7 @@ export function useModulos(janela: JanelaPerfilHook, materia: string, curso: str
 	useEffect(() => () => espera.current!.cancelar("A conversa mudou antes da resposta. Tente de novo."), [sessaoId]);
 
 	const mandar = useCallback(
-		<Acao extends "gerar" | "aguardar">(acao: Acao, dados: AcoesModulos[Acao]): Promise<MensagemEstadoModulos> => {
+		<Acao extends "gerar" | "aguardar" | "concluir">(acao: Acao, dados: AcoesModulos[Acao]): Promise<MensagemEstadoModulos> => {
 			const promessa = espera.current!.esperar(dados.pedido);
 			acoes.acaoDaInterface(PAINEL_MODULOS, acao, dados).catch((falha: unknown) => {
 				espera.current!.falhar(dados.pedido, new ErroDosModulos(`Não consegui falar com a sessão: ${(falha as Error).message}`));
@@ -264,6 +268,7 @@ export function useModulos(janela: JanelaPerfilHook, materia: string, curso: str
 			const limpa = nota?.trim();
 			return mandar("aguardar", { materia, curso, modulo, pedido: crypto.randomUUID(), ...(limpa ? { nota: limpa } : {}) });
 		},
+		concluir: (modulo) => mandar("concluir", { materia, curso, modulo, pedido: crypto.randomUUID() }),
 		cancelar: async (modulo) => {
 			try {
 				await acoes.acaoDaInterface(PAINEL_MODULOS, "cancelar", { materia, curso, modulo } satisfies AcoesModulos["cancelar"]);

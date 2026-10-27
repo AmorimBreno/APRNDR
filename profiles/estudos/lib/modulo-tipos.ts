@@ -175,6 +175,8 @@ export interface ModuloGerado extends ModuloBase {
 	custo: number;
 	/** Os materiais prontos (com o hash do manifesto) cujos trechos os conceitos do módulo citam. */
 	materiaisUsados: ArquivoDoCurso[];
+	/** ISO 8601: quando o Breno concluiu o módulo ("Concluir o módulo"). Concluído não volta atrás nem é gerado de novo. */
+	concluidoEm?: string;
 }
 
 /** O <módulo>.json. */
@@ -192,6 +194,8 @@ export interface AcoesModulos {
 	cancelar: { materia: string; curso: string; modulo: string };
 	/** Parte B: manda o módulo gerado inteiro. */
 	abrir: { materia: string; curso: string; modulo: string };
+	/** Conclui o módulo gerado (concluirModulo); a recomendação passa para o seguinte. */
+	concluir: { materia: string; curso: string; modulo: string; pedido: string };
 }
 
 export type AcaoModulos = keyof AcoesModulos;
@@ -212,6 +216,9 @@ export interface EstadoModuloNaTela {
 	esperando?: string[];
 	/** Em gerado. */
 	geradoEm?: string;
+	/** Em gerado: se o módulo foi concluído, e quando (ISO 8601). */
+	concluido?: boolean;
+	concluidoEm?: string;
 	custo?: number;
 	/** Em gerado: quantas lições, blocos e questões o módulo tem (resumoDoModulo). */
 	licoesGeradas?: number;
@@ -229,7 +236,9 @@ export interface MensagemEstadoModulos {
 	curso: string;
 	/** Na ordem do esqueleto. */
 	modulos: EstadoModuloNaTela[];
-	/** O da tela, quando a mudança respondeu a gerar ou aguardar. */
+	/** O recomendado, o "Próximo" (proximoModulo), ou null. */
+	proximo?: string | null;
+	/** O da tela, quando a mudança respondeu a gerar, aguardar ou concluir. */
 	pedido?: string;
 }
 
@@ -243,7 +252,7 @@ export interface MensagemModulo {
 /** A mensagem "erro". */
 export interface MensagemErroModulos {
 	mensagem: string;
-	/** A ação que falhou (listar, gerar, aguardar…). */
+	/** A ação que falhou (listar, gerar, aguardar, concluir…). */
 	ao?: string;
 	materia?: string;
 	curso?: string;
@@ -337,27 +346,29 @@ const listaDeIds = (valor: unknown): string[] =>
 /** As situações gravadas dos módulos do curso, por id (um módulo sem arquivo não aparece). */
 export type SituacoesModulos = Readonly<Record<string, SituacaoModulo | undefined>>;
 
+/** Os ids dos módulos gerados e concluídos (com concluidoEm). */
+export type ConcluidosModulos = readonly string[];
+
 /**
- * O próximo módulo (docs/modulos.md, "Qual módulo pode ser gerado"): o
- * primeiro do esqueleto, na ordem, que não está gerado nem aguardando
- * material. Um módulo aguardando não segura os seguintes. Com todos gerados
- * ou aguardando, null.
+ * O módulo recomendado, o "Próximo" (docs/modulos.md, "Qual módulo pode ser
+ * gerado"): o primeiro do esqueleto, na ordem, que não está concluído e não
+ * está aguardando material (gerado ou não). Concluir um módulo passa a
+ * recomendação para o seguinte. Com todos concluídos ou aguardando, null.
  */
-export function proximoModulo(esqueleto: Pick<Esqueleto, "modulos">, situacoes: SituacoesModulos): string | null {
-	return esqueleto.modulos.find((modulo) => !ehSituacaoModulo(situacoes[modulo.id]))?.id ?? null;
+export function proximoModulo(esqueleto: Pick<Esqueleto, "modulos">, situacoes: SituacoesModulos, concluidos: ConcluidosModulos): string | null {
+	return esqueleto.modulos.find(({ id }) => situacoes[id] !== "aguardando_material" && !(situacoes[id] === "gerado" && concluidos.includes(id)))?.id ?? null;
 }
 
 /**
- * Confere se o módulo pode ser gerado agora: o próximo, um aguardando
- * material, ou um gerado (para gerar de novo; a tela confirma antes).
- * Devolve o módulo do esqueleto. O resto é ErroModulo "Só o próximo módulo
- * pode ser gerado."; um curso que não está pronto, ou um módulo que não está
- * no esqueleto, também é ErroModulo.
+ * Confere se o módulo pode ser gerado agora: qualquer um que não está
+ * concluído (gerar de novo um gerado substitui a versão anterior; a tela
+ * confirma antes). Devolve o módulo do esqueleto. Um concluído é ErroModulo
+ * ("já foi concluído"); um curso que não está pronto, ou um módulo que não
+ * está no esqueleto, também é ErroModulo.
  */
-export function podeGerar(curso: Pick<Curso, "situacao" | "esqueleto">, situacoes: SituacoesModulos, modulo: string): ModuloDoEsqueleto {
+export function podeGerar(curso: Pick<Curso, "situacao" | "esqueleto">, situacoes: SituacoesModulos, modulo: string, concluidos: ConcluidosModulos): ModuloDoEsqueleto {
 	const doEsqueleto = moduloDoEsqueleto(curso, modulo);
-	if (ehSituacaoModulo(situacoes[modulo])) return doEsqueleto;
-	if (proximoModulo(curso.esqueleto!, situacoes) !== modulo) throw new ErroModulo("Só o próximo módulo pode ser gerado.");
+	if (situacoes[modulo] === "gerado" && concluidos.includes(modulo)) throw new ErroModulo("O módulo já foi concluído; um módulo concluído não é gerado de novo.");
 	return doEsqueleto;
 }
 

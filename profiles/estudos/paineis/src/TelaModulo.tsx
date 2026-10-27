@@ -18,11 +18,15 @@
 // prática (pergunta, questão, dissertativa) vai num cartão. As questões mostram o gabarito só quando pedido
 // ("Ver gabarito", "Ver resposta", "Ver rubrica e resposta-modelo"); as
 // referências abrem o material. Responder e pedir outra explicação chegam
-// com a aula (item 7). No pé, a lição anterior e a próxima.
+// com a aula (item 7). No pé, a lição anterior e a próxima; na última lição
+// de um módulo gerado e não concluído, também "Concluir o módulo" (com o
+// modal de confirmação; docs/modulos.md, "Concluir um módulo"), que volta
+// para a visão do curso depois de concluir. Um módulo concluído mostra no
+// topo do índice a etiqueta "Concluído em dd/mm".
 //
 // O módulo vem da ponte "modulos" (useModuloAberto, a ação "abrir"); o nome
 // e a ordem dos módulos, do curso (useCurso); quais estão gerados, do estado
-// dos módulos (useModulos).
+// dos módulos (useModulos), que também conclui (a ação "concluir").
 
 import {
 	Button,
@@ -30,6 +34,7 @@ import {
 	CourseBar,
 	EmptyState,
 	LessonBlock,
+	Modal,
 	type OrnamentGlyph,
 	pad2,
 	QuizQuestion,
@@ -62,8 +67,11 @@ import {
 	kickerDaBarra,
 	lembrarAvisoFechado,
 	passosDaTrilha,
+	perguntaConcluir,
+	podeConcluir,
 	proximoDaBarra,
 	resumoDoIndice,
+	rotuloConcluido,
 	rotuloDoBloco,
 	TEXTO_AVISO,
 	tituloDoModulo,
@@ -114,6 +122,7 @@ export function TelaModulo(props: PropsTelaModulo) {
 			abrirLicao={(id) => props.navegar(caminhoDoModulo(materiaId, cursoId, moduloId, id))}
 			abrirMaterial={(arquivo) => props.navegar(`caderno/${materiaId}/materiais/${arquivo}`)}
 			tentarDeNovo={aberto.abrirDeNovo}
+			concluir={() => modulos.concluir(moduloId)}
 		/>
 	);
 }
@@ -135,6 +144,8 @@ export interface PropsVisaoModulo {
 	abrirLicao(id: string): void;
 	abrirMaterial(arquivo: string): void;
 	tentarDeNovo(): void;
+	/** "Concluir o módulo": resolve quando a extensão concluiu; rejeita com a frase do erro. */
+	concluir?(): Promise<unknown>;
 }
 
 /** A CourseBar e o corpo da visão, pelos dados (sem ponte: dá para desenhar no servidor). */
@@ -190,9 +201,11 @@ export function VisaoModulo(props: PropsVisaoModulo) {
 				modulo={modulo}
 				licao={licao}
 				indice={indice}
+				{...(doEsqueleto ? { numero: doEsqueleto.numero, nome: doEsqueleto.nome } : {})}
 				abrirLicao={props.abrirLicao}
 				abrirMaterial={props.abrirMaterial}
 				voltarAoCurso={props.voltarAoCurso}
+				{...(props.concluir ? { concluir: props.concluir } : {})}
 			/>
 		);
 	}
@@ -234,14 +247,18 @@ export function VisaoModulo(props: PropsVisaoModulo) {
 	);
 }
 
-/** O índice das lições e a lição aberta, com a régua dos blocos e o pé. */
+/** O índice das lições e a lição aberta, com a régua dos blocos e o pé (na última lição, "Concluir o módulo"). */
 function LicaoAberta(props: {
 	modulo: Modulo;
 	licao: Licao;
 	indice: number;
+	/** O número e o nome do módulo no esqueleto (para o modal de concluir). */
+	numero?: number;
+	nome?: string;
 	abrirLicao(id: string): void;
 	abrirMaterial(arquivo: string): void;
 	voltarAoCurso(): void;
+	concluir?(): Promise<unknown>;
 }) {
 	const { modulo, licao, indice } = props;
 	const total = modulo.licoes.length;
@@ -291,10 +308,41 @@ function LicaoAberta(props: {
 	};
 	const ultima = indice + 1 >= total;
 
+	// "Concluir o módulo": o modal de confirmação, o pedido em andamento e o erro dele.
+	const [perguntarConcluir, setPerguntarConcluir] = useState(false);
+	const [concluindo, setConcluindo] = useState(false);
+	const [erroConcluir, setErroConcluir] = useState<string | undefined>(undefined);
+	const mostraConcluir = ultima && podeConcluir(modulo) && props.concluir !== undefined;
+	const pergunta = perguntaConcluir(props.numero ?? 0);
+	const concluido = rotuloConcluido(modulo);
+	const fecharConcluir = () => {
+		if (concluindo) return;
+		setPerguntarConcluir(false);
+		setErroConcluir(undefined);
+	};
+	const concluir = () => {
+		if (concluindo || !props.concluir) return;
+		setConcluindo(true);
+		setErroConcluir(undefined);
+		props
+			.concluir()
+			.then(() => {
+				setPerguntarConcluir(false);
+				props.voltarAoCurso();
+			})
+			.catch((falha: unknown) => setErroConcluir(falha instanceof Error ? falha.message : String(falha)))
+			.finally(() => setConcluindo(false));
+	};
+
 	return (
 		<div ref={corpo} className="curso__corpo modulo__corpo">
 			<div className="modulo__grade">
 				<nav className="modulo__indice" aria-label="Lições do módulo">
+					{concluido ? (
+						<Tag className="modulo__concluido" tone="sage" size="sm" icon="check">
+							{concluido}
+						</Tag>
+					) : null}
 					<p className="overline modulo__indice-titulo">Lições</p>
 					<ol className="modulo__licoes">
 						{itensDoIndice(modulo.licoes, indice).map((item) => (
@@ -365,17 +413,45 @@ function LicaoAberta(props: {
 							>
 								Lição anterior
 							</Button>
-							<Button
-								variant="secondary"
-								iconRight="arrow-right"
-								onClick={() => (ultima ? props.voltarAoCurso() : props.abrirLicao(modulo.licoes[indice + 1]!.id))}
-							>
-								{ultima ? "Voltar ao curso" : "Próxima lição"}
-							</Button>
+							<span className="modulo__pe-fim">
+								<Button
+									variant="secondary"
+									iconRight="arrow-right"
+									onClick={() => (ultima ? props.voltarAoCurso() : props.abrirLicao(modulo.licoes[indice + 1]!.id))}
+								>
+									{ultima ? "Voltar ao curso" : "Próxima lição"}
+								</Button>
+								{mostraConcluir ? (
+									<Button variant="primary" icon="check" onClick={() => setPerguntarConcluir(true)} disabled={concluindo} aria-busy={concluindo}>
+										Concluir o módulo
+									</Button>
+								) : null}
+							</span>
 						</footer>
 					</motion.article>
 				</div>
 			</div>
+			<Modal
+				open={perguntarConcluir}
+				onClose={fecharConcluir}
+				kicker={props.numero && props.nome ? tituloDoModulo(props.numero, props.nome) : "Módulo"}
+				title={pergunta.titulo}
+				size="sm"
+				dismissible={!concluindo}
+				footer={
+					<>
+						<Button variant="secondary" onClick={fecharConcluir} disabled={concluindo}>
+							Ainda não
+						</Button>
+						<Button variant="primary" icon="check" onClick={concluir} disabled={concluindo} aria-busy={concluindo}>
+							{concluindo ? "Concluindo…" : "Concluir"}
+						</Button>
+					</>
+				}
+			>
+				<p className="body">{pergunta.texto}</p>
+				{erroConcluir ? <p className="body-sm cursos__erro">{erroConcluir}</p> : null}
+			</Modal>
 		</div>
 	);
 }

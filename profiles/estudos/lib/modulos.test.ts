@@ -16,6 +16,7 @@ import { type Conceito, gravarMapa, mapaVazio, pastaExtraidoArquivo } from "./ma
 import { criarMateria, eventosMateria } from "./materias.ts";
 import {
 	caminhoDoModulo,
+	concluirModulo,
 	entradaDoModelo,
 	ErroModulo,
 	type Licao,
@@ -41,38 +42,50 @@ const MODELO = "openrouter/openai/gpt-6.1-sol";
 
 const esqueletoDe = (...ids: string[]) => ({ modulos: ids.map((id) => ({ id })) as ModuloDoEsqueleto[] });
 
-describe("proximoModulo", () => {
+describe("proximoModulo (o recomendado)", () => {
 	it("nenhum gerado: o primeiro", () => {
-		expect(proximoModulo(esqueletoDe("m1", "m2", "m3"), {})).toBe("m1");
+		expect(proximoModulo(esqueletoDe("m1", "m2", "m3"), {}, [])).toBe("m1");
 	});
 
-	it("alguns gerados: o primeiro que não está gerado, na ordem do esqueleto", () => {
-		expect(proximoModulo(esqueletoDe("m2", "m1", "m3"), { m2: "gerado" })).toBe("m1");
-		expect(proximoModulo(esqueletoDe("m1", "m2", "m3"), { m1: "gerado", m2: "gerado" })).toBe("m3");
+	it("um gerado não concluído continua recomendado; concluído passa a recomendação para o seguinte, na ordem do esqueleto", () => {
+		expect(proximoModulo(esqueletoDe("m1", "m2", "m3"), { m1: "gerado" }, [])).toBe("m1");
+		expect(proximoModulo(esqueletoDe("m1", "m2", "m3"), { m1: "gerado" }, ["m1"])).toBe("m2");
+		expect(proximoModulo(esqueletoDe("m2", "m1", "m3"), { m2: "gerado", m1: "gerado" }, ["m2"])).toBe("m1");
+		expect(proximoModulo(esqueletoDe("m1", "m2", "m3"), { m1: "gerado", m2: "gerado" }, ["m1"])).toBe("m2");
 	});
 
-	it("aguardando material não segura os seguintes", () => {
-		expect(proximoModulo(esqueletoDe("m1", "m2", "m3"), { m1: "gerado", m2: "aguardando_material" })).toBe("m3");
-		expect(proximoModulo(esqueletoDe("m1", "m2"), { m1: "aguardando_material", m2: "gerado" })).toBeNull();
+	it("aguardando material não é recomendado nem segura os seguintes", () => {
+		expect(proximoModulo(esqueletoDe("m1", "m2", "m3"), { m1: "aguardando_material" }, [])).toBe("m2");
+		expect(proximoModulo(esqueletoDe("m1", "m2", "m3"), { m1: "gerado", m2: "aguardando_material" }, ["m1"])).toBe("m3");
+		expect(proximoModulo(esqueletoDe("m1", "m2"), { m1: "aguardando_material", m2: "gerado" }, ["m2"])).toBeNull();
+	});
+
+	it("um id em concluidos que não está gerado não conta como concluído", () => {
+		expect(proximoModulo(esqueletoDe("m1", "m2"), {}, ["m1"])).toBe("m1");
 	});
 });
 
 describe("podeGerar", () => {
 	const curso = { situacao: "pronto" as const, esqueleto: { ...esqueletoDe("m1", "m2", "m3") } as Curso["esqueleto"] };
 
-	it("o próximo, um aguardando e um gerado podem; o resto não", () => {
+	it("qualquer módulo não concluído pode, gerado, aguardando ou sem arquivo, em qualquer ordem", () => {
 		const situacoes = { m1: "gerado", m2: "aguardando_material" } as const;
-		expect(podeGerar(curso, situacoes, "m3").id).toBe("m3");
-		expect(podeGerar(curso, situacoes, "m2").id).toBe("m2");
-		expect(podeGerar(curso, situacoes, "m1").id).toBe("m1");
-		expect(() => podeGerar(curso, {}, "m2")).toThrow("Só o próximo módulo pode ser gerado.");
-		expect(() => podeGerar(curso, {}, "m2")).toThrow(ErroModulo);
+		expect(podeGerar(curso, situacoes, "m3", []).id).toBe("m3");
+		expect(podeGerar(curso, situacoes, "m2", []).id).toBe("m2");
+		expect(podeGerar(curso, situacoes, "m1", []).id).toBe("m1");
+		expect(podeGerar(curso, {}, "m3", []).id).toBe("m3");
+	});
+
+	it("gerar de novo um concluído é erro", () => {
+		expect(() => podeGerar(curso, { m1: "gerado" }, "m1", ["m1"])).toThrow(/já foi concluído/);
+		expect(() => podeGerar(curso, { m1: "gerado" }, "m1", ["m1"])).toThrow(ErroModulo);
+		expect(podeGerar(curso, { m1: "gerado" }, "m2", ["m1"]).id).toBe("m2");
 	});
 
 	it("curso que não está pronto ou módulo que não existe é erro (um ErroCurso)", () => {
-		expect(() => podeGerar({ situacao: "rascunho", esqueleto: null }, {}, "m1")).toThrow(/ainda não foi criado/);
-		expect(() => podeGerar(curso, {}, "m9")).toThrow(/Não achei o módulo "m9"/);
-		expect(() => podeGerar(curso, {}, "m9")).toThrow(ErroCurso);
+		expect(() => podeGerar({ situacao: "rascunho", esqueleto: null }, {}, "m1", [])).toThrow(/ainda não foi criado/);
+		expect(() => podeGerar(curso, {}, "m9", [])).toThrow(/Não achei o módulo "m9"/);
+		expect(() => podeGerar(curso, {}, "m9", [])).toThrow(ErroCurso);
 	});
 });
 
@@ -475,7 +488,7 @@ describe("no disco", () => {
 
 	it("sem arquivo, undefined e nenhuma situação", async () => {
 		expect(await lerModulo(dados, materia, CURSO, "m1")).toBeUndefined();
-		expect(await situacoesDoCurso(dados, materia, CURSO)).toEqual({ situacoes: {}, modulos: {}, erros: [] });
+		expect(await situacoesDoCurso(dados, materia, CURSO)).toEqual({ situacoes: {}, modulos: {}, concluidos: [], erros: [] });
 	});
 
 	it("gravar e ler: ida e volta, com o evento gerou_modulo", async () => {
@@ -499,10 +512,9 @@ describe("no disco", () => {
 		});
 	});
 
-	it("só o próximo pode ser gerado; o gerado pode ser gerado de novo (substitui)", async () => {
-		await expect(gravarModuloGerado(dados, materia, CURSO, geracao("m2"))).rejects.toThrow("Só o próximo módulo pode ser gerado.");
-		await gravarModuloGerado(dados, materia, CURSO, geracao("m1"), { agora: AGORA });
+	it("qualquer um pode ser gerado, fora de ordem; o gerado pode ser gerado de novo (substitui)", async () => {
 		await gravarModuloGerado(dados, materia, CURSO, geracao("m2"), { agora: AGORA });
+		await gravarModuloGerado(dados, materia, CURSO, geracao("m1"), { agora: AGORA });
 		const denovo = await gravarModuloGerado(dados, materia, CURSO, { ...geracao("m1"), custo: 0.2 }, { agora: DEPOIS });
 		expect(await lerModulo(dados, materia, CURSO, "m1")).toEqual(denovo);
 		expect(denovo).toMatchObject({ custo: 0.2, geradoEm: DEPOIS.toISOString() });
@@ -547,10 +559,9 @@ describe("no disco", () => {
 		});
 		expect(await lerModulo(dados, materia, CURSO, "m1")).toEqual(aguardando);
 		expect((await daMateria()).at(-1)).toMatchObject({ verbo: "marcou_aguardando_material", sessao: "s1", objeto: { materia, curso: CURSO, modulo: "m1" }, resultado: { nota: "A aula 5 sai na quinta." } });
-		// O próximo agora é m2; m3 não pode aguardar.
-		await expect(marcarAguardando(dados, materia, CURSO, "m3", "")).rejects.toThrow("Só o próximo módulo pode ser marcado como aguardando material.");
-		await marcarAguardando(dados, materia, CURSO, "m2", undefined, { agora: AGORA });
-		expect((await situacoesDoCurso(dados, materia, CURSO)).situacoes).toEqual({ m1: "aguardando_material", m2: "aguardando_material" });
+		// Qualquer um que não foi gerado pode aguardar, fora de ordem.
+		await marcarAguardando(dados, materia, CURSO, "m3", undefined, { agora: AGORA });
+		expect((await situacoesDoCurso(dados, materia, CURSO)).situacoes).toEqual({ m1: "aguardando_material", m3: "aguardando_material" });
 		// Marcar de novo troca a nota e a foto.
 		const denovo = await marcarAguardando(dados, materia, CURSO, "m1", "Ainda não.", { agora: DEPOIS });
 		expect(denovo.aguardando).toMatchObject({ nota: "Ainda não.", desde: DEPOIS.toISOString() });
@@ -562,6 +573,49 @@ describe("no disco", () => {
 		await gravarModuloGerado(dados, materia, CURSO, geracao("m1"), { agora: DEPOIS });
 		await expect(marcarAguardando(dados, materia, CURSO, "m1", "")).rejects.toThrow(/um módulo gerado não volta a aguardar/);
 		expect((await daMateria()).filter((evento) => evento.verbo === "marcou_aguardando_material")).toHaveLength(3);
+	});
+
+	it("concluirModulo: grava o concluidoEm sem mexer no resto, o evento concluiu_modulo, e a recomendação passa para o seguinte", async () => {
+		const gerado = await gravarModuloGerado(dados, materia, CURSO, geracao("m1"), { agora: AGORA });
+		const curso = cursoPronto();
+		let lidos = await situacoesDoCurso(dados, materia, CURSO);
+		expect(lidos.concluidos).toEqual([]);
+		expect(proximoModulo(curso.esqueleto!, lidos.situacoes, lidos.concluidos)).toBe("m1");
+		const concluido = await concluirModulo(dados, materia, CURSO, "m1", { agora: DEPOIS, sessao: "s1" });
+		expect(concluido).toEqual({ ...gerado, concluidoEm: DEPOIS.toISOString() });
+		expect(await lerModulo(dados, materia, CURSO, "m1")).toEqual(concluido);
+		const bruto = await readFile(caminhoDoModulo(dados, materia, CURSO, "m1"), "utf8");
+		expect(Object.keys(JSON.parse(bruto)).at(-1)).toBe("concluidoEm");
+		lidos = await situacoesDoCurso(dados, materia, CURSO);
+		expect(lidos.concluidos).toEqual(["m1"]);
+		expect(proximoModulo(curso.esqueleto!, lidos.situacoes, lidos.concluidos)).toBe("m2");
+		expect((await daMateria()).at(-1)).toMatchObject({
+			verbo: "concluiu_modulo",
+			sessao: "s1",
+			ts: DEPOIS.toISOString(),
+			objeto: { materia, curso: CURSO, modulo: "m1" },
+			resultado: { licoes: 1, questoes: 1 },
+		});
+	});
+
+	it("concluir duas vezes, sem arquivo ou aguardando é erro; gerar de novo um concluído é erro", async () => {
+		await expect(concluirModulo(dados, materia, CURSO, "m1")).rejects.toThrow(/ainda não foi gerado/);
+		await marcarAguardando(dados, materia, CURSO, "m2", "");
+		await expect(concluirModulo(dados, materia, CURSO, "m2")).rejects.toThrow(/aguardando material/);
+		await gravarModuloGerado(dados, materia, CURSO, geracao("m1"), { agora: AGORA });
+		await concluirModulo(dados, materia, CURSO, "m1", { agora: AGORA });
+		await expect(concluirModulo(dados, materia, CURSO, "m1", { agora: DEPOIS })).rejects.toThrow("O módulo já foi concluído.");
+		await expect(concluirModulo(dados, materia, CURSO, "m1")).rejects.toThrow(ErroModulo);
+		await expect(gravarModuloGerado(dados, materia, CURSO, geracao("m1"), { agora: DEPOIS })).rejects.toThrow(/já foi concluído/);
+		expect(await lerModulo(dados, materia, CURSO, "m1")).toMatchObject({ concluidoEm: AGORA.toISOString(), geradoEm: AGORA.toISOString() });
+		expect((await daMateria()).filter((evento) => evento.verbo === "concluiu_modulo")).toHaveLength(1);
+		await expect(concluirModulo(dados, materia, CURSO, "m9")).rejects.toThrow(/Não achei o módulo "m9"/);
+	});
+
+	it("um concluidoEm que não é texto deixa o arquivo ilegível", async () => {
+		const gerado = await gravarModuloGerado(dados, materia, CURSO, geracao("m1"), { agora: AGORA });
+		await writeFile(caminhoDoModulo(dados, materia, CURSO, "m1"), JSON.stringify({ ...gerado, concluidoEm: 3 }), "utf8");
+		await expect(lerModulo(dados, materia, CURSO, "m1")).rejects.toThrow(/concluidoEm não é um texto/);
 	});
 
 	it("marcarAguardando num curso que não está pronto ou num módulo que não existe é erro", async () => {

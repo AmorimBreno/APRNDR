@@ -1,8 +1,8 @@
 // Os módulos do curso no disco (item 6, docs/modulos.md): cada módulo gerado
 // (ou aguardando material) é materias/<matéria>/cursos/<curso>/modulos/<módulo>.json,
 // gravado inteiro de uma vez; sem arquivo, o módulo ainda não foi gerado. Os
-// eventos gerou_modulo e marcou_aguardando_material vão para o eventos.jsonl
-// da matéria. Daqui sai também o que vai na mensagem dos modelos do plano e
+// eventos gerou_modulo, marcou_aguardando_material e concluiu_modulo vão para
+// o eventos.jsonl da matéria. Daqui sai também o que vai na mensagem dos modelos do plano e
 // das lições (entradaDoModelo). As regras são puras e ficam em
 // modulo-tipos.ts. Sem dependências: o pi carrega a extensão desta pasta.
 // Quem chama segura a trava da matéria (a extensão de módulos).
@@ -32,7 +32,6 @@ import {
 	niveisDoModulo,
 	type PedidoModulo,
 	podeGerar,
-	proximoModulo,
 	resumoDoModulo,
 	type SituacaoModulo,
 	SITUACOES_MODULO,
@@ -78,6 +77,8 @@ function moduloLido(valor: unknown, materia: string, curso: string, modulo: stri
 		if (!ehObjeto(aguardando) || typeof aguardando.desde !== "string" || !Array.isArray(aguardando.prontos)) throw new Error("falta o aguardando (desde e prontos)");
 	} else if (typeof valor.geradoEm !== "string" || typeof valor.modelo !== "string" || typeof valor.custo !== "number" || !Array.isArray(valor.materiaisUsados)) {
 		throw new Error("faltam geradoEm, modelo, custo ou materiaisUsados");
+	} else if (valor.concluidoEm !== undefined && typeof valor.concluidoEm !== "string") {
+		throw new Error("o concluidoEm não é um texto");
 	}
 	return moduloNaOrdem(valor as unknown as Modulo);
 }
@@ -99,6 +100,7 @@ function moduloNaOrdem(modulo: Modulo): Modulo {
 		modelo: modulo.modelo,
 		custo: modulo.custo,
 		materiaisUsados: modulo.materiaisUsados,
+		...(modulo.concluidoEm ? { concluidoEm: modulo.concluidoEm } : {}),
 	};
 }
 
@@ -137,10 +139,12 @@ async function gravarModulo(dados: string, modulo: Modulo): Promise<void> {
 	await gravarDeUmaVez(arquivo, `${JSON.stringify(moduloNaOrdem(modulo), null, "\t")}\n`);
 }
 
-/** Os módulos gravados do curso: as situações e os módulos por id, e os arquivos ilegíveis (nunca sobrescritos). */
+/** Os módulos gravados do curso: as situações e os módulos por id, os concluídos e os arquivos ilegíveis (nunca sobrescritos). */
 export interface ModulosDoCurso {
 	situacoes: Record<string, SituacaoModulo>;
 	modulos: Record<string, Modulo>;
+	/** Os ids dos gerados com concluidoEm, na ordem dos ids. */
+	concluidos: string[];
 	erros: Array<{ modulo: string; mensagem: string }>;
 }
 
@@ -149,7 +153,7 @@ export interface ModulosDoCurso {
  * ilegível vai para `erros` e fica fora das situações. Sem a pasta, nenhum.
  */
 export async function situacoesDoCurso(dados: string, materia: string, curso: string): Promise<ModulosDoCurso> {
-	const saida: ModulosDoCurso = { situacoes: {}, modulos: {}, erros: [] };
+	const saida: ModulosDoCurso = { situacoes: {}, modulos: {}, concluidos: [], erros: [] };
 	let entradas: Dirent[];
 	try {
 		entradas = await readdir(pastaModulos(dados, materia, curso), { withFileTypes: true });
@@ -167,6 +171,7 @@ export async function situacoesDoCurso(dados: string, materia: string, curso: st
 			if (!modulo) continue;
 			saida.situacoes[id] = modulo.situacao;
 			saida.modulos[id] = modulo;
+			if (modulo.situacao === "gerado" && modulo.concluidoEm) saida.concluidos.push(id);
 		} catch (erro) {
 			saida.erros.push({ modulo: id, mensagem: (erro as Error).message });
 		}
@@ -202,16 +207,16 @@ function pedidoLimpo(pedido: PedidoModulo | undefined, agora: Date): PedidoModul
 /**
  * Grava o módulo gerado (situação gerado, geradoEm agora), substituindo o que
  * havia (um aguardando, ou a versão anterior). Confere antes: o curso pronto,
- * o módulo no esqueleto e que ele pode ser gerado (podeGerar: o próximo, um
- * aguardando ou um gerado); um arquivo ilegível no lugar é ErroModulo e não é
+ * o módulo no esqueleto e que ele pode ser gerado (podeGerar: qualquer um que
+ * não está concluído); um arquivo ilegível no lugar é ErroModulo e não é
  * sobrescrito; sem lições, ErroModulo. Grava gerou_modulo no eventos.jsonl da
  * matéria (resultado {licoes, blocos, questoes, custo}; contexto {modelo,
  * prompts}).
  */
 export async function gravarModuloGerado(dados: string, materia: string, curso: string, geracao: GeracaoModulo, contexto: ContextoModulo = {}): Promise<ModuloGerado> {
 	const atual = await lerCurso(dados, materia, curso);
-	const { situacoes } = await situacoesDoCurso(dados, materia, curso);
-	podeGerar(atual, situacoes, geracao.id);
+	const { situacoes, concluidos } = await situacoesDoCurso(dados, materia, curso);
+	podeGerar(atual, situacoes, geracao.id, concluidos);
 	await lerModulo(dados, materia, curso, geracao.id);
 	if (!Array.isArray(geracao.licoes) || geracao.licoes.length === 0) throw new ErroModulo("Não há lições para gravar no módulo.");
 	const agora = contexto.agora ?? new Date();
@@ -250,20 +255,16 @@ export async function gravarModuloGerado(dados: string, materia: string, curso: 
 /**
  * Marca o módulo como aguardando material, com a nota (aparada; pode ser
  * vazia) e a foto dos materiais prontos da matéria agora (materiaisProntos).
- * Só o próximo módulo, ou um que já aguarda (marcar de novo troca a nota, o
- * desde e a foto); um gerado não volta a aguardar. Um arquivo ilegível no
- * lugar é ErroModulo e não é sobrescrito. Grava marcou_aguardando_material no
+ * Qualquer módulo que não foi gerado, como gerar (marcar de novo um que já
+ * aguarda troca a nota, o desde e a foto); um gerado não volta a aguardar.
+ * Um arquivo ilegível no lugar é ErroModulo e não é sobrescrito. Grava marcou_aguardando_material no
  * eventos.jsonl da matéria (resultado {nota}).
  */
 export async function marcarAguardando(dados: string, materia: string, curso: string, modulo: string, nota: unknown, contexto: ContextoCurso = {}): Promise<ModuloAguardando> {
 	const atual = await lerCurso(dados, materia, curso);
 	moduloDoEsqueleto(atual, modulo);
-	const { situacoes } = await situacoesDoCurso(dados, materia, curso);
 	const existente = await lerModulo(dados, materia, curso, modulo);
 	if (existente?.situacao === "gerado") throw new ErroModulo("O módulo já foi gerado; um módulo gerado não volta a aguardar material.");
-	if (existente?.situacao !== "aguardando_material" && proximoModulo(atual.esqueleto!, situacoes) !== modulo) {
-		throw new ErroModulo("Só o próximo módulo pode ser marcado como aguardando material.");
-	}
 	const agora = contexto.agora ?? new Date();
 	const texto = typeof nota === "string" ? nota.trim() : "";
 	const prontos = await materiaisProntos(dados, materia);
@@ -283,6 +284,33 @@ export async function marcarAguardando(dados: string, materia: string, curso: st
 		criarEvento({ ...daSessao(contexto), verbo: "marcou_aguardando_material", objeto: { materia, curso: atual.id, modulo }, resultado: { nota: texto } }, agora),
 	);
 	return novo;
+}
+
+/**
+ * Conclui o módulo (docs/modulos.md, "Concluir um módulo"): só um gerado e
+ * ainda não concluído; grava o concluidoEm (agora) no <módulo>.json, sem
+ * mexer no resto, e o concluiu_modulo no eventos.jsonl da matéria (resultado
+ * {licoes, questoes}). A recomendação (proximoModulo) passa para o
+ * seguinte. Concluído não volta atrás. Sem arquivo, aguardando
+ * material ou já concluído, ErroModulo; um arquivo ilegível é ErroModulo e
+ * não é sobrescrito.
+ */
+export async function concluirModulo(dados: string, materia: string, curso: string, modulo: string, contexto: ContextoCurso = {}): Promise<ModuloGerado> {
+	const atual = await lerCurso(dados, materia, curso);
+	moduloDoEsqueleto(atual, modulo);
+	const existente = await lerModulo(dados, materia, curso, modulo);
+	if (!existente) throw new ErroModulo("O módulo ainda não foi gerado; só um módulo gerado pode ser concluído.");
+	if (existente.situacao !== "gerado") throw new ErroModulo("O módulo está aguardando material; só um módulo gerado pode ser concluído.");
+	if (existente.concluidoEm) throw new ErroModulo("O módulo já foi concluído.");
+	const agora = contexto.agora ?? new Date();
+	const concluido: ModuloGerado = { ...existente, concluidoEm: agora.toISOString() };
+	await gravarModulo(dados, concluido);
+	const resumo = resumoDoModulo(concluido);
+	await acrescentarEvento(
+		eventosMateria(dados, materia),
+		criarEvento({ ...daSessao(contexto), verbo: "concluiu_modulo", objeto: { materia, curso: atual.id, modulo }, resultado: { licoes: resumo.licoes, questoes: resumo.questoes } }, agora),
+	);
+	return concluido;
 }
 
 // --- A mensagem dos modelos -------------------------------------------------------------

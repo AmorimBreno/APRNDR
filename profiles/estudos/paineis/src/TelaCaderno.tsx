@@ -204,6 +204,14 @@ export function descreverEvento(evento: Evento): { icone: IconName; texto: strin
 			const detalhe = [licoes, questoes, custo].filter(Boolean).join(" · ");
 			return { icone: "book", texto: `Módulo gerado: ${modulo} de ${curso}`, ...(detalhe ? { detalhe } : {}) };
 		}
+		case "concluiu_modulo": {
+			const modulo = typeof evento.objeto.modulo === "string" ? evento.objeto.modulo : "um módulo";
+			const curso = typeof evento.objeto.curso === "string" ? evento.objeto.curso : "um curso";
+			const licoes = typeof resultado.licoes === "number" ? `${resultado.licoes} ${resultado.licoes === 1 ? "lição" : "lições"}` : "";
+			const questoes = typeof resultado.questoes === "number" ? `${resultado.questoes} ${resultado.questoes === 1 ? "questão" : "questões"}` : "";
+			const detalhe = [licoes, questoes].filter(Boolean).join(" · ");
+			return { icone: "check", texto: `Módulo concluído: ${modulo} de ${curso}`, ...(detalhe ? { detalhe } : {}) };
+		}
 		case "marcou_aguardando_material": {
 			const modulo = typeof evento.objeto.modulo === "string" ? evento.objeto.modulo : "um módulo";
 			const aviso = typeof resultado.nota === "string" && resultado.nota.trim() ? resultado.nota.trim() : "";

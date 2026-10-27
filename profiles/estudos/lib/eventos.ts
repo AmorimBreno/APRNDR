@@ -45,6 +45,8 @@ export type VerboEvento =
 	// Os módulos gerados sob demanda (item 6): docs/modulos.md, "Eventos (na matéria)".
 	| "gerou_modulo"
 	| "marcou_aguardando_material"
+	// O concluir manual do módulo (item 6): docs/modulos.md, "Concluir um módulo".
+	| "concluiu_modulo"
 	// Aprendizagem (seção 9.2), usados a partir dos itens 7 e 8:
 	| "pediu_reexplicacao"
 	| "pediu_outro_jeito"

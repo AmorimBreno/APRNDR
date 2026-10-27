@@ -1,6 +1,6 @@
 # Módulos do curso: gerar sob demanda (item 6)
 
-ESPECIFICACAO 8.3 ("Geração dos módulos") e 9.1. O guia cria só o esqueleto; o conteúdo de cada módulo é gerado quando o Breno chega nele, pelo "Gerar módulo", com um formulário de campos opcionais. Decisões do Breno em 2026-10-26: só o próximo módulo pode ser gerado; o modelo é o GPT-6.1 Sol. Os cursos estão em docs/cursos.md.
+ESPECIFICACAO 8.3 ("Geração dos módulos") e 9.1. O guia cria só o esqueleto; o conteúdo de cada módulo é gerado quando o Breno chega nele, pelo "Gerar módulo", com um formulário de campos opcionais. Decisões do Breno: o modelo é o GPT-6.1 Sol (2026-10-26); qualquer módulo pode ser gerado quando ele quiser, e o "Próximo" é só a recomendação (2026-10-27). Os cursos estão em docs/cursos.md.
 
 Tudo isto é do perfil de estudos.
 
@@ -47,20 +47,24 @@ Duas partes, cada uma aprovada no app: A (o arquivo, a geração, o formulário,
 
 ## Qual módulo pode ser gerado
 
-Só o próximo, e só quando o Breno chega nele (8.3: "gerado quando o usuário chega nele"; correção de 2026-10-27, depois que o módulo 2 ficou liberado logo que o 1 foi gerado): o primeiro módulo do esqueleto, na ordem, que não está `gerado` nem `aguardando_material`, e só se todo módulo gerado antes dele está concluído. Um módulo aguardando material não segura os seguintes. Os gerados podem ser gerados de novo (com confirmação; a versão anterior é substituída) enquanto não estão concluídos. Um módulo aguardando pode ser gerado assim que o Breno quiser.
+Qualquer um, quando o Breno quiser (decisão dele em 2026-10-27, que troca o "só o próximo" de 2026-10-26). Gerar e ser recomendado são coisas separadas:
+- todo módulo não concluído pode ser gerado (ou gerado de novo, com confirmação; a versão anterior é substituída quando a nova fica pronta). Um concluído não é gerado de novo;
+- o recomendado ("Próximo") é o primeiro módulo do esqueleto, na ordem, que não está concluído e não está aguardando material. Concluir um módulo passa a recomendação para o seguinte.
 
 ### Concluir um módulo
 
-O módulo gerado ganha `concluidoEm` (ISO 8601) quando o Breno o conclui. Por enquanto, a conclusão é manual: "Concluir o módulo", no pé da última lição da visão do módulo, com confirmação ("Concluir o módulo NN? O próximo módulo fica liberado para gerar."). A partir do item 7, o progresso da aula também conclui. Evento `concluiu_modulo` (objeto `{materia, curso, modulo}`; resultado `{licoes, questoes}`), na matéria. Ação da ponte `concluir {materia, curso, modulo, pedido}`. Concluído não volta atrás (desfazer fica para depois).
+O módulo gerado ganha `concluidoEm` (ISO 8601) quando o Breno o conclui. Por enquanto, a conclusão é manual: "Concluir o módulo", no pé da última lição da visão do módulo, com confirmação ("Concluir o módulo NN? A recomendação passa para o próximo."). A partir do item 7, o progresso da aula também conclui. Evento `concluiu_modulo` (objeto `{materia, curso, modulo}`; resultado `{licoes, questoes}`), na matéria. Ação da ponte `concluir {materia, curso, modulo, pedido}`. Concluído não volta atrás (desfazer fica para depois).
 
-### O estado do card
+### O card de cada módulo
 
-- concluído: `done` (o vinil holográfico com o carimbo), ação "Rever" (abre a visão do módulo);
-- o primeiro módulo gerado e não concluído: `current` ("Em curso"), ação "Abrir"; o "Gerar de novo" fica embaixo do card;
-- gerando: `current`, com a etapa embaixo;
-- o próximo a gerar (pela regra acima): `next`, ação "Gerar módulo";
-- aguardando material: `next`, com a etiqueta e a nota;
-- os outros: `locked` ("Abre depois do Módulo NN").
+A cor diz se o módulo foi gerado; a etiqueta "Próximo" diz qual é o recomendado (independentes):
+- concluído: o vinil holográfico com o carimbo (state `done`), ação "Rever";
+- gerado e não concluído: preenchido de musgo (o material do state `next` do ModuleCard), ação "Abrir"; "Gerar de novo" embaixo do card;
+- não gerado: preto (o fundo do painel, borda cheia, sem tracejado nem cadeado), ação "Gerar módulo";
+- gerando: o card preto vai se enchendo de musgo de baixo para cima conforme o progresso (esperando os materiais ≈ 5 %, planejando ≈ 10 %, escrevendo a lição i de n ≈ 10 + 90 × (i − 1) / n %, gravado = 100 %), com uma transição suave; a etapa em texto embaixo do card e o Parar;
+- aguardando material: preto, com a etiqueta "Aguardando material" e a nota;
+- o recomendado leva a etiqueta "Próximo" (a do ModuleCard), seja gerado ou não; nenhum outro leva.
+Nada fica bloqueado. As variações são classes do perfil por cima do ModuleCard (o design system não muda).
 
 ## O nível de cada conceito
 
@@ -102,8 +106,8 @@ Extensão → tela (`gravar: false`):
 ## A tela (parte A)
 
 Na visão do curso (TelaCurso):
-- O card do próximo módulo tem a ação "Gerar módulo", que abre o formulário (Modal): a área de soltar materiais (vão para a matéria e entram no mapa), "Informações específicas" e "Observações" (TextArea), e a marcação "Ainda não tenho o material deste módulo" (troca o primário por "Marcar como aguardando material", com uma nota opcional). Um aviso diz o custo aproximado.
+- Todo card não gerado tem a ação "Gerar módulo", que abre o formulário (Modal): a área de soltar materiais (vão para a matéria e entram no mapa), "Informações específicas" e "Observações" (TextArea), e a marcação "Ainda não tenho o material deste módulo" (troca o primário por "Marcar como aguardando material", com uma nota opcional). Um aviso diz o custo aproximado.
 - Durante a geração, o card mostra a etapa ("Planejando as lições…", "Escrevendo a lição 2 de 4") e um "Parar".
 - Gerado: o card diz "Gerado" com o número de lições e de questões, e a ação "Abrir" (parte B; na parte A, "Em breve"). "Gerar de novo" fica num menu do card, com confirmação.
 - Aguardando material: o card com a etiqueta "Aguardando material" e a nota; com material novo, "Material novo: gerar agora?".
-- Os cards dos módulos depois do próximo continuam bloqueados.
+- Nenhum card fica bloqueado (ver "O card de cada módulo").

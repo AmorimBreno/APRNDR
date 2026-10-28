@@ -103,6 +103,7 @@ import {
 	recalcularCalendario,
 	salvarEdicao,
 } from "../lib/esqueleto.ts";
+import { lerEscrita, regrasQueValem, secaoDasRegras } from "../lib/escrita.ts";
 import { objetoJsonDoModelo } from "../lib/json-do-modelo.ts";
 import { ErroMapa, lerMapa, type MapaConteudo } from "../lib/mapa.ts";
 import { arquivoMateria, ErroMaterias } from "../lib/materias.ts";
@@ -366,7 +367,9 @@ export interface ConceitoParaQuestoes {
  * A mensagem do modelo das questões: o curso (nome, tipo, escopo, motivo), as
  * questões pedidas em ordem e, para cada conceito pedido, o nome, a
  * descrição, o nível que o aluno disse e, com `trechos` (escopos com
- * material), os trechos do material citados nele.
+ * material), os trechos do material citados nele. Com `regras`
+ * (secaoDasRegras, docs/escrita.md), a seção das regras de escrita do Breno
+ * no fim; sem regras, nada muda.
  */
 export function mensagemDoDiagnostico(entrada: {
 	nome: string;
@@ -374,6 +377,7 @@ export function mensagemDoDiagnostico(entrada: {
 	pedidos: ConceitosEscolhidos;
 	conceitos: readonly ConceitoParaQuestoes[];
 	trechos?: readonly TrechosDoConceito[];
+	regras?: string;
 }): string {
 	const { objetivo, pedidos } = entrada;
 	const escopo =
@@ -416,6 +420,7 @@ export function mensagemDoDiagnostico(entrada: {
 		...(objetivo.motivo ? [`Motivo do aluno: ${objetivo.motivo}`] : []),
 		`Questões pedidas (${pedidas.length}, nesta ordem):\n${pedidas.join("\n")}`,
 		`Conceitos:\n\n${blocos.join("\n\n")}`,
+		...(entrada.regras?.trim() ? [entrada.regras.trim()] : []),
 	].join("\n\n");
 }
 
@@ -846,12 +851,16 @@ export default function cursos(pi: ExtensionAPI, opcoes: OpcoesCursos = {}) {
 			if (pedidosIds.size === 0) throw new ErroDiagnostico("Nenhum conceito do curso está no mapa da matéria. Confirme a etapa Mapa de novo.");
 			const escolhidos = doCurso.filter((conceito) => pedidosIds.has(conceito.id));
 			const trechos = objetivo.escopo === "livre" ? undefined : await trechosDosConceitos(dados, materia, escolhidos);
+			// As regras de escrita que valem para a matéria (só leitura: quem grava o escrita.json é a extensão dos módulos, de uma vez).
+			// Um escrita.json ilegível é erro: as questões não saem sem as regras do Breno.
+			const regras = secaoDasRegras(regrasQueValem((await lerEscrita(dados)).regras, materia));
 			const mensagem = mensagemDoDiagnostico({
 				nome: atual.nome,
 				objetivo,
 				pedidos,
 				conceitos: escolhidos.map((conceito) => ({ id: conceito.id, nome: conceito.nome, descricao: conceito.descricao, nivel: autoavaliacao[conceito.id] })),
 				...(trechos ? { trechos } : {}),
+				regras,
 			});
 			// Fora da trava: a chamada pode levar minutos.
 			const resposta = await pedirJson(registro, modelo, prompt.instrucoes, mensagem, (texto) => validarQuestoes(objetoJsonDoModelo(texto), pedidos), sinal, {

@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Curso, MensagemCurso, MensagemListaCursos } from "../lib/curso-tipos.ts";
 import { confirmarNoDisco, gravarCurso, hojeLocal, lerCurso, pastaDoCurso } from "../lib/cursos.ts";
 import type { Diagnostico } from "../lib/diagnostico.ts";
+import { arquivoEscrita, salvarRegra } from "../lib/escrita.ts";
 import { somarDias } from "../lib/esqueleto.ts";
 import { lerEventos } from "../lib/eventos.ts";
 import { gravarMapa, type MapaConteudo, mapaVazio, pastaExtraidoArquivo } from "../lib/mapa.ts";
@@ -575,6 +576,8 @@ describe("diagnóstico", () => {
 		expect(mensagem).toContain("Sei aplicar");
 		expect(mensagem).toContain("nenhum trecho do material cita este conceito");
 		expect(mensagem).toContain("dissertativa sobre c-1");
+		// Sem regras de escrita, a mensagem fica sem a seção.
+		expect(mensagem).not.toContain("Regras de escrita");
 		// A segunda tentativa leva a resposta ruim e o motivo.
 		expect(chamadas[1]!.contexto.messages).toHaveLength(3);
 		expect(textoDaChamada(chamadas[1]!, 2)).toContain("não veio como o pedido");
@@ -586,6 +589,32 @@ describe("diagnóstico", () => {
 			resultado: { questoes: 4, custo: 0.02 },
 			contexto: { fase: "diagnostico", modelo: "teste/modelo-x", prompt: await promptDe("diagnostico.md") },
 		});
+	});
+
+	it("as regras de escrita que valem para a matéria entram no fim da mensagem das questões; um escrita.json ilegível é erro", async () => {
+		const id = await cursoNoDiagnostico();
+		await salvarRegra(dados, { texto: "Comece por um exemplo com números.", materia: null, ativa: true });
+		await salvarRegra(dados, { texto: "Nada de pegadinha.", materia, ativa: true });
+		await salvarRegra(dados, { texto: "Regra de outra matéria.", materia: "outra-materia", ativa: true });
+		await salvarRegra(dados, { texto: "Regra desligada.", materia: null, ativa: false });
+		await gerar(id, "g1");
+		const mensagem = textoDaChamada(chamadas[0]!);
+		const secao = JSON.stringify("Regras de escrita do Breno (obedeça sempre):\n1. Comece por um exemplo com números.\n2. Nada de pegadinha.").slice(1, -1);
+		expect(mensagem).toContain(secao);
+		expect(mensagem.endsWith(`${secao}"}]`)).toBe(true);
+		expect(mensagem).not.toContain("Regra de outra matéria.");
+		expect(mensagem).not.toContain("Regra desligada.");
+
+		// Ilegível: as questões não saem sem as regras, e o arquivo não muda.
+		const outro = await cursoNoDiagnostico();
+		await writeFile(arquivoEscrita(dados), "{ quebrado", "utf8");
+		acao("autoavaliar", { curso: outro, pedido: "a2", niveis: NIVEIS });
+		await respondeu("a2");
+		acao("gerar_diagnostico", { curso: outro, pedido: "g2" });
+		await respondeu("g2");
+		expect(String(erroDe("g2")!.mensagem)).toContain("Não consegui ler as regras de escrita");
+		expect(chamadas).toHaveLength(1);
+		expect(await readFile(arquivoEscrita(dados), "utf8")).toBe("{ quebrado");
 	});
 
 	it("gerar com outro em andamento no mesmo curso dá erro; no escopo livre não vão trechos", async () => {

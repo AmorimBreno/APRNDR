@@ -37,6 +37,8 @@ O que fazer:
 9. Fórmulas e símbolos em LaTeX entre cifrões, como $\hat{y} = \beta_0 + \beta_1 x$ ou $R^2$. Dentro do JSON, a barra invertida do LaTeX vai dobrada ("$\\hat{y}$"), como manda o JSON.
 10. Escreva tudo em português do Brasil, a menos que o termo técnico seja usado normalmente em outra língua.
 
+As "Regras de escrita do Breno" da mensagem, quando houver, valem acima das orientações gerais de estilo deste prompt (mas não acima do formato do JSON e das regras das referências): obedeça a todas, sempre.
+
 Responda só com o JSON abaixo, sem texto antes ou depois e sem comentários. Uma entrada em "questoes" por questão pedida, na ordem pedida:
 
 {"questoes": [

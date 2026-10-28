@@ -31,6 +31,8 @@ O que fazer:
 8. "titulo": curto (de 2 a 7 palavras), dizendo o assunto, sem número ("Pesos do TF-IDF", não "Lição 1: pesos do TF-IDF"). "objetivo": uma frase curta (até umas 20 palavras) dizendo o que o aluno vai conseguir fazer ao fim da lição, começando por um verbo ("Calcular o IDF de um termo e explicar por que termos raros pesam mais."). O objetivo é para o aluno: não fale do formato dos blocos, do nível dele, da prova nem de nomes de arquivo ou seções.
 9. Escreva tudo em português do Brasil, a menos que o termo técnico seja usado normalmente em outra língua.
 
+As "Regras de escrita do Breno" da mensagem, quando houver, valem acima das orientações gerais de estilo deste prompt (mas não acima do formato do JSON e das regras das referências): obedeça a todas, sempre.
+
 Responda só com o JSON abaixo, sem texto antes ou depois e sem comentários. Uma entrada em "licoes" por lição, na ordem de estudo; cada item de "roteiro" é um de "explicacao", "verificacao", "alternativa" ou "dissertativa":
 
 {"licoes": [

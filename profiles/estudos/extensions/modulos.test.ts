@@ -13,9 +13,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { confirmarEtapa, type Curso, gravarCurso, novoCurso } from "../lib/cursos.ts";
 import type { Diagnostico } from "../lib/diagnostico.ts";
 import { calcularCalendario, type Modulo as ModuloDoEsqueleto } from "../lib/esqueleto.ts";
+import { arquivoEscrita, lerEscrita, type RegraEscrita, salvarRegra } from "../lib/escrita.ts";
 import { lerEventos } from "../lib/eventos.ts";
 import { type Conceito, gravarMapa, lerMapa, mapaVazio, pastaExtraidoArquivo } from "../lib/mapa.ts";
-import { criarMateria, eventosMateria } from "../lib/materias.ts";
+import { criarMateria, eventosAprendiz, eventosMateria } from "../lib/materias.ts";
 import { caminhoDoModulo, type EstadoModuloNaTela, lerModulo, type ModuloGerado } from "../lib/modulos.ts";
 import { hashDoPrompt } from "./cursos.ts";
 import modulos, { type MensagemEstado, type OpcoesModulos } from "./modulos.ts";
@@ -31,6 +32,7 @@ type Mostrado = { painel: string; acao: string; dados: Record<string, unknown>; 
 const CURSO = "p1-busca";
 const PROMPT_PLANO = "---\nmodel: teste/modelo-x\n---\nPlaneje as lições.\n";
 const PROMPT_LICAO = "---\nmodel: teste/modelo-x\n---\nEscreva a lição.\n";
+const PROMPT_BLOCO = "---\nmodel: teste/modelo-x\n---\nReescreva o bloco.\n";
 
 let dados = "";
 let materia = "";
@@ -98,6 +100,7 @@ function piFalso(registrar = true): ExtensionAPI {
 const opcoesDeTeste = (extra: OpcoesModulos = {}): OpcoesModulos => ({
 	caminhoPromptPlano: join(dados, "modulo-plano.md"),
 	caminhoPromptLicao: join(dados, "modulo-licao.md"),
+	caminhoPromptBloco: join(dados, "modulo-bloco.md"),
 	...extra,
 });
 
@@ -161,6 +164,7 @@ beforeEach(async () => {
 	chamadas = [];
 	await writeFile(join(dados, "modulo-plano.md"), PROMPT_PLANO, "utf8");
 	await writeFile(join(dados, "modulo-licao.md"), PROMPT_LICAO, "utf8");
+	await writeFile(join(dados, "modulo-bloco.md"), PROMPT_BLOCO, "utf8");
 	await gravarMapa(dados, materia, {
 		...mapaVazio(),
 		situacao: "aprovado",
@@ -699,5 +703,331 @@ describe("ler_modulo", () => {
 		const fora = await ferramentas.ler_modulo!.execute("3", { curso: CURSO, modulo: "m9" }, undefined, undefined, ctx);
 		expect(fora.isError).toBe(true);
 		expect(fora.content[0]!.text).toContain('Não achei o módulo "m9"');
+	});
+});
+
+// --- A escrita: as regras, o retorno e a reescrita do bloco ------------------------------------
+
+const acaoEscrita = (nome: string, dadosAcao: Record<string, unknown> = {}) => barramento.emit("interface:acao", { painel: "escrita", acao: nome, dados: dadosAcao });
+const daEscrita = (nome: string) => mostrados.filter((mensagem) => mensagem.painel === "escrita" && mensagem.acao === nome);
+const doAprendiz = async (verbo: string) => (await lerEventos(eventosAprendiz(dados))).eventos.filter((evento) => evento.verbo === verbo);
+const regrasDe = (pedido: string) => (comPedido(pedido).find((mensagem) => mensagem.painel === "escrita" && mensagem.acao === "regras")?.dados.regras ?? []) as RegraEscrita[];
+
+describe("painel escrita", () => {
+	beforeEach(() => ligar());
+
+	it("listar, salvar (criar e alterar) e apagar, com o pedido e os eventos", async () => {
+		acaoEscrita("listar", { pedido: "l0" });
+		await respondeu("l0");
+		expect(comPedido("l0")[0]).toMatchObject({ painel: "escrita", acao: "regras", dados: { regras: [] }, gravar: false });
+
+		acaoEscrita("salvar", { pedido: "s1", regra: { texto: "  Comece sempre por um exemplo. ", materia: null, ativa: true } });
+		await respondeu("s1");
+		const [criada] = regrasDe("s1");
+		expect(criada).toMatchObject({ texto: "Comece sempre por um exemplo.", materia: null, ativa: true, origem: "escrita" });
+		expect(criada!.id).toMatch(/^r-/);
+
+		acaoEscrita("salvar", { pedido: "s2", regra: { id: criada!.id, texto: "Comece sempre por um exemplo.", materia, ativa: false } });
+		await respondeu("s2");
+		expect(regrasDe("s2")).toEqual([expect.objectContaining({ id: criada!.id, materia, ativa: false })]);
+
+		acaoEscrita("apagar", { pedido: "a1", id: criada!.id });
+		await respondeu("a1");
+		expect(regrasDe("a1")).toEqual([]);
+		expect((await lerEscrita(dados)).regras).toEqual([]);
+		expect((await doAprendiz("criou_regra_escrita")).map((evento) => evento.sessao)).toEqual(["sessao-1"]);
+		expect(await doAprendiz("alterou_regra_escrita")).toHaveLength(1);
+		expect(await doAprendiz("apagou_regra_escrita")).toHaveLength(1);
+		expect(mostrados.every((mensagem) => mensagem.gravar === false)).toBe(true);
+	});
+
+	it("erros voltam com o pedido: sem texto, matéria que não existe, id que não existe", async () => {
+		acaoEscrita("salvar", { pedido: "e1", regra: { texto: "  ", materia: null, ativa: true } });
+		await respondeu("e1");
+		expect(erroDe("e1")).toEqual({ mensagem: "A regra está sem texto.", ao: "salvar", pedido: "e1" });
+		acaoEscrita("salvar", { pedido: "e2", regra: { texto: "Uma regra.", materia: "nao-existe", ativa: true } });
+		await respondeu("e2");
+		expect(erroDe("e2")?.mensagem).toBe('Não achei a matéria "nao-existe".');
+		acaoEscrita("apagar", { pedido: "e3", id: "r-nada" });
+		await respondeu("e3");
+		expect(erroDe("e3")?.mensagem).toContain('Não achei a regra "r-nada"');
+		expect(daEscrita("erro")).toHaveLength(3);
+		expect((await lerEscrita(dados)).regras).toEqual([]);
+	});
+
+	it("uma trava só: dois salvar ao mesmo tempo gravam as duas regras", async () => {
+		acaoEscrita("salvar", { pedido: "s1", regra: { texto: "Regra um.", materia: null, ativa: true } });
+		acaoEscrita("salvar", { pedido: "s2", regra: { texto: "Regra dois.", materia, ativa: true } });
+		await respondeu("s1");
+		await respondeu("s2");
+		expect(regrasDe("s1").map((regra) => regra.texto)).toEqual(["Regra um."]);
+		expect(regrasDe("s2").map((regra) => regra.texto)).toEqual(["Regra um.", "Regra dois."]);
+		expect((await lerEscrita(dados)).regras.map((regra) => regra.texto)).toEqual(["Regra um.", "Regra dois."]);
+	});
+
+	it("um escrita.json ilegível é erro e não é sobrescrito", async () => {
+		await mkdir(join(arquivoEscrita(dados), ".."), { recursive: true });
+		await writeFile(arquivoEscrita(dados), "{ quebrado", "utf8");
+		acaoEscrita("listar", { pedido: "l" });
+		await respondeu("l");
+		expect(erroDe("l")?.mensagem).toContain("Não consegui ler as regras de escrita");
+		acaoEscrita("salvar", { pedido: "s", regra: { texto: "Uma regra.", materia: null, ativa: true } });
+		await respondeu("s");
+		expect(erroDe("s")?.mensagem).toContain("nada foi gravado por cima");
+		expect(await readFile(arquivoEscrita(dados), "utf8")).toBe("{ quebrado");
+		// A geração do módulo também não segue sem as regras.
+		acao("gerar", { modulo: "m1", pedido: "g" });
+		await respondeu("g");
+		expect(erroDe("g")?.mensagem).toContain("Não consegui ler as regras de escrita");
+		expect(chamadas).toHaveLength(0);
+	});
+
+	it("uma cópia sem session_start fica calada", async () => {
+		modulos(piFalso(false), opcoesDeTeste());
+		acaoEscrita("salvar", { pedido: "s", regra: { texto: "Uma regra.", materia: null, ativa: true } });
+		await respondeu("s");
+		await new Promise((resolver) => setTimeout(resolver, 30));
+		expect(comPedido("s")).toHaveLength(1);
+		expect((await lerEscrita(dados)).regras).toHaveLength(1);
+	});
+});
+
+/** Um bloco de explicação reescrito pelo modelo falso. */
+const EXPLICACAO_NOVA = JSON.stringify({
+	bloco: { tipo: "explicacao", conceitos: ["c-tf"], formato: "exemplo_resolvido", texto: 'No documento "a a b", o termo a aparece 2 vezes: TF = 2.', referencias: [{ arquivo: "aula.pdf", local: "página 1" }] },
+});
+
+const retornoDe = (pedido: string) => (comPedido(pedido).find((mensagem) => mensagem.acao === "estado")?.dados as unknown as MensagemEstado | undefined)?.retorno;
+
+/** Grava um retorno "melhorar" (longo e abstrato) no l1-b1 e devolve o id do evento. */
+async function retornoNoB1(pedido = "r1", extra: Record<string, unknown> = {}): Promise<string> {
+	acao("retorno", { modulo: "m1", licao: "l1", bloco: "l1-b1", pedido, avaliacao: "melhorar", motivos: ["longo", "abstrato", "longo"], texto: " Muito texto antes do exemplo. ", ...extra });
+	await respondeu(pedido);
+	const id = retornoDe(pedido);
+	if (!id) throw new Error(`o retorno não foi gravado: ${JSON.stringify(erroDe(pedido))}`);
+	return id;
+}
+
+const reescrever = (pedido: string, retorno: string, bloco = "l1-b1") => acao("reescrever_bloco", { modulo: "m1", licao: "l1", bloco, pedido, retorno });
+
+describe("retorno e reescrita do bloco", () => {
+	beforeEach(async () => {
+		ligar();
+		geracaoQueDaCerto();
+		await gerarM1();
+	});
+
+	it("retorno sem virarRegra: o evento avaliou_bloco com o contexto do bloco e o estado com o pedido e o id", async () => {
+		const id = await retornoNoB1();
+		expect(comPedido("r1")[0]).toMatchObject({ painel: "modulos", acao: "estado", dados: { materia, curso: CURSO, pedido: "r1", retorno: id } });
+		const [evento] = await doAprendiz("avaliou_bloco");
+		expect(evento).toEqual({
+			id,
+			ts: expect.any(String),
+			sessao: "sessao-1",
+			verbo: "avaliou_bloco",
+			objeto: { materia, curso: CURSO, modulo: "m1", licao: "l1", bloco: "l1-b1", tipo: "explicacao", conceitos: ["c-tf"] },
+			resultado: { avaliacao: "melhorar", motivos: ["longo", "abstrato"], texto: "Muito texto antes do exemplo." },
+			contexto: { modelo: "teste/modelo-x", prompt: { nome: "modulo-licao.md", hash: hashDoPrompt(PROMPT_LICAO) }, versao: 1 },
+		});
+		expect(daEscrita("regras")).toHaveLength(0);
+		expect(await doAprendiz("criou_regra_escrita")).toHaveLength(0);
+	});
+
+	it("retorno com virarRegra: grava o evento e a regra (origem retorno) e manda as regras no painel escrita", async () => {
+		const id = await retornoNoB1("r1", { virarRegra: { texto: "Exemplo antes da definição.", materia } });
+		await esperar(() => daEscrita("regras").length > 0);
+		const regras = daEscrita("regras")[0]!.dados.regras as RegraEscrita[];
+		expect(regras).toEqual([expect.objectContaining({ texto: "Exemplo antes da definição.", materia, ativa: true, origem: "retorno", retorno: id })]);
+		expect((await lerEscrita(dados)).regras).toEqual(regras);
+		const [criou] = await doAprendiz("criou_regra_escrita");
+		expect(criou).toMatchObject({ resultado: { origem: "retorno", retorno: id } });
+		expect(await doAprendiz("avaliou_bloco")).toHaveLength(1);
+	});
+
+	it("retorno inválido, ou de um bloco que não existe, é erro com o pedido e não grava", async () => {
+		acao("retorno", { modulo: "m1", licao: "l1", bloco: "l1-b1", pedido: "e1", avaliacao: "otimo" });
+		await respondeu("e1");
+		expect(erroDe("e1")).toMatchObject({ ao: "retorno", modulo: "m1", mensagem: expect.stringContaining("A avaliação do bloco não é válida") });
+		acao("retorno", { modulo: "m1", licao: "l1", bloco: "l1-b9", pedido: "e2", avaliacao: "bom" });
+		await respondeu("e2");
+		expect(erroDe("e2")?.mensagem).toBe('Não achei o bloco "l1-b9" na lição l1.');
+		expect(await doAprendiz("avaliou_bloco")).toHaveLength(0);
+	});
+
+	it("reescrever_bloco: reescrevendo no estado, o bloco novo com versao 2 e o antigo em anteriores, o evento e o módulo novo", async () => {
+		const id = await retornoNoB1();
+		const antes = (await lerModulo(dados, materia, CURSO, "m1")) as ModuloGerado;
+		const antigo = antes.licoes[0]!.blocos[0]!;
+		const adiado = adiada();
+		respostas.push(adiado.resposta);
+		const chamadasAntes = chamadas.length;
+		reescrever("w1", id);
+		await respondeu("w1");
+		expect(doModulo(comPedido("w1")[0]!.dados as unknown as MensagemEstado, "m1")).toMatchObject({ situacao: "gerado", reescrevendo: { licao: "l1", bloco: "l1-b1" } });
+		await esperar(() => chamadas.length > chamadasAntes);
+
+		// A mensagem: a lição com os outros blocos, o bloco atual, o retorno, o nível e os trechos do conceito do bloco.
+		const pedido = chamadas.at(-1)!;
+		expect(pedido.contexto.systemPrompt).toBe("Reescreva o bloco.");
+		const mensagem = textoDaChamada(pedido);
+		expect(mensagem).toContain('Lição do bloco: l1, "Contando termos"');
+		expect(mensagem).toContain("### l1-b1 · Explicação (posição 1): ESTE É O BLOCO A REESCREVER");
+		expect(mensagem).toContain("Pergunta: O que o TF conta?");
+		expect(mensagem).toContain("Resposta esperada: As ocorrências do termo no documento.");
+		expect(mensagem).toContain("Bloco a reescrever: l1-b1, do tipo explicacao, posição 1 de 4, versão 1.");
+		expect(mensagem).toContain('"texto": "Texto sobre c-tf."');
+		expect(mensagem).not.toContain('"id": "l1-b1"');
+		expect(mensagem).toContain("Avaliação: Precisa melhorar\nMotivos: Longo demais (longo); Abstrato demais (abstrato)\nTexto do aluno: Muito texto antes do exemplo.");
+		expect(mensagem).toContain("Nível do aluno: iniciante");
+		expect(mensagem).toContain('<trecho arquivo="aula.pdf" local="página 1">\nTF conta quantas vezes o termo aparece no documento.\n</trecho>');
+		expect(mensagem).not.toContain("IDF é o log");
+		expect(mensagem).toContain("Escopo: só o material");
+		expect(mensagem).toContain("Motivo do aluno: Use os exercícios como base para as questões práticas.");
+		expect(mensagem).not.toContain("Regras de escrita");
+
+		adiado.soltar(EXPLICACAO_NOVA);
+		await esperar(() => recebidas("modulo").length > 0);
+		const novo = recebidas("modulo").at(-1)!.dados.modulo as ModuloGerado;
+		const gravado = (await lerModulo(dados, materia, CURSO, "m1")) as ModuloGerado;
+		expect(novo).toEqual(gravado);
+		const bloco = gravado.licoes[0]!.blocos[0]!;
+		expect(bloco).toMatchObject({ id: "l1-b1", tipo: "explicacao", formato: "exemplo_resolvido", versao: 2, referencias: [ref(1)] });
+		expect(bloco.reescritoEm).toEqual(expect.any(String));
+		expect(bloco.anteriores).toEqual([{ ...antigo, versao: 1, substituidoEm: bloco.reescritoEm, retorno: id }]);
+		// O resto do módulo não muda (nem o custo, que é o da geração).
+		expect(gravado.licoes[0]!.blocos.slice(1)).toEqual(antes.licoes[0]!.blocos.slice(1));
+		expect(gravado.custo).toBe(antes.custo);
+		await esperar(() => doModulo(ultimo(), "m1")?.reescrevendo === undefined);
+		expect(situacaoDe("m1")).toBe("gerado");
+
+		const [evento] = await doAprendiz("reescreveu_bloco");
+		expect(evento).toMatchObject({
+			sessao: "sessao-1",
+			objeto: { materia, curso: CURSO, modulo: "m1", licao: "l1", bloco: "l1-b1", tipo: "explicacao", conceitos: ["c-tf"] },
+			resultado: { de: 1, para: 2, retorno: id },
+			contexto: { modelo: "teste/modelo-x", prompt: { nome: "modulo-bloco.md", hash: hashDoPrompt(PROMPT_BLOCO) }, custo: 0.01 },
+		});
+
+		// Um retorno na versão 2 leva o modelo e o prompt da reescrita.
+		await retornoNoB1("r2");
+		const ultimoRetorno = (await doAprendiz("avaliou_bloco")).at(-1)!;
+		expect(ultimoRetorno.contexto).toEqual({ modelo: "teste/modelo-x", prompt: { nome: "modulo-bloco.md", hash: hashDoPrompt(PROMPT_BLOCO) }, versao: 2 });
+	});
+
+	it("uma resposta inválida tem uma nova tentativa; duas, o erro, e o bloco fica como estava", async () => {
+		const id = await retornoNoB1();
+		const errado = JSON.stringify({ bloco: { tipo: "verificacao", conceitos: ["c-tf"], pergunta: "?", respostaEsperada: "!" } });
+		respostas.push(errado, EXPLICACAO_NOVA);
+		reescrever("w1", id);
+		await respondeu("w1");
+		await esperar(() => recebidas("modulo").length > 0);
+		expect(textoDaChamada(chamadas.at(-1)!)).toContain('A sua resposta não veio como o pedido: O bloco reescrito veio do tipo "verificacao", e precisava ser "explicacao".');
+		expect((await doAprendiz("reescreveu_bloco"))[0]!.contexto).toMatchObject({ custo: 0.02 });
+
+		const antes = await lerModulo(dados, materia, CURSO, "m1");
+		const id2 = await retornoNoB1("r2");
+		respostas.push(errado, "isto não é JSON");
+		reescrever("w2", id2);
+		await respondeu("w2");
+		await esperar(() => recebidas("erro").some((mensagem) => mensagem.dados.ao === "reescrever_bloco"));
+		const erro = recebidas("erro").find((mensagem) => mensagem.dados.ao === "reescrever_bloco")!.dados;
+		expect(erro).toMatchObject({ materia, curso: CURSO, modulo: "m1", mensagem: expect.stringContaining("O modelo não devolveu o bloco reescrito (l1-b1), nem na segunda tentativa") });
+		expect(String(erro.mensagem)).toContain("O bloco não mudou. Gasto: US$ 0.0200.");
+		expect(await lerModulo(dados, materia, CURSO, "m1")).toEqual(antes);
+		expect(await doAprendiz("reescreveu_bloco")).toHaveLength(1);
+		await esperar(() => doModulo(ultimo(), "m1")?.reescrevendo === undefined);
+		expect(situacaoDe("m1")).toBe("gerado");
+	});
+
+	it("o retorno de outro bloco, ou que não existe, é erro com o pedido e não chama o modelo", async () => {
+		const id = await retornoNoB1();
+		const antes = chamadas.length;
+		reescrever("w1", id, "l1-b3");
+		await respondeu("w1");
+		expect(erroDe("w1")).toMatchObject({ ao: "reescrever_bloco", mensagem: expect.stringContaining("é de outro bloco") });
+		reescrever("w2", "nao-existe");
+		await respondeu("w2");
+		expect(erroDe("w2")?.mensagem).toBe('Não achei o retorno "nao-existe" nos eventos.');
+		expect(chamadas).toHaveLength(antes);
+		expect(doModulo(ultimo(), "m1")?.reescrevendo).toBeUndefined();
+	});
+
+	it("o retorno de uma sessão anterior é lido do eventos.jsonl", async () => {
+		const id = await retornoNoB1();
+		tratadores.session_shutdown?.({}, ctx);
+		ligar();
+		respostas.push(EXPLICACAO_NOVA);
+		reescrever("w1", id);
+		await respondeu("w1");
+		await esperar(() => recebidas("modulo").length > 0);
+		expect(textoDaChamada(chamadas.at(-1)!)).toContain("Texto do aluno: Muito texto antes do exemplo.");
+	});
+
+	it("uma operação por curso: gerar ou reescrever de novo durante a reescrita é erro; cancelar aborta", async () => {
+		const id = await retornoNoB1();
+		const adiado = adiada();
+		respostas.push(adiado.resposta);
+		const antes = chamadas.length;
+		reescrever("w1", id);
+		await esperar(() => chamadas.length > antes);
+		acao("gerar", { modulo: "m2", pedido: "g" });
+		await respondeu("g");
+		expect(erroDe("g")?.mensagem).toBe("Um bloco do módulo m1 deste curso está sendo reescrito. Espere terminar (ou pare) antes de gerar um módulo.");
+		reescrever("w2", id);
+		await respondeu("w2");
+		expect(erroDe("w2")?.mensagem).toBe("Este bloco já está sendo reescrito. Espere terminar (ou pare) antes de pedir de novo.");
+
+		acao("cancelar", { modulo: "m1", pedido: "c" });
+		await respondeu("c");
+		expect(chamadas.at(-1)!.opcoes.signal?.aborted).toBe(true);
+		expect(doModulo(ultimo(), "m1")).toMatchObject({ situacao: "gerado" });
+		expect(doModulo(ultimo(), "m1")?.reescrevendo).toBeUndefined();
+		await new Promise((resolver) => setTimeout(resolver, 30));
+		expect(recebidas("erro").filter((mensagem) => mensagem.dados.ao === "reescrever_bloco" && !mensagem.dados.pedido)).toHaveLength(0);
+		expect(await doAprendiz("reescreveu_bloco")).toHaveLength(0);
+		expect(((await lerModulo(dados, materia, CURSO, "m1")) as ModuloGerado).licoes[0]!.blocos[0]!.versao).toBeUndefined();
+
+		// Durante uma geração, reescrever é erro.
+		const outro = adiada();
+		respostas.push(outro.resposta);
+		acao("gerar", { modulo: "m2", pedido: "g2" });
+		await respondeu("g2");
+		reescrever("w3", id);
+		await respondeu("w3");
+		expect(erroDe("w3")?.mensagem).toBe("O módulo m2 deste curso está sendo gerado. Espere terminar (ou pare) antes de reescrever um bloco.");
+	});
+});
+
+describe("as regras de escrita nas mensagens dos módulos", () => {
+	beforeEach(() => ligar());
+
+	it("as regras que valem para a matéria vão no fim do plano, da lição e da reescrita; as de outra matéria e as desligadas, não", async () => {
+		await salvarRegra(dados, { texto: "Comece sempre por um exemplo concreto com números.", materia: null, ativa: true });
+		await salvarRegra(dados, { texto: "Frases curtas.", materia, ativa: true });
+		await salvarRegra(dados, { texto: "Regra de outra matéria.", materia: "outra-materia", ativa: true });
+		await salvarRegra(dados, { texto: "Regra desligada.", materia: null, ativa: false });
+		const secao = "Regras de escrita do Breno (obedeça sempre):\n1. Comece sempre por um exemplo concreto com números.\n2. Frases curtas.";
+		geracaoQueDaCerto();
+		await gerarM1();
+		expect(chamadas).toHaveLength(3);
+		for (const chamada of chamadas) {
+			const texto = textoDaChamada(chamada);
+			expect(texto.endsWith(`\n\n${secao}`)).toBe(true);
+			expect(texto).not.toContain("Regra de outra matéria.");
+			expect(texto).not.toContain("Regra desligada.");
+		}
+		const id = await retornoNoB1();
+		respostas.push(EXPLICACAO_NOVA);
+		reescrever("w1", id);
+		await respondeu("w1");
+		await esperar(() => recebidas("modulo").length > 0);
+		expect(textoDaChamada(chamadas.at(-1)!).endsWith(`\n\n${secao}`)).toBe(true);
+	});
+
+	it("sem regras, as mensagens ficam sem a seção", async () => {
+		geracaoQueDaCerto();
+		await gerarM1();
+		for (const chamada of chamadas) expect(textoDaChamada(chamada)).not.toContain("Regras de escrita");
 	});
 });

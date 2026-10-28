@@ -21,21 +21,54 @@
 //   concluido dos gerados, o módulo recomendado (proximo) e o aviso de
 //   material novo nos que aguardam;
 // - a ferramenta só de leitura do professor, ler_modulo. Numa conversa de
-//   caderno, ela fica na matéria da conversa.
+//   caderno, ela fica na matéria da conversa;
+// - a escrita dos módulos (docs/escrita.md): o painel "escrita" (listar,
+//   salvar e apagar as regras de escrita do Breno; mensagens "regras" e
+//   "erro", gravar: false), com uma trava só para tudo que lê e grava o
+//   aprendiz/escrita.json (esta extensão é a única que grava nele); no painel
+//   "modulos", o retorno em cada bloco (o evento avaliou_bloco e, com
+//   virarRegra, a regra) e a reescrita de um bloco (../prompts/modulo-bloco.md,
+//   fora da trava, com a nova tentativa; uma operação por curso de cada vez,
+//   junto das gerações). As regras que valem para a matéria entram nas
+//   mensagens do plano, das lições e da reescrita do bloco.
 import { readFile, stat } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { type Curso, ErroCurso, type Escopo, lerCurso, materiaisProntos, type TipoCurso } from "../lib/cursos.ts";
-import type { PromptUsado } from "../lib/diagnostico.ts";
+import type { PromptUsado, TrechosDoConceito } from "../lib/diagnostico.ts";
+import {
+	type AcoesEscrita,
+	type AcoesModulosEscrita,
+	apagarRegra,
+	type EntradaRegra,
+	ErroEscrita,
+	gravarBlocoReescrito,
+	lerEscrita,
+	type MensagensEscrita,
+	type MotivoRetorno,
+	NOMES_AVALIACAO,
+	NOMES_MOTIVO,
+	PAINEL_ESCRITA,
+	registrarRetorno,
+	regrasQueValem,
+	salvarRegra,
+	secaoDasRegras,
+	type AvaliacaoBloco,
+	validarRetorno,
+} from "../lib/escrita.ts";
 import { NOMES_TIPO_MODULO } from "../lib/esqueleto.ts";
+import { type Evento, lerEventos } from "../lib/eventos.ts";
 import { objetoJsonDoModelo } from "../lib/json-do-modelo.ts";
 import { ErroMapa, lerMapa, PAINEL_MAPA } from "../lib/mapa.ts";
-import { arquivoMateria, ErroMaterias } from "../lib/materias.ts";
+import { arquivoMateria, ErroMaterias, eventosAprendiz, eventosMateria } from "../lib/materias.ts";
 import {
 	type AcoesModulos,
 	type Bloco,
+	type ModuloGerado,
+	validarBloco,
+	versaoDoBloco,
 	concluirModulo,
 	type ConceitoDoModulo,
 	type EntradaLicao,
@@ -72,6 +105,9 @@ export const CAMINHO_PROMPT_PLANO = join(dirname(fileURLToPath(import.meta.url))
 /** O prompt de cada lição (mesmo formato). */
 export const CAMINHO_PROMPT_LICAO = join(dirname(fileURLToPath(import.meta.url)), "..", "prompts", "modulo-licao.md");
 
+/** O prompt da reescrita de um bloco (mesmo formato). */
+export const CAMINHO_PROMPT_BLOCO = join(dirname(fileURLToPath(import.meta.url)), "..", "prompts", "modulo-bloco.md");
+
 /** Quanto a geração espera os materiais do formulário ficarem prontos antes de desistir. */
 export const TEMPO_ESPERA_MATERIAIS_MS = 30 * 60_000;
 
@@ -81,11 +117,18 @@ export const INTERVALO_VARREDURA_MS = 5_000;
 /** O teto de tokens da resposta (o modelo pode raciocinar antes de responder). */
 const MAX_TOKENS_PLANO = 16_000;
 const MAX_TOKENS_LICAO = 32_000;
+const MAX_TOKENS_BLOCO = 16_000;
 
 /** Até quantos caracteres ler_modulo devolve de uma vez (as explicações vão inteiras). */
 const LIMITE_LEITURA = 100_000;
 
-const ACOES: ReadonlyArray<keyof AcoesModulos> = ["listar", "gerar", "aguardar", "cancelar", "abrir", "concluir"];
+/** As ações da tela no painel modulos: as da lib (AcoesModulos) e as do retorno e da reescrita (AcoesModulosEscrita). */
+type AcaoDaTela = keyof (AcoesModulos & AcoesModulosEscrita);
+
+const ACOES: ReadonlyArray<AcaoDaTela> = ["listar", "gerar", "aguardar", "cancelar", "abrir", "concluir", "retorno", "reescrever_bloco"];
+
+/** As ações do painel escrita. */
+const ACOES_ESCRITA: ReadonlyArray<keyof AcoesEscrita> = ["listar", "salvar", "apagar"];
 
 interface DadosAcao {
 	materia?: unknown;
@@ -96,20 +139,38 @@ interface DadosAcao {
 	observacoes?: unknown;
 	materiaisNovos?: unknown;
 	nota?: unknown;
+	licao?: unknown;
+	bloco?: unknown;
+	avaliacao?: unknown;
+	motivos?: unknown;
+	texto?: unknown;
+	virarRegra?: unknown;
+	retorno?: unknown;
 }
 
-const FRASES: Record<keyof AcoesModulos | "ler", string> = {
+const FRASES: Record<AcaoDaTela | "ler", string> = {
 	listar: "listar os módulos",
 	gerar: "gerar o módulo",
 	aguardar: "marcar o módulo como aguardando material",
 	cancelar: "parar a geração do módulo",
 	abrir: "abrir o módulo",
 	concluir: "concluir o módulo",
+	retorno: "gravar o retorno do bloco",
+	reescrever_bloco: "reescrever o bloco",
 	ler: "ler o módulo",
+};
+
+const FRASES_ESCRITA: Record<keyof AcoesEscrita, string> = {
+	listar: "ler as regras de escrita",
+	salvar: "salvar a regra de escrita",
+	apagar: "apagar a regra de escrita",
 };
 
 const mensagemDe = (erro: unknown, acao: keyof typeof FRASES) =>
 	erro instanceof ErroCurso || erro instanceof ErroMapa || erro instanceof ErroMaterias ? erro.message : `Não consegui ${FRASES[acao]}: ${(erro as Error).message}`;
+
+const mensagemDaEscrita = (erro: unknown, acao: keyof AcoesEscrita) =>
+	erro instanceof ErroCurso || erro instanceof ErroMaterias ? erro.message : `Não consegui ${FRASES_ESCRITA[acao]}: ${(erro as Error).message}`;
 
 /**
  * O estado de um módulo na tela com o aviso: os materiais do formulário que
@@ -124,9 +185,11 @@ export type EstadoModulo = EstadoModuloNaTela & { aviso?: string };
 /**
  * A mensagem "estado" com o módulo recomendado do curso (proximoModulo: o
  * primeiro que não está concluído nem aguardando; null com todos concluídos
- * ou aguardando), sempre presente, e os módulos com o aviso.
+ * ou aguardando), sempre presente, e os módulos com o aviso. Quando responde
+ * a um retorno, `retorno` traz o id do evento avaliou_bloco gravado (o que a
+ * tela manda no reescrever_bloco).
  */
-export type MensagemEstado = Omit<MensagensModulos["estado"], "modulos"> & { modulos: EstadoModulo[]; proximo: string | null };
+export type MensagemEstado = Omit<MensagensModulos["estado"], "modulos"> & { modulos: EstadoModulo[]; proximo: string | null; retorno?: string };
 
 // --- O modelo --------------------------------------------------------------------
 
@@ -222,9 +285,11 @@ function linhasDoConceito(conceito: ConceitoDoModulo): string[] {
 /**
  * A mensagem do modelo do plano (docs/modulos.md, "A geração", 2): o curso,
  * o módulo, quantas lições, o formulário e os conceitos do módulo com o nível
- * e, nos escopos com material, os locais do material que os citam.
+ * e, nos escopos com material, os locais do material que os citam. Com
+ * `regras` (secaoDasRegras), a seção das regras de escrita no fim; sem
+ * regras, nada muda.
  */
-export function mensagemDoPlano(entrada: EntradaPlano): string {
+export function mensagemDoPlano(entrada: EntradaPlano, regras = ""): string {
 	const comMaterial = entrada.curso.escopo !== "livre";
 	const blocos = entrada.conceitos.map((conceito) => {
 		const linhas = linhasDoConceito(conceito);
@@ -239,16 +304,32 @@ export function mensagemDoPlano(entrada: EntradaPlano): string {
 		...linhasDoCurso(entrada),
 		`Lições pedidas: exatamente ${entrada.licoes}.`,
 		`Conceitos do módulo (${entrada.conceitos.length}, na ordem do módulo):\n\n${blocos.join("\n\n")}`,
+		...comRegras(regras),
 	].join("\n\n");
+}
+
+/** A seção das regras de escrita, quando há (sem regras, nada). */
+const comRegras = (regras: string) => (regras.trim() ? [regras.trim()] : []);
+
+/** Os trechos do material de um conceito, como vão para o modelo da lição e da reescrita do bloco. */
+function linhasDosTrechos(trechos: TrechosDoConceito["trechos"]): string[] {
+	if (trechos.length === 0) return ["Trechos do material: nenhum trecho do material cita este conceito."];
+	return [
+		"Trechos do material:",
+		...trechos.map(
+			(trecho) => `<trecho arquivo=${JSON.stringify(trecho.arquivo)} local=${JSON.stringify(trecho.local)}>\n${trecho.texto.trim()}${trecho.cortado ? "\n[… cortado]" : ""}\n</trecho>`,
+		),
+	];
 }
 
 /**
  * A mensagem do modelo de uma lição (docs/modulos.md, "A geração", 3): o
  * curso, o módulo, o formulário, o plano inteiro, a lição com o roteiro e os
  * conceitos dela com o nível e, nos escopos com material, os trechos do
- * .extraido citados por eles.
+ * .extraido citados por eles. Com `regras`, a seção das regras de escrita no
+ * fim, como no plano.
  */
-export function mensagemDaLicao(entrada: EntradaLicao): string {
+export function mensagemDaLicao(entrada: EntradaLicao, regras = ""): string {
 	const comMaterial = entrada.curso.escopo !== "livre";
 	const plano = entrada.plano.map(
 		(licao, indice) =>
@@ -258,18 +339,7 @@ export function mensagemDaLicao(entrada: EntradaLicao): string {
 	const trechosDe = new Map(entrada.trechos.map((item) => [item.id, item.trechos]));
 	const blocos = entrada.conceitos.map((conceito) => {
 		const linhas = linhasDoConceito(conceito);
-		if (comMaterial) {
-			const trechos = trechosDe.get(conceito.id) ?? [];
-			if (trechos.length === 0) linhas.push("Trechos do material: nenhum trecho do material cita este conceito.");
-			else
-				linhas.push(
-					"Trechos do material:",
-					...trechos.map(
-						(trecho) =>
-							`<trecho arquivo=${JSON.stringify(trecho.arquivo)} local=${JSON.stringify(trecho.local)}>\n${trecho.texto.trim()}${trecho.cortado ? "\n[… cortado]" : ""}\n</trecho>`,
-					),
-				);
-		}
+		if (comMaterial) linhas.push(...linhasDosTrechos(trechosDe.get(conceito.id) ?? []));
 		linhas.push("</conceito>");
 		return linhas.join("\n");
 	});
@@ -282,6 +352,95 @@ export function mensagemDaLicao(entrada: EntradaLicao): string {
 			`Roteiro (${licao.roteiro.length} blocos, nesta ordem): ${licao.roteiro.map((tipo, indice) => `${indice + 1}. ${tipo}`).join("; ")}`,
 		].join("\n"),
 		`Conceitos da lição (${blocos.length}):\n\n${blocos.join("\n\n")}`,
+		...comRegras(regras),
+	].join("\n\n");
+}
+
+/** O retorno do Breno que pede a reescrita, como foi gravado no avaliou_bloco. */
+export interface RetornoDaReescrita {
+	avaliacao: AvaliacaoBloco;
+	motivos: MotivoRetorno[];
+	texto: string;
+}
+
+/** O que vai na mensagem da reescrita de um bloco. */
+export interface EntradaBloco {
+	/** O curso, o módulo e o formulário (os de entradaDoModelo). */
+	curso: EntradaPlano["curso"];
+	modulo: EntradaPlano["modulo"];
+	formulario: EntradaPlano["formulario"];
+	/** A lição gravada, com todos os blocos. */
+	licao: Licao;
+	/** O id do bloco a reescrever. */
+	bloco: string;
+	retorno: RetornoDaReescrita;
+	/** Os conceitos do bloco, com o nível. */
+	conceitos: ConceitoDoModulo[];
+	/** Os trechos do material citados pelos conceitos do bloco (nenhum no escopo livre). */
+	trechos: TrechosDoConceito[];
+	/** O nome de um conceito pelo id (os conceitos da lição na mensagem). */
+	nomeDe?: (id: string) => string;
+}
+
+/** Os campos que o código põe num bloco (o id e as versões): ficam fora do bloco mandado ao modelo. */
+const CAMPOS_DO_CODIGO = new Set(["id", "versao", "reescritoEm", "anteriores", "substituidoEm", "retorno"]);
+
+/** O bloco no formato que o modelo devolve (sem o id e as versões; as referências só com o arquivo e o local). */
+function blocoParaOModelo(bloco: Bloco): Record<string, unknown> {
+	const saida: Record<string, unknown> = {};
+	for (const [campo, valor] of Object.entries(bloco)) {
+		if (CAMPOS_DO_CODIGO.has(campo)) continue;
+		saida[campo] = campo === "referencias" && Array.isArray(valor) ? (valor as Array<{ arquivo: string; local: string }>).map(({ arquivo, local }) => ({ arquivo, local })) : valor;
+	}
+	return saida;
+}
+
+/**
+ * A mensagem do modelo da reescrita de um bloco (docs/escrita.md,
+ * "Reescrever um bloco"): o curso, o módulo e o formulário; a lição (título,
+ * objetivo, conceitos e os outros blocos em texto, com o gabarito, para o
+ * bloco novo encaixar sem repetir); o bloco atual em JSON; o retorno
+ * (avaliação, motivos e texto); os conceitos do bloco com o nível e, nos
+ * escopos com material, os trechos citados por eles; e, com `regras`, a
+ * seção das regras de escrita.
+ */
+export function mensagemDoBloco(entrada: EntradaBloco, regras = ""): string {
+	const nomeDe = entrada.nomeDe ?? ((id: string) => id);
+	const { licao, retorno } = entrada;
+	const posicao = licao.blocos.findIndex((bloco) => bloco.id === entrada.bloco);
+	const atual = licao.blocos[posicao];
+	if (!atual) throw new ErroModulo(`Não achei o bloco "${entrada.bloco}" na lição ${licao.id}.`);
+	const comMaterial = entrada.curso.escopo !== "livre";
+	const trechosDe = new Map(entrada.trechos.map((item) => [item.id, item.trechos]));
+	const outros = licao.blocos.map((bloco, indice) =>
+		bloco.id === atual.id
+			? `### ${bloco.id} · ${NOMES_TIPO_BLOCO[bloco.tipo]} (posição ${indice + 1}): ESTE É O BLOCO A REESCREVER (o conteúdo atual vai abaixo, em JSON)`
+			: linhasDoBloco(bloco, nomeDe, true).join("\n"),
+	);
+	const conceitos = entrada.conceitos.map((conceito) => {
+		const linhas = linhasDoConceito(conceito);
+		if (comMaterial) linhas.push(...linhasDosTrechos(trechosDe.get(conceito.id) ?? []));
+		linhas.push("</conceito>");
+		return linhas.join("\n");
+	});
+	const motivos = retorno.motivos.length ? retorno.motivos.map((motivo) => `${NOMES_MOTIVO[motivo] ?? motivo} (${motivo})`).join("; ") : "(nenhum marcado)";
+	return [
+		...linhasDoCurso(entrada),
+		[
+			`Lição do bloco: ${licao.id}, ${JSON.stringify(licao.titulo)}`,
+			`Objetivo da lição: ${licao.objetivo || "(sem objetivo)"}`,
+			`Conceitos da lição: ${licao.conceitos.map((id) => `${id} (${nomeDe(id)})`).join(", ")}`,
+		].join("\n"),
+		`Os blocos da lição, na ordem (${licao.blocos.length}):\n\n${outros.join("\n\n")}`,
+		`Bloco a reescrever: ${atual.id}, do tipo ${atual.tipo}, posição ${posicao + 1} de ${licao.blocos.length}, versão ${versaoDoBloco(atual)}. O conteúdo atual:\n\`\`\`json\n${JSON.stringify(blocoParaOModelo(atual), null, 2)}\n\`\`\``,
+		[
+			"Retorno do aluno sobre este bloco:",
+			`Avaliação: ${NOMES_AVALIACAO[retorno.avaliacao] ?? retorno.avaliacao}`,
+			`Motivos: ${motivos}`,
+			`Texto do aluno: ${retorno.texto || "(não escreveu)"}`,
+		].join("\n"),
+		`Conceitos do bloco (${conceitos.length}):\n\n${conceitos.join("\n\n")}`,
+		...comRegras(regras),
 	].join("\n\n");
 }
 
@@ -366,6 +525,8 @@ export interface OpcoesModulos {
 	caminhoPromptPlano?: string;
 	/** O modulo-licao.md (nos testes, um prompt de mentira). */
 	caminhoPromptLicao?: string;
+	/** O modulo-bloco.md (nos testes, um prompt de mentira). */
+	caminhoPromptBloco?: string;
 	/** Quanto esperar os materiais do formulário (nos testes, pouco). */
 	tempoEsperaMateriaisMs?: number;
 	/** De quanto em quanto tempo conferir os materiais prontos durante a espera. */
@@ -393,6 +554,39 @@ interface Geracao {
 	acordar?: () => void;
 }
 
+/** Uma reescrita de bloco em andamento (uma operação por curso, junto das gerações). */
+interface ReescritaEmAndamento {
+	modulo: string;
+	licao: string;
+	bloco: string;
+	controle: AbortController;
+	/** Só depois de conferida a reescrita aparece no estado (reescrevendo). */
+	aceita: boolean;
+}
+
+/** Um retorno gravado (o avaliou_bloco): de onde é o bloco e o que o Breno disse. */
+interface RetornoGravado {
+	objeto: { materia: string; curso: string; modulo: string; licao: string; bloco: string };
+	resultado: RetornoDaReescrita;
+}
+
+/** O retorno de um evento avaliou_bloco lido do eventos.jsonl; outro formato, undefined. */
+function retornoDoEvento(evento: Evento): RetornoGravado | undefined {
+	const { objeto, resultado } = evento;
+	const textos = ["materia", "curso", "modulo", "licao", "bloco"] as const;
+	if (evento.verbo !== "avaliou_bloco" || !textos.every((campo) => typeof objeto?.[campo] === "string") || !resultado) return undefined;
+	const motivos = Array.isArray(resultado.motivos) ? (resultado.motivos as unknown[]).filter((motivo): motivo is MotivoRetorno => typeof motivo === "string" && motivo in NOMES_MOTIVO) : [];
+	const avaliacao = resultado.avaliacao === "bom" || resultado.avaliacao === "melhorar" ? resultado.avaliacao : undefined;
+	if (!avaliacao) return undefined;
+	return {
+		objeto: { materia: objeto.materia as string, curso: objeto.curso as string, modulo: objeto.modulo as string, licao: objeto.licao as string, bloco: objeto.bloco as string },
+		resultado: { avaliacao, motivos, texto: typeof resultado.texto === "string" ? resultado.texto : "" },
+	};
+}
+
+const ehPromptUsado = (valor: unknown): valor is PromptUsado =>
+	typeof valor === "object" && valor !== null && typeof (valor as PromptUsado).nome === "string" && typeof (valor as PromptUsado).hash === "string";
+
 /** "a", "a e b", "a, b e c". */
 const listaComE = (itens: readonly string[]) => (itens.length <= 1 ? (itens[0] ?? "") : `${itens.slice(0, -1).join(", ")} e ${itens.at(-1)}`);
 
@@ -408,6 +602,7 @@ const textoOpcional = (valor: unknown) => (typeof valor === "string" && valor.tr
 export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 	const caminhoPlano = opcoes.caminhoPromptPlano ?? CAMINHO_PROMPT_PLANO;
 	const caminhoLicao = opcoes.caminhoPromptLicao ?? CAMINHO_PROMPT_LICAO;
+	const caminhoBloco = opcoes.caminhoPromptBloco ?? CAMINHO_PROMPT_BLOCO;
 	const tempoEspera = opcoes.tempoEsperaMateriaisMs ?? TEMPO_ESPERA_MATERIAIS_MS;
 	const intervalo = opcoes.intervaloVarreduraMs ?? INTERVALO_VARREDURA_MS;
 	let pastaDados: string | undefined;
@@ -423,6 +618,12 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 	const avisos = new Map<string, string>();
 	/** Os cursos cujo estado a tela pediu, por matéria: recebem o estado de novo quando um material chega ou sai. */
 	const vistos = new Map<string, Set<string>>();
+	/** A trava do aprendiz/escrita.json: todo ler-gravar das regras espera o anterior. Pode ser tomada dentro da trava de uma matéria, nunca o contrário. */
+	let travaEscrita: Promise<unknown> = Promise.resolve();
+	/** As reescritas de bloco em andamento, por "matéria/curso" (uma operação por curso, junto das gerações). */
+	const reescritas = new Map<string, ReescritaEmAndamento>();
+	/** Os retornos gravados nesta sessão, pelo id do evento (os outros são lidos do aprendiz/eventos.jsonl). */
+	const retornos = new Map<string, RetornoGravado>();
 
 	const daSessao = () => (sessao ? { sessao } : {});
 	const chaveDo = (materia: string, curso: string) => `${materia}/${curso}`;
@@ -435,11 +636,84 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 		pi.events.emit("interface:mostrar", { painel: PAINEL_MODULOS, acao, dados, gravar: false });
 	}
 
+	function mostrarEscrita(acao: "regras", dados: MensagensEscrita["regras"]): void;
+	function mostrarEscrita(acao: "erro", dados: MensagensEscrita["erro"]): void;
+	function mostrarEscrita(acao: keyof MensagensEscrita, dados: unknown): void {
+		pi.events.emit("interface:mostrar", { painel: PAINEL_ESCRITA, acao, dados, gravar: false });
+	}
+
 	/** Roda `tarefa` na trava da matéria (depois da anterior, mesmo que ela tenha falhado). */
 	const naTrava = <T>(materia: string, tarefa: () => Promise<T>): Promise<T> => {
 		const resultado = (travas.get(materia) ?? Promise.resolve()).then(tarefa, tarefa);
 		travas.set(materia, resultado.catch(() => undefined));
 		return resultado;
+	};
+
+	/** Roda `tarefa` na trava do escrita.json (depois da anterior, mesmo que ela tenha falhado). */
+	const naTravaEscrita = <T>(tarefa: () => Promise<T>): Promise<T> => {
+		const resultado = travaEscrita.then(tarefa, tarefa);
+		travaEscrita = resultado.catch(() => undefined);
+		return resultado;
+	};
+
+	/** A seção das regras de escrita que valem para a matéria (vazia sem regras). Um escrita.json ilegível é ErroEscrita: a geração não segue sem as regras do Breno. */
+	const regrasDaMateria = async (dados: string, materia: string) => secaoDasRegras(regrasQueValem((await naTravaEscrita(() => lerEscrita(dados))).regras, materia));
+
+	/** O prompt (nome e hash) de agora, para quando o evento não diz; sem o arquivo, nada. */
+	const promptDeAgora = async (caminho: string): Promise<PromptLido | undefined> => {
+		try {
+			return await lerPrompt(caminho);
+		} catch {
+			return undefined;
+		}
+	};
+
+	/**
+	 * Como o bloco foi gerado, para o contexto do avaliou_bloco: o modelo e o
+	 * prompt (nome e hash). Na versão 1, o modelo do módulo e o prompt da lição
+	 * do gerou_modulo daquela geração (o do mesmo instante do geradoEm); numa
+	 * reescrita, o modelo e o prompt do reescreveu_bloco que deu aquela versão.
+	 * Sem o evento, o prompt de agora (o da lição ou o do bloco).
+	 */
+	const origemDoBloco = async (dados: string, modulo: ModuloGerado, licao: string, bloco: Bloco): Promise<{ modelo: string; prompt?: PromptUsado }> => {
+		const versao = versaoDoBloco(bloco);
+		if (versao > 1) {
+			const { eventos } = await lerEventos(eventosAprendiz(dados));
+			const reescrito = eventos.findLast(
+				(evento) =>
+					evento.verbo === "reescreveu_bloco" &&
+					evento.objeto.materia === modulo.materia &&
+					evento.objeto.curso === modulo.curso &&
+					evento.objeto.modulo === modulo.id &&
+					evento.objeto.licao === licao &&
+					evento.objeto.bloco === bloco.id &&
+					evento.resultado?.para === versao,
+			);
+			if (reescrito && typeof reescrito.contexto?.modelo === "string") {
+				const prompt = reescrito.contexto.prompt;
+				return { modelo: reescrito.contexto.modelo, ...(ehPromptUsado(prompt) ? { prompt: { nome: prompt.nome, hash: prompt.hash } } : {}) };
+			}
+			const agora = await promptDeAgora(caminhoBloco);
+			return { modelo: agora?.modelo ?? modulo.modelo, ...(agora ? { prompt: agora.usado } : {}) };
+		}
+		const { eventos } = await lerEventos(eventosMateria(dados, modulo.materia));
+		const gerou = eventos.findLast(
+			(evento) => evento.verbo === "gerou_modulo" && evento.objeto.curso === modulo.curso && evento.objeto.modulo === modulo.id && evento.ts === modulo.geradoEm,
+		);
+		const nomeLicao = basename(caminhoLicao);
+		const doEvento = Array.isArray(gerou?.contexto?.prompts) ? (gerou.contexto.prompts as unknown[]).find((prompt): prompt is PromptUsado => ehPromptUsado(prompt) && prompt.nome === nomeLicao) : undefined;
+		if (doEvento) return { modelo: modulo.modelo, prompt: { nome: doEvento.nome, hash: doEvento.hash } };
+		const agora = await promptDeAgora(caminhoLicao);
+		return { modelo: modulo.modelo, ...(agora ? { prompt: agora.usado } : {}) };
+	};
+
+	/** O retorno pelo id do evento: o desta sessão (em memória) ou o do aprendiz/eventos.jsonl. */
+	const lerRetorno = async (dados: string, id: string): Promise<RetornoGravado | undefined> => {
+		const naMemoria = retornos.get(id);
+		if (naMemoria) return naMemoria;
+		const { eventos } = await lerEventos(eventosAprendiz(dados));
+		const evento = eventos.find((item) => item.id === id && item.verbo === "avaliou_bloco");
+		return evento ? retornoDoEvento(evento) : undefined;
 	};
 
 	/** A matéria existe (o materia.json)? O id vem da tela; nunca cria pasta solta. */
@@ -467,6 +741,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 		const algumAguardando = Object.values(lidos.modulos).some((modulo) => modulo.situacao === "aguardando_material");
 		const prontos = algumAguardando ? await materiaisProntos(dados, materia) : [];
 		const geracao = geracoes.get(chaveDo(materia, atual.id));
+		const reescrita = reescritas.get(chaveDo(materia, atual.id));
 		const lista = atual.esqueleto.modulos.map(({ id }): EstadoModulo => {
 			if (geracao?.aceita && geracao.modulo === id) {
 				const esperando = geracao.esperando ?? [];
@@ -494,6 +769,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 					questoes: resumo.questoes,
 					concluido: Boolean(gravado.concluidoEm),
 					...(gravado.concluidoEm ? { concluidoEm: gravado.concluidoEm } : {}),
+					...(reescrita?.aceita && reescrita.modulo === id ? { reescrevendo: { licao: reescrita.licao, bloco: reescrita.bloco } } : {}),
 				};
 			} else if (gravado?.situacao === "aguardando_material") {
 				doGravado = { nota: gravado.aguardando.nota, materialNovo: materialNovo(gravado.aguardando, prontos) };
@@ -508,12 +784,12 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 	};
 
 	/** Manda o estado do curso. Chamado dentro da trava, para um estado velho nunca chegar depois de um novo. */
-	const mostrarEstado = async (dados: string, materia: string, curso: string, pedido?: string) => {
+	const mostrarEstado = async (dados: string, materia: string, curso: string, pedido?: string, extra: { retorno?: string } = {}) => {
 		const estado = await estadoDoCurso(dados, materia, curso);
 		const doCurso = vistos.get(materia) ?? new Set<string>();
 		doCurso.add(curso);
 		vistos.set(materia, doCurso);
-		mostrar("estado", { materia, curso, modulos: estado.modulos, proximo: estado.proximo, ...(pedido ? { pedido } : {}) });
+		mostrar("estado", { materia, curso, modulos: estado.modulos, proximo: estado.proximo, ...(pedido ? { pedido } : {}), ...(extra.retorno ? { retorno: extra.retorno } : {}) });
 	};
 
 	/** O estado pela trava; um erro vira "erro" para a tela. Depois do fim da sessão, nada. */
@@ -632,6 +908,8 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 					: `O módulo ${emAndamento.modulo} deste curso está sendo gerado. Espere terminar (ou pare) antes de gerar outro.`,
 			);
 		}
+		const reescrevendo = reescritas.get(chave);
+		if (reescrevendo) throw new ErroModulo(`Um bloco do módulo ${reescrevendo.modulo} deste curso está sendo reescrito. Espere terminar (ou pare) antes de gerar um módulo.`);
 		const geracao: Geracao = { modulo, controle: new AbortController(), aceita: false, situacao: "planejando", falhasDoMapa: new Set() };
 		geracoes.set(chave, geracao);
 		const sinal = geracao.controle.signal;
@@ -653,6 +931,8 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 			if (!registro) throw new ErroModulo("A sessão não tem o registro de modelos do pi; não dá para chamar o modelo dos módulos.");
 			const modeloPlano = resolverModelo(registro, promptPlano.modelo, "do plano do módulo");
 			const modeloLicao = resolverModelo(registro, promptLicao.modelo, "das lições do módulo");
+			// As regras de escrita que valem para a matéria, lidas uma vez (as mesmas no plano e em todas as lições).
+			const regras = await regrasDaMateria(dados, materia);
 
 			const escopo = await naTrava(materia, async () => {
 				const atual = await lerCurso(dados, materia, curso);
@@ -699,7 +979,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 				registro,
 				modeloPlano,
 				promptPlano.instrucoes,
-				mensagemDoPlano(entrada.plano),
+				mensagemDoPlano(entrada.plano, regras),
 				(texto) => validarPlano(objetoJsonDoModelo(texto), { conceitosDoModulo: entrada.plano.conceitos.map((conceito) => conceito.id), licoes: entrada.plano.licoes, tipo: entrada.plano.curso.tipo }),
 				sinal,
 				{
@@ -725,7 +1005,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 					registro,
 					modeloLicao,
 					promptLicao.instrucoes,
-					mensagemDaLicao(entradaLicao),
+					mensagemDaLicao(entradaLicao, regras),
 					(texto) => validarLicao(objetoJsonDoModelo(texto), { licao: entradaLicao.licao, trechos: entradaLicao.referencias, escopo: entradaLicao.curso.escopo }).licao,
 					sinal,
 					{
@@ -770,6 +1050,193 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 		}
 	};
 
+	/**
+	 * Grava o retorno do Breno num bloco (retorno): na trava da matéria, lê o
+	 * módulo gerado e o bloco (o tipo, os conceitos, a versão e como foi
+	 * gerado) e, na trava do escrita.json (o virarRegra grava nele),
+	 * registrarRetorno; guarda o retorno em memória (para a reescrita) e manda
+	 * o estado com o pedido e o id do evento e, se criou regra, as regras no
+	 * painel escrita.
+	 */
+	const gravarRetorno = (dados: string, materia: string, curso: string, modulo: string, dadosAcao: DadosAcao, pedido: string | undefined) =>
+		naTrava(materia, async () => {
+			const licao = textoOpcional(dadosAcao.licao);
+			const bloco = textoOpcional(dadosAcao.bloco);
+			if (!licao) throw new ErroModulo("Falta o id da lição.");
+			if (!bloco) throw new ErroModulo("Falta o id do bloco.");
+			const lido = await lerModulo(dados, materia, curso, modulo);
+			if (!lido) throw new ErroModulo(`O módulo ${modulo} ainda não foi gerado.`);
+			if (lido.situacao !== "gerado") throw new ErroModulo(`O módulo ${modulo} está aguardando material; não há bloco para avaliar.`);
+			const daLicao = lido.licoes.find((item) => item.id === licao);
+			if (!daLicao) throw new ErroModulo(`Não achei a lição "${licao}" no módulo ${modulo}.`);
+			const doBloco = daLicao.blocos.find((item) => item.id === bloco);
+			if (!doBloco) throw new ErroModulo(`Não achei o bloco "${bloco}" na lição ${licao}.`);
+			const origem = await origemDoBloco(dados, lido, licao, doBloco);
+			const registrado = await naTravaEscrita(() =>
+				registrarRetorno(
+					dados,
+					{
+						materia,
+						curso,
+						modulo,
+						licao,
+						bloco,
+						tipo: doBloco.tipo,
+						conceitos: [...doBloco.conceitos],
+						avaliacao: dadosAcao.avaliacao,
+						motivos: dadosAcao.motivos,
+						texto: dadosAcao.texto,
+						virarRegra: dadosAcao.virarRegra as { texto: string; materia: string | null } | null | undefined,
+						versao: versaoDoBloco(doBloco),
+						modelo: origem.modelo,
+						prompt: origem.prompt ?? null,
+					},
+					daSessao(),
+				),
+			);
+			// O que foi gravado no evento: registrarRetorno limpa pelo mesmo validarRetorno.
+			const limpo = validarRetorno({ avaliacao: dadosAcao.avaliacao, motivos: dadosAcao.motivos, texto: dadosAcao.texto });
+			retornos.set(registrado.retorno, { objeto: { materia, curso, modulo, licao, bloco }, resultado: { avaliacao: limpo.avaliacao, motivos: limpo.motivos, texto: limpo.texto } });
+			await mostrarEstado(dados, materia, curso, pedido, { retorno: registrado.retorno });
+			if (registrado.regras) mostrarEscrita("regras", { regras: registrado.regras });
+		});
+
+	/**
+	 * Reescreve um bloco a partir de um retorno (reescrever_bloco; docs/escrita.md,
+	 * "Reescrever um bloco"): lê o prompt e resolve o modelo; dentro da trava,
+	 * confere o módulo gerado, a lição, o bloco e o retorno (do mesmo bloco) e
+	 * manda o estado com o pedido e reescrevendo; fora dela, junta a entrada
+	 * (os conceitos do bloco com o nível e os trechos, como na lição) e as
+	 * regras e chama o modelo (validarBloco, com a nova tentativa); dentro da
+	 * trava de novo, grava (gravarBlocoReescrito) e manda o módulo novo e o
+	 * estado. Uma operação por curso de cada vez (as gerações e as
+	 * reescritas); cancelar aborta e o bloco fica como estava. Com erro antes
+	 * de aceitar, o erro com o pedido; depois, o erro e o estado (o módulo
+	 * continua gerado, com o bloco antigo).
+	 */
+	const reescrever = async (dados: string, materia: string, curso: string, modulo: string, dadosAcao: DadosAcao, pedido: string | undefined) => {
+		const chave = chaveDo(materia, curso);
+		const comPedido = pedido ? { pedido } : {};
+		const licao = textoOpcional(dadosAcao.licao);
+		const bloco = textoOpcional(dadosAcao.bloco);
+		const retornoId = textoOpcional(dadosAcao.retorno);
+		if (!licao) throw new ErroModulo("Falta o id da lição.");
+		if (!bloco) throw new ErroModulo("Falta o id do bloco.");
+		if (!retornoId) throw new ErroEscrita("Falta o id do retorno que pede a reescrita.");
+		const gerando = geracoes.get(chave);
+		if (gerando) throw new ErroModulo(`O módulo ${gerando.modulo} deste curso está sendo gerado. Espere terminar (ou pare) antes de reescrever um bloco.`);
+		const emAndamento = reescritas.get(chave);
+		if (emAndamento) {
+			throw new ErroModulo(
+				emAndamento.modulo === modulo && emAndamento.licao === licao && emAndamento.bloco === bloco
+					? "Este bloco já está sendo reescrito. Espere terminar (ou pare) antes de pedir de novo."
+					: `O bloco ${emAndamento.bloco} do módulo ${emAndamento.modulo} deste curso está sendo reescrito. Espere terminar (ou pare) antes de reescrever outro.`,
+			);
+		}
+		const reescrita: ReescritaEmAndamento = { modulo, licao, bloco, controle: new AbortController(), aceita: false };
+		reescritas.set(chave, reescrita);
+		const sinal = reescrita.controle.signal;
+		try {
+			const prompt = await lerPrompt(caminhoBloco);
+			if (!registro) throw new ErroModulo("A sessão não tem o registro de modelos do pi; não dá para chamar o modelo da reescrita do bloco.");
+			const modelo = resolverModelo(registro, prompt.modelo, "da reescrita do bloco");
+			const regras = await regrasDaMateria(dados, materia);
+
+			const alvo = await naTrava(materia, async () => {
+				const atual = await lerCurso(dados, materia, curso);
+				const lido = await lerModulo(dados, materia, curso, modulo);
+				if (!lido) throw new ErroModulo(`O módulo ${modulo} ainda não foi gerado.`);
+				if (lido.situacao !== "gerado") throw new ErroModulo(`O módulo ${modulo} está aguardando material; não há bloco para reescrever.`);
+				const daLicao = lido.licoes.find((item) => item.id === licao);
+				if (!daLicao) throw new ErroModulo(`Não achei a lição "${licao}" no módulo ${modulo}.`);
+				const doBloco = daLicao.blocos.find((item) => item.id === bloco);
+				if (!doBloco) throw new ErroModulo(`Não achei o bloco "${bloco}" na lição ${licao}.`);
+				const retorno = await lerRetorno(dados, retornoId);
+				if (!retorno) throw new ErroEscrita(`Não achei o retorno "${retornoId}" nos eventos.`);
+				const { objeto } = retorno;
+				if (objeto.materia !== materia || objeto.curso !== curso || objeto.modulo !== modulo || objeto.licao !== licao || objeto.bloco !== bloco) {
+					throw new ErroEscrita(`O retorno "${retornoId}" é de outro bloco (${objeto.modulo}, ${objeto.bloco}); a reescrita usa um retorno do próprio bloco.`);
+				}
+				reescrita.aceita = true;
+				await mostrarEstado(dados, materia, curso, pedido);
+				return { curso: atual, modulo: lido, licao: daLicao, bloco: doBloco, retorno: retorno.resultado };
+			});
+
+			// A entrada: a lição com só os conceitos do bloco, para os trechos virem deles (como na lição).
+			if (sinal.aborted) throw new Cancelado();
+			const conceitosDoBloco = alvo.bloco.conceitos.filter((id) => alvo.licao.conceitos.includes(id));
+			const naEntrada = { id: alvo.licao.id, titulo: alvo.licao.titulo, objetivo: alvo.licao.objetivo, conceitos: conceitosDoBloco, roteiro: alvo.licao.blocos.map((item) => item.tipo) };
+			const entrada = await entradaDoModelo(dados, materia, alvo.curso, modulo, { pedido: alvo.modulo.pedido, plano: [naEntrada] });
+			const doBloco = entrada.licoes?.[0];
+			if (!doBloco) throw new ErroModulo("Não consegui montar a entrada da reescrita do bloco.");
+			const nomes = new Map(entrada.plano.conceitos.map((conceito) => [conceito.id, conceito.nome]));
+			const mensagem = mensagemDoBloco(
+				{
+					curso: entrada.plano.curso,
+					modulo: entrada.plano.modulo,
+					formulario: entrada.plano.formulario,
+					licao: alvo.licao,
+					bloco,
+					retorno: alvo.retorno,
+					conceitos: doBloco.conceitos,
+					trechos: doBloco.trechos,
+					nomeDe: (id) => nomes.get(id) ?? id,
+				},
+				regras,
+			);
+			const resposta = await pedirJson(
+				registro,
+				modelo,
+				prompt.instrucoes,
+				mensagem,
+				(texto) =>
+					validarBloco(objetoJsonDoModelo(texto), {
+						licao: { id: alvo.licao.id, conceitos: alvo.licao.conceitos },
+						trechos: doBloco.referencias,
+						escopo: entrada.plano.curso.escopo,
+						tipo: alvo.bloco.tipo,
+					}),
+				sinal,
+				{
+					maxTokens: MAX_TOKENS_BLOCO,
+					formato: `{"bloco": {...}}, com um bloco do tipo ${alvo.bloco.tipo}`,
+					oQue: `o bloco reescrito (${bloco})`,
+					depois: "O bloco não mudou.",
+				},
+			);
+
+			await naTrava(materia, async () => {
+				if (sinal.aborted) throw new Cancelado();
+				if (reescritas.get(chave) === reescrita) reescritas.delete(chave);
+				const novo = await gravarBlocoReescrito(
+					dados,
+					materia,
+					curso,
+					modulo,
+					licao,
+					bloco,
+					resposta.resultado,
+					{ retornoId, modelo: prompt.modelo, prompt: prompt.usado, custo: resposta.custo },
+					daSessao(),
+				);
+				mostrar("modulo", { materia, curso, modulo: novo });
+				await mostrarEstado(dados, materia, curso);
+			});
+		} catch (erro) {
+			if (reescritas.get(chave) === reescrita) reescritas.delete(chave);
+			if (pastaDados !== dados || erro instanceof Cancelado || sinal.aborted) return;
+			const mensagem = mensagemDe(erro, "reescrever_bloco");
+			if (!reescrita.aceita) {
+				mostrar("erro", { mensagem, ao: "reescrever_bloco", materia, curso, modulo, ...comPedido });
+				return;
+			}
+			mostrar("erro", { mensagem, ao: "reescrever_bloco", materia, curso, modulo });
+			await mostrarNaTrava(dados, materia, curso, "reescrever_bloco");
+		} finally {
+			if (reescritas.get(chave) === reescrita) reescritas.delete(chave);
+		}
+	};
+
 	pi.on("session_start", (_evento, ctx) => {
 		pastaDados = ctx.cwd;
 		sessao = ctx.sessionManager.getSessionId();
@@ -782,6 +1249,9 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 		pastaDados = undefined;
 		for (const geracao of geracoes.values()) geracao.controle.abort();
 		geracoes.clear();
+		for (const reescrita of reescritas.values()) reescrita.controle.abort();
+		reescritas.clear();
+		retornos.clear();
 		erros.clear();
 		avisos.clear();
 		vistos.clear();
@@ -824,7 +1294,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 
 	pi.events.on("interface:acao", (recebido) => {
 		const { painel, acao, dados: bruto } = recebido as { painel?: string; acao?: string; dados?: unknown };
-		if (painel !== PAINEL_MODULOS || !ACOES.includes(acao as keyof AcoesModulos)) return;
+		if (painel !== PAINEL_MODULOS || !ACOES.includes(acao as AcaoDaTela)) return;
 		const dadosAcao = (bruto ?? {}) as DadosAcao;
 		const materia = dadosAcao.materia;
 		if (typeof materia !== "string") return;
@@ -833,7 +1303,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 		// ação seria feita em dobro (e o modelo, chamado em dobro).
 		const dados = pastaDados;
 		if (!dados) return;
-		const ao = acao as keyof AcoesModulos;
+		const ao = acao as AcaoDaTela;
 		const pedido = typeof dadosAcao.pedido === "string" ? dadosAcao.pedido : undefined;
 		const comPedido = pedido ? { pedido } : {};
 		const curso = typeof dadosAcao.curso === "string" && dadosAcao.curso ? dadosAcao.curso : undefined;
@@ -870,12 +1340,22 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 						avisos.delete(chaveDoModulo(materia, curso, modulo));
 						await mostrarEstado(dados, materia, curso, pedido);
 					});
+				} else if (ao === "retorno") {
+					await gravarRetorno(dados, materia, curso, modulo, dadosAcao, pedido);
+				} else if (ao === "reescrever_bloco") {
+					await reescrever(dados, materia, curso, modulo, dadosAcao, pedido);
 				} else if (ao === "cancelar") {
+					// Para a geração ou a reescrita de um bloco do módulo (o que estava gravado fica).
 					const chave = chaveDo(materia, curso);
 					const emAndamento = geracoes.get(chave);
 					if (emAndamento?.modulo === modulo) {
 						emAndamento.controle.abort();
 						geracoes.delete(chave);
+					}
+					const reescrevendo = reescritas.get(chave);
+					if (reescrevendo?.modulo === modulo) {
+						reescrevendo.controle.abort();
+						reescritas.delete(chave);
 					}
 					erros.delete(chaveDoModulo(materia, curso, modulo));
 					avisos.delete(chaveDoModulo(materia, curso, modulo));
@@ -904,6 +1384,40 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 				mostrar("erro", { mensagem: mensagemDe(erro, ao), ao, materia, curso, ...comModulo, ...comPedido });
 			}
 		})();
+	});
+
+	// O painel escrita (docs/escrita.md, "Ponte"): listar, salvar e apagar as
+	// regras, cada um na trava do escrita.json; a resposta é "regras" (com o
+	// pedido) ou "erro". Sem session_start, calada como o resto.
+	pi.events.on("interface:acao", (recebido) => {
+		const { painel, acao, dados: bruto } = (recebido ?? {}) as { painel?: string; acao?: string; dados?: unknown };
+		if (painel !== PAINEL_ESCRITA || !ACOES_ESCRITA.includes(acao as keyof AcoesEscrita)) return;
+		const dados = pastaDados;
+		if (!dados) return;
+		const ao = acao as keyof AcoesEscrita;
+		const dadosAcao = (typeof bruto === "object" && bruto !== null ? bruto : {}) as { pedido?: unknown; regra?: unknown; id?: unknown };
+		const pedido = typeof dadosAcao.pedido === "string" ? dadosAcao.pedido : undefined;
+		const comPedido = pedido ? { pedido } : {};
+		void naTravaEscrita(async () => {
+			if (pastaDados !== dados) return;
+			if (ao === "listar") {
+				mostrarEscrita("regras", { regras: (await lerEscrita(dados)).regras, ...comPedido });
+			} else if (ao === "salvar") {
+				const regra = dadosAcao.regra as { materia?: unknown } | undefined;
+				const materia = typeof regra === "object" && regra !== null ? regra.materia : undefined;
+				// Uma regra de uma matéria só vale para uma matéria que existe (o id vem da tela).
+				if (typeof materia === "string" && materia && !(await materiaExiste(dados, materia))) throw new ErroEscrita(`Não achei a matéria "${materia}".`);
+				const { regras } = await salvarRegra(dados, dadosAcao.regra as EntradaRegra, daSessao());
+				mostrarEscrita("regras", { regras, ...comPedido });
+			} else {
+				if (typeof dadosAcao.id !== "string" || !dadosAcao.id) throw new ErroEscrita("Falta o id da regra.");
+				const regras = await apagarRegra(dados, dadosAcao.id, daSessao());
+				mostrarEscrita("regras", { regras, ...comPedido });
+			}
+		}).catch((erro: unknown) => {
+			if (pastaDados !== dados) return;
+			mostrarEscrita("erro", { mensagem: mensagemDaEscrita(erro, ao), ao, ...comPedido });
+		});
 	});
 
 	/** A matéria que a ferramenta lê: a da conversa, se ela for de um caderno; senão, a do parâmetro. */

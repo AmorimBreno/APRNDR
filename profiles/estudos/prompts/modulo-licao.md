@@ -79,6 +79,8 @@ Questão dissertativa:
 - Dentro do JSON, as quebras de linha vão como \n e a barra invertida do LaTeX vai dobrada ("$\\frac{a}{b}$"), como manda o JSON.
 - Escreva tudo em português do Brasil, a menos que o termo técnico seja usado normalmente em outra língua.
 
+As "Regras de escrita do Breno" da mensagem, quando houver, valem acima das orientações gerais de estilo deste prompt (mas não acima do formato do JSON e das regras das referências): obedeça a todas, sempre.
+
 Responda só com o JSON abaixo, sem texto antes ou depois e sem comentários. Uma entrada em "blocos" por item do roteiro, na ordem do roteiro:
 
 {"blocos": [

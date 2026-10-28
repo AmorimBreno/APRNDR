@@ -47,6 +47,12 @@ export type VerboEvento =
 	| "marcou_aguardando_material"
 	// O concluir manual do módulo (item 6): docs/modulos.md, "Concluir um módulo".
 	| "concluiu_modulo"
+	// A escrita dos módulos: docs/escrita.md. Todos vão para o aprendiz/eventos.jsonl.
+	| "criou_regra_escrita"
+	| "alterou_regra_escrita"
+	| "apagou_regra_escrita"
+	| "avaliou_bloco"
+	| "reescreveu_bloco"
 	// Aprendizagem (seção 9.2), usados a partir dos itens 7 e 8:
 	| "pediu_reexplicacao"
 	| "pediu_outro_jeito"

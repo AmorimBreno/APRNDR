@@ -96,8 +96,38 @@ export interface AguardandoMaterial {
 	prontos: ArquivoDoCurso[];
 }
 
+/**
+ * As versões de um bloco (docs/escrita.md, "Reescrever um bloco"). Os blocos
+ * gerados (e os gravados antes da reescrita) não têm esses campos: são a
+ * versão 1 (versaoDoBloco). Reescrever põe o bloco novo no lugar com versao
+ * + 1 e reescritoEm, e o antigo vai para anteriores (substituirBloco, em
+ * escrita-tipos.ts). O id do bloco não muda.
+ */
+export interface VersoesDoBloco {
+	/** 1 na geração, mais 1 a cada reescrita. Ausente = 1. */
+	versao?: number;
+	/** ISO 8601 da reescrita que gerou esta versão. */
+	reescritoEm?: string;
+	/** As versões anteriores, da mais antiga para a mais recente. */
+	anteriores?: BlocoAnterior[];
+}
+
+/** Um bloco como estava antes de uma reescrita: inteiro, sem as anteriores dele (ficam na lista do bloco atual), com a versão, quando foi substituído e o id do evento de retorno que pediu a reescrita. */
+export type BlocoAnterior = (
+	| Omit<BlocoExplicacao, "anteriores">
+	| Omit<BlocoVerificacao, "anteriores">
+	| Omit<BlocoAlternativa, "anteriores">
+	| Omit<BlocoDissertativa, "anteriores">
+) & {
+	versao: number;
+	/** ISO 8601. */
+	substituidoEm: string;
+	/** O id do evento avaliou_bloco que pediu a reescrita. */
+	retorno: string;
+};
+
 /** Uma explicação: markdown (docs/markdown-da-conversa.md) no formato escolhido pelo nível do conceito. */
-export interface BlocoExplicacao {
+export interface BlocoExplicacao extends VersoesDoBloco {
 	/** l<n>-b<n>, dado pelo código. */
 	id: string;
 	tipo: "explicacao";
@@ -112,7 +142,7 @@ export interface BlocoExplicacao {
 }
 
 /** Uma pergunta rápida para conferir o entendimento, com a resposta esperada. */
-export interface BlocoVerificacao {
+export interface BlocoVerificacao extends VersoesDoBloco {
 	id: string;
 	tipo: "verificacao";
 	conceitos: string[];
@@ -121,16 +151,20 @@ export interface BlocoVerificacao {
 }
 
 /** Uma questão de alternativa no formato das do diagnóstico, com as referências ao material. */
-export interface BlocoAlternativa extends QuestaoAlternativa {
+export interface BlocoAlternativa extends QuestaoAlternativa, VersoesDoBloco {
 	referencias: Referencia[];
 }
 
 /** Uma dissertativa no formato das do diagnóstico (rubrica de 3 a 5 critérios), com as referências ao material. */
-export interface BlocoDissertativa extends QuestaoDissertativa {
+export interface BlocoDissertativa extends QuestaoDissertativa, VersoesDoBloco {
 	referencias: Referencia[];
 }
 
 export type Bloco = BlocoExplicacao | BlocoVerificacao | BlocoAlternativa | BlocoDissertativa;
+
+/** A versão do bloco: a gravada, ou 1 (os blocos gerados não têm o campo). */
+export const versaoDoBloco = (bloco: Pick<VersoesDoBloco, "versao">): number =>
+	typeof bloco.versao === "number" && Number.isInteger(bloco.versao) && bloco.versao >= 1 ? bloco.versao : 1;
 
 export interface Licao {
 	/** l1, l2…, dado pelo código. */
@@ -184,7 +218,7 @@ export type Modulo = ModuloAguardando | ModuloGerado;
 
 // --- Ponte (painel "modulos") ----------------------------------------------------
 
-/** Os dados de cada ação da tela para a extensão (interface:acao, painel modulos). */
+/** Os dados de cada ação da tela para a extensão (interface:acao, painel modulos). O retorno e o reescrever_bloco estão em AcoesModulosEscrita (escrita-tipos.ts, docs/escrita.md). */
 export interface AcoesModulos {
 	/** O estado de todos os módulos do curso. */
 	listar: { materia: string; curso: string };
@@ -226,6 +260,8 @@ export interface EstadoModuloNaTela {
 	questoes?: number;
 	/** Em aguardando_material: a nota. */
 	nota?: string;
+	/** Em gerado, enquanto um bloco é reescrito (docs/escrita.md, "Ponte"): a lição e o bloco. */
+	reescrevendo?: { licao: string; bloco: string };
 	/** Em aguardando_material: os materiais prontos da matéria mudaram desde que ele começou a aguardar (materialNovo). */
 	materialNovo?: boolean;
 }
@@ -523,7 +559,8 @@ function lerReferencias(valor: unknown, trechos: readonly Referencia[]): Referen
 	return saida;
 }
 
-type BlocoSemId = Omit<BlocoExplicacao, "id"> | Omit<BlocoVerificacao, "id"> | Omit<BlocoAlternativa, "id"> | Omit<BlocoDissertativa, "id">;
+/** Um bloco sem o id (o que validarBloco devolve; o id é dado pelo código). */
+export type BlocoSemId = Omit<BlocoExplicacao, "id"> | Omit<BlocoVerificacao, "id"> | Omit<BlocoAlternativa, "id"> | Omit<BlocoDissertativa, "id">;
 
 /** Lê um bloco do modelo: o bloco limpo, ou o motivo do descarte. */
 function lerBloco(item: unknown, permitidos: ReadonlySet<string>, trechos: readonly Referencia[], escopo: Escopo): { bloco: BlocoSemId } | { motivo: string } {
@@ -602,6 +639,28 @@ export function validarLicao(
 		},
 		descartes,
 	};
+}
+
+/**
+ * Confere UM bloco que o modelo devolveu (a reescrita de um bloco,
+ * docs/escrita.md), pelas mesmas regras da lição (lerBloco, como em
+ * validarLicao): conceitos só da lição, o conteúdo de cada tipo, as
+ * referências contra os `trechos` mandados e o complemento pelo escopo. O
+ * formato da explicação pode ser outro que o do bloco antigo. Aceita o bloco
+ * solto ou dentro de {"bloco": {...}}. Devolve o bloco sem id (substituirBloco
+ * mantém o do antigo). Um bloco que não vale, ou de outro tipo que `tipo`, é
+ * ErroModulo com o motivo (a extensão tenta de novo, uma vez).
+ */
+export function validarBloco(
+	resultado: unknown,
+	opcoes: { licao: Pick<LicaoPlanejada, "id" | "conceitos">; trechos: readonly Referencia[]; escopo: Escopo; tipo: TipoBloco },
+): BlocoSemId {
+	const item = ehObjeto(resultado) && ehObjeto(resultado.bloco) ? resultado.bloco : resultado;
+	if (!ehObjeto(item)) throw new ErroModulo(`O modelo não devolveu o bloco da lição ${opcoes.licao.id}.`);
+	const lido = lerBloco(item, new Set(opcoes.licao.conceitos), opcoes.trechos, opcoes.escopo);
+	if ("motivo" in lido) throw new ErroModulo(`O bloco reescrito da lição ${opcoes.licao.id} não vale: ${lido.motivo}.`);
+	if (lido.bloco.tipo !== opcoes.tipo) throw new ErroModulo(`O bloco reescrito veio do tipo "${lido.bloco.tipo}", e precisava ser "${opcoes.tipo}".`);
+	return structuredClone(lido.bloco);
 }
 
 // --- Resumo ----------------------------------------------------------------------------

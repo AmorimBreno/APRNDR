@@ -132,8 +132,13 @@ export async function lerModulo(dados: string, materia: string, curso: string, m
 	}
 }
 
-/** Grava o <módulo>.json inteiro de uma vez (escreve ao lado e renomeia), em JSON com tabulação. */
-async function gravarModulo(dados: string, modulo: Modulo): Promise<void> {
+/**
+ * Grava o <módulo>.json inteiro de uma vez (escreve ao lado e renomeia), em
+ * JSON com tabulação, sem conferir nada: quem chama já leu o módulo
+ * (lerModulo) e segura a trava da matéria. A reescrita de um bloco
+ * (escrita.ts) também grava por aqui.
+ */
+export async function gravarModulo(dados: string, modulo: Modulo): Promise<void> {
 	const arquivo = caminhoDoModulo(dados, modulo.materia, modulo.curso, modulo.id);
 	await mkdir(dirname(arquivo), { recursive: true });
 	await gravarDeUmaVez(arquivo, `${JSON.stringify(moduloNaOrdem(modulo), null, "\t")}\n`);

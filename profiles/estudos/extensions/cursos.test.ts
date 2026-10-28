@@ -20,12 +20,19 @@ import { criarMateria, eventosAprendiz, eventosMateria } from "../lib/materias.t
 import cursos, { CAMINHO_PROMPT_CORRETOR, CAMINHO_PROMPT_DIAGNOSTICO, CAMINHO_PROMPT_ESQUELETO, hashDoPrompt, linhaDoPrazo, pedidoDoLimite, textoDoCurso } from "./cursos.ts";
 import { lerPromptMapeador } from "./mapa.ts";
 
-/** Os prompts de mentira, na pasta de dados do teste (com o nome dos de verdade). */
+/** Os prompts de mentira, na pasta de dados do teste (com o nome dos de verdade), e a metodologia de mentira em metodo/. */
 const opcoesDeTeste = () => ({
 	caminhoPromptDiagnostico: join(dados, "diagnostico.md"),
 	caminhoPromptCorretor: join(dados, "corretor.md"),
 	caminhoPromptEsqueleto: join(dados, "esqueleto.md"),
+	pastaMetodo: join(dados, "metodo"),
 });
+
+/** Os arquivos da metodologia de mentira. */
+const METODO: Record<string, string> = { "quiz.md": "Como escrever o quiz.\n", "dissertativa.md": "Como escrever a dissertativa.\n" };
+/** O system prompt com a metodologia de mentira, como instrucoesComMetodo o monta. */
+const comMetodo = (instrucoes: string, arquivos: string[]) =>
+	[instrucoes, ...arquivos.map((arquivo) => `<metodologia arquivo="${arquivo}">\n${METODO[arquivo]!.trim()}\n</metodologia>`)].join("\n\n");
 
 type Resultado = { content: Array<{ text: string }>; details: unknown; isError?: boolean };
 type Entrada = { type: string; customType?: string; data?: unknown };
@@ -107,6 +114,8 @@ beforeEach(async () => {
 	await writeFile(join(dados, "diagnostico.md"), "---\nmodel: teste/modelo-x\n---\nGere as questões.\n", "utf8");
 	await writeFile(join(dados, "corretor.md"), "---\nmodel: teste/modelo-x\n---\nCorrija pela rubrica.\n", "utf8");
 	await writeFile(join(dados, "esqueleto.md"), "---\nmodel: teste/modelo-x\n---\nMonte os módulos.\n", "utf8");
+	await mkdir(join(dados, "metodo"), { recursive: true });
+	for (const [arquivo, conteudo] of Object.entries(METODO)) await writeFile(join(dados, "metodo", arquivo), conteudo, "utf8");
 	ctx = { cwd: dados, sessionManager: { getSessionId: () => "sessao-1", getBranch: () => entradas }, modelRegistry: registro };
 	barramento = new EventEmitter();
 	ferramentas = {};
@@ -451,6 +460,14 @@ const TEXTO = "A regressão ajusta uma reta aos pontos para prever.";
 
 const doAprendiz = async (verbo: string) => (await lerEventos(eventosAprendiz(dados))).eventos.filter((evento) => evento.verbo === verbo);
 const promptDe = async (nome: string) => ({ nome, hash: hashDoPrompt(await readFile(join(dados, nome), "utf8")) });
+/** O prompt com a metodologia, como o contexto dos eventos o guarda (usadoComMetodo): os nomes e os hashes juntos por " + ". */
+const promptComMetodo = async (nome: string, arquivos: string[]) => {
+	const prompt = await promptDe(nome);
+	return {
+		nome: [prompt.nome, ...arquivos.map((arquivo) => `metodo/${arquivo}`)].join(" + "),
+		hash: [prompt.hash, ...arquivos.map((arquivo) => hashDoPrompt(METODO[arquivo]!))].join(" + "),
+	};
+};
 const textoDaChamada = (pedido: Pedido, indice = 0) => JSON.stringify(pedido.contexto.messages[indice]?.content);
 const emAndamento = async (id: string) => (await lerCurso(dados, materia, id)).diagnosticoEmAndamento!;
 
@@ -498,7 +515,7 @@ describe("diagnóstico", () => {
 			[["c-2"], { nivel: 1 }],
 			[["c-3"], { nivel: 0 }],
 		]);
-		expect(eventos[0]).toMatchObject({ sessao: "sessao-1", objeto: { materia, curso: id }, contexto: { fase: "diagnostico", prompt: await promptDe("diagnostico.md") } });
+		expect(eventos[0]).toMatchObject({ sessao: "sessao-1", objeto: { materia, curso: id }, contexto: { fase: "diagnostico", prompt: await promptComMetodo("diagnostico.md", ["quiz.md", "dissertativa.md"]) } });
 		acao("autoavaliar", { curso: id, pedido: "a3", niveis: { "c-1": 7 } });
 		await respondeu("a3");
 		expect(erroDe("a3")).toMatchObject({ ao: "autoavaliar", materia, curso: id });
@@ -568,7 +585,7 @@ describe("diagnóstico", () => {
 
 		// A mensagem ao modelo: os conceitos, os níveis e os trechos (escopo só o material).
 		expect(chamadas).toHaveLength(2);
-		expect(chamadas[0]!.contexto.systemPrompt).toBe("Gere as questões.");
+		expect(chamadas[0]!.contexto.systemPrompt).toBe(comMetodo("Gere as questões.", ["quiz.md", "dissertativa.md"]));
 		expect(chamadas[0]!.opcoes.temperature).toBeUndefined();
 		const mensagem = textoDaChamada(chamadas[0]!);
 		expect(mensagem).toContain("Regressão linear ajusta uma reta aos dados.");
@@ -587,7 +604,7 @@ describe("diagnóstico", () => {
 			sessao: "sessao-1",
 			objeto: { materia, curso: id },
 			resultado: { questoes: 4, custo: 0.02 },
-			contexto: { fase: "diagnostico", modelo: "teste/modelo-x", prompt: await promptDe("diagnostico.md") },
+			contexto: { fase: "diagnostico", modelo: "teste/modelo-x", prompt: await promptComMetodo("diagnostico.md", ["quiz.md", "dissertativa.md"]) },
 		});
 	});
 
@@ -670,7 +687,7 @@ describe("diagnóstico", () => {
 		]);
 		expect(eventos[0]).toMatchObject({
 			objeto: { materia, curso: id, conceitos: ["c-1"], questao: "q1" },
-			contexto: { fase: "diagnostico", modelo: "teste/modelo-x", prompt: await promptDe("diagnostico.md") },
+			contexto: { fase: "diagnostico", modelo: "teste/modelo-x", prompt: await promptComMetodo("diagnostico.md", ["quiz.md", "dissertativa.md"]) },
 		});
 		// Responder de novo, ou sem confiança, dá erro com a questão.
 		await responder(id, "r3", { questao: "q1", confianca: 3, escolha: 0, tempoMs: 1 });
@@ -709,7 +726,7 @@ describe("diagnóstico", () => {
 		// Com questões sem resposta, a tela não vê a correção.
 		expect((ultimoCurso().curso.diagnosticoEmAndamento!.respostas.q4 as { correcao?: unknown }).correcao).toBeUndefined();
 		const corretor = chamadas[1]!;
-		expect(corretor.contexto.systemPrompt).toBe("Corrija pela rubrica.");
+		expect(corretor.contexto.systemPrompt).toBe(comMetodo("Corrija pela rubrica.", ["dissertativa.md"]));
 		expect(corretor.opcoes.temperature).toBe(0);
 		expect(textoDaChamada(corretor)).toContain(TEXTO);
 		expect(textoDaChamada(corretor)).toContain("Mínimos quadrados");
@@ -719,7 +736,7 @@ describe("diagnóstico", () => {
 		expect(evento).toMatchObject({
 			objeto: { materia, curso: id, conceitos: ["c-1"], questao: "q4" },
 			resultado: { confianca: 2, tempoMs: 180000, total: 2.5, max: 5, texto: TEXTO, criterios: [{ criterio: "Reta", pontos: 2, max: 2 }, {}, {}] },
-			contexto: { fase: "diagnostico", modelo: "teste/modelo-x", prompt: await promptDe("corretor.md") },
+			contexto: { fase: "diagnostico", modelo: "teste/modelo-x", prompt: await promptComMetodo("corretor.md", ["dissertativa.md"]) },
 		});
 		expect(await doAprendiz("respondeu_questao")).toHaveLength(0);
 	});
@@ -797,7 +814,7 @@ describe("diagnóstico", () => {
 		expect(evento).toMatchObject({
 			objeto: { materia, curso: id },
 			resultado: { acertos: 2, alternativas: 3, dissertativas: 1, nota: 0.5 },
-			contexto: { fase: "diagnostico", modelo: "teste/modelo-x", prompt: await promptDe("diagnostico.md") },
+			contexto: { fase: "diagnostico", modelo: "teste/modelo-x", prompt: await promptComMetodo("diagnostico.md", ["quiz.md", "dissertativa.md"]) },
 		});
 		const depois = (await ferramentas.ler_curso!.execute("3", { materia, curso: id }, undefined, undefined, ctx)).content[0]!.text;
 		expect(depois).toContain("Concluído em");

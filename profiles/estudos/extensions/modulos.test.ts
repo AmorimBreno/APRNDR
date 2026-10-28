@@ -17,9 +17,10 @@ import { arquivoEscrita, lerEscrita, type RegraEscrita, salvarRegra } from "../l
 import { lerEventos } from "../lib/eventos.ts";
 import { type Conceito, gravarMapa, lerMapa, mapaVazio, pastaExtraidoArquivo } from "../lib/mapa.ts";
 import { criarMateria, eventosAprendiz, eventosMateria } from "../lib/materias.ts";
-import { caminhoDoModulo, type EstadoModuloNaTela, lerModulo, MINIMO_CARACTERES_EXEMPLO, type ModuloGerado } from "../lib/modulos.ts";
-import { hashDoPrompt } from "./cursos.ts";
-import modulos, { type MensagemEstado, type OpcoesModulos } from "./modulos.ts";
+import { ARQUIVOS_METODO, caminhoDoModulo, type EstadoModuloNaTela, lerModulo, MINIMO_CARACTERES_EXEMPLO, type ModuloGerado } from "../lib/modulos.ts";
+import { hashDoPrompt, lerMetodo, PASTA_METODO } from "./cursos.ts";
+import modulos, { CAMINHO_PROMPT_BLOCO, CAMINHO_PROMPT_LICAO, CAMINHO_PROMPT_PLANO, type MensagemEstado, type OpcoesModulos } from "./modulos.ts";
+import { lerPromptMapeador } from "./mapa.ts";
 
 type Resultado = { content: Array<{ text: string }>; details: unknown; isError?: boolean };
 type Entrada = { type: string; customType?: string; data?: unknown };
@@ -33,6 +34,12 @@ const CURSO = "p1-busca";
 const PROMPT_PLANO = "---\nmodel: teste/modelo-x\n---\nPlaneje as lições.\n";
 const PROMPT_LICAO = "---\nmodel: teste/modelo-x\n---\nEscreva a lição.\n";
 const PROMPT_BLOCO = "---\nmodel: teste/modelo-x\n---\nReescreva o bloco.\n";
+/** Os arquivos da metodologia de mentira, em <dados>/metodo. */
+const METODO: Record<string, string> = Object.fromEntries(ARQUIVOS_METODO.map((arquivo) => [arquivo, `Como escrever (${arquivo}).\n`]));
+/** O system prompt com a metodologia de mentira, como instrucoesComMetodo o monta. */
+const comMetodo = (instrucoes: string, arquivos: string[]) =>
+	[instrucoes, ...arquivos.map((arquivo) => `<metodologia arquivo="${arquivo}">\n${METODO[arquivo]!.trim()}\n</metodologia>`)].join("\n\n");
+const metodoUsado = (arquivo: string) => ({ nome: `metodo/${arquivo}`, hash: hashDoPrompt(METODO[arquivo]!) });
 
 let dados = "";
 let materia = "";
@@ -101,6 +108,7 @@ const opcoesDeTeste = (extra: OpcoesModulos = {}): OpcoesModulos => ({
 	caminhoPromptPlano: join(dados, "modulo-plano.md"),
 	caminhoPromptLicao: join(dados, "modulo-licao.md"),
 	caminhoPromptBloco: join(dados, "modulo-bloco.md"),
+	pastaMetodo: join(dados, "metodo"),
 	...extra,
 });
 
@@ -165,6 +173,8 @@ beforeEach(async () => {
 	await writeFile(join(dados, "modulo-plano.md"), PROMPT_PLANO, "utf8");
 	await writeFile(join(dados, "modulo-licao.md"), PROMPT_LICAO, "utf8");
 	await writeFile(join(dados, "modulo-bloco.md"), PROMPT_BLOCO, "utf8");
+	await mkdir(join(dados, "metodo"), { recursive: true });
+	for (const [arquivo, conteudo] of Object.entries(METODO)) await writeFile(join(dados, "metodo", arquivo), conteudo, "utf8");
 	await gravarMapa(dados, materia, {
 		...mapaVazio(),
 		situacao: "aprovado",
@@ -277,6 +287,15 @@ const LICAO_2 = JSON.stringify({
 });
 /** Uma lição sem prática que valha (validarLicao pede a nova tentativa). */
 const LICAO_SEM_PRATICA = JSON.stringify({ blocos: [explicacao("c-tf", "conceito", "página 1")] });
+/** Uma lição fora do esquema: sem a introdução e sem a ideia central antes do quiz (problemasDaLicao). */
+const LICAO_FORA_DO_ESQUEMA = JSON.stringify({ blocos: [explicacao("c-tf", "conceito", "página 1"), explicacao("c-tf", "exemplo_resolvido", "página 1"), alternativa("c-tf")] });
+/** Um plano que precisa de conserto: a lição 1 sem a introdução e sem a ideia central. */
+const PLANO_A_CONSERTAR = JSON.stringify({
+	licoes: [
+		{ titulo: "Contando termos", objetivo: "Calcular o TF.", conceitos: ["c-tf"], roteiro: ["conceito", "exemplo_resolvido", "verificacao", "conceito", "alternativa"] },
+		{ titulo: "Termos raros pesam mais", objetivo: "Calcular o IDF.", conceitos: ["c-idf"], roteiro: ["introducao", "conceito", "exemplo_incompleto", "ideia_central", "dissertativa"] },
+	],
+});
 
 /** Marca o arquivo como mapeado no mapa da matéria (mapa.arquivos com o hash do manifesto), como o mapeador faria. */
 async function mapear(arquivo: string, hash = `h-${arquivo}`): Promise<void> {
@@ -294,6 +313,20 @@ async function gerarM1(pedido = "p-gerar", extra: Record<string, unknown> = {}) 
 }
 
 // --- Testes -----------------------------------------------------------------------------------
+
+describe("os prompts e a metodologia do perfil", () => {
+	it("os prompts dizem o modelo e o formato; os arquivos da metodologia existem, cada um com o título", async () => {
+		for (const caminho of [CAMINHO_PROMPT_PLANO, CAMINHO_PROMPT_LICAO, CAMINHO_PROMPT_BLOCO]) {
+			const prompt = lerPromptMapeador(await readFile(caminho, "utf8"));
+			expect(prompt.modelo).toBe("openrouter/openai/gpt-6.1-sol");
+			expect(prompt.instrucoes).toContain("metodologia");
+		}
+		expect(lerPromptMapeador(await readFile(CAMINHO_PROMPT_LICAO, "utf8")).instrucoes).toContain('"tipo": "ideia_central"');
+		const lidos = await lerMetodo(PASTA_METODO, ARQUIVOS_METODO);
+		expect(lidos.map((item) => item.usado.nome)).toEqual(ARQUIVOS_METODO.map((arquivo) => `metodo/${arquivo}`));
+		for (const item of lidos) expect(item.conteudo).toMatch(/^# \S/);
+	});
+});
 
 describe("ponte", () => {
 	beforeEach(() => ligar());
@@ -355,9 +388,11 @@ describe("ponte", () => {
 			resultado: { licoes: 2, blocos: 11, questoes: 2 },
 			contexto: {
 				modelo: "teste/modelo-x",
+				// Os prompts e, depois, cada arquivo da metodologia usado (sem repetir), com o hash.
 				prompts: [
 					{ nome: "modulo-plano.md", hash: hashDoPrompt(PROMPT_PLANO) },
 					{ nome: "modulo-licao.md", hash: hashDoPrompt(PROMPT_LICAO) },
+					...ARQUIVOS_METODO.map(metodoUsado),
 				],
 			},
 		});
@@ -365,15 +400,20 @@ describe("ponte", () => {
 		// As mensagens: o plano pede 2 lições (2 h) com os níveis e os locais; a lição leva o plano e os trechos.
 		expect(chamadas).toHaveLength(3);
 		const plano = textoDaChamada(chamadas[0]!);
-		expect(chamadas[0]!.contexto.systemPrompt).toBe("Planeje as lições.");
+		// O plano leva a estrutura da lição; cada lição, a estrutura e os arquivos dos itens do roteiro dela.
+		expect(chamadas[0]!.contexto.systemPrompt).toBe(comMetodo("Planeje as lições.", ["estrutura-da-licao.md"]));
+		expect(chamadas[1]!.contexto.systemPrompt).toBe(
+			comMetodo("Escreva a lição.", ["estrutura-da-licao.md", "introducao.md", "conceito.md", "exemplos.md", "pergunta.md", "ideia-central.md", "quiz.md"]),
+		);
 		expect(plano).toContain("Lições pedidas: exatamente 2.");
 		expect(plano).toContain("Motivo do aluno: Use os exercícios como base para as questões práticas.");
 		expect(plano).toContain("Informações específicas do aluno para este módulo:\nFoco no IDF.");
-		expect(plano).toContain("Nível do aluno: iniciante (explicação no formato exemplo_resolvido");
-		expect(plano).toContain("Nível do aluno: intermediário (explicação no formato exemplo_incompleto");
+		expect(plano).toContain("Nível do aluno: iniciante (exemplo no formato exemplo_resolvido");
+		expect(plano).toContain("Nível do aluno: intermediário (exemplo no formato exemplo_incompleto");
 		expect(plano).toContain("- aula.pdf, página 2");
 		const licao2 = textoDaChamada(chamadas[2]!);
-		expect(chamadas[2]!.contexto.systemPrompt).toBe("Escreva a lição.");
+		expect(chamadas[2]!.contexto.systemPrompt).toBe(comMetodo("Escreva a lição.", ["estrutura-da-licao.md", "introducao.md", "conceito.md", "exemplos.md", "ideia-central.md", "dissertativa.md"]));
+		expect(licao2).toContain("Roteiro (5 blocos, nesta ordem): 1. introducao; 2. conceito; 3. exemplo_incompleto; 4. ideia_central; 5. dissertativa");
 		expect(licao2).toContain('Lição a escrever: l2, "Termos raros pesam mais"');
 		expect(licao2).toContain('1. l1, "Contando termos"');
 		expect(licao2).toContain('<trecho arquivo="aula.pdf" local="página 2">\nIDF é o log de N sobre o número de documentos com o termo.\n</trecho>');
@@ -385,8 +425,49 @@ describe("ponte", () => {
 		await gerarM1();
 		expect(situacaoDe("m1")).toBe("gerado");
 		expect(chamadas).toHaveLength(4);
-		expect(textoDaChamada(chamadas[2]!)).toContain("A sua resposta não veio como o pedido: A lição l1");
+		expect(textoDaChamada(chamadas[2]!)).toMatch(/^A lição l1 \("Contando termos"\) veio sem prática que valha\./);
+		expect(textoDaChamada(chamadas[2]!)).toContain("Escreva a lição de novo, pelo esquema da lição e pela metodologia");
 		expect(((await lerModulo(dados, materia, CURSO, "m1")) as ModuloGerado).custo).toBeCloseTo(0.04);
+	});
+
+	it("uma lição fora do esquema tem uma nova tentativa com os problemas; duas, o erro com os problemas", async () => {
+		respostas.push(PLANO_M1, LICAO_FORA_DO_ESQUEMA, LICAO_1, LICAO_2);
+		await gerarM1("p1");
+		expect(situacaoDe("m1")).toBe("gerado");
+		const novaTentativa = textoDaChamada(chamadas[2]!);
+		expect(novaTentativa).toContain('A lição l1 ("Contando termos") não segue o esquema da lição.');
+		expect(novaTentativa).toContain("o primeiro bloco precisa ser a introdução");
+		expect(novaTentativa).toContain("Falta a ideia central");
+		expect(novaTentativa).toContain("Escreva a lição de novo");
+
+		respostas.push(PLANO_M1, LICAO_FORA_DO_ESQUEMA, LICAO_FORA_DO_ESQUEMA);
+		await gerarM1("p2");
+		const emErro = doModulo(ultimo(), "m1")!;
+		expect(emErro.situacao).toBe("erro");
+		expect(emErro.mensagem).toContain('O modelo não devolveu a lição 1 de 2 ("Contando termos"), nem na segunda tentativa (A lição l1 ("Contando termos") não segue o esquema da lição.');
+		expect(emErro.mensagem).not.toContain("Escreva a lição de novo");
+	});
+
+	it("um plano que precisou de conserto tem uma nova tentativa com os consertos; na segunda, vale o consertado", async () => {
+		respostas.push(PLANO_A_CONSERTAR, PLANO_A_CONSERTAR, LICAO_1, LICAO_2);
+		await gerarM1();
+		expect(situacaoDe("m1")).toBe("gerado");
+		expect(chamadas).toHaveLength(4);
+		const novaTentativa = textoDaChamada(chamadas[1]!);
+		expect(novaTentativa).toContain("O plano não seguiu tudo o que foi pedido, e o código precisou consertar:");
+		expect(novaTentativa).toContain('- Lição l1 ("Contando termos"): faltava a introdução; entrou uma no começo do roteiro.');
+		expect(novaTentativa).toContain("faltava a ideia central");
+		// A lição 1 foi escrita pelo roteiro consertado.
+		expect(textoDaChamada(chamadas[2]!)).toContain(
+			"Roteiro (7 blocos, nesta ordem): 1. introducao; 2. conceito; 3. exemplo_resolvido; 4. verificacao; 5. conceito; 6. ideia_central; 7. alternativa",
+		);
+
+		// Um plano sem consertos não tem a nova tentativa.
+		chamadas = [];
+		respostas.push(PLANO_A_CONSERTAR, PLANO_M1, LICAO_1, LICAO_2);
+		await gerarM1("p2");
+		expect(chamadas).toHaveLength(4);
+		expect(textoDaChamada(chamadas[2]!)).toContain("Roteiro (6 blocos, nesta ordem): 1. introducao; 2. conceito; 3. verificacao;");
 	});
 
 	it("uma lição que falha duas vezes deixa o módulo em erro, sem arquivo e sem evento", async () => {
@@ -677,6 +758,8 @@ describe("ler_modulo", () => {
 		expect(sem).toContain("Texto sobre c-tf.");
 		expect(sem).toContain("Conceitos: Frequência do termo.");
 		expect(sem).toContain("Pergunta: O que o TF conta?");
+		expect(sem).toContain("### l1-b1 · Explicação (introdução: o contexto do tema)");
+		expect(sem).toContain("### l1-b5 · Ideia central\nConceitos: Frequência do termo.\n\nGuarde o essencial de c-tf.");
 		expect(sem).toContain("B) 2\n");
 		expect(sem).toContain("Referências: aula.pdf, página 1.");
 		expect(sem).not.toContain("As ocorrências do termo no documento.");
@@ -816,6 +899,9 @@ async function retornoNoB1(pedido = "r1", extra: Record<string, unknown> = {}): 
 	return id;
 }
 
+/** O prompt da reescrita com a metodologia da introdução (o l1-b1), como o reescreveu_bloco o guarda. */
+const PROMPT_BLOCO_COM_INTRODUCAO = () => ({ nome: "modulo-bloco.md + metodo/introducao.md", hash: `${hashDoPrompt(PROMPT_BLOCO)} + ${hashDoPrompt(METODO["introducao.md"]!)}` });
+
 const reescrever = (pedido: string, retorno: string, bloco = "l1-b1") => acao("reescrever_bloco", { modulo: "m1", licao: "l1", bloco, pedido, retorno });
 
 describe("retorno e reescrita do bloco", () => {
@@ -877,7 +963,8 @@ describe("retorno e reescrita do bloco", () => {
 
 		// A mensagem: a lição com os outros blocos, o bloco atual, o retorno, o nível e os trechos do conceito do bloco.
 		const pedido = chamadas.at(-1)!;
-		expect(pedido.contexto.systemPrompt).toBe("Reescreva o bloco.");
+		// O system prompt leva o arquivo da metodologia do tipo do bloco (l1-b1 é a introdução).
+		expect(pedido.contexto.systemPrompt).toBe(comMetodo("Reescreva o bloco.", ["introducao.md"]));
 		const mensagem = textoDaChamada(pedido);
 		expect(mensagem).toContain('Lição do bloco: l1, "Contando termos"');
 		expect(mensagem).toContain("### l1-b1 · Explicação (posição 1): ESTE É O BLOCO A REESCREVER");
@@ -914,13 +1001,31 @@ describe("retorno e reescrita do bloco", () => {
 			sessao: "sessao-1",
 			objeto: { materia, curso: CURSO, modulo: "m1", licao: "l1", bloco: "l1-b1", tipo: "explicacao", conceitos: ["c-tf"] },
 			resultado: { de: 1, para: 2, retorno: id },
-			contexto: { modelo: "teste/modelo-x", prompt: { nome: "modulo-bloco.md", hash: hashDoPrompt(PROMPT_BLOCO) }, custo: 0.01 },
+			contexto: { modelo: "teste/modelo-x", prompt: PROMPT_BLOCO_COM_INTRODUCAO(), custo: 0.01 },
 		});
 
 		// Um retorno na versão 2 leva o modelo e o prompt da reescrita.
 		await retornoNoB1("r2");
 		const ultimoRetorno = (await doAprendiz("avaliou_bloco")).at(-1)!;
-		expect(ultimoRetorno.contexto).toEqual({ modelo: "teste/modelo-x", prompt: { nome: "modulo-bloco.md", hash: hashDoPrompt(PROMPT_BLOCO) }, versao: 2 });
+		expect(ultimoRetorno.contexto).toEqual({ modelo: "teste/modelo-x", prompt: PROMPT_BLOCO_COM_INTRODUCAO(), versao: 2 });
+	});
+
+	it("a ideia central também é reescrita, com o arquivo dela na metodologia", async () => {
+		acao("retorno", { modulo: "m1", licao: "l1", bloco: "l1-b5", pedido: "r1", avaliacao: "melhorar", motivos: ["confuso"], texto: "Mais direto." });
+		await respondeu("r1");
+		const id = retornoDe("r1")!;
+		respostas.push(JSON.stringify({ bloco: { tipo: "ideia_central", conceitos: ["c-tf"], texto: "O TF conta as ocorrências do termo no documento." } }));
+		reescrever("w1", id, "l1-b5");
+		await respondeu("w1");
+		await esperar(() => recebidas("modulo").length > 0);
+		expect(chamadas.at(-1)!.contexto.systemPrompt).toBe(comMetodo("Reescreva o bloco.", ["ideia-central.md"]));
+		expect(textoDaChamada(chamadas.at(-1)!)).toContain("### l1-b5 · Ideia central (posição 5): ESTE É O BLOCO A REESCREVER");
+		const bloco = ((await lerModulo(dados, materia, CURSO, "m1")) as ModuloGerado).licoes[0]!.blocos[4]!;
+		expect(bloco).toMatchObject({ id: "l1-b5", tipo: "ideia_central", texto: "O TF conta as ocorrências do termo no documento.", versao: 2 });
+		const [evento] = await doAprendiz("reescreveu_bloco");
+		expect(evento!.contexto).toMatchObject({
+			prompt: { nome: "modulo-bloco.md + metodo/ideia-central.md", hash: `${hashDoPrompt(PROMPT_BLOCO)} + ${hashDoPrompt(METODO["ideia-central.md"]!)}` },
+		});
 	});
 
 	it("uma resposta inválida tem uma nova tentativa; duas, o erro, e o bloco fica como estava", async () => {

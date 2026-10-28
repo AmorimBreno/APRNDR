@@ -1,5 +1,6 @@
 // Verificação da geração de módulos (item 6, parte A) com chamadas reais aos
-// modelos de profiles/estudos/prompts/modulo-plano.md e modulo-licao.md.
+// modelos de profiles/estudos/prompts/modulo-plano.md e modulo-licao.md (com
+// os arquivos da metodologia de profiles/estudos/metodo/ no system prompt).
 // Monta numa pasta temporária (fora do Drive), pela lib, uma matéria com um
 // material pequeno já extraído (um .extraido de mentira de um markdown com 4
 // trechos sobre TF-IDF, o último uma lista de exercícios), o mapa aprovado com
@@ -8,9 +9,12 @@
 // concluído com níveis variados; o módulo m1 de 2 h com 3 conceitos). Carrega a
 // extensão profiles/estudos/extensions/modulos.ts pelo carregador de extensões
 // do pi (o mesmo das sessões), entrega a ela o registro de modelos de verdade
-// e manda, pela ponte, gerar o m1. Mostra os estados, as lições, os blocos por
-// tipo, os formatos das explicações, as referências e o custo, e uma
-// explicação e uma questão inteiras. A pasta temporária é apagada no fim.
+// e manda, pela ponte, gerar o m1. Mostra os estados, cada chamada (o tamanho
+// do system prompt e as novas tentativas, com a mensagem delas), as lições com
+// o roteiro, os blocos com o tamanho, a parte dos caracteres nas explicações
+// (o esquema da lição), as referências e o custo, e uma introdução, um
+// conceito, um exemplo e uma questão inteiros. A pasta temporária é apagada
+// no fim.
 //
 // Uso, na raiz do repositório (a chave vem do processo ou, se faltar, das
 // variáveis de usuário do Windows; o script nunca a imprime):
@@ -30,7 +34,17 @@ import { calcularCalendario, type Modulo as ModuloDoEsqueleto } from "../profile
 import { lerEventos } from "../profiles/estudos/lib/eventos.ts";
 import { gravarMapa, type MapaConteudo, mapaVazio, pastaExtraidoArquivo } from "../profiles/estudos/lib/mapa.ts";
 import { criarMateria, eventosMateria } from "../profiles/estudos/lib/materias.ts";
-import { type Bloco, type EstadoModuloNaTela, lerModulo, type ModuloGerado, niveisDoModulo } from "../profiles/estudos/lib/modulos.ts";
+import {
+	type Bloco,
+	caracteresDaLicao,
+	ehFormatoExemplo,
+	type EstadoModuloNaTela,
+	lerModulo,
+	type ModuloGerado,
+	niveisDoModulo,
+	problemasDaLicao,
+	roteiroDaLicao,
+} from "../profiles/estudos/lib/modulos.ts";
 
 const raiz = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 // O pi do packages/core (a raiz do monorepo não tem node_modules dele).
@@ -198,6 +212,15 @@ try {
 			}
 			return async (...argumentos: Parameters<typeof registroReal.complete>) => {
 				const inicio = Date.now();
+				const [, contexto] = argumentos;
+				chamadas++;
+				console.log(`\nChamada ${chamadas}: system prompt com ${contexto.systemPrompt?.length ?? 0} caracteres (${[...(contexto.systemPrompt ?? "").matchAll(/<metodologia arquivo="([^"]+)">/g)].map((achado) => achado[1]).join(", ") || "sem metodologia"}).`);
+				if (contexto.messages.length > 1) {
+					novasTentativas++;
+					const ultima = contexto.messages.at(-1)!;
+					const texto = Array.isArray(ultima.content) ? ultima.content.map((parte) => ("text" in parte ? parte.text : "")).join("") : String(ultima.content);
+					console.log(`Nova tentativa, com a mensagem:\n${texto}`);
+				}
 				const resposta = await alvo.complete(...argumentos);
 				console.log(
 					`Chamada: ${resposta.provider}/${resposta.model}, parada ${resposta.stopReason}${resposta.errorMessage ? ` (${resposta.errorMessage})` : ""}, ${resposta.usage.input + resposta.usage.cacheRead + resposta.usage.cacheWrite} tokens de entrada, ${resposta.usage.output} de saída, US$ ${resposta.usage.cost.total.toFixed(5)}, ${((Date.now() - inicio) / 1000).toFixed(1)} s`,
@@ -207,6 +230,8 @@ try {
 		},
 	});
 
+	let chamadas = 0;
+	let novasTentativas = 0;
 	const mostrados: Array<{ acao: string; dados: Record<string, unknown> }> = [];
 	barramento.on("interface:mostrar", (mensagem) => {
 		const recebida = mensagem as { acao: string; dados: Record<string, unknown> };
@@ -251,19 +276,34 @@ try {
 		console.log(`Objetivo: ${licao.objetivo}`);
 		console.log(`Conceitos: ${licao.conceitos.map((id) => `${id} (${niveis[id]})`).join(", ")}`);
 		console.log(`Blocos (${licao.blocos.length}): ${contar(licao.blocos)}`);
+		console.log(`Roteiro: ${roteiroDaLicao(licao).join(", ")}`);
 		for (const bloco of licao.blocos) {
 			const referencias = "referencias" in bloco ? bloco.referencias.map((referencia) => referencia.local).join("; ") : "";
-			const extra = bloco.tipo === "explicacao" ? ` formato ${bloco.formato}${bloco.complemento ? ", complemento" : ""}, ${bloco.texto.length} caracteres` : "";
-			console.log(`- ${bloco.id} ${bloco.tipo} [${bloco.conceitos.join(", ")}]${extra}${referencias ? `; referências: ${referencias}` : ""}`);
+			const tamanho = caracteresDaLicao([bloco]).total;
+			const extra = bloco.tipo === "explicacao" ? ` formato ${bloco.formato}${bloco.complemento ? ", complemento" : ""}` : "";
+			console.log(`- ${bloco.id} ${bloco.tipo} [${bloco.conceitos.join(", ")}]${extra}, ${tamanho} caracteres${referencias ? `; referências: ${referencias}` : ""}`);
 		}
+		const caracteres = caracteresDaLicao(licao.blocos);
+		console.log(`Caracteres: ${caracteres.explicacoes} nas explicações e na ideia central, ${caracteres.questoes} nas questões; ${(caracteres.proporcao * 100).toFixed(1)} % nas explicações.`);
+		const problemas = problemasDaLicao(licao.blocos);
+		console.log(problemas.length ? `Problemas do esquema: ${problemas.join(" ")}` : "Segue o esquema da lição.");
 	}
+	console.log(`\nChamadas: ${chamadas}; novas tentativas: ${novasTentativas}.`);
 	const todos = modulo.licoes.flatMap((licao) => licao.blocos);
-	const umaExplicacao = todos.find((bloco) => bloco.tipo === "explicacao" && bloco.formato !== "conceito") ?? todos.find((bloco) => bloco.tipo === "explicacao");
-	const umaQuestao = todos.find((bloco) => bloco.tipo === "alternativa") ?? todos.find((bloco) => bloco.tipo === "dissertativa");
-	console.log("\n=== Uma explicação inteira");
-	console.log(JSON.stringify(umaExplicacao, null, 2));
-	console.log("\n=== Uma questão inteira");
-	console.log(JSON.stringify(umaQuestao, null, 2));
+	const daExplicacao = (teste: (formato: string) => boolean) => todos.find((bloco) => bloco.tipo === "explicacao" && teste(bloco.formato));
+	const inteiros: Array<[string, Bloco | undefined]> = [
+		["Uma introdução inteira", daExplicacao((formato) => formato === "introducao")],
+		["Um conceito inteiro", daExplicacao((formato) => formato === "conceito")],
+		["Um exemplo inteiro", daExplicacao(ehFormatoExemplo)],
+		["A ideia central da primeira lição", todos.find((bloco) => bloco.tipo === "ideia_central")],
+		["Uma pergunta inteira", todos.find((bloco) => bloco.tipo === "verificacao")],
+		["Uma questão inteira", todos.find((bloco) => bloco.tipo === "alternativa") ?? todos.find((bloco) => bloco.tipo === "dissertativa")],
+	];
+	for (const [titulo, bloco] of inteiros) {
+		console.log(`\n=== ${titulo}${bloco ? ` (${bloco.id})` : ""}`);
+		if (bloco && (bloco.tipo === "explicacao" || bloco.tipo === "ideia_central")) console.log(bloco.texto);
+		else console.log(JSON.stringify(bloco, null, 2));
+	}
 
 	const eventos = (await lerEventos(eventosMateria(dados, materia))).eventos.filter((evento) => evento.verbo === "gerou_modulo");
 	console.log(`\n=== Eventos: gerou_modulo ${JSON.stringify(eventos.map(({ resultado, contexto }) => ({ resultado, contexto })))}`);

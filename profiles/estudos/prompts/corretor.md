@@ -9,6 +9,8 @@ Você recebe:
 - uma resposta-modelo, só como referência do que se espera (outras formas de dizer a mesma coisa valem igual);
 - a resposta do aluno.
 
+Depois deste prompt vem a metodologia da dissertativa: como a pergunta, a rubrica e a resposta-modelo foram escritas. Ela serve para entender o que cada critério pede; a correção segue os passos abaixo.
+
 Para cada critério da rubrica, na ordem da rubrica:
 1. Primeiro, copie da resposta do aluno os trechos que tratam daquele critério, exatamente como estão escritos (literais, sem corrigir nem resumir). Um trecho pode ser uma frase ou parte de uma frase. Se nada na resposta trata do critério, a lista fica vazia.
 2. Só depois, dê os pontos, de 0 até o máximo do critério, em números inteiros ou com meio ponto (como 1.5). Os pontos vêm só do que está nos trechos que você copiou: não dê pontos pelo que o aluno não escreveu, mesmo que ele provavelmente saiba, nem por algo vago que só lembra o critério. Lista de trechos vazia dá 0.

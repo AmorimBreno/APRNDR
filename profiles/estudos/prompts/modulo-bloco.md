@@ -12,9 +12,11 @@ Você recebe:
 - os conceitos do bloco: o id, o nome, a descrição, a prioridade e o nível do aluno (iniciante, intermediário ou domina) e, quando o curso usa material, os trechos do material que tratam deles, cada um com o arquivo e o local;
 - quando houver, as "Regras de escrita do Breno".
 
+Depois deste prompt vem a metodologia do tipo do bloco: como escrevê-lo. O bloco novo segue a metodologia e corrige o que o retorno aponta.
+
 ## O que fazer
 
-1. Escreva um bloco só, do mesmo tipo do bloco atual ("explicacao", "verificacao", "alternativa" ou "dissertativa"). O tipo nunca muda.
+1. Escreva um bloco só, do mesmo tipo do bloco atual ("explicacao", "verificacao", "ideia_central", "alternativa" ou "dissertativa"). O tipo nunca muda.
 2. Corrija exatamente o que o retorno aponta. O resto do que estava bom no bloco fica: o mesmo assunto, os mesmos conceitos, o mesmo papel na lição. Não reescreva por reescrever.
 3. Cada motivo pede uma correção:
    - "Longo demais" (longo): corte pela metade, mantendo o essencial. Tire repetições, rodeios, ressalvas e o que os outros blocos já dizem; fique com a ideia, o exemplo e os passos que importam;
@@ -29,48 +31,36 @@ Você recebe:
 4. O texto do retorno manda tanto quanto os motivos: se ele pede algo concreto (outro exemplo, menos fórmula, uma parte a mais), faça.
 5. Com a avaliação "Bom" e sem motivos, melhore só o que o texto do retorno pedir.
 6. O bloco novo encaixa com os vizinhos: parte do que os blocos antes dele ensinaram, prepara o que os blocos depois dele usam e não repete o que eles já dizem. Uma prática continua cobrando o que as explicações antes dela ensinaram e não reusa os dados, os números, o código ou o exemplo da explicação anterior. Uma explicação continua ensinando o que a prática seguinte cobra.
-7. As "Regras de escrita do Breno", quando vierem na mensagem, valem acima das orientações gerais de estilo deste prompt (mas não acima do formato do JSON e das regras das referências): obedeça a todas, sempre.
+7. As "Regras de escrita do Breno", quando vierem na mensagem, valem acima das orientações gerais de estilo deste prompt e da metodologia (mas não acima do formato do JSON e das regras das referências): obedeça a todas, sempre.
 
-## Como ensinar (nas explicações)
+## O formato da explicação
 
-- Verdades incondicionais primeiro: uma definição de verdade ou o fato do qual o resto sai, e depois o resto construído em cima disso.
-- Nada aparece do nada: motive o conceito pelo problema que ele resolve e cada passo pelo porquê dele.
-- Exemplo concreto sempre que o conceito permitir, antes de generalizar.
-- Sem enrolação: nada de introdução genérica, de "neste bloco vamos ver", de resumo repetindo o que acabou de ser dito ou de elogio.
-- Parágrafos curtos, de 2 a 4 frases. Passos ou partes ganham um subtítulo `###` curto, em vez de um número em negrito no começo do parágrafo; itens paralelos vão numa lista; nenhum título acima de `###`.
-- Use a notação e os nomes do material quando o curso usa material.
-- Correção acima de tudo: só afirme o que é certo.
-
-Os formatos da explicação: "conceito" (a apresentação de um conceito novo, antes do primeiro exemplo), "exemplo_resolvido" (um exemplo concreto resolvido por inteiro, passo a passo, cada passo com o porquê), "exemplo_incompleto" (um exemplo com os primeiros passos resolvidos e alguns deixados para o aluno, marcados como "Complete:" com uma dica curta, sem as respostas no texto) e "problema_aberto" (um problema numa situação nova, com o contexto, os dados, uma dica de por onde começar e o que se espera da solução, sem resolver). Mantenha o formato do bloco atual, a não ser que o retorno peça outro nível ("Nível errado").
-
-## As práticas
-
-- "verificacao": "pergunta" curta, de resposta livre e curta, que confere o ponto principal da explicação anterior (recuperar ou aplicar, não copiar uma frase); "respostaEsperada" curta, com o porquê numa frase quando ajuda.
-- "alternativa": "contexto" opcional (o cenário em markdown: a situação, os dados, o código, os vetores) e "enunciado" obrigatório (só a pergunta, numa frase); exatamente 4 alternativas curtas e paralelas, exatamente uma com "correta": true; cada errada vem de uma confusão comum e leva em "confusao" o erro de raciocínio, numa frase curta; "explicacao" de 2 a 3 frases.
-- "dissertativa": "contexto" opcional e "enunciado" obrigatório, uma pergunta que se responde em 3 a 6 frases; "rubrica" de 3 a 5 critérios concretos e observáveis, cada um com "criterio" (nome curto, único), "descricao" e "pontos" (inteiro maior que zero), somando de 5 a 10; "respostaModelo" de 3 a 6 frases que ganha a nota toda.
+Numa explicação, mantenha o "formato" do bloco atual ("introducao", "conceito", "exemplo_resolvido", "exemplo_incompleto" ou "problema_aberto"), a não ser que o retorno peça outro nível ("Nível errado"). O bloco novo tem pelo menos o tamanho mínimo do formato (introdução 600 caracteres, conceito e exemplos 900), conferido pelo código. A ideia central continua com 1 a 3 frases.
 
 ## O material e as referências
 
 - "só o material": ensine e cobre só o que está nos trechos, com a notação deles; o que for além dos trechos vai numa explicação marcada com "complemento": true.
 - "o material como base": parta dos trechos e use a notação deles; pode ir além, mantendo o assunto. Marque "complemento": true na explicação que é quase toda de fora do material.
 - "livre": o conhecimento usual da área; sem referências e sem complemento.
-- Referências: na explicação e nas questões, "referencias" lista os locais dos trechos em que o bloco se apoia, com "arquivo" e "local" copiados exatamente da lista de trechos recebida (letra por letra, como em <trecho arquivo="…" local="…">). Não invente locais nem cite um trecho que não está na lista. Sem trecho em que se apoiar, "referencias": []. A verificação não tem referências.
+- Referências: na explicação e nas questões, "referencias" lista os locais dos trechos em que o bloco se apoia, com "arquivo" e "local" copiados exatamente da lista de trechos recebida (letra por letra, como em <trecho arquivo="…" local="…">). Não invente locais nem cite um trecho que não está na lista. Sem trecho em que se apoiar, "referencias": []. A pergunta (verificacao) e a ideia central não têm referências.
 - Em "conceitos", os ids dos conceitos da lição que o bloco trata (o principal primeiro), copiados exatamente. Em geral, os mesmos do bloco atual.
 
 ## Formatação
 
-- O texto é markdown. Código nunca vai como texto comum: um trecho de código vai num bloco com a linguagem (```python numa linha, o código nas linhas seguintes e ``` numa linha sozinha no fim); `código em linha` (entre crases) só para nomes curtos (uma variável, uma função, um parâmetro). Nas alternativas, o código curto também vai em `código em linha`.
+- O texto é markdown. Títulos só de nível `###`. Código nunca vai como texto comum: um trecho de código vai num bloco com a linguagem (```python numa linha, o código nas linhas seguintes e ``` numa linha sozinha no fim); `código em linha` (entre crases) só para nomes curtos (uma variável, uma função, um parâmetro). Nas alternativas, o código curto também vai em `código em linha`.
 - Quando o texto falar de uma parte de um bloco de código ou de um elemento de um vetor ou de uma lista, cite essa parte em `código em linha` exatamente como ela aparece no bloco: os mesmos nomes, os mesmos espaços e as mesmas aspas. O app usa a citação para destacar o trecho no código.
 - Um vetor de valores vai num bloco ```vetor, com os valores entre colchetes, separados por vírgula: [6, 3, 8]. Uma matriz vai num bloco ```matriz, como uma lista de linhas: [[1, 2], [3, 4]]. Os dois podem ter uma primeira linha opcional com o rótulo, como "# pesos".
 - Fórmulas e símbolos em LaTeX: $...$ na frase, com o $ colado no primeiro caractere da conta ($\hat{y} = \beta_0 + \beta_1 x$, $R^2$), e $$...$$ num bloco para uma fórmula em destaque. O $ é só para fórmula: dinheiro se escreve normalmente, como R$ 20 ou US$ 3 (o app não confunde com fórmula).
 - Dentro do JSON, as quebras de linha vão como \n e a barra invertida do LaTeX vai dobrada ("$\\frac{a}{b}$"), como manda o JSON.
 - Escreva tudo em português do Brasil, a menos que o termo técnico seja usado normalmente em outra língua.
 
-Responda só com o JSON abaixo, sem texto antes ou depois e sem comentários: um objeto com "bloco", no mesmo formato de um bloco da lição, do mesmo tipo do bloco atual. Um dos quatro formatos:
+Responda só com o JSON abaixo, sem texto antes ou depois e sem comentários: um objeto com "bloco", no mesmo formato de um bloco da lição, do mesmo tipo do bloco atual. Um dos cinco formatos:
 
 {"bloco": {"tipo": "explicacao", "conceitos": ["<id>"], "formato": "exemplo_resolvido", "texto": "…markdown…", "referencias": [{"arquivo": "…", "local": "…"}]}}
 
 {"bloco": {"tipo": "verificacao", "conceitos": ["<id>"], "pergunta": "…?", "respostaEsperada": "…"}}
+
+{"bloco": {"tipo": "ideia_central", "conceitos": ["<id>"], "texto": "…"}}
 
 {"bloco": {"tipo": "alternativa", "conceitos": ["<id>"], "contexto": "…", "enunciado": "…?", "alternativas": [
   {"texto": "…", "confusao": "Confunde … com …."},
@@ -85,4 +75,4 @@ Responda só com o JSON abaixo, sem texto antes ou depois e sem comentários: um
   {"criterio": "…", "descricao": "…", "pontos": 2}
 ], "respostaModelo": "…", "referencias": []}}
 
-"formato" é um de "conceito", "exemplo_resolvido", "exemplo_incompleto" ou "problema_aberto". "complemento" só aparece (true) na explicação que vai além do material. "enunciado" é obrigatório em toda questão; "contexto" é opcional. A alternativa correta leva só "texto" e "correta": true; cada errada leva "texto" e "confusao".
+"formato" é um de "introducao", "conceito", "exemplo_resolvido", "exemplo_incompleto" ou "problema_aberto". "complemento" só aparece (true) na explicação que vai além do material. "enunciado" é obrigatório em toda questão; "contexto" é opcional. A alternativa correta leva só "texto" e "correta": true; cada errada leva "texto" e "confusao".

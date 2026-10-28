@@ -10,9 +10,15 @@
 //   (os avisos "materiais:pronto", ou a varredura dos materiais prontos), faz
 //   o plano (../prompts/modulo-plano.md) e depois uma chamada por lição
 //   (../prompts/modulo-licao.md), em sequência, pelo ctx.modelRegistry do pi,
-//   como o diagnóstico e o esqueleto (extensions/cursos.ts): as chamadas vão
-//   fora da trava, com uma nova tentativa se a resposta não vier no formato
-//   (validarPlano, validarLicao), e o módulo é gravado dentro dela
+//   como o diagnóstico e o esqueleto (extensions/cursos.ts). O system prompt
+//   de cada chamada é o prompt e, depois dele, os arquivos da metodologia
+//   (../metodo/, docs/modulos.md, "A metodologia em arquivos"): o plano leva a
+//   estrutura da lição; cada lição, os de arquivosDeMetodo(roteiro); a
+//   reescrita, o do tipo do bloco. As chamadas vão fora da trava, com uma nova
+//   tentativa se a resposta não vier no formato, se o plano precisou de
+//   conserto (conferirPlano: a nova tentativa leva os consertos; depois, vale
+//   o consertado) ou se a lição não segue o esquema (validarLicao, com as
+//   frases de problemasDaLicao; depois, o erro), e o módulo é gravado dentro dela
 //   (gravarModuloGerado), substituindo a versão anterior só no fim. Uma
 //   geração por curso de cada vez; cancelar para a geração e o que estava
 //   gravado fica;
@@ -27,8 +33,9 @@
 //   "erro", gravar: false), com uma trava só para tudo que lê e grava o
 //   aprendiz/escrita.json (esta extensão é a única que grava nele); no painel
 //   "modulos", o retorno em cada bloco (o evento avaliou_bloco e, com
-//   virarRegra, a regra) e a reescrita de um bloco (../prompts/modulo-bloco.md,
-//   fora da trava, com a nova tentativa; uma operação por curso de cada vez,
+//   virarRegra, a regra) e a reescrita de um bloco (../prompts/modulo-bloco.md
+//   com o arquivo da metodologia do tipo do bloco, fora da trava, com a nova
+//   tentativa; uma operação por curso de cada vez,
 //   junto das gerações). As regras que valem para a matéria entram nas
 //   mensagens do plano, das lições e da reescrita do bloco.
 import { readFile, stat } from "node:fs/promises";
@@ -65,7 +72,14 @@ import { ErroMapa, lerMapa, PAINEL_MAPA } from "../lib/mapa.ts";
 import { arquivoMateria, ErroMaterias, eventosAprendiz, eventosMateria } from "../lib/materias.ts";
 import {
 	type AcoesModulos,
+	ARQUIVO_ESTRUTURA_LICAO,
+	arquivoDeMetodo,
+	arquivosDeMetodo,
 	type Bloco,
+	type ConsertoPlano,
+	conferirPlano,
+	itemDoRoteiro,
+	roteiroDaLicao,
 	type ModuloGerado,
 	validarBloco,
 	versaoDoBloco,
@@ -93,9 +107,8 @@ import {
 	gravarModuloGerado,
 	marcarAguardando,
 	validarLicao,
-	validarPlano,
 } from "../lib/modulos.ts";
-import { hashDoPrompt, pedirJson, type RegistroCursos } from "./cursos.ts";
+import { hashDoPrompt, instrucoesComMetodo, lerMetodo, type MetodoLido, PASTA_METODO, PedirDeNovo, pedirJson, type RegistroCursos, usadoComMetodo } from "./cursos.ts";
 import { arquivoDoAviso, lerPromptMapeador } from "./mapa.ts";
 import { materiaDaConversa } from "./notas.ts";
 
@@ -248,6 +261,7 @@ const NOMES_FORMATO: Record<FormatoExplicacao, string> = {
 	exemplo_incompleto: "exemplo com passos para completar",
 	problema_aberto: "problema aberto",
 	conceito: "apresentação do conceito",
+	introducao: "introdução: o contexto do tema",
 };
 
 /** 7, 6,5: o número com vírgula, para os textos. */
@@ -278,7 +292,7 @@ function linhasDoConceito(conceito: ConceitoDoModulo): string[] {
 		`Nome: ${conceito.nome}`,
 		`Descrição: ${conceito.descricao || "(sem descrição)"}`,
 		`Prioridade: ${conceito.prioridade}`,
-		`Nível do aluno: ${NOMES_NIVEL[conceito.nivel] ?? conceito.nivel} (explicação no formato ${FORMATO_DO_NIVEL[conceito.nivel]}: ${NOMES_FORMATO[FORMATO_DO_NIVEL[conceito.nivel]]})`,
+		`Nível do aluno: ${NOMES_NIVEL[conceito.nivel] ?? conceito.nivel} (exemplo no formato ${FORMATO_DO_NIVEL[conceito.nivel]}: ${NOMES_FORMATO[FORMATO_DO_NIVEL[conceito.nivel]]})`,
 	];
 }
 
@@ -444,6 +458,25 @@ export function mensagemDoBloco(entrada: EntradaBloco, regras = ""): string {
 	].join("\n\n");
 }
 
+/** O que a nova tentativa da lição pede, depois dos problemas (validarLicao). */
+const PEDIDO_DA_LICAO_DE_NOVO =
+	'Escreva a lição de novo, pelo esquema da lição e pela metodologia, corrigindo esses problemas, e responda só com o JSON {"blocos": [...]}, um bloco por item do roteiro, sem nenhum texto antes ou depois.';
+
+/** A mensagem da nova tentativa do plano: os consertos que o código fez (conferirPlano) e o pedido de refazer sem precisar deles. */
+export function mensagemDosConsertos(consertos: readonly ConsertoPlano[]): string {
+	return [
+		"O plano não seguiu tudo o que foi pedido, e o código precisou consertar:",
+		...consertos.map((conserto) => `- ${conserto.mensagem}`),
+		'Refaça o plano já seguindo o pedido e a estrutura da lição, para nada precisar de conserto, e responda só com o JSON {"licoes": [...]}, sem nenhum texto antes ou depois.',
+	].join("\n");
+}
+
+/** Os arquivos da metodologia usados, sem repetir, na ordem em que apareceram (para o contexto do gerou_modulo). */
+function metodoUsado(lidos: readonly MetodoLido[]) {
+	const vistos = new Set<string>();
+	return lidos.flatMap((item) => (vistos.has(item.usado.nome) ? [] : (vistos.add(item.usado.nome), [item.usado])));
+}
+
 // --- Texto para o professor ----------------------------------------------------
 
 const NOMES_TIPO_BLOCO: Record<Bloco["tipo"], string> = {
@@ -451,6 +484,7 @@ const NOMES_TIPO_BLOCO: Record<Bloco["tipo"], string> = {
 	verificacao: "Verificação",
 	alternativa: "Questão de alternativa",
 	dissertativa: "Questão dissertativa",
+	ideia_central: "Ideia central",
 };
 
 const LETRAS = "ABCDEFGHIJ";
@@ -461,7 +495,7 @@ function linhasDoBloco(bloco: Bloco, nomeDe: (id: string) => string, comGabarito
 	if (bloco.tipo === "explicacao") extras.push(NOMES_FORMATO[bloco.formato] ?? bloco.formato, ...(bloco.complemento ? ["complemento: vai além do material"] : []));
 	const linhas = [`### ${bloco.id} · ${NOMES_TIPO_BLOCO[bloco.tipo]}${extras.length ? ` (${extras.join("; ")})` : ""}`, `Conceitos: ${bloco.conceitos.map(nomeDe).join(", ")}.`];
 	const referencias = "referencias" in bloco ? bloco.referencias : [];
-	if (bloco.tipo === "explicacao") linhas.push("", bloco.texto);
+	if (bloco.tipo === "explicacao" || bloco.tipo === "ideia_central") linhas.push("", bloco.texto);
 	else if (bloco.tipo === "verificacao") {
 		linhas.push(`Pergunta: ${bloco.pergunta}`);
 		if (comGabarito) linhas.push(`Resposta esperada: ${bloco.respostaEsperada}`);
@@ -527,6 +561,8 @@ export interface OpcoesModulos {
 	caminhoPromptLicao?: string;
 	/** O modulo-bloco.md (nos testes, um prompt de mentira). */
 	caminhoPromptBloco?: string;
+	/** A pasta da metodologia (nos testes, arquivos de mentira). */
+	pastaMetodo?: string;
 	/** Quanto esperar os materiais do formulário (nos testes, pouco). */
 	tempoEsperaMateriaisMs?: number;
 	/** De quanto em quanto tempo conferir os materiais prontos durante a espera. */
@@ -603,6 +639,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 	const caminhoPlano = opcoes.caminhoPromptPlano ?? CAMINHO_PROMPT_PLANO;
 	const caminhoLicao = opcoes.caminhoPromptLicao ?? CAMINHO_PROMPT_LICAO;
 	const caminhoBloco = opcoes.caminhoPromptBloco ?? CAMINHO_PROMPT_BLOCO;
+	const pastaMetodo = opcoes.pastaMetodo ?? PASTA_METODO;
 	const tempoEspera = opcoes.tempoEsperaMateriaisMs ?? TEMPO_ESPERA_MATERIAIS_MS;
 	const intervalo = opcoes.intervaloVarreduraMs ?? INTERVALO_VARREDURA_MS;
 	let pastaDados: string | undefined;
@@ -928,6 +965,8 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 		try {
 			const promptPlano = await lerPrompt(caminhoPlano);
 			const promptLicao = await lerPrompt(caminhoLicao);
+			// A estrutura da lição, que o plano carrega (os arquivos das lições são lidos depois do plano, pelos roteiros).
+			const metodoPlano = await lerMetodo(pastaMetodo, [ARQUIVO_ESTRUTURA_LICAO]);
 			if (!registro) throw new ErroModulo("A sessão não tem o registro de modelos do pi; não dá para chamar o modelo dos módulos.");
 			const modeloPlano = resolverModelo(registro, promptPlano.modelo, "do plano do módulo");
 			const modeloLicao = resolverModelo(registro, promptLicao.modelo, "das lições do módulo");
@@ -978,9 +1017,19 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 			const plano = await pedirJson(
 				registro,
 				modeloPlano,
-				promptPlano.instrucoes,
+				instrucoesComMetodo(promptPlano.instrucoes, metodoPlano),
 				mensagemDoPlano(entrada.plano, regras),
-				(texto) => validarPlano(objetoJsonDoModelo(texto), { conceitosDoModulo: entrada.plano.conceitos.map((conceito) => conceito.id), licoes: entrada.plano.licoes, tipo: entrada.plano.curso.tipo }),
+				(texto, tentativa) => {
+					const conferido = conferirPlano(objetoJsonDoModelo(texto), {
+						conceitosDoModulo: entrada.plano.conceitos.map((conceito) => conceito.id),
+						licoes: entrada.plano.licoes,
+						tipo: entrada.plano.curso.tipo,
+						niveis: Object.fromEntries(entrada.plano.conceitos.map((conceito) => [conceito.id, conceito.nivel])),
+					});
+					// Com consertos, uma nova tentativa com eles; na segunda, vale o plano consertado.
+					if (conferido.consertos.length > 0 && tentativa === 1) throw new PedirDeNovo(mensagemDosConsertos(conferido.consertos));
+					return conferido.licoes;
+				},
 				sinal,
 				{
 					maxTokens: MAX_TOKENS_PLANO,
@@ -994,6 +1043,12 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 			// As lições: uma chamada por lição, em sequência, cada uma com a nova tentativa do pedirJson.
 			const comLicoes = await entradaDoModelo(dados, materia, curso, modulo, { pedido: doPedido, plano: plano.resultado });
 			const entradas = comLicoes.licoes ?? [];
+			// Os arquivos da metodologia de todas as lições, lidos uma vez (cada lição leva os do roteiro dela).
+			const metodoLicoes = await lerMetodo(pastaMetodo, arquivosDeMetodo(entradas.flatMap((item) => item.licao.roteiro)));
+			const metodoDe = (roteiro: readonly unknown[]) => {
+				const arquivos: readonly string[] = arquivosDeMetodo(roteiro);
+				return metodoLicoes.filter((item) => arquivos.includes(item.arquivo));
+			};
 			const licoes: Licao[] = [];
 			for (const [indice, entradaLicao] of entradas.entries()) {
 				if (sinal.aborted) throw new Cancelado();
@@ -1004,9 +1059,18 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 				const escrita = await pedirJson(
 					registro,
 					modeloLicao,
-					promptLicao.instrucoes,
+					instrucoesComMetodo(promptLicao.instrucoes, metodoDe(entradaLicao.licao.roteiro)),
 					mensagemDaLicao(entradaLicao, regras),
-					(texto) => validarLicao(objetoJsonDoModelo(texto), { licao: entradaLicao.licao, trechos: entradaLicao.referencias, escopo: entradaLicao.curso.escopo }).licao,
+					(texto, tentativa) => {
+						const lido = objetoJsonDoModelo(texto);
+						try {
+							return validarLicao(lido, { licao: entradaLicao.licao, trechos: entradaLicao.referencias, escopo: entradaLicao.curso.escopo }).licao;
+						} catch (erro) {
+							// Fora do esquema (ou sem explicação ou prática): a nova tentativa leva os problemas; na segunda, o erro como está.
+							if (erro instanceof ErroModulo && tentativa === 1) throw new PedirDeNovo(`${erro.message}\n\n${PEDIDO_DA_LICAO_DE_NOVO}`);
+							throw erro;
+						}
+					},
 					sinal,
 					{
 						maxTokens: MAX_TOKENS_LICAO,
@@ -1029,7 +1093,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 					materia,
 					curso,
 					{ id: modulo, licoes, pedido: doPedido, modelo, custo, materiaisUsados: comLicoes.materiaisUsados },
-					{ ...daSessao(), modelo, prompts: [promptPlano.usado, promptLicao.usado] },
+					{ ...daSessao(), modelo, prompts: [promptPlano.usado, promptLicao.usado, ...metodoUsado([...metodoPlano, ...metodoLicoes])] },
 				);
 				await mostrarEstado(dados, materia, curso);
 			});
@@ -1165,7 +1229,9 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 			// A entrada: a lição com só os conceitos do bloco, para os trechos virem deles (como na lição).
 			if (sinal.aborted) throw new Cancelado();
 			const conceitosDoBloco = alvo.bloco.conceitos.filter((id) => alvo.licao.conceitos.includes(id));
-			const naEntrada = { id: alvo.licao.id, titulo: alvo.licao.titulo, objetivo: alvo.licao.objetivo, conceitos: conceitosDoBloco, roteiro: alvo.licao.blocos.map((item) => item.tipo) };
+			const naEntrada = { id: alvo.licao.id, titulo: alvo.licao.titulo, objetivo: alvo.licao.objetivo, conceitos: conceitosDoBloco, roteiro: roteiroDaLicao(alvo.licao) };
+			// O arquivo da metodologia do tipo do bloco (a explicação pelo formato).
+			const metodo = await lerMetodo(pastaMetodo, [arquivoDeMetodo(itemDoRoteiro(alvo.bloco))]);
 			const entrada = await entradaDoModelo(dados, materia, alvo.curso, modulo, { pedido: alvo.modulo.pedido, plano: [naEntrada] });
 			const doBloco = entrada.licoes?.[0];
 			if (!doBloco) throw new ErroModulo("Não consegui montar a entrada da reescrita do bloco.");
@@ -1187,7 +1253,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 			const resposta = await pedirJson(
 				registro,
 				modelo,
-				prompt.instrucoes,
+				instrucoesComMetodo(prompt.instrucoes, metodo),
 				mensagem,
 				(texto) =>
 					validarBloco(objetoJsonDoModelo(texto), {
@@ -1216,7 +1282,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 					licao,
 					bloco,
 					resposta.resultado,
-					{ retornoId, modelo: prompt.modelo, prompt: prompt.usado, custo: resposta.custo },
+					{ retornoId, modelo: prompt.modelo, prompt: usadoComMetodo(prompt.usado, metodo), custo: resposta.custo },
 					daSessao(),
 				);
 				mostrar("modulo", { materia, curso, modulo: novo });

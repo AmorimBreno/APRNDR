@@ -17,7 +17,7 @@ import { arquivoEscrita, lerEscrita, type RegraEscrita, salvarRegra } from "../l
 import { lerEventos } from "../lib/eventos.ts";
 import { type Conceito, gravarMapa, lerMapa, mapaVazio, pastaExtraidoArquivo } from "../lib/mapa.ts";
 import { criarMateria, eventosAprendiz, eventosMateria } from "../lib/materias.ts";
-import { caminhoDoModulo, type EstadoModuloNaTela, lerModulo, type ModuloGerado } from "../lib/modulos.ts";
+import { caminhoDoModulo, type EstadoModuloNaTela, lerModulo, MINIMO_CARACTERES_EXEMPLO, type ModuloGerado } from "../lib/modulos.ts";
 import { hashDoPrompt } from "./cursos.ts";
 import modulos, { type MensagemEstado, type OpcoesModulos } from "./modulos.ts";
 
@@ -229,11 +229,13 @@ const textoDaChamada = (pedido: Pedido) => {
 
 const PLANO_M1 = JSON.stringify({
 	licoes: [
-		{ titulo: "Contando termos", objetivo: "Calcular o TF.", conceitos: ["c-tf"], roteiro: ["explicacao", "verificacao", "explicacao", "alternativa"] },
-		{ titulo: "Termos raros pesam mais", objetivo: "Calcular o IDF.", conceitos: ["c-idf"], roteiro: ["explicacao", "dissertativa"] },
+		{ titulo: "Contando termos", objetivo: "Calcular o TF.", conceitos: ["c-tf"], roteiro: ["introducao", "conceito", "verificacao", "exemplo_resolvido", "ideia_central", "alternativa"] },
+		{ titulo: "Termos raros pesam mais", objetivo: "Calcular o IDF.", conceitos: ["c-idf"], roteiro: ["introducao", "conceito", "exemplo_incompleto", "ideia_central", "dissertativa"] },
 	],
 });
-const explicacao = (conceitoId: string, formato: string, local: string) => ({ tipo: "explicacao", conceitos: [conceitoId], formato, texto: `Texto sobre ${conceitoId}.`, referencias: [{ arquivo: "aula.pdf", local }] });
+/** Uma explicação acima do mínimo de caracteres do formato (o esquema da lição). */
+const explicacao = (conceitoId: string, formato: string, local: string) => ({ tipo: "explicacao", conceitos: [conceitoId], formato, texto: `Texto sobre ${conceitoId}. ${"x".repeat(MINIMO_CARACTERES_EXEMPLO)}`, referencias: [{ arquivo: "aula.pdf", local }] });
+const ideiaCentral = (conceitoId: string) => ({ tipo: "ideia_central", conceitos: [conceitoId], texto: `Guarde o essencial de ${conceitoId}.` });
 const alternativa = (conceitoId: string) => ({
 	tipo: "alternativa",
 	conceitos: [conceitoId],
@@ -262,13 +264,17 @@ const dissertativa = (conceitoId: string) => ({
 });
 const LICAO_1 = JSON.stringify({
 	blocos: [
+		explicacao("c-tf", "introducao", "página 1"),
 		explicacao("c-tf", "conceito", "página 1"),
 		{ tipo: "verificacao", conceitos: ["c-tf"], pergunta: "O que o TF conta?", respostaEsperada: "As ocorrências do termo no documento." },
 		explicacao("c-tf", "exemplo_resolvido", "página 1"),
+		ideiaCentral("c-tf"),
 		alternativa("c-tf"),
 	],
 });
-const LICAO_2 = JSON.stringify({ blocos: [explicacao("c-idf", "exemplo_incompleto", "página 2"), dissertativa("c-idf")] });
+const LICAO_2 = JSON.stringify({
+	blocos: [explicacao("c-idf", "introducao", "página 2"), explicacao("c-idf", "conceito", "página 2"), explicacao("c-idf", "exemplo_incompleto", "página 2"), ideiaCentral("c-idf"), dissertativa("c-idf")],
+});
 /** Uma lição sem prática que valha (validarLicao pede a nova tentativa). */
 const LICAO_SEM_PRATICA = JSON.stringify({ blocos: [explicacao("c-tf", "conceito", "página 1")] });
 
@@ -330,13 +336,13 @@ describe("ponte", () => {
 		expect(gravado.custo).toBeCloseTo(0.03);
 		expect(gravado.pedido).toMatchObject({ informacoes: "Foco no IDF." });
 		expect(gravado.licoes.map((licao) => licao.blocos.map((bloco) => bloco.id))).toEqual([
-			["l1-b1", "l1-b2", "l1-b3", "l1-b4"],
-			["l2-b1", "l2-b2"],
+			["l1-b1", "l1-b2", "l1-b3", "l1-b4", "l1-b5", "l1-b6"],
+			["l2-b1", "l2-b2", "l2-b3", "l2-b4", "l2-b5"],
 		]);
-		expect(gravado.licoes[0]!.blocos[0]).toMatchObject({ formato: "conceito", referencias: [ref(1)] });
+		expect(gravado.licoes[0]!.blocos[0]).toMatchObject({ formato: "introducao", referencias: [ref(1)] });
 
 		const fim = doModulo(ultimo(), "m1")!;
-		expect(fim).toMatchObject({ situacao: "gerado", licoesGeradas: 2, blocos: 6, questoes: 2, geradoEm: gravado.geradoEm, concluido: false });
+		expect(fim).toMatchObject({ situacao: "gerado", licoesGeradas: 2, blocos: 11, questoes: 2, geradoEm: gravado.geradoEm, concluido: false });
 		expect(fim.concluidoEm).toBeUndefined();
 		// Gerado e não concluído, m1 continua o recomendado.
 		expect(ultimo()!.proximo).toBe("m1");
@@ -346,7 +352,7 @@ describe("ponte", () => {
 		expect(eventos[0]).toMatchObject({
 			sessao: "sessao-1",
 			objeto: { materia, curso: CURSO, modulo: "m1" },
-			resultado: { licoes: 2, blocos: 6, questoes: 2 },
+			resultado: { licoes: 2, blocos: 11, questoes: 2 },
 			contexto: {
 				modelo: "teste/modelo-x",
 				prompts: [
@@ -401,8 +407,10 @@ describe("ponte", () => {
 
 	it("qualquer módulo pode ser gerado, fora de ordem", async () => {
 		respostas.push(
-			JSON.stringify({ licoes: [{ titulo: "Cosseno", objetivo: "Comparar.", conceitos: ["c-cos"], roteiro: ["explicacao", "alternativa"] }] }),
-			JSON.stringify({ blocos: [explicacao("c-cos", "problema_aberto", "página 3"), alternativa("c-cos")] }),
+			JSON.stringify({ licoes: [{ titulo: "Cosseno", objetivo: "Comparar.", conceitos: ["c-cos"], roteiro: ["introducao", "conceito", "problema_aberto", "ideia_central", "alternativa"] }] }),
+			JSON.stringify({
+				blocos: [explicacao("c-cos", "introducao", "página 3"), explicacao("c-cos", "conceito", "página 3"), explicacao("c-cos", "problema_aberto", "página 3"), ideiaCentral("c-cos"), alternativa("c-cos")],
+			}),
 		);
 		acao("gerar", { modulo: "m2", pedido: "p-m2" });
 		await respondeu("p-m2");
@@ -665,7 +673,7 @@ describe("ler_modulo", () => {
 		expect(sem).toContain("# Módulo m1: Pesos dos termos");
 		expect(sem).toContain(", ainda não concluído;");
 		expect(sem).toContain("## Lição l1: Contando termos");
-		expect(sem).toContain("### l1-b1 · Explicação (apresentação do conceito)");
+		expect(sem).toContain("### l1-b2 · Explicação (apresentação do conceito)");
 		expect(sem).toContain("Texto sobre c-tf.");
 		expect(sem).toContain("Conceitos: Frequência do termo.");
 		expect(sem).toContain("Pergunta: O que o TF conta?");
@@ -794,7 +802,7 @@ describe("painel escrita", () => {
 
 /** Um bloco de explicação reescrito pelo modelo falso. */
 const EXPLICACAO_NOVA = JSON.stringify({
-	bloco: { tipo: "explicacao", conceitos: ["c-tf"], formato: "exemplo_resolvido", texto: 'No documento "a a b", o termo a aparece 2 vezes: TF = 2.', referencias: [{ arquivo: "aula.pdf", local: "página 1" }] },
+	bloco: { tipo: "explicacao", conceitos: ["c-tf"], formato: "exemplo_resolvido", texto: `No documento "a a b", o termo a aparece 2 vezes: TF = 2. ${"x".repeat(MINIMO_CARACTERES_EXEMPLO)}`, referencias: [{ arquivo: "aula.pdf", local: "página 1" }] },
 });
 
 const retornoDe = (pedido: string) => (comPedido(pedido).find((mensagem) => mensagem.acao === "estado")?.dados as unknown as MensagemEstado | undefined)?.retorno;
@@ -875,8 +883,8 @@ describe("retorno e reescrita do bloco", () => {
 		expect(mensagem).toContain("### l1-b1 · Explicação (posição 1): ESTE É O BLOCO A REESCREVER");
 		expect(mensagem).toContain("Pergunta: O que o TF conta?");
 		expect(mensagem).toContain("Resposta esperada: As ocorrências do termo no documento.");
-		expect(mensagem).toContain("Bloco a reescrever: l1-b1, do tipo explicacao, posição 1 de 4, versão 1.");
-		expect(mensagem).toContain('"texto": "Texto sobre c-tf."');
+		expect(mensagem).toContain("Bloco a reescrever: l1-b1, do tipo explicacao, posição 1 de 6, versão 1.");
+		expect(mensagem).toContain('"texto": "Texto sobre c-tf. x');
 		expect(mensagem).not.toContain('"id": "l1-b1"');
 		expect(mensagem).toContain("Avaliação: Precisa melhorar\nMotivos: Longo demais (longo); Abstrato demais (abstrato)\nTexto do aluno: Muito texto antes do exemplo.");
 		expect(mensagem).toContain("Nível do aluno: iniciante");

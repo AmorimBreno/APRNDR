@@ -27,7 +27,7 @@ import {
 } from "./escrita.ts";
 import { lerEventos } from "./eventos.ts";
 import { eventosAprendiz } from "./materias.ts";
-import { caminhoDoModulo, ErroModulo, type Licao, lerModulo, type ModuloGerado, validarBloco, validarLicao, versaoDoBloco } from "./modulos.ts";
+import { type Bloco, caminhoDoModulo, ErroModulo, type Licao, lerModulo, MINIMO_CARACTERES_EXEMPLO, type ModuloGerado, validarBloco, versaoDoBloco } from "./modulos.ts";
 
 const AGORA = new Date("2026-10-28T13:00:00.000Z");
 const DEPOIS = new Date("2026-10-28T14:00:00.000Z");
@@ -135,8 +135,10 @@ const TRECHOS = [
 	{ arquivo: "aula.pdf", local: "página 1", trecho: "pagina-1" },
 	{ arquivo: "aula.pdf", local: "página 2", trecho: "pagina-2" },
 ];
+/** Um texto de explicação acima do mínimo do formato (MINIMO_CARACTERES_EXEMPLO). */
+const longo = (comeco: string) => `${comeco} ${"x".repeat(MINIMO_CARACTERES_EXEMPLO)}`;
 const LICAO = { id: "l1", titulo: "A reta", objetivo: "", conceitos: ["c-a", "c-b"] };
-const explicacao = (extra: Record<string, unknown> = {}) => ({ tipo: "explicacao", conceitos: ["c-a"], formato: "exemplo_resolvido", texto: "Um **exemplo**.", referencias: [{ arquivo: "aula.pdf", local: "página 1" }], ...extra });
+const explicacao = (extra: Record<string, unknown> = {}) => ({ tipo: "explicacao", conceitos: ["c-a"], formato: "exemplo_resolvido", texto: longo("Um **exemplo**."), referencias: [{ arquivo: "aula.pdf", local: "página 1" }], ...extra });
 const questaoAlternativa = (extra: Record<string, unknown> = {}) => ({
 	tipo: "alternativa",
 	conceitos: ["c-a"],
@@ -146,7 +148,14 @@ const questaoAlternativa = (extra: Record<string, unknown> = {}) => ({
 	referencias: [],
 	...extra,
 });
-const umaLicao = (): Licao => validarLicao({ blocos: [explicacao(), questaoAlternativa()] }, { licao: LICAO, trechos: TRECHOS, escopo: "so_material" }).licao;
+/** Uma lição com uma explicação e um quiz, montada direto (como as gravadas antes do esquema da lição, que continuam válidas para ler). */
+const umaLicao = (): Licao => ({
+	...LICAO,
+	blocos: [
+		{ id: "l1-b1", ...validarBloco(explicacao(), { licao: LICAO, trechos: TRECHOS, escopo: "so_material", tipo: "explicacao" }) } as Bloco,
+		{ id: "l1-b2", ...validarBloco(questaoAlternativa(), { licao: LICAO, trechos: TRECHOS, escopo: "so_material", tipo: "alternativa" }) } as Bloco,
+	],
+});
 const moduloGerado = (materia: string, curso: string): ModuloGerado => ({
 	versao: 1,
 	id: "m1",
@@ -165,7 +174,7 @@ describe("validarBloco", () => {
 
 	it("confere pelas regras da lição: conceitos da lição, referências dos trechos, complemento; solto ou em {bloco}", () => {
 		const bloco = validarBloco(explicacao({ conceitos: ["c-a", "c-z"], formato: "conceito", referencias: [{ arquivo: "aula.pdf", local: "página 2" }, { arquivo: "aula.pdf", local: "página 9" }] }), opcoes);
-		expect(bloco).toEqual({ tipo: "explicacao", conceitos: ["c-a"], formato: "conceito", texto: "Um **exemplo**.", referencias: [TRECHOS[1]] });
+		expect(bloco).toEqual({ tipo: "explicacao", conceitos: ["c-a"], formato: "conceito", texto: longo("Um **exemplo**."), referencias: [TRECHOS[1]] });
 		expect(validarBloco({ bloco: explicacao({ referencias: [] }) }, opcoes)).toMatchObject({ complemento: true, referencias: [] });
 		expect(validarBloco(questaoAlternativa(), { ...opcoes, tipo: "alternativa" })).toMatchObject({ tipo: "alternativa", enunciado: "Qual?" });
 	});
@@ -180,7 +189,7 @@ describe("validarBloco", () => {
 });
 
 describe("substituirBloco", () => {
-	const novo = (texto = "Mais curto.") => validarBloco(explicacao({ texto, formato: "conceito" }), { licao: LICAO, trechos: TRECHOS, escopo: "so_material", tipo: "explicacao" });
+	const novo = (texto = "Mais curto.") => validarBloco(explicacao({ texto: longo(texto), formato: "conceito" }), { licao: LICAO, trechos: TRECHOS, escopo: "so_material", tipo: "explicacao" });
 
 	it("o novo no lugar com versao + 1 e reescritoEm; o antigo em anteriores; o id fica; o recebido não muda", () => {
 		const modulo = moduloGerado("calc", "p1");
@@ -190,20 +199,20 @@ describe("substituirBloco", () => {
 		const trocado = substituirBloco(modulo, "l1", "l1-b1", novo(), { retornoId: "ev-1", agora: DEPOIS });
 		expect(modulo).toEqual(antes);
 		const bloco = trocado.licoes[0]!.blocos[0]!;
-		expect(bloco).toMatchObject({ id: "l1-b1", tipo: "explicacao", texto: "Mais curto.", formato: "conceito", versao: 2, reescritoEm: DEPOIS.toISOString() });
+		expect(bloco).toMatchObject({ id: "l1-b1", tipo: "explicacao", texto: longo("Mais curto."), formato: "conceito", versao: 2, reescritoEm: DEPOIS.toISOString() });
 		expect(bloco.anteriores).toEqual([{ ...antigo, versao: 1, substituidoEm: DEPOIS.toISOString(), retorno: "ev-1" }]);
 		expect(trocado.licoes[0]!.blocos[1]).toEqual(modulo.licoes[0]!.blocos[1]);
 		expect(trocado.licoes[0]!.blocos).toHaveLength(2);
 
 		const outra = substituirBloco(trocado, "l1", "l1-b1", novo("Terceira."), { retornoId: "ev-2", agora: MAIS_DEPOIS });
 		const terceira = outra.licoes[0]!.blocos[0]!;
-		expect(terceira).toMatchObject({ id: "l1-b1", texto: "Terceira.", versao: 3, reescritoEm: MAIS_DEPOIS.toISOString() });
+		expect(terceira).toMatchObject({ id: "l1-b1", texto: longo("Terceira."), versao: 3, reescritoEm: MAIS_DEPOIS.toISOString() });
 		expect(terceira.anteriores!.map((item) => [item.versao, item.retorno])).toEqual([
 			[1, "ev-1"],
 			[2, "ev-2"],
 		]);
 		expect(terceira.anteriores![1]).not.toHaveProperty("anteriores");
-		expect(terceira.anteriores![1]).toMatchObject({ texto: "Mais curto.", reescritoEm: DEPOIS.toISOString(), substituidoEm: MAIS_DEPOIS.toISOString() });
+		expect(terceira.anteriores![1]).toMatchObject({ texto: longo("Mais curto."), reescritoEm: DEPOIS.toISOString(), substituidoEm: MAIS_DEPOIS.toISOString() });
 	});
 
 	it("o id e os campos de versão do novo são ignorados", () => {
@@ -368,7 +377,7 @@ describe("no disco", () => {
 		await writeFile(arquivo, `${JSON.stringify(modulo, null, "\t")}\n`, "utf8");
 	}
 
-	const novoBloco = (texto: string) => validarBloco(explicacao({ texto }), { licao: LICAO, trechos: TRECHOS, escopo: "so_material", tipo: "explicacao" });
+	const novoBloco = (texto: string) => validarBloco(explicacao({ texto: longo(texto) }), { licao: LICAO, trechos: TRECHOS, escopo: "so_material", tipo: "explicacao" });
 	const reescrita = (retornoId: string) => ({ retornoId, modelo: MODELO, prompt: { nome: "modulo-bloco.md", hash: "def" }, custo: 0.01 });
 
 	it("gravarBlocoReescrito: o módulo gravado com as versões e o reescreveu_bloco", async () => {
@@ -381,13 +390,13 @@ describe("no disco", () => {
 		const gravado = await gravarBlocoReescrito(dados, MATERIA, CURSO, "m1", "l1", "l1-b1", novoBloco("Versão 2."), reescrita("ev-1"), { agora: DEPOIS, sessao: "s2" });
 		expect(await lerModulo(dados, MATERIA, CURSO, "m1")).toEqual(gravado);
 		const bloco = gravado.licoes[0]!.blocos[0]!;
-		expect(bloco).toMatchObject({ id: "l1-b1", texto: "Versão 2.", versao: 2, reescritoEm: DEPOIS.toISOString() });
+		expect(bloco).toMatchObject({ id: "l1-b1", texto: longo("Versão 2."), versao: 2, reescritoEm: DEPOIS.toISOString() });
 		expect(bloco.anteriores).toEqual([{ ...original.licoes[0]!.blocos[0]!, versao: 1, substituidoEm: DEPOIS.toISOString(), retorno: "ev-1" }]);
 		expect(gravado).toMatchObject({ custo: 0.12, geradoEm: AGORA.toISOString(), modelo: MODELO });
 
 		await gravarBlocoReescrito(dados, MATERIA, CURSO, "m1", "l1", "l1-b1", novoBloco("Versão 3."), reescrita("ev-2"), { agora: MAIS_DEPOIS });
 		const final = (await lerModulo(dados, MATERIA, CURSO, "m1")) as ModuloGerado;
-		expect(final.licoes[0]!.blocos[0]).toMatchObject({ texto: "Versão 3.", versao: 3 });
+		expect(final.licoes[0]!.blocos[0]).toMatchObject({ texto: longo("Versão 3."), versao: 3 });
 		expect(final.licoes[0]!.blocos[0]!.anteriores!.map((item) => item.versao)).toEqual([1, 2]);
 
 		const eventos = await doAprendiz();

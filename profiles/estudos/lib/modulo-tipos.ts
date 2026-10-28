@@ -47,32 +47,67 @@ export const NIVEIS_CONCEITO = ["iniciante", "intermediario", "domina"] as const
 export type NivelConceito = (typeof NIVEIS_CONCEITO)[number];
 
 /**
- * O formato de uma explicação (ESPECIFICACAO 9.1): exemplo_resolvido
- * (iniciante), exemplo_incompleto (intermediário: passos para completar),
- * problema_aberto (domina) ou conceito (a apresentação, antes do exemplo).
+ * O formato de uma explicação (ESPECIFICACAO 9.1 e docs/modulos.md, "O
+ * esquema da lição"): exemplo_resolvido (iniciante), exemplo_incompleto
+ * (intermediário: passos para completar), problema_aberto (domina), conceito
+ * (a teoria, com o porquê, antes do exemplo) ou introducao (o contexto do
+ * tema: sempre o primeiro bloco da lição). As lições gravadas antes do
+ * esquema não têm introdução.
  */
-export const FORMATOS_EXPLICACAO = ["exemplo_resolvido", "exemplo_incompleto", "problema_aberto", "conceito"] as const;
+export const FORMATOS_EXPLICACAO = ["exemplo_resolvido", "exemplo_incompleto", "problema_aberto", "conceito", "introducao"] as const;
 export type FormatoExplicacao = (typeof FORMATOS_EXPLICACAO)[number];
 
+/** Os formatos de explicação que são exemplo (o conceito aplicado; o formato sai do nível). */
+export const FORMATOS_EXEMPLO = ["exemplo_resolvido", "exemplo_incompleto", "problema_aberto"] as const satisfies readonly FormatoExplicacao[];
+export type FormatoExemplo = (typeof FORMATOS_EXEMPLO)[number];
+
+/** O mínimo de caracteres (o texto aparado) de uma introdução, de um conceito e de um exemplo (docs/modulos.md, "O esquema da lição"). */
+export const MINIMO_CARACTERES_INTRODUCAO = 600;
+export const MINIMO_CARACTERES_CONCEITO = 900;
+export const MINIMO_CARACTERES_EXEMPLO = 900;
+
+/** A parte mínima dos caracteres da lição que fica nas explicações e na ideia central (caracteresDaLicao). */
+export const PROPORCAO_MINIMA_EXPLICACAO = 0.7;
+
+/** De quantas frases é a ideia central (frasesDoTexto). */
+export const MINIMO_FRASES_IDEIA_CENTRAL = 1;
+export const MAXIMO_FRASES_IDEIA_CENTRAL = 3;
+
 /** O formato do exemplo que cada nível pede (9.1). */
-export const FORMATO_DO_NIVEL: Record<NivelConceito, FormatoExplicacao> = {
+export const FORMATO_DO_NIVEL: Record<NivelConceito, FormatoExemplo> = {
 	iniciante: "exemplo_resolvido",
 	intermediario: "exemplo_incompleto",
 	domina: "problema_aberto",
 };
 
-/** Os tipos de bloco de uma lição, na ordem do roteiro do plano. */
-export const TIPOS_BLOCO = ["explicacao", "verificacao", "alternativa", "dissertativa"] as const;
+/** Os tipos de bloco de uma lição. */
+export const TIPOS_BLOCO = ["explicacao", "verificacao", "alternativa", "dissertativa", "ideia_central"] as const;
 export type TipoBloco = (typeof TIPOS_BLOCO)[number];
 
-/** Os tipos de bloco que contam como prática (tudo o que não é explicação). */
+/** Os tipos de bloco que contam como prática: as questões (pergunta, quiz e dissertativa). A explicação e a ideia central não são. */
 export const TIPOS_PRATICA = ["verificacao", "alternativa", "dissertativa"] as const satisfies readonly TipoBloco[];
 export type TipoPratica = (typeof TIPOS_PRATICA)[number];
 
+/**
+ * Um item do roteiro de uma lição no plano: a explicação pelo formato
+ * (introducao, conceito, exemplo_resolvido…) e os outros blocos pelo tipo.
+ */
+export const ITENS_ROTEIRO = [...FORMATOS_EXPLICACAO, "verificacao", "alternativa", "dissertativa", "ideia_central"] as const;
+export type ItemRoteiro = (typeof ITENS_ROTEIRO)[number];
+
 export const ehSituacaoModulo = (valor: unknown): valor is SituacaoModulo => (SITUACOES_MODULO as readonly unknown[]).includes(valor);
 export const ehFormatoExplicacao = (valor: unknown): valor is FormatoExplicacao => (FORMATOS_EXPLICACAO as readonly unknown[]).includes(valor);
+export const ehFormatoExemplo = (valor: unknown): valor is FormatoExemplo => (FORMATOS_EXEMPLO as readonly unknown[]).includes(valor);
 export const ehTipoBloco = (valor: unknown): valor is TipoBloco => (TIPOS_BLOCO as readonly unknown[]).includes(valor);
 export const ehPratica = (valor: unknown): valor is TipoPratica => (TIPOS_PRATICA as readonly unknown[]).includes(valor);
+export const ehItemRoteiro = (valor: unknown): valor is ItemRoteiro => (ITENS_ROTEIRO as readonly unknown[]).includes(valor);
+
+/** O mínimo de caracteres de uma explicação pelo formato: introdução 600, conceito e exemplos 900. */
+export function minimoDeCaracteres(formato: FormatoExplicacao): number {
+	if (formato === "introducao") return MINIMO_CARACTERES_INTRODUCAO;
+	if (formato === "conceito") return MINIMO_CARACTERES_CONCEITO;
+	return MINIMO_CARACTERES_EXEMPLO;
+}
 
 /** O que o Breno escreveu no formulário "Gerar módulo" (tudo opcional) e os materiais que mandou por ali. */
 export interface PedidoModulo {
@@ -118,6 +153,7 @@ export type BlocoAnterior = (
 	| Omit<BlocoVerificacao, "anteriores">
 	| Omit<BlocoAlternativa, "anteriores">
 	| Omit<BlocoDissertativa, "anteriores">
+	| Omit<BlocoIdeiaCentral, "anteriores">
 ) & {
 	versao: number;
 	/** ISO 8601. */
@@ -160,7 +196,15 @@ export interface BlocoDissertativa extends QuestaoDissertativa, VersoesDoBloco {
 	referencias: Referencia[];
 }
 
-export type Bloco = BlocoExplicacao | BlocoVerificacao | BlocoAlternativa | BlocoDissertativa;
+/** A ideia central da lição (docs/modulos.md, "O esquema da lição"): o que guardar, em 1 a 3 frases, logo antes da questão final. Não é questão. */
+export interface BlocoIdeiaCentral extends VersoesDoBloco {
+	id: string;
+	tipo: "ideia_central";
+	conceitos: string[];
+	texto: string;
+}
+
+export type Bloco = BlocoExplicacao | BlocoVerificacao | BlocoAlternativa | BlocoDissertativa | BlocoIdeiaCentral;
 
 /** A versão do bloco: a gravada, ou 1 (os blocos gerados não têm o campo). */
 export const versaoDoBloco = (bloco: Pick<VersoesDoBloco, "versao">): number =>
@@ -173,7 +217,7 @@ export interface Licao {
 	objetivo: string;
 	/** Os ids dos conceitos do módulo que a lição cobre. */
 	conceitos: string[];
-	/** Na ordem; alterna explicação e prática e termina com prática. */
+	/** Na ordem, pelo esquema da lição (validarLicao). As lições gravadas antes do esquema seguem o formato antigo e continuam válidas para ler. */
 	blocos: Bloco[];
 }
 
@@ -312,8 +356,8 @@ export interface ResultadoPlano {
 		objetivo: string;
 		/** Os ids dos conceitos do módulo que a lição cobre. */
 		conceitos: string[];
-		/** A sequência dos tipos de bloco. */
-		roteiro: TipoBloco[];
+		/** A sequência dos blocos: a explicação pelo formato, os outros pelo tipo (ItemRoteiro). */
+		roteiro: ItemRoteiro[];
 	}>;
 }
 
@@ -330,6 +374,7 @@ export interface ResultadoLicao {
 		conceitos: string[];
 		/** Na explicação. */
 		formato?: FormatoExplicacao;
+		/** Na explicação e na ideia central. */
 		texto?: string;
 		complemento?: boolean;
 		/** Na explicação e nas questões. */
@@ -347,14 +392,51 @@ export interface ResultadoLicao {
 	}>;
 }
 
-/** Uma lição do plano depois de validarPlano: com o id dado pelo código e o roteiro consertado. */
+/** Uma lição do plano depois de validarPlano: com o id dado pelo código e o roteiro consertado pelo esquema da lição. */
 export interface LicaoPlanejada {
 	/** l1, l2… */
 	id: string;
 	titulo: string;
 	objetivo: string;
 	conceitos: string[];
-	roteiro: TipoBloco[];
+	roteiro: ItemRoteiro[];
+}
+
+/**
+ * As regras dos consertos do plano (ConsertoPlano). As do esquema da lição
+ * (REGRAS_DO_ESQUEMA) são as que mudam a ordem dos blocos; as outras são as
+ * de antes do esquema (o que o plano sempre consertou).
+ */
+export type RegraConserto =
+	| "item_desconhecido"
+	| "explicacao_sem_formato"
+	| "introducao"
+	| "questao_antes_do_conceito"
+	| "questoes_seguidas"
+	| "pergunta_fora_do_lugar"
+	| "termina_sem_questao"
+	| "ideia_central"
+	| "licao_sem_conceitos"
+	| "licoes_a_mais"
+	| "conceito_sem_licao"
+	| "dissertativa";
+
+/** As regras de conserto que vêm do esquema da lição (docs/modulos.md, "O esquema da lição"). */
+export const REGRAS_DO_ESQUEMA = [
+	"explicacao_sem_formato",
+	"introducao",
+	"questao_antes_do_conceito",
+	"questoes_seguidas",
+	"pergunta_fora_do_lugar",
+	"termina_sem_questao",
+	"ideia_central",
+] as const satisfies readonly RegraConserto[];
+
+/** Um conserto que validarPlano fez: a lição (o id do plano consertado; null numa lição que saiu ou no plano todo), a regra e a frase. */
+export interface ConsertoPlano {
+	licao: string | null;
+	regra: RegraConserto;
+	mensagem: string;
 }
 
 // --- Funções -------------------------------------------------------------------
@@ -475,6 +557,211 @@ export function niveisDoModulo(diagnostico: DiagnosticoEmAndamento | null | unde
 	return niveisDosConceitos(diagnostico, modulo.conceitos);
 }
 
+// --- O esquema da lição -------------------------------------------------------------------
+
+/** O item do roteiro de um bloco: a explicação pelo formato (sem formato, conceito), os outros pelo tipo. */
+export function itemDoRoteiro(bloco: Pick<Bloco, "tipo"> & { formato?: FormatoExplicacao }): ItemRoteiro {
+	return bloco.tipo === "explicacao" ? (bloco.formato ?? "conceito") : bloco.tipo;
+}
+
+/** O roteiro de uma lição escrita (itemDoRoteiro de cada bloco, na ordem). */
+export function roteiroDaLicao(licao: Pick<Licao, "blocos">): ItemRoteiro[] {
+	return licao.blocos.map(itemDoRoteiro);
+}
+
+/** As regras do esquema que violacoesDoEsquema confere. */
+export type RegraEsquema = "introducao" | "sem_conceito" | "questao_antes_do_conceito" | "questoes_seguidas" | "pergunta_fora_do_lugar" | "ideia_central";
+
+/** Uma regra do esquema que o roteiro não segue, no item `indice` (-1 quando é a lição toda: sem_conceito). */
+export interface ViolacaoEsquema {
+	regra: RegraEsquema;
+	indice: number;
+}
+
+/** A questão final da lição: o último quiz (alternativa) ou dissertativa; sem nenhum, -1. A pergunta (verificacao) não conta. */
+export function indiceDaQuestaoFinal(roteiro: readonly ItemRoteiro[]): number {
+	for (let indice = roteiro.length - 1; indice >= 0; indice--) if (roteiro[indice] === "alternativa" || roteiro[indice] === "dissertativa") return indice;
+	return -1;
+}
+
+/**
+ * Confere um roteiro (o do plano, ou o de uma lição escrita: roteiroDaLicao)
+ * pelo esquema da lição (docs/modulos.md, "O esquema da lição"):
+ * - começa pela introdução (explicação de formato introducao);
+ * - tem um conceito (sem ele, sem_conceito, e as regras das questões não são
+ *   conferidas);
+ * - nenhuma questão (verificacao, alternativa, dissertativa) antes do
+ *   primeiro conceito;
+ * - nunca duas questões seguidas (a ideia central e as explicações separam);
+ * - toda pergunta (verificacao) vem logo depois de um conceito ou de um
+ *   exemplo;
+ * - com quiz ou dissertativa, a ideia central vem logo antes da questão final
+ *   (indiceDaQuestaoFinal).
+ * Cada item que falha aparece uma vez (na primeira regra que falha). Sem
+ * nenhuma, [].
+ */
+export function violacoesDoEsquema(roteiro: readonly ItemRoteiro[]): ViolacaoEsquema[] {
+	const saida: ViolacaoEsquema[] = [];
+	if (roteiro[0] !== "introducao") saida.push({ regra: "introducao", indice: 0 });
+	const primeiro = roteiro.indexOf("conceito");
+	if (primeiro < 0) return [...saida, { regra: "sem_conceito", indice: -1 }];
+	for (const [indice, item] of roteiro.entries()) {
+		if (!ehPratica(item)) continue;
+		const anterior = roteiro[indice - 1];
+		if (indice < primeiro) saida.push({ regra: "questao_antes_do_conceito", indice });
+		else if (ehPratica(anterior)) saida.push({ regra: "questoes_seguidas", indice });
+		else if (item === "verificacao" && anterior !== "conceito" && !ehFormatoExemplo(anterior)) saida.push({ regra: "pergunta_fora_do_lugar", indice });
+	}
+	const final = indiceDaQuestaoFinal(roteiro);
+	if (final >= 0 && roteiro[final - 1] !== "ideia_central") saida.push({ regra: "ideia_central", indice: final });
+	return saida;
+}
+
+/** As frases de um texto: os pedaços separados por ponto, interrogação, exclamação ou reticências seguidos de espaço. Vazio, 0. */
+export function frasesDoTexto(texto: string): number {
+	const limpo = texto.trim();
+	if (!limpo) return 0;
+	return limpo.split(/(?<=[.!?…])\s+/u).filter((pedaco) => pedaco.trim()).length;
+}
+
+/** Os caracteres de uma lição: nas explicações e na ideia central, nas questões, o total e a parte das explicações (de 0 a 1). */
+export interface CaracteresDaLicao {
+	explicacoes: number;
+	questoes: number;
+	total: number;
+	proporcao: number;
+}
+
+/**
+ * Conta os caracteres da lição para a proporção do esquema: as explicações e
+ * a ideia central pelo texto; as questões pelo que o aluno lê antes de
+ * responder (a pergunta da verificação; o contexto, o enunciado e as
+ * alternativas do quiz; o contexto e o enunciado da dissertativa). O
+ * gabarito (resposta esperada, explicação, confusões, rubrica,
+ * resposta-modelo) não conta. Sem caracteres, proporção 0.
+ */
+export function caracteresDaLicao(blocos: readonly (Bloco | BlocoSemId)[]): CaracteresDaLicao {
+	let explicacoes = 0;
+	let questoes = 0;
+	for (const bloco of blocos) {
+		if (bloco.tipo === "explicacao" || bloco.tipo === "ideia_central") explicacoes += bloco.texto.length;
+		else if (bloco.tipo === "verificacao") questoes += bloco.pergunta.length;
+		else {
+			questoes += (bloco.contexto ?? "").length + bloco.enunciado.length;
+			if (bloco.tipo === "alternativa") for (const alternativa of bloco.alternativas) questoes += alternativa.texto.length;
+		}
+	}
+	const total = explicacoes + questoes;
+	return { explicacoes, questoes, total, proporcao: total > 0 ? explicacoes / total : 0 };
+}
+
+/** O que dizer ao modelo para desenvolver uma explicação curta, pelo formato. */
+const DICA_DO_FORMATO = (formato: FormatoExplicacao): string =>
+	formato === "introducao"
+		? "Desenvolva o contexto: o que é o tema, por que importa e onde se usa."
+		: formato === "conceito"
+			? "Desenvolva o porquê e um exemplo."
+			: "Desenvolva o exemplo passo a passo e explique cada passo, não só o código.";
+
+/**
+ * Se a explicação está abaixo do mínimo do formato (minimoDeCaracteres), a
+ * frase para o modelo ("A explicação l2-b3 (conceito) tem 420 caracteres; o
+ * mínimo é 900. Desenvolva o porquê e um exemplo."); senão, undefined. O
+ * `nome` é como o bloco aparece na frase (o id, ou "do bloco reescrito").
+ */
+export function problemaDoTamanho(bloco: Pick<BlocoExplicacao, "formato" | "texto">, nome: string): string | undefined {
+	const minimo = minimoDeCaracteres(bloco.formato);
+	const tamanho = bloco.texto.length;
+	if (tamanho >= minimo) return undefined;
+	return `A explicação ${nome} (${bloco.formato}) tem ${tamanho} caracteres; o mínimo é ${minimo}. ${DICA_DO_FORMATO(bloco.formato)}`;
+}
+
+/** Como um bloco aparece nas frases para o modelo: "l2-b3 (conceito)". */
+const nomeDoBloco = (bloco: Pick<Bloco, "id" | "tipo"> & { formato?: FormatoExplicacao }) => `${bloco.id} (${itemDoRoteiro(bloco)})`;
+
+/**
+ * Os problemas de uma lição escrita pelo esquema da lição, como frases que
+ * dizem ao modelo o que corrigir (a extensão manda na nova tentativa): a
+ * ordem dos blocos (violacoesDoEsquema), o tamanho de cada explicação
+ * (problemaDoTamanho) e a parte dos caracteres nas explicações
+ * (caracteresDaLicao, PROPORCAO_MINIMA_EXPLICACAO). Sem problemas, [].
+ */
+export function problemasDaLicao(blocos: readonly Bloco[]): string[] {
+	const problemas: string[] = [];
+	const roteiro = blocos.map(itemDoRoteiro);
+	for (const { regra, indice } of violacoesDoEsquema(roteiro)) {
+		const bloco = blocos[indice];
+		const anterior = blocos[indice - 1];
+		if (regra === "introducao") {
+			problemas.push(
+				`A lição começa por ${bloco ? nomeDoBloco(bloco) : "nada"}; o primeiro bloco precisa ser a introdução (explicação de formato "introducao": o que é o tema, por que importa e onde se usa).`,
+			);
+		} else if (regra === "sem_conceito") {
+			problemas.push('A lição não tem nenhuma explicação de formato "conceito"; cada ideia começa por um conceito (a teoria, com o porquê), antes do exemplo e das questões.');
+		} else if (regra === "questao_antes_do_conceito") {
+			problemas.push(`A questão ${nomeDoBloco(bloco!)} vem antes do primeiro conceito; nenhuma questão antes de apresentar o conceito.`);
+		} else if (regra === "questoes_seguidas") {
+			problemas.push(`As questões ${nomeDoBloco(anterior!)} e ${nomeDoBloco(bloco!)} estão seguidas; ponha uma explicação entre elas ou tire uma.`);
+		} else if (regra === "pergunta_fora_do_lugar") {
+			problemas.push(`A pergunta ${nomeDoBloco(bloco!)} vem depois de ${nomeDoBloco(anterior!)}; uma pergunta (verificacao) vem logo depois de um conceito ou de um exemplo.`);
+		} else {
+			problemas.push(`Falta a ideia central (bloco "ideia_central", de 1 a 3 frases) logo antes da questão final ${nomeDoBloco(bloco!)}.`);
+		}
+	}
+	for (const bloco of blocos) {
+		if (bloco.tipo !== "explicacao") continue;
+		const problema = problemaDoTamanho(bloco, bloco.id);
+		if (problema) problemas.push(problema);
+	}
+	const { proporcao, total } = caracteresDaLicao(blocos);
+	if (total > 0 && proporcao < PROPORCAO_MINIMA_EXPLICACAO) {
+		problemas.push(
+			`As explicações (introdução, conceitos, exemplos e ideia central) têm ${Math.floor(proporcao * 100)} % dos caracteres da lição; o mínimo é ${Math.round(PROPORCAO_MINIMA_EXPLICACAO * 100)} %. Desenvolva mais as explicações ou enxugue as questões.`,
+		);
+	}
+	return problemas;
+}
+
+// --- A metodologia em arquivos ----------------------------------------------------------
+
+/** O arquivo da estrutura da lição (profiles/estudos/metodo/), que o plano e cada lição carregam. */
+export const ARQUIVO_ESTRUTURA_LICAO = "estrutura-da-licao.md";
+
+/** Os arquivos da metodologia (docs/modulos.md, "A metodologia em arquivos"), na ordem em que arquivosDeMetodo os devolve. */
+export const ARQUIVOS_METODO = [
+	ARQUIVO_ESTRUTURA_LICAO,
+	"introducao.md",
+	"conceito.md",
+	"exemplos.md",
+	"pergunta.md",
+	"ideia-central.md",
+	"quiz.md",
+	"dissertativa.md",
+] as const;
+export type ArquivoMetodo = (typeof ARQUIVOS_METODO)[number];
+
+/** O arquivo da metodologia de um item do roteiro (o da reescrita de um bloco: arquivoDeMetodo(itemDoRoteiro(bloco))). */
+export function arquivoDeMetodo(item: ItemRoteiro): ArquivoMetodo {
+	if (item === "introducao") return "introducao.md";
+	if (item === "conceito") return "conceito.md";
+	if (ehFormatoExemplo(item)) return "exemplos.md";
+	if (item === "verificacao") return "pergunta.md";
+	if (item === "ideia_central") return "ideia-central.md";
+	if (item === "alternativa") return "quiz.md";
+	return "dissertativa.md";
+}
+
+/**
+ * Os arquivos da metodologia que a chamada de uma lição carrega: a estrutura
+ * da lição e os dos itens do roteiro (arquivoDeMetodo), sem repetir, na ordem
+ * de ARQUIVOS_METODO. Itens que não são do roteiro são ignorados.
+ */
+export function arquivosDeMetodo(roteiro: readonly unknown[]): ArquivoMetodo[] {
+	const usados = new Set<ArquivoMetodo>([ARQUIVO_ESTRUTURA_LICAO]);
+	for (const item of roteiro) if (ehItemRoteiro(item)) usados.add(arquivoDeMetodo(item));
+	return ARQUIVOS_METODO.filter((arquivo) => usados.has(arquivo));
+}
+
 // --- O plano ---------------------------------------------------------------------------
 
 /** Quantas lições um módulo de `horas` horas pede: uma por uns 50 minutos (40 a 60), arredondado, de 1 a 6. */
@@ -483,61 +770,236 @@ export function licoesPorHoras(horas: number): number {
 	return Math.min(LICOES_MAXIMAS, Math.max(LICOES_MINIMAS, Math.round((horas * 60) / MINUTOS_POR_LICAO)));
 }
 
+/** Um conserto de uma lição, antes de saber como a frase começa. */
+type ConsertoDaLicao = { regra: RegraConserto; texto: string };
+
+/** "verificacao", "verificacao e alternativa", "a, b e c". */
+const listaComE = (itens: readonly string[]) => (itens.length <= 1 ? (itens[0] ?? "") : `${itens.slice(0, -1).join(", ")} e ${itens.at(-1)}`);
+
 /**
- * Conserta o roteiro de uma lição: só tipos de bloco que existem; duas
- * explicações seguidas viram uma (o roteiro alterna explicação e prática);
- * sem explicação, uma no começo; se não termina com prática, uma verificação
- * no fim.
+ * Lê o roteiro que o modelo devolveu: só itens do roteiro (ITENS_ROTEIRO,
+ * aparados); um item desconhecido sai. Uma "explicacao" sem formato (o
+ * roteiro de antes do esquema) vira, pela posição: a introdução no começo, o
+ * exemplo (`exemplo`, o formato do nível) logo depois de um conceito, e o
+ * conceito no resto.
  */
-function consertarRoteiro(valor: unknown): TipoBloco[] {
-	const roteiro: TipoBloco[] = [];
-	for (const tipo of Array.isArray(valor) ? (valor as unknown[]) : []) {
-		const limpo = typeof tipo === "string" ? tipo.trim() : tipo;
-		if (!ehTipoBloco(limpo)) continue;
-		if (limpo === "explicacao" && roteiro.at(-1) === "explicacao") continue;
-		roteiro.push(limpo);
+function lerRoteiro(valor: unknown, exemplo: FormatoExemplo): { roteiro: ItemRoteiro[]; consertos: ConsertoDaLicao[] } {
+	const roteiro: ItemRoteiro[] = [];
+	const desconhecidos: string[] = [];
+	const semFormato: ItemRoteiro[] = [];
+	for (const item of Array.isArray(valor) ? (valor as unknown[]) : []) {
+		const limpo = typeof item === "string" ? item.trim() : item;
+		if (ehItemRoteiro(limpo)) roteiro.push(limpo);
+		else if (limpo === "explicacao") {
+			const virou: ItemRoteiro = roteiro.length === 0 ? "introducao" : roteiro.at(-1) === "conceito" ? exemplo : "conceito";
+			roteiro.push(virou);
+			semFormato.push(virou);
+		} else desconhecidos.push(`"${mostrar(limpo)}"`);
 	}
-	if (!roteiro.includes("explicacao")) roteiro.unshift("explicacao");
-	if (!ehPratica(roteiro.at(-1))) roteiro.push("verificacao");
-	return roteiro;
+	const consertos: ConsertoDaLicao[] = [];
+	if (desconhecidos.length > 0) consertos.push({ regra: "item_desconhecido", texto: `${desconhecidos.length === 1 ? "o item desconhecido" : "os itens desconhecidos"} ${listaComE(desconhecidos)} ${desconhecidos.length === 1 ? "saiu" : "saíram"} do roteiro` });
+	if (semFormato.length > 0) consertos.push({ regra: "explicacao_sem_formato", texto: `${semFormato.length === 1 ? "a explicação sem formato virou" : "as explicações sem formato viraram"} ${listaComE(semFormato)}, pela posição` });
+	return { roteiro, consertos };
+}
+
+/** Tira a segunda de cada par de questões seguidas (as que sobram continuam separadas). */
+function semQuestoesSeguidas(roteiro: readonly ItemRoteiro[], consertos: ConsertoDaLicao[]): ItemRoteiro[] {
+	const saida: ItemRoteiro[] = [];
+	const tiradas: ItemRoteiro[] = [];
+	for (const item of roteiro) {
+		if (ehPratica(item) && ehPratica(saida.at(-1))) tiradas.push(item);
+		else saida.push(item);
+	}
+	if (tiradas.length > 0) consertos.push({ regra: "questoes_seguidas", texto: `havia questões seguidas; ${tiradas.length === 1 ? "saiu a segunda" : "saíram as segundas"} (${listaComE(tiradas)})` });
+	return saida;
+}
+
+/**
+ * Conserta o roteiro de uma lição pelo esquema da lição, na ordem: a
+ * introdução no começo (a que faltava entra; a que estava em outro lugar vai
+ * para o começo; as a mais saem); sem nenhum conceito, null (não dá para
+ * consertar); as questões antes do primeiro conceito saem; a pergunta que
+ * não vem logo depois de um conceito ou exemplo sai; das questões seguidas,
+ * sai a segunda; se não termina com uma questão, um quiz no fim; com quiz ou
+ * dissertativa, uma ideia central só, logo antes da questão final (a que
+ * faltava entra, a que estava em outro lugar vai para lá); e as questões
+ * seguidas de novo (tirar a ideia central de um lugar pode juntar duas).
+ */
+function consertarRoteiro(lido: readonly ItemRoteiro[]): { roteiro: ItemRoteiro[]; consertos: ConsertoDaLicao[] } | null {
+	const consertos: ConsertoDaLicao[] = [];
+	let roteiro = [...lido];
+
+	const introducoes = roteiro.filter((item) => item === "introducao").length;
+	if (roteiro[0] !== "introducao" || introducoes > 1) {
+		const texto =
+			introducoes === 0
+				? "faltava a introdução; entrou uma no começo do roteiro"
+				: roteiro[0] === "introducao"
+					? "havia mais de uma introdução; ficou só a do começo"
+					: "a introdução não era o primeiro bloco; foi para o começo";
+		roteiro = ["introducao", ...roteiro.filter((item) => item !== "introducao")];
+		consertos.push({ regra: "introducao", texto });
+	}
+
+	const primeiro = roteiro.indexOf("conceito");
+	if (primeiro < 0) return null;
+	const antes = roteiro.slice(0, primeiro).filter(ehPratica);
+	if (antes.length > 0) {
+		roteiro = roteiro.filter((item, indice) => indice >= primeiro || !ehPratica(item));
+		consertos.push({ regra: "questao_antes_do_conceito", texto: `${antes.length === 1 ? "a questão" : "as questões"} antes do primeiro conceito (${listaComE(antes)}) ${antes.length === 1 ? "saiu" : "saíram"}` });
+	}
+
+	const noLugar: ItemRoteiro[] = [];
+	let foraDoLugar = 0;
+	for (const item of roteiro) {
+		const anterior = noLugar.at(-1);
+		if (item === "verificacao" && anterior !== "conceito" && !ehFormatoExemplo(anterior)) foraDoLugar++;
+		else noLugar.push(item);
+	}
+	if (foraDoLugar > 0) {
+		roteiro = noLugar;
+		consertos.push({ regra: "pergunta_fora_do_lugar", texto: `${foraDoLugar === 1 ? "uma pergunta (verificacao) que não vinha" : `${foraDoLugar} perguntas (verificacao) que não vinham`} logo depois de um conceito ou exemplo ${foraDoLugar === 1 ? "saiu" : "saíram"}` });
+	}
+
+	roteiro = semQuestoesSeguidas(roteiro, consertos);
+
+	if (!ehPratica(roteiro.at(-1))) {
+		roteiro.push("alternativa");
+		consertos.push({ regra: "termina_sem_questao", texto: "o roteiro não terminava com uma questão; entrou um quiz (alternativa) no fim" });
+	}
+
+	const final = indiceDaQuestaoFinal(roteiro);
+	const ideias = roteiro.filter((item) => item === "ideia_central").length;
+	if (final >= 0 && (roteiro[final - 1] !== "ideia_central" || ideias !== 1)) {
+		const semIdeia: ItemRoteiro[] = roteiro.filter((item) => item !== "ideia_central");
+		const naFinal = indiceDaQuestaoFinal(semIdeia);
+		const questao = semIdeia[naFinal]!;
+		semIdeia.splice(naFinal, 0, "ideia_central");
+		roteiro = semIdeia;
+		const texto =
+			ideias === 0
+				? `faltava a ideia central; entrou uma logo antes da questão final (${questao})`
+				: ideias === 1
+					? `a ideia central foi para logo antes da questão final (${questao})`
+					: `havia ${ideias} ideias centrais; ficou uma, logo antes da questão final (${questao})`;
+		consertos.push({ regra: "ideia_central", texto });
+	}
+
+	roteiro = semQuestoesSeguidas(roteiro, consertos);
+	return { roteiro, consertos };
+}
+
+/** O formato do exemplo de uma lição: o do nível mais baixo dos conceitos dela (sem níveis, o do iniciante). */
+function formatoDoExemploDaLicao(conceitos: readonly string[], niveis: Readonly<Record<string, NivelConceito>> | undefined): FormatoExemplo {
+	let nivel: NivelConceito | undefined;
+	for (const id of conceitos) {
+		const doConceito = niveis?.[id];
+		if (doConceito && (nivel === undefined || ORDEM_NIVEL[doConceito] < ORDEM_NIVEL[nivel])) nivel = doConceito;
+	}
+	return FORMATO_DO_NIVEL[nivel ?? "iniciante"];
+}
+
+export interface OpcoesPlano {
+	conceitosDoModulo: readonly string[];
+	licoes: number;
+	tipo?: TipoCurso;
+	/** Os níveis dos conceitos (niveisDoModulo): escolhem o formato do exemplo de uma "explicacao" sem formato. Sem eles, exemplo_resolvido. */
+	niveis?: Readonly<Record<string, NivelConceito>>;
 }
 
 /**
  * Confere e conserta o plano que o modelo devolveu (ResultadoPlano) e devolve
- * as lições com ids l1, l2… na ordem:
+ * as lições com ids l1, l2… na ordem e a lista do que foi consertado (para a
+ * extensão decidir se pede uma nova tentativa; REGRAS_DO_ESQUEMA diz quais
+ * consertos são do esquema da lição):
  * - conceitos só do módulo (os outros saem, sem repetir na lição); uma lição
  *   sem nenhum conceito do módulo (ou que não é objeto) sai;
  * - título numa linha (vazio vira "Lição N"); objetivo aparado (pode ser
  *   vazio);
- * - o roteiro só com tipos de bloco que existem, alternando explicação e
- *   prática e terminando com prática (consertarRoteiro);
+ * - o roteiro só com itens que existem (lerRoteiro) e consertado pelo esquema
+ *   da lição (consertarRoteiro); um roteiro sem nenhum conceito não tem
+ *   conserto seguro: ErroModulo (a extensão tenta de novo);
  * - até `licoes` lições (licoesPorHoras): as que passam saem, e os conceitos
  *   delas entram pela regra seguinte;
  * - os conceitos do módulo que nenhuma lição cobriu entram no fim da última,
  *   na ordem do módulo;
  * - com `tipo` teórico ou misto e nenhuma dissertativa no plano, uma
- *   dissertativa no fim do roteiro da última lição.
- * Sem nenhuma lição que valha, ErroModulo (a extensão tenta de novo).
+ *   dissertativa na última lição: no lugar do quiz final (depois dele não
+ *   cabe outra questão) ou, sem quiz final, no fim, com a ideia central
+ *   antes.
+ * Sem nenhuma lição que valha, ErroModulo.
  */
-export function validarPlano(resultado: unknown, opcoes: { conceitosDoModulo: readonly string[]; licoes: number; tipo?: TipoCurso }): LicaoPlanejada[] {
+export function conferirPlano(resultado: unknown, opcoes: OpcoesPlano): { licoes: LicaoPlanejada[]; consertos: ConsertoPlano[] } {
 	if (!ehObjeto(resultado) || !Array.isArray(resultado.licoes)) throw new ErroModulo('O modelo não devolveu a lista de lições (falta "licoes").');
 	const doModulo = [...new Set(opcoes.conceitosDoModulo)];
 	const permitidos = new Set(doModulo);
 	const maximo = Math.min(LICOES_MAXIMAS, Math.max(LICOES_MINIMAS, Math.floor(opcoes.licoes) || LICOES_MINIMAS));
-	const lidas: Array<Omit<LicaoPlanejada, "id">> = [];
-	for (const item of resultado.licoes as unknown[]) {
-		if (lidas.length >= maximo) break;
-		if (!ehObjeto(item)) continue;
+	const lidas: Array<LicaoPlanejada & { consertos: ConsertoDaLicao[] }> = [];
+	const doPlano: ConsertoPlano[] = [];
+	const itens = resultado.licoes as unknown[];
+	for (const [posicao, item] of itens.entries()) {
+		if (lidas.length >= maximo) {
+			doPlano.push({ licao: null, regra: "licoes_a_mais", mensagem: `O plano veio com ${itens.length} lições; ficaram as ${maximo} primeiras que valem, e as outras saíram.` });
+			break;
+		}
+		if (!ehObjeto(item)) {
+			doPlano.push({ licao: null, regra: "licao_sem_conceitos", mensagem: `A ${posicao + 1}ª lição do plano não é um objeto; saiu.` });
+			continue;
+		}
 		const conceitos = listaDeIds(item.conceitos).filter((id) => permitidos.has(id));
-		if (conceitos.length === 0) continue;
-		lidas.push({ titulo: linhaLimpa(item.titulo), objetivo: textoLimpo(item.objetivo), conceitos, roteiro: consertarRoteiro(item.roteiro) });
+		const titulo = linhaLimpa(item.titulo);
+		if (conceitos.length === 0) {
+			doPlano.push({ licao: null, regra: "licao_sem_conceitos", mensagem: `A ${posicao + 1}ª lição do plano${titulo ? ` ("${titulo}")` : ""} não cita nenhum conceito do módulo; saiu.` });
+			continue;
+		}
+		const id = `l${lidas.length + 1}`;
+		const nome = titulo || `Lição ${lidas.length + 1}`;
+		const lido = lerRoteiro(item.roteiro, formatoDoExemploDaLicao(conceitos, opcoes.niveis));
+		const consertado = consertarRoteiro(lido.roteiro);
+		if (!consertado) {
+			throw new ErroModulo(
+				`A lição ${id} do plano ("${nome}") não tem nenhum conceito no roteiro: cada ideia da lição começa por uma explicação de formato "conceito". Refaça o roteiro pelo esquema da lição.`,
+			);
+		}
+		lidas.push({ id, titulo: nome, objetivo: textoLimpo(item.objetivo), conceitos, roteiro: consertado.roteiro, consertos: [...lido.consertos, ...consertado.consertos] });
 	}
 	if (lidas.length === 0) throw new ErroModulo("O modelo não devolveu nenhuma lição com conceitos do módulo.");
 	const cobertos = new Set(lidas.flatMap((licao) => licao.conceitos));
 	const ultima = lidas.at(-1)!;
-	for (const id of doModulo) if (!cobertos.has(id)) ultima.conceitos.push(id);
-	if ((opcoes.tipo === "teorico" || opcoes.tipo === "misto") && !lidas.some((licao) => licao.roteiro.includes("dissertativa"))) ultima.roteiro.push("dissertativa");
-	return lidas.map((licao, indice) => ({ id: `l${indice + 1}`, titulo: licao.titulo || `Lição ${indice + 1}`, objetivo: licao.objetivo, conceitos: licao.conceitos, roteiro: licao.roteiro }));
+	const faltaram = doModulo.filter((id) => !cobertos.has(id));
+	if (faltaram.length > 0) {
+		ultima.conceitos.push(...faltaram);
+		ultima.consertos.push({ regra: "conceito_sem_licao", texto: `${faltaram.length === 1 ? "o conceito" : "os conceitos"} ${listaComE(faltaram)}, que nenhuma lição cobria, ${faltaram.length === 1 ? "entrou" : "entraram"} nesta (a última)` });
+	}
+	if ((opcoes.tipo === "teorico" || opcoes.tipo === "misto") && !lidas.some((licao) => licao.roteiro.includes("dissertativa"))) {
+		// Depois do quiz final não cabe outra questão (nunca duas seguidas): a dissertativa toma o lugar dele.
+		const final = indiceDaQuestaoFinal(ultima.roteiro);
+		if (final >= 0) {
+			ultima.roteiro[final] = "dissertativa";
+			ultima.consertos.push({ regra: "dissertativa", texto: "o curso é teórico ou misto e o plano não tinha dissertativa; o quiz final desta lição (a última) virou uma dissertativa" });
+		} else {
+			const semIdeia = semQuestoesSeguidas(
+				ultima.roteiro.filter((item) => item !== "ideia_central"),
+				ultima.consertos,
+			);
+			ultima.roteiro = [...semIdeia, "ideia_central", "dissertativa"];
+			ultima.consertos.push({ regra: "dissertativa", texto: "o curso é teórico ou misto e o plano não tinha dissertativa; entrou uma no fim desta lição (a última), com a ideia central antes" });
+		}
+	}
+	for (const licao of lidas) {
+		const sobrou = violacoesDoEsquema(licao.roteiro);
+		if (sobrou.length > 0) throw new ErroModulo(`O roteiro da lição ${licao.id} do plano não segue o esquema da lição (${sobrou.map((item) => item.regra).join(", ")}).`);
+	}
+	const consertos: ConsertoPlano[] = [
+		...doPlano,
+		...lidas.flatMap((licao) => licao.consertos.map(({ regra, texto }) => ({ licao: licao.id, regra, mensagem: `Lição ${licao.id} ("${licao.titulo}"): ${texto}.` }))),
+	];
+	return { licoes: lidas.map(({ consertos: _consertos, ...licao }) => licao), consertos };
+}
+
+/** O plano conferido e consertado (conferirPlano), só com as lições: o que a extensão usa quando não precisa saber o que foi consertado. */
+export function validarPlano(resultado: unknown, opcoes: OpcoesPlano): LicaoPlanejada[] {
+	return conferirPlano(resultado, opcoes).licoes;
 }
 
 // --- As lições -------------------------------------------------------------------------
@@ -560,7 +1022,12 @@ function lerReferencias(valor: unknown, trechos: readonly Referencia[]): Referen
 }
 
 /** Um bloco sem o id (o que validarBloco devolve; o id é dado pelo código). */
-export type BlocoSemId = Omit<BlocoExplicacao, "id"> | Omit<BlocoVerificacao, "id"> | Omit<BlocoAlternativa, "id"> | Omit<BlocoDissertativa, "id">;
+export type BlocoSemId =
+	| Omit<BlocoExplicacao, "id">
+	| Omit<BlocoVerificacao, "id">
+	| Omit<BlocoAlternativa, "id">
+	| Omit<BlocoDissertativa, "id">
+	| Omit<BlocoIdeiaCentral, "id">;
 
 /** Lê um bloco do modelo: o bloco limpo, ou o motivo do descarte. */
 function lerBloco(item: unknown, permitidos: ReadonlySet<string>, trechos: readonly Referencia[], escopo: Escopo): { bloco: BlocoSemId } | { motivo: string } {
@@ -586,6 +1053,15 @@ function lerBloco(item: unknown, permitidos: ReadonlySet<string>, trechos: reado
 		if (!respostaEsperada) return { motivo: "verificação sem a resposta esperada" };
 		return { bloco: { tipo: "verificacao", conceitos, pergunta, respostaEsperada } };
 	}
+	if (item.tipo === "ideia_central") {
+		const texto = textoLimpo(item.texto);
+		if (!texto) return { motivo: "ideia central vazia" };
+		const frases = frasesDoTexto(texto);
+		if (frases < MINIMO_FRASES_IDEIA_CENTRAL || frases > MAXIMO_FRASES_IDEIA_CENTRAL) {
+			return { motivo: `a ideia central tem ${frases} frases (precisa de ${MINIMO_FRASES_IDEIA_CENTRAL} a ${MAXIMO_FRASES_IDEIA_CENTRAL})` };
+		}
+		return { bloco: { tipo: "ideia_central", conceitos, texto } };
+	}
 	// As questões, pelas regras do diagnóstico (lerQuestao), com os conceitos já filtrados.
 	const lida = lerQuestao({ ...item, conceitos }, permitidos);
 	if ("motivo" in lida) return lida;
@@ -599,14 +1075,20 @@ function lerBloco(item: unknown, permitidos: ReadonlySet<string>, trechos: reado
  * - explicação: texto e formato válido; verificação: pergunta e resposta
  *   esperada; alternativa e dissertativa pelas regras do diagnóstico
  *   (lerQuestao: uma correta, a confusão em cada errada, rubrica de 3 a 5
- *   critérios); um bloco que não vale (ou vazio, ou de tipo desconhecido) sai;
+ *   critérios); ideia central: texto de 1 a 3 frases (frasesDoTexto); um
+ *   bloco que não vale (ou vazio, ou de tipo desconhecido) sai;
  * - referências como no mapa: um local que não é o de um dos `trechos`
  *   mandados sai (no escopo livre, nenhuma);
  * - complemento: no escopo "só o material", a explicação que o modelo marcou
  *   ou que não cita nenhum trecho válido; em "material base", só a que o
  *   modelo marcou; no livre, nenhuma.
  * Sem nenhuma explicação ou sem nenhuma prática que valha, ErroModulo com os
- * motivos dos descartes (a extensão tenta a lição de novo, uma vez).
+ * motivos dos descartes. Depois, o esquema da lição no que sobrou
+ * (problemasDaLicao: a ordem dos blocos, o tamanho de cada explicação e a
+ * parte dos caracteres nas explicações): com problemas, ErroModulo com as
+ * frases que dizem ao modelo o que corrigir e os descartes (a extensão tenta
+ * a lição de novo, uma vez). As lições gravadas antes do esquema não passam
+ * por aqui: continuam válidas para ler.
  */
 export function validarLicao(
 	resultado: unknown,
@@ -629,13 +1111,19 @@ export function validarLicao(
 		const motivos = descartes.length > 0 ? ` Descartados: ${descartes.join("; ")}.` : "";
 		throw new ErroModulo(`A lição ${licao.id} ("${licao.titulo}") veio sem ${faltas.join(" e sem ")} que valha.${motivos}`);
 	}
+	const comIds = blocos.map((bloco, indice) => ({ id: `${licao.id}-b${indice + 1}`, ...structuredClone(bloco) }) as Bloco);
+	const problemas = problemasDaLicao(comIds);
+	if (problemas.length > 0) {
+		const motivos = descartes.length > 0 ? ` Descartados: ${descartes.join("; ")}.` : "";
+		throw new ErroModulo(`A lição ${licao.id} ("${licao.titulo}") não segue o esquema da lição. ${problemas.join(" ")}${motivos}`);
+	}
 	return {
 		licao: {
 			id: licao.id,
 			titulo: licao.titulo,
 			objetivo: licao.objetivo,
 			conceitos: [...licao.conceitos],
-			blocos: blocos.map((bloco, indice) => ({ id: `${licao.id}-b${indice + 1}`, ...structuredClone(bloco) }) as Bloco),
+			blocos: comIds,
 		},
 		descartes,
 	};
@@ -646,10 +1134,12 @@ export function validarLicao(
  * docs/escrita.md), pelas mesmas regras da lição (lerBloco, como em
  * validarLicao): conceitos só da lição, o conteúdo de cada tipo, as
  * referências contra os `trechos` mandados e o complemento pelo escopo. O
- * formato da explicação pode ser outro que o do bloco antigo. Aceita o bloco
+ * formato da explicação pode ser outro que o do bloco antigo, e ela tem o
+ * mínimo de caracteres do formato (problemaDoTamanho: introdução 600,
+ * conceito e exemplos 900); a ideia central, de 1 a 3 frases. Aceita o bloco
  * solto ou dentro de {"bloco": {...}}. Devolve o bloco sem id (substituirBloco
- * mantém o do antigo). Um bloco que não vale, ou de outro tipo que `tipo`, é
- * ErroModulo com o motivo (a extensão tenta de novo, uma vez).
+ * mantém o do antigo). Um bloco que não vale, curto demais ou de outro tipo
+ * que `tipo` é ErroModulo com o motivo (a extensão tenta de novo, uma vez).
  */
 export function validarBloco(
 	resultado: unknown,
@@ -660,6 +1150,10 @@ export function validarBloco(
 	const lido = lerBloco(item, new Set(opcoes.licao.conceitos), opcoes.trechos, opcoes.escopo);
 	if ("motivo" in lido) throw new ErroModulo(`O bloco reescrito da lição ${opcoes.licao.id} não vale: ${lido.motivo}.`);
 	if (lido.bloco.tipo !== opcoes.tipo) throw new ErroModulo(`O bloco reescrito veio do tipo "${lido.bloco.tipo}", e precisava ser "${opcoes.tipo}".`);
+	if (lido.bloco.tipo === "explicacao") {
+		const problema = problemaDoTamanho(lido.bloco, "do bloco reescrito");
+		if (problema) throw new ErroModulo(problema);
+	}
 	return structuredClone(lido.bloco);
 }
 

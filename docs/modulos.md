@@ -66,6 +66,34 @@ A cor diz se o módulo foi gerado; a etiqueta "Próximo" diz qual é o recomenda
 - o recomendado leva a etiqueta "Próximo" (a do ModuleCard), seja gerado ou não; nenhum outro leva.
 Nada fica bloqueado. As variações são classes do perfil por cima do ModuleCard (o design system não muda).
 
+## O esquema da lição (2026-10-28)
+
+Pedido do Breno: as lições estavam curtas, pouco explicadas e com questões demais. Toda lição segue um esquema, que o plano escreve no roteiro e o código confere:
+
+1. **Introdução** (explicação, formato `introducao`): o contexto do tema — o que é, por que importa, onde e como se usa no mundo real e no material. Sempre o primeiro bloco.
+2. Para cada ideia da lição, um ciclo:
+   - **Conceito** (explicação, formato `conceito`): a teoria, com o porquê;
+   - **Exemplo** (explicação, formato pelo nível: `exemplo_resolvido`, `exemplo_incompleto` ou `problema_aberto`): o conceito aplicado, desenvolvido passo a passo e depois retomado para explicar melhor;
+   - **Pergunta** (`verificacao`): uma pergunta curta para ver se o conceito apresentado foi entendido;
+   - opcionalmente, mais explicação (`conceito` ou exemplo) quando a ideia pede.
+3. **Ideia central** (bloco novo `ideia_central`: `{texto, conceitos}`, de 1 a 3 frases): o que guardar da lição, no visual do Callout. Vem antes do quiz.
+4. **Quiz** (`alternativa`): no fim de cada ideia prática ou da lição.
+5. **Dissertativa**: quando a lição (ou a ideia) é mais teórica, com pouco a praticar.
+
+Regras que o código confere (validarPlano no roteiro e validarLicao no resultado; uma nova tentativa da lição quando falham): começa por `introducao`; nenhuma questão antes do primeiro conceito; nunca duas questões seguidas (pergunta, quiz, dissertativa); toda pergunta vem depois de um conceito ou exemplo; ideia central antes do quiz final; pelo menos 70 % dos caracteres da lição em explicações (introdução, conceito, exemplos e ideia central); uma explicação de conceito tem pelo menos uns 900 caracteres, uma introdução uns 600 e um exemplo uns 900 (exemplo explicado, não só o código). Lições geradas antes disto continuam válidas para ler.
+
+## A metodologia em arquivos
+
+O "como ensinar" sai dos prompts e vai para arquivos por tipo de ensino, em `profiles/estudos/metodo/` (a base, no repositório): `estrutura-da-licao.md`, `introducao.md`, `conceito.md`, `exemplos.md`, `ideia-central.md`, `pergunta.md`, `quiz.md`, `dissertativa.md`. Cada chamada carrega só o que vai escrever: o plano carrega a estrutura; a lição, a estrutura e os arquivos dos tipos de bloco do roteiro dela; a reescrita de um bloco, o arquivo do tipo dele; o diagnóstico, quiz e dissertativa; o corretor, dissertativa. Os prompts (`prompts/modulo-*.md`, `diagnostico.md`) ficam com o formato e as regras de saída. A parte 4 do plano acrescenta, por arquivo, os ajustes pessoais aprovados pelo Breno, na pasta de dados (`aprendiz/metodo/<arquivo>.md`), carregados junto da base.
+
+## A tela das questões (2026-10-28)
+
+Os blocos de texto continuam com a etiqueta de hoje. As questões não levam etiqueta: cada tipo tem um post-it (o Sticker do design system, como o "Em curso" do card do módulo), com ícone e nome, preso no canto do cartão, e a borda do cartão na cor do tipo:
+- Quiz (`alternativa`): âmbar, texto preto;
+- Dissertativa: tijolo, texto preto;
+- Pergunta (`verificacao`): musgo (a cor do card do módulo gerado), texto preto.
+A ideia central usa o visual do Callout (não é questão).
+
 ## O nível de cada conceito
 
 Calculado pelo código a partir do diagnóstico concluído do curso (por enquanto; o perfil do aprendiz é o item 9): `iniciante` (disse "nunca vi" ou "já ouvi falar", ou errou a questão dele), `intermediario` (disse "sei explicar", ou acertou em parte), `domina` (disse "sei aplicar" e acertou); sem questão, vale o que ele disse. O nível escolhe o formato da explicação (9.1: exemplo resolvido completo para iniciante, com passos faltando para intermediário, problema aberto para quem domina; exemplos resolvidos demais atrapalham quem já sabe).

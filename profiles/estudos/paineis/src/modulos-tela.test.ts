@@ -22,6 +22,7 @@ import {
 	proximoDaTela,
 	resumoDoGerado,
 	textoDaEtapa,
+	textoDasFeitas,
 	tituloDoFormulario,
 } from "./modulos-tela.ts";
 import { descreverEvento } from "./TelaCaderno.tsx";
@@ -146,6 +147,13 @@ describe("textos dos cards", () => {
 		expect(resumoDoGerado({ licoesGeradas: 3, questoes: 8 })).toBe("3 lições · 8 questões");
 		expect(resumoDoGerado({ licoesGeradas: 1, questoes: 1 })).toBe("1 lição · 1 questão");
 		expect(resumoDoGerado({})).toBe("");
+	});
+
+	it("as questões feitas do gerado, no singular e no plural", () => {
+		expect(textoDasFeitas({ feitas: 3, questoes: 12 })).toBe("3 de 12 questões feitas");
+		expect(textoDasFeitas({ feitas: 0, questoes: 1 })).toBe("0 de 1 questão feita");
+		expect(textoDasFeitas({ feitas: 0, questoes: 0 })).toBe("");
+		expect(textoDasFeitas(undefined)).toBe("");
 	});
 
 	it("a ação de cada card", () => {

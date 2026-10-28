@@ -3,7 +3,7 @@
 // mostra pelo estado do módulo que a extensão mandou (a cor, a etiqueta
 // "Próximo" do recomendado, o enchimento durante a geração e as classes do
 // perfil por cima do card), os textos das etapas, o primário do formulário
-// "Gerar módulo" e o pedido que ele manda. Sem React e sem o design system:
+// "Gerar módulo", o pedido que ele manda e as questões feitas do gerado. Sem React e sem o design system:
 // os testes (modulos-tela.test.ts) rodam no Node.
 
 import type { EstadoModuloNaTela, MensagemEstadoModulos, SituacaoNaTela } from "../../lib/modulo-tipos.ts";
@@ -191,6 +191,12 @@ export function resumoDoGerado(modulo: Pick<EstadoModuloNaTela, "licoesGeradas" 
 	]
 		.filter(Boolean)
 		.join(" · ");
+}
+
+/** "3 de 12 questões feitas" (o progresso do estado: pergunta, quiz e dissertativa); sem progresso, ou sem questão, "". */
+export function textoDasFeitas(progresso: EstadoModuloNaTela["progresso"]): string {
+	if (!progresso || typeof progresso.feitas !== "number" || typeof progresso.questoes !== "number" || progresso.questoes <= 0) return "";
+	return `${progresso.feitas} de ${progresso.questoes} ${progresso.questoes === 1 ? "questão feita" : "questões feitas"}`;
 }
 
 /** O texto da ação no rodapé do card. */

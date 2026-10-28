@@ -966,6 +966,8 @@
 .modulo__postit.ap-sticker--pin { top: -16px; right: var(--space-6); }
 .modulo__postit .ap-sticker__face { padding: 7px 14px 8px; color: var(--ink-inverse); }
 .modulo__postit .ap-sticker__text { font-size: 13px; }
+/* O post-it verde (Pergunta) com o texto claro do card do módulo gerado: o preto sobre o musgo fica ilegível. O âmbar e o tijolo seguem com o texto preto que o Breno pediu. */
+.modulo__postit.ap-sticker--moss .ap-sticker__face { color: var(--on-moss); }
 .modulo__postit .ap-icon { flex: none; }
 /* A ideia central: o Callout ocupa a largura do texto, sem a margem de baixo da prosa. */
 .modulo__bloco .ap-block__body > .modulo__ideia { margin: 0; }

@@ -13,10 +13,9 @@
 import { Button, Callout, EssayAnswer, Icon, Modal, pad2, QuizFeedback, QuizProgress, QuizQuestion, StudentNote, Tag } from "@estudos/design-system";
 import { AgenteAnimado, type DadosAvatarAgente, Markdown, semMovimento } from "@estudos/ui";
 import { motion } from "motion/react";
-import { type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Curso } from "../../lib/curso-tipos.ts";
 import {
-	CONFIANCAS,
 	type Confianca,
 	type DiagnosticoEmAndamento,
 	type DiagnosticoNaTela,
@@ -63,6 +62,7 @@ import {
 	vizinhasNaOrdem,
 } from "./diagnostico-tela.ts";
 import type { MapaDaMateria } from "./mapa-ponte.ts";
+import { ConfiancaAntes, Teclas } from "./Teclas.tsx";
 
 /** A troca de questão no resultado: uma mola curta (fade e um leve deslocamento). */
 const MOLA_CURTA = { type: "spring", stiffness: 520, damping: 42 } as const;
@@ -379,32 +379,6 @@ function ErroGerar({ mensagem, tentar }: { mensagem: string; tentar(): void }) {
 }
 
 /**
- * Um seletor segmentado com radios nativos (as setas andam, Tab entra e sai
- * do grupo), no visual das teclas de papel; a marcada fica âmbar.
- */
-function Teclas<V extends number>(props: { rotulo: string; opcoes: Array<{ valor: V; texto: string; tecla?: string }>; valor: V | undefined; mudar(valor: V): void }) {
-	const nome = useId();
-	return (
-		<div role="radiogroup" aria-label={props.rotulo} className="diag__teclas">
-			{props.opcoes.map((opcao) => {
-				const marcada = props.valor === opcao.valor;
-				return (
-					<label key={opcao.valor} className={`diag__tecla${marcada ? " diag__tecla--marcada" : ""}`}>
-						<input type="radio" className="diag__radio" name={nome} value={opcao.valor} checked={marcada} onChange={() => props.mudar(opcao.valor)} />
-						{opcao.tecla ? (
-							<span className="diag__tecla-num data" aria-hidden="true">
-								{opcao.tecla}
-							</span>
-						) : null}
-						<span className="body-sm diag__tecla-texto">{opcao.texto}</span>
-					</label>
-				);
-			})}
-		</div>
-	);
-}
-
-/**
  * A questão em vista: a confiança primeiro; só com ela marcada, as alternativas
  * (ou o campo) ficam ativas. Com contexto, o contexto vai numa coluna e a
  * pergunta, a confiança, as alternativas e o Responder na outra, nessa ordem
@@ -438,15 +412,7 @@ function QuestaoAtual(props: {
 	const kicker = partes.contexto ? undefined : props.kicker;
 	const conteudo = (
 		<>
-			<div className="diag__confianca">
-				<p className="body-strong diag__pergunta">Antes de responder: quanto você confia que vai acertar?</p>
-				<Teclas<Confianca>
-					rotulo="Confiança"
-					opcoes={CONFIANCAS.map((valor) => ({ valor, texto: NOMES_CONFIANCA[valor], tecla: String(valor) }))}
-					valor={confianca}
-					mudar={setConfianca}
-				/>
-			</div>
+			<ConfiancaAntes valor={confianca} mudar={setConfianca} />
 			<div className={`diag__resposta${confianca === undefined ? " diag__resposta--apagada" : ""}`} inert={confianca === undefined}>
 				{questao.tipo === "alternativa" ? (
 					<QuizQuestion

@@ -955,6 +955,20 @@
 .modulo__cartao .modulo__revelado { margin-top: var(--space-6); padding-top: var(--space-6); border-top: var(--border-hair) solid var(--line-strong); }
 /* Dentro do cartão (surface-raised), as alternativas num tom mais fundo, para se destacarem do cartão e não só pela borda. */
 .modulo__cartao .ap-opt { background: var(--surface-panel); }
+/* A questão (docs/modulos.md, "A tela das questões"): a borda fina e um fundo levíssimo na cor do tipo, e o post-it
+   (o Sticker) preso no canto superior direito, com o texto preto em qualquer tom. */
+.retorno__conteudo { position: relative; }
+.modulo__cartao--amber { --cor-questao: var(--amber); }
+.modulo__cartao--brick { --cor-questao: var(--brick); }
+.modulo__cartao--moss { --cor-questao: var(--moss); }
+.modulo__cartao:is(.modulo__cartao--amber, .modulo__cartao--brick, .modulo__cartao--moss) { padding-top: calc(var(--space-8) + var(--space-4)); border-color: color-mix(in srgb, var(--cor-questao) 60%, var(--line)); background: color-mix(in srgb, var(--cor-questao) 6%, var(--surface-raised)); }
+.modulo__cartao:is(.modulo__cartao--amber, .modulo__cartao--brick, .modulo__cartao--moss) > .ap-block__num { top: calc(var(--space-8) + var(--space-4) + 3px); }
+.modulo__postit.ap-sticker--pin { top: -16px; right: var(--space-6); }
+.modulo__postit .ap-sticker__face { padding: 7px 14px 8px; color: var(--ink-inverse); }
+.modulo__postit .ap-sticker__text { font-size: 13px; }
+.modulo__postit .ap-icon { flex: none; }
+/* A ideia central: o Callout ocupa a largura do texto, sem a margem de baixo da prosa. */
+.modulo__bloco .ap-block__body > .modulo__ideia { margin: 0; }
 
 .modulo__questao { display: flex; flex-direction: column; gap: var(--space-5); }
 .modulo__questao .ap-quiz { max-width: none; }
@@ -1005,6 +1019,8 @@
 @media (max-width: 640px) {
 	.modulo__leitura { padding-left: 0; }
 	.modulo__cartao { padding: var(--space-5); }
+	.modulo__cartao:is(.modulo__cartao--amber, .modulo__cartao--brick, .modulo__cartao--moss) { padding-top: calc(var(--space-5) + var(--space-6)); }
+	.modulo__postit.ap-sticker--pin { right: var(--space-4); }
 }
 @media (prefers-reduced-motion: reduce) {
 	.modulo__item { transition: none; }
@@ -1081,7 +1097,7 @@
 .retorno__salvo { display: inline-flex; align-items: center; gap: 6px; min-height: var(--control-sm); padding: 0 var(--space-2); color: var(--sage-text); }
 .retorno__faixa { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3); border-radius: var(--radius-md); background: var(--amber-tint); box-shadow: inset 0 0 0 var(--border-hair) var(--amber); }
 .retorno__faixa-texto { flex: 1; min-width: 0; color: var(--ink); }
-.retorno__bloco--reescrevendo .retorno__conteudo > .ap-block, .retorno__bloco--reescrevendo .modulo__referencias { opacity: var(--opacity-disabled); pointer-events: none; user-select: none; transition: opacity .2s ease-out; }
+.retorno__bloco--reescrevendo .retorno__conteudo > :is(.ap-block, .modulo__postit), .retorno__bloco--reescrevendo .modulo__referencias { opacity: var(--opacity-disabled); pointer-events: none; user-select: none; transition: opacity .2s ease-out; }
 .retorno__reescrito { color: var(--ink-muted); }
 .retorno__anterior { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-5); border-radius: var(--radius-md); background: var(--surface-well); }
 .retorno__anterior-cabeca { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
@@ -1091,6 +1107,6 @@
 .retorno__anterior-corpo { color: var(--ink-muted); }
 .retorno__anterior-corpo .modulo__explicacao > :is(p, ul, ol, blockquote, table):last-child, .retorno__anterior-corpo > :last-child { margin-bottom: 0; }
 @media (prefers-reduced-motion: reduce) {
-	.escrita__regra, .escrita__materia-botao, .escrita__link, .retorno__motivo, .retorno__bloco--reescrevendo .retorno__conteudo > .ap-block { transition: none; }
+	.escrita__regra, .escrita__materia-botao, .escrita__link, .retorno__motivo, .retorno__bloco--reescrevendo .retorno__conteudo > :is(.ap-block, .modulo__postit) { transition: none; }
 	.retorno__motivo:hover { transform: none; }
 }

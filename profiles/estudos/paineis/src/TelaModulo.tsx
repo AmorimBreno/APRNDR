@@ -53,6 +53,7 @@ import {
 	pad2,
 	QuizQuestion,
 	SectionRuler,
+	Sticker,
 	Tag,
 	TextArea,
 	type Tone,
@@ -123,8 +124,10 @@ import {
 	passosDaTrilha,
 	perguntaConcluir,
 	podeConcluir,
+	postItDaQuestao,
 	proximoDaBarra,
 	resumoDoIndice,
+	ROTULO_IDEIA_CENTRAL,
 	rotuloConcluido,
 	rotuloDoBloco,
 	TEXTO_AVISO,
@@ -619,8 +622,12 @@ export function BlocoDaLicao(props: { bloco: Bloco; numero: number; licao?: stri
 	const [aberto, setAberto] = useState(false);
 	const { rotulo, icone } = rotuloDoBloco(bloco);
 	const referencias = "referencias" in bloco ? agruparReferencias(bloco.referencias) : [];
-	// A prática (pergunta rápida, questão e dissertativa) vai num cartão; a explicação, solta, como texto de artigo.
-	const pratica = bloco.tipo !== "explicacao";
+	// A prática (pergunta rápida, quiz e dissertativa) vai num cartão com a borda e o post-it do tipo; a explicação,
+	// solta, como texto de artigo, com a etiqueta do formato; a ideia central, no Callout, sem etiqueta.
+	const postIt = postItDaQuestao(bloco);
+	const pratica = postIt !== undefined;
+	const etiqueta = bloco.tipo === "explicacao";
+	const cabeca = etiqueta || foiReescrito(bloco);
 	const versao = versaoDoBloco(bloco);
 	const anteriores = versoesAnteriores(bloco);
 
@@ -747,22 +754,36 @@ export function BlocoDaLicao(props: { bloco: Bloco; numero: number; licao?: stri
 					exit={semMovimento() ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, transition: { duration: 0.12 } }}
 					transition={MOLA}
 				>
-					<LessonBlock index={props.numero} {...(pratica ? { className: "modulo__cartao" } : {})} {...(acoes ? { actions: acoes } : {})}>
-						<header className="ap-block__head modulo__bloco-cabeca">
-							<Tag className="ap-block__label" tone="steel" size="sm" icon={icone}>
-								{rotulo}
-							</Tag>
-							{ehComplemento(bloco) ? (
-								<Tag tone="amber" size="sm" title="Este bloco vai além dos seus materiais.">
-									Além do material
-								</Tag>
-							) : null}
-							{foiReescrito(bloco) ? (
-								<Tag tone="neutral" size="sm" icon="refresh" className="retorno__reescrito" title={tituloDoReescrito(bloco)}>
-									{ROTULO_REESCRITO}
-								</Tag>
-							) : null}
-						</header>
+					{postIt ? (
+						<Sticker className="modulo__postit" tone={postIt.tom} pin="top-right" rotate={4}>
+							<Icon name={postIt.icone} size={16} strokeWidth={2.5} />
+							{postIt.nome}
+						</Sticker>
+					) : null}
+					<LessonBlock
+						index={props.numero}
+						{...(postIt ? { className: `modulo__cartao modulo__cartao--${postIt.tom}` } : {})}
+						{...(acoes ? { actions: acoes } : {})}
+					>
+						{cabeca ? (
+							<header className="ap-block__head modulo__bloco-cabeca">
+								{etiqueta ? (
+									<Tag className="ap-block__label" tone="steel" size="sm" icon={icone}>
+										{rotulo}
+									</Tag>
+								) : null}
+								{ehComplemento(bloco) ? (
+									<Tag tone="amber" size="sm" title="Este bloco vai além dos seus materiais.">
+										Além do material
+									</Tag>
+								) : null}
+								{foiReescrito(bloco) ? (
+									<Tag tone="neutral" size="sm" icon="refresh" className="retorno__reescrito" title={tituloDoReescrito(bloco)}>
+										{ROTULO_REESCRITO}
+									</Tag>
+								) : null}
+							</header>
+						) : null}
 						<ConteudoDoBloco bloco={bloco} gabarito={aberto} />
 					</LessonBlock>
 				</motion.div>
@@ -820,6 +841,12 @@ function ConteudoDoBloco({ bloco, gabarito: aberto }: { bloco: Bloco | BlocoAnte
 	} else if (bloco.tipo === "verificacao") {
 		conteudo = <Markdown texto={bloco.pergunta} />;
 		gabarito = <RespostaEsperada bloco={bloco} />;
+	} else if (bloco.tipo === "ideia_central") {
+		conteudo = (
+			<Callout className="modulo__ideia" tone="moss" label={ROTULO_IDEIA_CENTRAL.rotulo} icon={ROTULO_IDEIA_CENTRAL.icone}>
+				<Markdown texto={bloco.texto} />
+			</Callout>
+		);
 	} else if (bloco.tipo === "alternativa") {
 		conteudo = <QuestaoAlternativa bloco={bloco} gabarito={aberto} />;
 		gabarito = bloco.explicacao ? (

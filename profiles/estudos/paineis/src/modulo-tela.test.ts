@@ -26,6 +26,7 @@ import {
 	passosDaTrilha,
 	perguntaConcluir,
 	podeConcluir,
+	postItDaQuestao,
 	proximoDaBarra,
 	resumoDoIndice,
 	rotaDoModulo,
@@ -35,7 +36,7 @@ import {
 } from "./modulo-tela.ts";
 import { lerModuloAberto, lerModulos } from "./modulos-ponte.ts";
 
-const explicacao = (id: string, formato: "conceito" | "exemplo_resolvido" | "exemplo_incompleto" | "problema_aberto", complemento = false): Bloco => ({
+const explicacao = (id: string, formato: "introducao" | "conceito" | "exemplo_resolvido" | "exemplo_incompleto" | "problema_aberto", complemento = false): Bloco => ({
 	id,
 	tipo: "explicacao",
 	conceitos: ["c-a"],
@@ -67,6 +68,7 @@ const dissertativa = (id: string): Bloco => ({
 	respostaModelo: "Modelo.",
 	referencias: [],
 });
+const ideiaCentral = (id: string): Bloco => ({ id, tipo: "ideia_central", conceitos: ["c-a"], texto: "O que guardar." });
 const licao = (id: string, titulo: string, blocos: Bloco[]): Licao => ({ id, titulo, objetivo: "", conceitos: ["c-a"], blocos });
 const gerado = (licoes: Licao[]): Modulo => ({
 	versao: 1,
@@ -122,6 +124,7 @@ describe("o que abrir mostra", () => {
 
 describe("os blocos", () => {
 	it("explicação: o rótulo e o ícone pelo formato", () => {
+		expect(rotuloDoBloco(explicacao("b", "introducao"))).toEqual({ rotulo: "Introdução", icone: "flag" });
 		expect(rotuloDoBloco(explicacao("b", "conceito"))).toEqual({ rotulo: "Explicação", icone: "bulb" });
 		expect(rotuloDoBloco(explicacao("b", "exemplo_resolvido"))).toEqual({ rotulo: "Exemplo resolvido", icone: "code" });
 		expect(rotuloDoBloco(explicacao("b", "exemplo_incompleto"))).toEqual({ rotulo: "Exemplo para completar", icone: "code" });
@@ -130,8 +133,21 @@ describe("os blocos", () => {
 
 	it("as práticas: o rótulo e o ícone pelo tipo", () => {
 		expect(rotuloDoBloco(verificacao("b"))).toEqual({ rotulo: "Pergunta", icone: "help" });
-		expect(rotuloDoBloco(alternativa("b"))).toEqual({ rotulo: "Questão", icone: "checklist" });
+		expect(rotuloDoBloco(alternativa("b"))).toEqual({ rotulo: "Quiz", icone: "checklist" });
 		expect(rotuloDoBloco(dissertativa("b"))).toEqual({ rotulo: "Dissertativa", icone: "message" });
+	});
+
+	it("a ideia central: o rótulo e o ícone do Callout", () => {
+		expect(rotuloDoBloco(ideiaCentral("b"))).toEqual({ rotulo: "Ideia central", icone: "bulb" });
+	});
+
+	it("o post-it de cada questão: o nome, o ícone e a cor; a explicação e a ideia central não têm", () => {
+		expect(postItDaQuestao(alternativa("b"))).toEqual({ nome: "Quiz", icone: "checklist", tom: "amber" });
+		expect(postItDaQuestao(dissertativa("b"))).toEqual({ nome: "Dissertativa", icone: "message", tom: "brick" });
+		expect(postItDaQuestao(verificacao("b"))).toEqual({ nome: "Pergunta", icone: "help", tom: "moss" });
+		expect(postItDaQuestao(explicacao("b", "introducao"))).toBeUndefined();
+		expect(postItDaQuestao(explicacao("b", "conceito"))).toBeUndefined();
+		expect(postItDaQuestao(ideiaCentral("b"))).toBeUndefined();
 	});
 
 	it("o complemento é só a explicação marcada", () => {
@@ -143,7 +159,7 @@ describe("os blocos", () => {
 	it("a régua: um traço por bloco, com o rótulo", () => {
 		expect(itensDaRegua(licao("l1", "Um", [explicacao("l1-b1", "exemplo_resolvido"), alternativa("l1-b2")]))).toEqual([
 			{ id: "l1-b1", label: "Exemplo resolvido" },
-			{ id: "l1-b2", label: "Questão" },
+			{ id: "l1-b2", label: "Quiz" },
 		]);
 	});
 

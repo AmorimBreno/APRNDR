@@ -73,29 +73,52 @@ export function aberturaDoModulo(lido: LidoModuloAberto): Abertura {
 
 /** O rótulo e o ícone de cada formato de explicação. */
 export const ROTULOS_EXPLICACAO: Record<FormatoExplicacao, { rotulo: string; icone: IconName }> = {
+	introducao: { rotulo: "Introdução", icone: "flag" },
 	conceito: { rotulo: "Explicação", icone: "bulb" },
 	exemplo_resolvido: { rotulo: "Exemplo resolvido", icone: "code" },
 	exemplo_incompleto: { rotulo: "Exemplo para completar", icone: "code" },
 	problema_aberto: { rotulo: "Problema aberto", icone: "flag" },
 };
 
-/** O rótulo e o ícone das práticas. */
+/** O rótulo e o ícone das práticas (o nome e o ícone do post-it delas). */
 export const ROTULOS_PRATICA = {
 	verificacao: { rotulo: "Pergunta", icone: "help" },
-	alternativa: { rotulo: "Questão", icone: "checklist" },
+	alternativa: { rotulo: "Quiz", icone: "checklist" },
 	dissertativa: { rotulo: "Dissertativa", icone: "message" },
 } as const satisfies Record<string, { rotulo: string; icone: IconName }>;
 
-/** O rótulo (a Tag do LessonBlock) e o ícone de um bloco, pelo tipo e, na explicação, pelo formato. */
+/** O rótulo e o ícone da ideia central (o título do Callout dela e o traço da régua). */
+export const ROTULO_IDEIA_CENTRAL = { rotulo: "Ideia central", icone: "bulb" } as const satisfies { rotulo: string; icone: IconName };
+
+/** O rótulo (a Tag do LessonBlock, o post-it da questão, o traço da régua) e o ícone de um bloco, pelo tipo e, na explicação, pelo formato. */
 export function rotuloDoBloco(bloco: Pick<Bloco, "tipo"> & { formato?: FormatoExplicacao }): { rotulo: string; icone: IconName } {
 	if (bloco.tipo === "explicacao") return ROTULOS_EXPLICACAO[bloco.formato ?? "conceito"] ?? ROTULOS_EXPLICACAO.conceito;
+	if (bloco.tipo === "ideia_central") return ROTULO_IDEIA_CENTRAL;
 	return ROTULOS_PRATICA[bloco.tipo];
+}
+
+/** O tom do post-it (e da borda do cartão) de cada tipo de questão (docs/modulos.md, "A tela das questões"). */
+export type TomDaQuestao = "amber" | "brick" | "moss";
+
+export interface PostItDaQuestao {
+	nome: string;
+	icone: IconName;
+	tom: TomDaQuestao;
+}
+
+const TONS_DA_QUESTAO: Record<keyof typeof ROTULOS_PRATICA, TomDaQuestao> = { alternativa: "amber", dissertativa: "brick", verificacao: "moss" };
+
+/** O post-it de uma questão (Quiz âmbar, Dissertativa tijolo, Pergunta musgo); a explicação e a ideia central não têm. */
+export function postItDaQuestao(bloco: Pick<Bloco, "tipo">): PostItDaQuestao | undefined {
+	if (bloco.tipo !== "verificacao" && bloco.tipo !== "alternativa" && bloco.tipo !== "dissertativa") return undefined;
+	const { rotulo, icone } = ROTULOS_PRATICA[bloco.tipo];
+	return { nome: rotulo, icone, tom: TONS_DA_QUESTAO[bloco.tipo] };
 }
 
 /** O bloco vai além do material (só a explicação pode ir). */
 export const ehComplemento = (bloco: Bloco): boolean => bloco.tipo === "explicacao" && bloco.complemento === true;
 
-/** Os traços da SectionRuler: um por bloco, com o rótulo dele ("03 · Questão" no hover). */
+/** Os traços da SectionRuler: um por bloco, com o rótulo dele ("03 · Quiz" no hover). */
 export function itensDaRegua(licao: Pick<Licao, "blocos">): RulerItem[] {
 	return licao.blocos.map((bloco) => ({ id: bloco.id, label: rotuloDoBloco(bloco).rotulo }));
 }

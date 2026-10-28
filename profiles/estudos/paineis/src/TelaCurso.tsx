@@ -17,7 +17,8 @@
 // durante a geração, o card preto se enche de musgo pelo progresso e embaixo
 // dele aparecem a etapa e "Parar"; o gerado é musgo, com "Abrir" (a visão do
 // módulo gerado, TelaModulo.tsx) e, embaixo, "Gerado" com as lições e as
-// questões e "Gerar de novo" (com confirmação); o concluído é o holográfico,
+// questões, "Gerar de novo" (com confirmação) e "3 de 12 questões feitas"
+// (o progresso do estado); o concluído é o holográfico,
 // com "Rever"; o aguardando material é preto, com a etiqueta, a nota e "Gerar
 // agora"; o erro, a mensagem e "Tentar de novo". Só o recomendado leva a
 // etiqueta "Próximo". Nenhum card fica bloqueado.
@@ -46,6 +47,7 @@ import {
 	estiloDoCard,
 	PERGUNTA_GERAR_DE_NOVO,
 	resumoDoGerado,
+	textoDasFeitas,
 	textoDaEtapa,
 } from "./modulos-tela.ts";
 
@@ -384,7 +386,7 @@ export function TelaCurso(props: PropsTelaCurso) {
 /**
  * O que fica embaixo do card, pelo estado do módulo: durante a geração, a
  * etapa e "Parar" (o progresso é o enchimento do card); no gerado, "Gerado",
- * as lições e as questões e "Gerar de novo"; no aguardando material, a
+ * as lições e as questões, "Gerar de novo" e "3 de 12 questões feitas"; no aguardando material, a
  * etiqueta, a nota e o aviso de material novo; no erro, a mensagem; no
  * concluído, nada.
  */
@@ -416,16 +418,20 @@ function RodapeModulo(props: {
 		);
 	} else if (card.tipo === "gerado") {
 		const resumo = estado ? resumoDoGerado(estado) : "";
+		const feitas = textoDasFeitas(estado?.progresso);
 		conteudo = (
-			<div className="mod__linha">
-				<Tag size="sm" tone="sage" icon="check">
-					Gerado
-				</Tag>
-				{resumo ? <span className="data mod__resumo">{resumo}</span> : null}
-				<Button variant="ghost" size="sm" icon="refresh" className="mod__de-novo" onClick={props.gerarDeNovo}>
-					Gerar de novo
-				</Button>
-			</div>
+			<>
+				<div className="mod__linha">
+					<Tag size="sm" tone="sage" icon="check">
+						Gerado
+					</Tag>
+					{resumo ? <span className="data mod__resumo">{resumo}</span> : null}
+					<Button variant="ghost" size="sm" icon="refresh" className="mod__de-novo" onClick={props.gerarDeNovo}>
+						Gerar de novo
+					</Button>
+				</div>
+				{feitas ? <p className="data mod__feitas">{feitas}</p> : null}
+			</>
 		);
 	} else if (card.tipo === "aguardando") {
 		conteudo = (

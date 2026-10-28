@@ -20,10 +20,19 @@
 // bloco é reescrito, o estado do módulo traz reescrevendo; no fim, chega o
 // "modulo" novo (useModuloAberto). Um "erro" do reescrever_bloco que chega
 // depois de começar fica no bloco (errosDaReescrita).
+//
+// As questões do módulo (docs/modulos.md, "Responder as questões"):
+// responder, corrigir e encerrar levam um pedido, como o retorno; a promessa
+// resolve com a primeira resposta com ele que não é um "erro" (o "modulo" com
+// a resposta) e rejeita com o "erro" dele. Toda mensagem "modulo" traz o
+// corrigindo (os blocos em conferência agora), que o useModuloAberto guarda.
+// Uma conferência que falha manda um "erro" com ao "corrigir" e o bloco, que
+// fica na questão (errosDasQuestoes) até a conferência recomeçar.
 
 import { type AcaoRecebida, type JanelaPerfilHook, semEsperar } from "@estudos/ui";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AcoesModulosEscrita } from "../../lib/escrita-tipos.ts";
+import type { EntradaResponder } from "../../lib/modulo-respostas-tipos.ts";
 import { type AcoesModulos, type MensagemErroModulos, type MensagemEstadoModulos, type MensagemModulo, PAINEL_MODULOS } from "../../lib/modulo-tipos.ts";
 import { EsperaDePedidos, respostaQualquer } from "./escrita-ponte.ts";
 import { chaveDoBloco, type DadosDoRetorno } from "./escrita-tela.ts";
@@ -56,6 +65,9 @@ export interface LidoModulos {
 const doCurso = (dados: { materia?: string; curso?: string } | undefined, materia: string, curso: string) =>
 	!!dados && (dados.materia === undefined || dados.materia === materia) && (dados.curso === undefined || dados.curso === curso);
 
+/** As ações cujos erros são da visão do módulo (lerModuloAberto, errosDaReescrita, errosDasQuestoes), não do card. */
+const AO_DA_VISAO = new Set(["abrir", "retorno", "reescrever_bloco", "responder", "corrigir", "encerrar"]);
+
 /**
  * Lê, em ordem, o que chegou ao painel "modulos" para o curso. Um erro sem
  * matéria ou sem curso também conta (só esta tela ouve o painel). Os erros
@@ -78,8 +90,8 @@ export function lerModulos(recebidas: readonly AcaoRecebida[], materia: string, 
 			}
 		} else if (recebida.acao === "erro") {
 			const dados = recebida.dados as MensagemErroModulos | undefined;
-			// Os erros do abrir, do retorno e da reescrita são da visão do módulo (lerModuloAberto, errosDaReescrita), não do card.
-			if (!dados || !doCurso(dados, materia, curso) || dados.pedido || dados.ao === "abrir" || dados.ao === "retorno" || dados.ao === "reescrever_bloco") continue;
+			// Os erros do abrir, do retorno, da reescrita e das questões são da visão do módulo, não do card.
+			if (!dados || !doCurso(dados, materia, curso) || dados.pedido || (dados.ao !== undefined && AO_DA_VISAO.has(dados.ao))) continue;
 			const erro: ErroVistoModulo = { chave: recebida.chave, mensagem: dados.mensagem || "Erro desconhecido.", ...(dados.ao ? { ao: dados.ao } : {}) };
 			if (dados.modulo && dados.ao !== "listar") errosModulo[dados.modulo] = erro;
 			else erroLista = erro;
@@ -90,10 +102,14 @@ export function lerModulos(recebidas: readonly AcaoRecebida[], materia: string, 
 
 // --- O módulo aberto (parte B) ----------------------------------------------
 
+/** Os ids de blocos do corrigindo de uma mensagem "modulo" (só os textos; ausente ou fora do formato, vazio). */
+const blocosCorrigindo = (corrigindo: unknown): string[] =>
+	Array.isArray(corrigindo) ? corrigindo.filter((bloco): bloco is string => typeof bloco === "string" && bloco !== "") : [];
+
 /**
  * Lê, em ordem, a resposta ao "abrir" do módulo: o último "modulo" daquele
- * módulo do curso, ou o último "erro" do abrir dele (o que veio por último
- * vale). Nada ainda, vazio.
+ * módulo do curso (com o corrigindo dele), ou o último "erro" do abrir dele
+ * (o que veio por último vale). Nada ainda, vazio.
  */
 export function lerModuloAberto(recebidas: readonly AcaoRecebida[], materia: string, curso: string, modulo: string): LidoModuloAberto {
 	let lido: LidoModuloAberto = {};
@@ -101,7 +117,7 @@ export function lerModuloAberto(recebidas: readonly AcaoRecebida[], materia: str
 		if (recebida.acao === "modulo") {
 			const dados = recebida.dados as MensagemModulo | undefined;
 			if (!dados || dados.materia !== materia || dados.curso !== curso || dados.modulo?.id !== modulo || !Array.isArray(dados.modulo.licoes)) continue;
-			lido = { modulo: dados.modulo };
+			lido = { modulo: dados.modulo, corrigindo: blocosCorrigindo(dados.corrigindo) };
 		} else if (recebida.acao === "erro") {
 			const dados = recebida.dados as MensagemErroModulos | undefined;
 			if (!dados || dados.ao !== "abrir" || dados.modulo !== modulo || !doCurso(dados, materia, curso)) continue;
@@ -186,6 +202,32 @@ export function errosDaReescrita(
 				chave = typeof dados.licao === "string" && typeof dados.bloco === "string" ? chaveDoBloco(dados.licao, dados.bloco) : ultimo;
 			}
 			if (chave) erros[chave] = { chave: recebida.chave, mensagem: dados.mensagem || "Erro desconhecido.", ...(dados.ao ? { ao: dados.ao } : {}) };
+		}
+	}
+	return erros;
+}
+
+// --- As questões (docs/modulos.md, "Responder as questões") --------------------
+
+/**
+ * Os erros da conferência de cada questão do módulo (pelo id do bloco), lidos
+ * em ordem: um "erro" com ao "corrigir" e o bloco, daquele módulo (com ou sem
+ * pedido). Um "modulo" posterior com o bloco no corrigindo (a conferência
+ * recomeçou) apaga o erro dele. Quem mostra confere se a questão ainda espera
+ * a conferência (situacaoDaQuestao.aConferir).
+ */
+export function errosDasQuestoes(recebidas: readonly AcaoRecebida[], alvo: { materia: string; curso: string; modulo: string }): Record<string, ErroVistoModulo> {
+	const erros: Record<string, ErroVistoModulo> = {};
+	for (const recebida of recebidas) {
+		if (recebida.acao === "modulo") {
+			const dados = recebida.dados as MensagemModulo | undefined;
+			if (!dados || dados.materia !== alvo.materia || dados.curso !== alvo.curso || dados.modulo?.id !== alvo.modulo) continue;
+			for (const bloco of blocosCorrigindo(dados.corrigindo)) delete erros[bloco];
+		} else if (recebida.acao === "erro") {
+			const dados = recebida.dados as MensagemErroModulos | undefined;
+			if (!dados || dados.ao !== "corrigir" || typeof dados.bloco !== "string" || !dados.bloco || !doCurso(dados, alvo.materia, alvo.curso)) continue;
+			if (dados.modulo !== undefined && dados.modulo !== alvo.modulo) continue;
+			erros[dados.bloco] = { chave: recebida.chave, mensagem: dados.mensagem || "Erro desconhecido.", ao: "corrigir" };
 		}
 	}
 	return erros;
@@ -283,7 +325,18 @@ export interface ModulosDoCurso {
 	reescreverBloco(modulo: string, licao: string, bloco: string, retorno: string): Promise<void>;
 	/** Os erros da reescrita de cada bloco do módulo (pela chave lição/bloco). */
 	errosReescrita(modulo: string): Record<string, ErroVistoModulo>;
+	/** Responde uma questão (uma tentativa ou "Não sei"); resolve com o "modulo" com a resposta. */
+	responder(modulo: string, bloco: string, entrada: EntradaResponder): Promise<void>;
+	/** Tenta de novo a conferência que falhou; resolve quando a conferência chegou. */
+	corrigir(modulo: string, bloco: string): Promise<void>;
+	/** "Ver a resposta-modelo": encerra a dissertativa corrigida. */
+	encerrar(modulo: string, bloco: string): Promise<void>;
+	/** Os erros da conferência de cada questão do módulo (pelo id do bloco). */
+	errosQuestoes(modulo: string): Record<string, ErroVistoModulo>;
 }
+
+/** As ações com pedido cuja resposta não tem nome fixo na ponte (respostaQualquer). */
+type AcoesComPedido = AcoesModulosEscrita & Pick<AcoesModulos, "responder" | "corrigir" | "encerrar">;
 
 /**
  * Os módulos de um curso: pede "listar" ao montar, quando a sessão muda e
@@ -328,7 +381,7 @@ export function useModulos(janela: JanelaPerfilHook, materia: string, curso: str
 
 	const [pedidos, setPedidos] = useState<Record<string, CamposPedido>>({});
 
-	// O retorno e a reescrita: a resposta não tem nome fixo na ponte (respostaQualquer).
+	// O retorno, a reescrita e as questões: a resposta não tem nome fixo na ponte (respostaQualquer).
 	const esperaRetorno = useRef<EsperaDePedidos<{ acao: string; dados: Record<string, unknown> }> | undefined>(undefined);
 	esperaRetorno.current ??= new EsperaDePedidos(respostaQualquer, (mensagem) => new ErroDosModulos(mensagem));
 	useEffect(() => {
@@ -336,7 +389,7 @@ export function useModulos(janela: JanelaPerfilHook, materia: string, curso: str
 	}, [recebidas]);
 	useEffect(() => () => esperaRetorno.current!.cancelar("A conversa mudou antes da resposta. Tente de novo."), [sessaoId]);
 	const mandarComPedido = useCallback(
-		<Acao extends keyof AcoesModulosEscrita>(acao: Acao, dados: AcoesModulosEscrita[Acao]) => {
+		<Acao extends keyof AcoesComPedido>(acao: Acao, dados: AcoesComPedido[Acao]) => {
 			const promessa = esperaRetorno.current!.esperar(dados.pedido);
 			acoes.acaoDaInterface(PAINEL_MODULOS, acao, dados).catch((falha: unknown) => {
 				esperaRetorno.current!.falhar(dados.pedido, `Não consegui falar com a sessão: ${(falha as Error).message}`);
@@ -381,6 +434,16 @@ export function useModulos(janela: JanelaPerfilHook, materia: string, curso: str
 				Object.fromEntries(Object.entries(reescritas.pedidos).filter(([, item]) => item.modulo === modulo).map(([pedido, item]) => [pedido, item.chave])),
 				reescritas.ultimo[modulo],
 			),
+		responder: async (modulo, bloco, entrada) => {
+			await mandarComPedido("responder", { materia, curso, modulo, bloco, pedido: crypto.randomUUID(), ...entrada });
+		},
+		corrigir: async (modulo, bloco) => {
+			await mandarComPedido("corrigir", { materia, curso, modulo, bloco, pedido: crypto.randomUUID() });
+		},
+		encerrar: async (modulo, bloco) => {
+			await mandarComPedido("encerrar", { materia, curso, modulo, bloco, pedido: crypto.randomUUID() });
+		},
+		errosQuestoes: (modulo) => errosDasQuestoes(recebidas ?? [], { materia, curso, modulo }),
 		cancelar: async (modulo) => {
 			try {
 				await acoes.acaoDaInterface(PAINEL_MODULOS, "cancelar", { materia, curso, modulo } satisfies AcoesModulos["cancelar"]);

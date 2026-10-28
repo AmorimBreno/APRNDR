@@ -34,7 +34,7 @@ import {
 	rotuloDoBloco,
 	tituloDoModulo,
 } from "./modulo-tela.ts";
-import { lerModuloAberto, lerModulos } from "./modulos-ponte.ts";
+import { errosDasQuestoes, lerModuloAberto, lerModulos } from "./modulos-ponte.ts";
 
 const explicacao = (id: string, formato: "introducao" | "conceito" | "exemplo_resolvido" | "exemplo_incompleto" | "problema_aberto", complemento = false): Bloco => ({
 	id,
@@ -299,15 +299,76 @@ describe("a ponte: a resposta ao abrir", () => {
 			recebida("3", "erro", { mensagem: "Falhou o listar.", ao: "listar", materia: "materia", curso: "curso" }),
 			recebida("4", "modulo", { materia: "materia", curso: "curso", modulo }),
 		];
-		expect(lerModuloAberto(recebidas, "materia", "curso", "m2")).toEqual({ modulo });
+		expect(lerModuloAberto(recebidas, "materia", "curso", "m2")).toEqual({ modulo, corrigindo: [] });
 		const comErro = [...recebidas, recebida("5", "erro", { mensagem: "O módulo m2 ainda não foi gerado.", ao: "abrir", materia: "materia", curso: "curso", modulo: "m2" })];
 		expect(lerModuloAberto(comErro, "materia", "curso", "m2")).toEqual({ erro: "O módulo m2 ainda não foi gerado." });
-		expect(lerModuloAberto([...comErro, recebida("6", "modulo", { materia: "materia", curso: "curso", modulo })], "materia", "curso", "m2")).toEqual({ modulo });
+		expect(lerModuloAberto([...comErro, recebida("6", "modulo", { materia: "materia", curso: "curso", modulo })], "materia", "curso", "m2")).toEqual({ modulo, corrigindo: [] });
+	});
+
+	it("guarda o corrigindo do último módulo (só os ids em texto)", () => {
+		const recebidas = [
+			recebida("1", "modulo", { materia: "materia", curso: "curso", modulo, corrigindo: ["l1-b2"] }),
+			recebida("2", "modulo", { materia: "materia", curso: "curso", modulo: { ...modulo, id: "m3" }, corrigindo: [] }),
+		];
+		expect(lerModuloAberto(recebidas, "materia", "curso", "m2")).toEqual({ modulo, corrigindo: ["l1-b2"] });
+		const depois = [...recebidas, recebida("3", "modulo", { materia: "materia", curso: "curso", modulo, corrigindo: ["l1-b2", 3, "", null] })];
+		expect(lerModuloAberto(depois, "materia", "curso", "m2").corrigindo).toEqual(["l1-b2"]);
+		const semCampo = [...depois, recebida("4", "modulo", { materia: "materia", curso: "curso", modulo })];
+		expect(lerModuloAberto(semCampo, "materia", "curso", "m2").corrigindo).toEqual([]);
 	});
 
 	it("os erros do abrir não viram erro do card na visão do curso", () => {
 		const lido = lerModulos([recebida("1", "erro", { mensagem: "O módulo m2 ainda não foi gerado.", ao: "abrir", materia: "materia", curso: "curso", modulo: "m2" })], "materia", "curso");
 		expect(lido.errosModulo).toEqual({});
 		expect(lido.erroLista).toBeUndefined();
+	});
+
+	it("os erros das questões (responder, corrigir, encerrar) também não viram erro do card", () => {
+		const lido = lerModulos(
+			[
+				recebida("1", "erro", { mensagem: "O modelo não respondeu.", ao: "corrigir", materia: "materia", curso: "curso", modulo: "m2", bloco: "l1-b2" }),
+				recebida("2", "erro", { mensagem: "Já acabou.", ao: "responder", materia: "materia", curso: "curso", modulo: "m2", bloco: "l1-b2" }),
+				recebida("3", "erro", { mensagem: "Já encerrada.", ao: "encerrar", materia: "materia", curso: "curso", modulo: "m2", bloco: "l1-b2" }),
+			],
+			"materia",
+			"curso",
+		);
+		expect(lido.errosModulo).toEqual({});
+		expect(lido.erroLista).toBeUndefined();
+	});
+});
+
+describe("a ponte: os erros da conferência das questões", () => {
+	const recebida = (chave: string, acao: string, dados: unknown): AcaoRecebida => ({ chave, acao, dados });
+	const modulo = gerado([licao("l1", "Um", [explicacao("l1-b1", "conceito"), verificacao("l1-b2"), alternativa("l1-b3")])]);
+	const alvo = { materia: "materia", curso: "curso", modulo: "m2" };
+	const erro = (chave: string, dados: Record<string, unknown>) => recebida(chave, "erro", { materia: "materia", curso: "curso", modulo: "m2", ...dados });
+
+	it("o erro do corrigir fica no bloco, com ou sem pedido; os de outras ações e de outros módulos, não", () => {
+		expect(errosDasQuestoes([], alvo)).toEqual({});
+		const recebidas = [
+			erro("1", { mensagem: "O modelo não respondeu.", ao: "corrigir", bloco: "l1-b2" }),
+			erro("2", { mensagem: "Escolha repetida.", ao: "responder", bloco: "l1-b3", pedido: "p1" }),
+			erro("3", { mensagem: "Outro módulo.", ao: "corrigir", bloco: "l1-b3", modulo: "m3" }),
+			erro("4", { mensagem: "Sem bloco.", ao: "corrigir" }),
+			recebida("5", "erro", { mensagem: "Outro curso.", ao: "corrigir", bloco: "l1-b3", materia: "materia", curso: "outro" }),
+			erro("6", { mensagem: "", ao: "corrigir", bloco: "l1-b9", pedido: "p2" }),
+		];
+		expect(errosDasQuestoes(recebidas, alvo)).toEqual({
+			"l1-b2": { chave: "1", mensagem: "O modelo não respondeu.", ao: "corrigir" },
+			"l1-b9": { chave: "6", mensagem: "Erro desconhecido.", ao: "corrigir" },
+		});
+	});
+
+	it("o módulo com o bloco no corrigindo (a conferência recomeçou) apaga o erro; depois, um erro novo volta", () => {
+		const primeiro = erro("1", { mensagem: "Falhou.", ao: "corrigir", bloco: "l1-b2" });
+		const outroModulo = recebida("2", "modulo", { materia: "materia", curso: "curso", modulo: { ...modulo, id: "m3" }, corrigindo: ["l1-b2"] });
+		expect(errosDasQuestoes([primeiro, outroModulo], alvo)).toHaveProperty("l1-b2");
+		const semEle = recebida("3", "modulo", { materia: "materia", curso: "curso", modulo, corrigindo: [] });
+		expect(errosDasQuestoes([primeiro, semEle], alvo)).toHaveProperty("l1-b2");
+		const recomecou = recebida("4", "modulo", { materia: "materia", curso: "curso", modulo, corrigindo: ["l1-b2"] });
+		expect(errosDasQuestoes([primeiro, recomecou], alvo)).toEqual({});
+		const deNovo = erro("5", { mensagem: "Falhou de novo.", ao: "corrigir", bloco: "l1-b2" });
+		expect(errosDasQuestoes([primeiro, recomecou, deNovo], alvo)).toEqual({ "l1-b2": { chave: "5", mensagem: "Falhou de novo.", ao: "corrigir" } });
 	});
 });

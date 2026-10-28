@@ -42,6 +42,8 @@ export function indiceDaLicao(licoes: readonly Pick<Licao, "id">[], licao: strin
 /** O que a extensão respondeu ao "abrir" (modulos-ponte.ts, lerModuloAberto). */
 export interface LidoModuloAberto {
 	modulo?: Modulo;
+	/** Os blocos cuja resposta está sendo conferida pelo modelo agora (o corrigindo do último "modulo"; vazio sem nenhum). */
+	corrigindo?: string[];
 	erro?: string;
 }
 

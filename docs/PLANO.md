@@ -273,4 +273,18 @@ Escrita dos módulos (2026-10-28; pedido do Breno: dar retorno e ver a escrita m
 - Conferido no navegador só abrindo as telas, sem salvar nada (para não gravar eventos de teste no aprendiz/eventos.jsonl do Breno): o modal vazio com o exemplo, o campo da regra nova, o link no índice e o balão do retorno (os motivos só com Precisa melhorar; o texto da regra acompanhando o retorno). Não conferi no app: salvar uma regra, salvar um retorno, a reescrita com o Parar e a versão anterior (estão no roteiro docs/teste-escrita.md).
 - Riscos anotados: no escopo "só o material", a reescrita pode trazer números de exemplo que não estão no material sem marcar complemento (a validação aceita, porque o bloco tem referência); o subtítulo de um passo pode não combinar com o parágrafo.
 
+Plano de 2026-10-28, aprovado pelo Breno ("manda bala"). Quatro partes, cada uma aprovada no app:
+- (1) Um post-it por tipo de questão, o esquema da lição e lições mais ricas, a metodologia em arquivos.
+- (2) Questões de verdade nos módulos: o quiz com dica depois do erro e a resposta depois de 2 erros; a dissertativa escrita e corrigida pela rubrica, com a nota pelos conceitos; a pergunta rápida conferida; a confiança de 1 a 4 antes. Tudo vira evento, e o progresso sai das respostas.
+- (3) Feedback: em cada bloco de texto, "Feedback" com Ruim, Bom e Ótimo e um Detalhar com o balão de retorno; no fim de cada lição, um questionário opcional com sliders de 5 níveis e o professor em forma de bolha (desenhada por nós em SVG, inspirada numa imagem que o Breno mandou), que muda de humor, de chorando a maravilhado, com a barra que esquenta e o fogo no excelente.
+- (4) O ciclo do método: ao concluir um módulo, um relatório dos retornos e propostas de ajuste da metodologia citando eventos, aprovadas uma a uma pelo Breno, guardadas em aprendiz/metodo/.
+- As perguntas que ele não respondeu seguiram as recomendações: a confiança antes das questões; o "Feedback" substitui o "Retorno", com Detalhar.
+
+Parte 1 feita (2026-10-28, aguarda a aprovação no app). Contrato em docs/modulos.md ("O esquema da lição", "A metodologia em arquivos", "A tela das questões"):
+- O esquema da lição na lib: a introdução primeiro, o ciclo conceito → exemplo → pergunta, a ideia central antes do quiz final, a dissertativa na parte teórica, nunca duas questões seguidas, pelo menos 70 % de explicação e tamanhos mínimos. O plano é consertado com uma nova tentativa; a lição ganha uma nova tentativa com a lista dos problemas.
+- A metodologia saiu dos prompts para profiles/estudos/metodo/ (estrutura-da-licao, introducao, conceito, exemplos, ideia-central, pergunta, quiz, dissertativa). Cada chamada carrega só a parte que usa, e o hash vai nos eventos.
+- A tela: um post-it por tipo de questão (Quiz âmbar e Dissertativa tijolo com texto preto; Pergunta musgo com o texto claro do card, porque o preto sobre o musgo ficava ilegível), a borda do cartão na cor do tipo, a ideia central no Callout e o rótulo Introdução.
+- Chamada real (scripts/testar-modulo.ts): um módulo de 2 h virou 2 lições de 9 blocos, com 91 a 92 % de explicação e explicações de 990 a 2283 caracteres, seguindo o esquema sem nova tentativa; US$ 0,139 (antes, US$ 0,09 com lições curtas).
+- Conferido no navegador no módulo 1 do Breno: os post-its e as bordas. Não conferido: a ideia central e a introdução no navegador (o módulo dele foi gerado antes; só nos testes). Gerar um módulo novo mostra.
+
 Depois: o item 7 da seção 10 da especificação, a sessão de estudo (a aula interativa com a barra de ações na seleção e o painel do curso), depois de o Breno aprovar o item 6 no app.

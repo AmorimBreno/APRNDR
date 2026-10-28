@@ -43,6 +43,7 @@ As linhas alteradas nos arquivos do learn são marcadas com o comentário [estud
 - paineis/ (Etapa 3): o código de tela do perfil, pacote @estudos/perfil-estudos do workspace (a tela inicial com os cadernos e o painel do quiz).
 - capa.png (Etapa 3): a capa do perfil na tela de perfis (aparencia.capa do profile.json), ilustração escolhida pelo Breno.
 - O ask_user_question do app fica no núcleo (packages/core/src/pergunta.ts), com o mesmo nome, parâmetros e resultado do ask-user-question.ts; este continua só para o pi no terminal.
+- metodo/ (parte 1 do plano de 2026-10-28): a metodologia em arquivos. O metodo/conceito.md traz o essencial da skill teach (do learn); a skill continua no lugar.
 
 ## Pendências
 

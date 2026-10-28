@@ -17,18 +17,22 @@
 // separados por um fio. As explicações ficam soltas, como texto de artigo; a
 // prática (pergunta, questão, dissertativa) vai num cartão. Numa explicação
 // com código principal, o código fica ao lado do texto, fixo, e o `código em
-// linha` do texto destaca no código o trecho citado (CodigoCitado.tsx). As questões mostram o gabarito só quando pedido
-// ("Ver gabarito", "Ver resposta", "Ver rubrica e resposta-modelo"); as
-// referências abrem o material. Responder e pedir outra explicação chegam
-// com a aula (item 7). No pé, a lição anterior e a próxima; na última lição
+// linha` do texto destaca no código o trecho citado (CodigoCitado.tsx). As
+// questões são respondidas no próprio cartão (QuestaoModulo.tsx; docs/modulos.md,
+// "Responder as questões"): a confiança antes, as tentativas, a conferência
+// pelo modelo e o gabarito no fim; as referências abrem o material. O índice
+// mostra no topo o placar das questões feitas do módulo (QuizProgress) e, em
+// cada lição, "3 de 5". No pé, a lição anterior e a próxima; na última lição
 // de um módulo gerado e não concluído, também "Concluir o módulo" (com o
 // modal de confirmação; docs/modulos.md, "Concluir um módulo"), que volta
-// para a visão do curso depois de concluir. Um módulo concluído mostra no
-// topo do índice a etiqueta "Concluído em dd/mm".
+// para a visão do curso depois de concluir, e, com todas as questões feitas,
+// "Você fez todas as questões.". Um módulo concluído mostra no topo do
+// índice a etiqueta "Concluído em dd/mm".
 //
 // O módulo vem da ponte "modulos" (useModuloAberto, a ação "abrir"); o nome
 // e a ordem dos módulos, do curso (useCurso); quais estão gerados, do estado
-// dos módulos (useModulos), que também conclui (a ação "concluir").
+// dos módulos (useModulos), que também conclui (a ação "concluir") e responde
+// as questões (responder, corrigir e encerrar).
 //
 // A escrita dos módulos (docs/escrita.md, "A tela"): no pé de cada bloco,
 // "Retorno" abre um balão embaixo do bloco (Bom / Precisa melhorar, os
@@ -51,7 +55,7 @@ import {
 	Modal,
 	type OrnamentGlyph,
 	pad2,
-	QuizQuestion,
+	QuizProgress,
 	SectionRuler,
 	Sticker,
 	Tag,
@@ -63,21 +67,11 @@ import { AnimatePresence, motion } from "motion/react";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { MOTIVOS_RETORNO, NOMES_AVALIACAO, NOMES_MOTIVO, TEXTO_REGRA_MAXIMO, TEXTO_RETORNO_MAXIMO } from "../../lib/escrita-tipos.ts";
 import type { Materia } from "../../lib/materia-tipos.ts";
-import {
-	type Bloco,
-	type BlocoAlternativa,
-	type BlocoAnterior,
-	type BlocoDissertativa,
-	type BlocoVerificacao,
-	type EstadoModuloNaTela,
-	type Licao,
-	type Modulo,
-	versaoDoBloco,
-} from "../../lib/modulo-tipos.ts";
+import { ehQuestao, progressoDoModulo, respostaDoBloco, type RespostaModulo } from "../../lib/modulo-respostas-tipos.ts";
+import { type Bloco, type BlocoAnterior, type EstadoModuloNaTela, type Licao, type Modulo, versaoDoBloco } from "../../lib/modulo-tipos.ts";
 import { ExplicacaoComCodigo } from "./CodigoCitado.tsx";
 import { rotuloCapa } from "./comum.ts";
 import { useCurso } from "./cursos-ponte.ts";
-import { numeroCurto, partesDaQuestao } from "./diagnostico-tela.ts";
 import { useEscrita } from "./escrita-ponte.ts";
 import {
 	alternarMotivo,
@@ -113,9 +107,7 @@ import {
 	caminhoDoModulo,
 	dadosDaLicao,
 	ehComplemento,
-	fraseDaConfusao,
 	ID_AVALIACAO_GERAL,
-	idDaCorreta,
 	indiceDaLicao,
 	itensDaRegua,
 	itensDoIndice,
@@ -134,6 +126,8 @@ import {
 	tituloDoModulo,
 } from "./modulo-tela.ts";
 import { type ErroVistoModulo, reescrevendoNoModulo, useModuloAberto, useModulos } from "./modulos-ponte.ts";
+import { type AcoesQuestoes, QuestaoModulo, QuestaoParaLer } from "./QuestaoModulo.tsx";
+import { placarDoModulo, TEXTO_TODAS_FEITAS, textoDoProgresso, todasFeitas } from "./questao-modulo-tela.ts";
 import { EtiquetaReferencia } from "./SecaoMapa.tsx";
 
 const MOLA = { type: "spring", stiffness: 380, damping: 32 } as const;
@@ -208,6 +202,13 @@ export function TelaModulo(props: PropsTelaModulo) {
 		reescrever: (licao, bloco, retorno) => modulos.reescreverBloco(moduloId, licao, bloco, retorno),
 		parar: () => modulos.cancelar(moduloId),
 	};
+	const questoes: AcoesQuestoes = {
+		corrigindo: aberto.corrigindo ?? [],
+		erros: modulos.errosQuestoes(moduloId),
+		responder: (bloco, entrada) => modulos.responder(moduloId, bloco, entrada),
+		corrigir: (bloco) => modulos.corrigir(moduloId, bloco),
+		encerrar: (bloco) => modulos.encerrar(moduloId, bloco),
+	};
 	return (
 		<>
 			<VisaoModulo
@@ -227,6 +228,7 @@ export function TelaModulo(props: PropsTelaModulo) {
 			tentarDeNovo={aberto.abrirDeNovo}
 			concluir={() => modulos.concluir(moduloId)}
 			retornos={retornos}
+			questoes={questoes}
 			abrirEscrita={() => setVendoEscrita(true)}
 			/>
 			<ModalEscrita aberto={vendoEscrita} fechar={() => setVendoEscrita(false)} escrita={escrita} materias={materias} />
@@ -255,6 +257,8 @@ export interface PropsVisaoModulo {
 	concluir?(): Promise<unknown>;
 	/** O retorno por bloco e a reescrita; sem ele, os blocos não têm "Retorno". */
 	retornos?: AcoesRetorno;
+	/** Responder as questões; sem ele, os botões delas ficam desligados. */
+	questoes?: AcoesQuestoes;
 	/** Abre "Como o professor escreve"; sem ele, o índice não tem o link. */
 	abrirEscrita?(): void;
 }
@@ -318,6 +322,7 @@ export function VisaoModulo(props: PropsVisaoModulo) {
 				voltarAoCurso={props.voltarAoCurso}
 				{...(props.concluir ? { concluir: props.concluir } : {})}
 				{...(props.retornos ? { retornos: props.retornos } : {})}
+				{...(props.questoes ? { questoes: props.questoes } : {})}
 				{...(props.abrirEscrita ? { abrirEscrita: props.abrirEscrita } : {})}
 			/>
 		);
@@ -373,9 +378,13 @@ function LicaoAberta(props: {
 	voltarAoCurso(): void;
 	concluir?(): Promise<unknown>;
 	retornos?: AcoesRetorno;
+	questoes?: AcoesQuestoes;
 	abrirEscrita?(): void;
 }) {
 	const { modulo, licao, indice } = props;
+	const respostas = modulo.situacao === "gerado" ? modulo.respostas : undefined;
+	const progresso = progressoDoModulo({ licoes: modulo.licoes, ...(respostas ? { respostas } : {}) });
+	const placar = placarDoModulo({ licoes: modulo.licoes, ...(respostas ? { respostas } : {}) });
 	const total = modulo.licoes.length;
 	const corpo = useRef<HTMLDivElement>(null);
 	const artigo = useRef<HTMLElement>(null);
@@ -458,22 +467,33 @@ function LicaoAberta(props: {
 							{concluido}
 						</Tag>
 					) : null}
+					{placar.questoes > 0 ? (
+						<QuizProgress className="modulo__placar" label="Questões feitas" total={placar.questoes} current={placar.feitas} results={placar.resultados} />
+					) : null}
 					<p className="overline modulo__indice-titulo">Lições</p>
 					<ol className="modulo__licoes">
-						{itensDoIndice(modulo.licoes, indice).map((item) => (
-							<li key={item.id}>
-								<button
-									type="button"
-									className={`modulo__item${item.atual ? " modulo__item--atual" : ""}`}
-									aria-current={item.atual ? "page" : undefined}
-									title={item.titulo}
-									onClick={() => props.abrirLicao(item.id)}
-								>
-									<span className="data modulo__item-num">{item.numero}</span>
-									<span className="body modulo__item-titulo">{item.titulo}</span>
-								</button>
-							</li>
-						))}
+						{itensDoIndice(modulo.licoes, indice).map((item, posicao) => {
+							const feitas = textoDoProgresso(progresso.licoes[posicao] ?? { feitas: 0, questoes: 0 });
+							return (
+								<li key={item.id}>
+									<button
+										type="button"
+										className={`modulo__item${item.atual ? " modulo__item--atual" : ""}`}
+										aria-current={item.atual ? "page" : undefined}
+										title={item.titulo}
+										onClick={() => props.abrirLicao(item.id)}
+									>
+										<span className="data modulo__item-num">{item.numero}</span>
+										<span className="body modulo__item-titulo">{item.titulo}</span>
+										{feitas ? (
+											<span className="data modulo__item-feitas" aria-label={`Questões feitas: ${feitas}`}>
+												{feitas}
+											</span>
+										) : null}
+									</button>
+								</li>
+							);
+						})}
 					</ol>
 					<p className="data modulo__resumo">{resumoDoIndice(modulo)}</p>
 					{props.abrirEscrita ? (
@@ -527,6 +547,8 @@ function LicaoAberta(props: {
 									licao={licao.id}
 									abrirMaterial={props.abrirMaterial}
 									{...(props.retornos ? { retornos: props.retornos } : {})}
+									{...(ehQuestao(bloco) ? { resposta: respostaDoBloco(respostas, bloco) } : {})}
+									{...(props.questoes ? { questoes: props.questoes } : {})}
 								/>
 							))}
 						</div>
@@ -542,6 +564,7 @@ function LicaoAberta(props: {
 								Lição anterior
 							</Button>
 							<span className="modulo__pe-fim">
+								{mostraConcluir && todasFeitas(progresso) ? <span className="body-sm modulo__todas-feitas">{TEXTO_TODAS_FEITAS}</span> : null}
 								<Button
 									variant="secondary"
 									iconRight="arrow-right"
@@ -612,14 +635,22 @@ function Dobra(props: { className: string; children: ReactNode }) {
 
 /**
  * Um bloco da lição num LessonBlock: o rótulo (e "Além do material",
- * "Reescrito"), o conteúdo, o gabarito para ver e as referências. Com
+ * "Reescrito"), o conteúdo (a questão para responder, QuestaoModulo) e as referências. Com
  * `retornos`, o pé tem "Retorno" (o balão embaixo do bloco), "Ver a versão
  * anterior" (num bloco reescrito) e, durante a reescrita, a faixa com o Parar.
  */
-export function BlocoDaLicao(props: { bloco: Bloco; numero: number; licao?: string; abrirMaterial(arquivo: string): void; retornos?: AcoesRetorno }) {
+export function BlocoDaLicao(props: {
+	bloco: Bloco;
+	numero: number;
+	licao?: string;
+	abrirMaterial(arquivo: string): void;
+	retornos?: AcoesRetorno;
+	/** A resposta que vale para a questão (respostaDoBloco). */
+	resposta?: RespostaModulo | undefined;
+	questoes?: AcoesQuestoes;
+}) {
 	const { bloco, retornos } = props;
 	const licao = props.licao ?? "";
-	const [aberto, setAberto] = useState(false);
 	const { rotulo, icone } = rotuloDoBloco(bloco);
 	const referencias = "referencias" in bloco ? agruparReferencias(bloco.referencias) : [];
 	// A prática (pergunta rápida, quiz e dissertativa) vai num cartão com a borda e o post-it do tipo; a explicação,
@@ -684,19 +715,9 @@ export function BlocoDaLicao(props: { bloco: Bloco; numero: number; licao?: stri
 	};
 	const repetir = erroLocal?.retorno ?? (erroPonte ? ultimoRetorno.current : undefined);
 
-	let botao: { ver: string; esconder: string } | undefined;
-	if (bloco.tipo === "verificacao") botao = { ver: "Ver resposta", esconder: "Esconder resposta" };
-	else if (bloco.tipo === "alternativa") botao = { ver: "Ver gabarito", esconder: "Esconder gabarito" };
-	else if (bloco.tipo === "dissertativa") botao = { ver: "Ver rubrica e resposta-modelo", esconder: "Esconder rubrica e resposta-modelo" };
-
 	const acoes =
-		botao || (retornos && !reescrevendo) ? (
+		retornos && !reescrevendo ? (
 			<>
-				{botao ? (
-					<Button variant="ghost" size="sm" aria-expanded={aberto} onClick={() => setAberto(!aberto)}>
-						{aberto ? botao.esconder : botao.ver}
-					</Button>
-				) : null}
 				{retornos && !reescrevendo ? (
 					<Button variant="ghost" size="sm" icon="message" aria-expanded={balao} onClick={() => setBalao(!balao)}>
 						Retorno
@@ -784,7 +805,11 @@ export function BlocoDaLicao(props: { bloco: Bloco; numero: number; licao?: stri
 								) : null}
 							</header>
 						) : null}
-						<ConteudoDoBloco bloco={bloco} gabarito={aberto} />
+						{ehQuestao(bloco) ? (
+							<QuestaoModulo key={versao} bloco={bloco} resposta={props.resposta} {...(props.questoes ? { acoes: props.questoes } : {})} />
+						) : (
+							<ConteudoDoBloco bloco={bloco} />
+						)}
 					</LessonBlock>
 				</motion.div>
 			</AnimatePresence>
@@ -832,52 +857,17 @@ export function BlocoDaLicao(props: { bloco: Bloco; numero: number; licao?: stri
 	);
 }
 
-/** O conteúdo de um bloco (ou de uma versão anterior dele) e, com `gabarito`, o gabarito revelado. */
-function ConteudoDoBloco({ bloco, gabarito: aberto }: { bloco: Bloco | BlocoAnterior; gabarito: boolean }) {
-	let conteudo: ReactNode;
-	let gabarito: ReactNode = null;
-	if (bloco.tipo === "explicacao") {
-		conteudo = <ExplicacaoComCodigo texto={bloco.texto} />;
-	} else if (bloco.tipo === "verificacao") {
-		conteudo = <Markdown texto={bloco.pergunta} />;
-		gabarito = <RespostaEsperada bloco={bloco} />;
-	} else if (bloco.tipo === "ideia_central") {
-		conteudo = (
+/** O conteúdo de um bloco que não se responde (a explicação, a ideia central) ou de uma versão anterior dele (a questão só para ler). */
+function ConteudoDoBloco({ bloco }: { bloco: Bloco | BlocoAnterior }) {
+	if (bloco.tipo === "explicacao") return <ExplicacaoComCodigo texto={bloco.texto} />;
+	if (bloco.tipo === "ideia_central") {
+		return (
 			<Callout className="modulo__ideia" tone="moss" label={ROTULO_IDEIA_CENTRAL.rotulo} icon={ROTULO_IDEIA_CENTRAL.icone}>
 				<Markdown texto={bloco.texto} />
 			</Callout>
 		);
-	} else if (bloco.tipo === "alternativa") {
-		conteudo = <QuestaoAlternativa bloco={bloco} gabarito={aberto} />;
-		gabarito = bloco.explicacao ? (
-			<div className="modulo__gabarito">
-				<p className="overline modulo__gabarito-rotulo">Explicação</p>
-				<Markdown texto={bloco.explicacao} />
-			</div>
-		) : null;
-	} else {
-		conteudo = <QuestaoDissertativa bloco={bloco} />;
-		gabarito = <RubricaEResposta bloco={bloco} />;
 	}
-	return (
-		<>
-			{conteudo}
-			<AnimatePresence initial={false}>
-				{aberto && gabarito ? (
-					<motion.div
-						key="gabarito"
-						className="modulo__revelado"
-						initial={semMovimento() ? false : { opacity: 0, y: -4 }}
-						animate={{ opacity: 1, y: 0 }}
-						exit={semMovimento() ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, transition: { duration: 0.12 } }}
-						transition={MOLA}
-					>
-						{gabarito}
-					</motion.div>
-				) : null}
-			</AnimatePresence>
-		</>
-	);
+	return <QuestaoParaLer bloco={bloco} />;
 }
 
 /** As opções do "Virar regra de escrita": todas as matérias ou só esta. */
@@ -1061,96 +1051,8 @@ function VersaoAnterior(props: { bloco: Bloco; anteriores: BlocoAnterior[] }) {
 				) : null}
 			</div>
 			<div className="ap-prose lesson-body retorno__anterior-corpo">
-				<ConteudoDoBloco key={atual} bloco={anterior} gabarito={false} />
+				<ConteudoDoBloco key={atual} bloco={anterior} />
 			</div>
 		</section>
-	);
-}
-
-/** O contexto de uma questão (o cenário, em markdown), quando ela tem. */
-function Contexto({ texto }: { texto: string | undefined }) {
-	if (!texto) return null;
-	return (
-		<div className="modulo__contexto">
-			<Markdown texto={texto} />
-		</div>
-	);
-}
-
-/** A alternativa sem valor e desligada; com o gabarito, a correta e, embaixo de cada errada, a confusão dela. */
-function QuestaoAlternativa({ bloco, gabarito }: { bloco: BlocoAlternativa; gabarito: boolean }) {
-	const partes = partesDaQuestao(bloco);
-	const correta = idDaCorreta(bloco.alternativas);
-	return (
-		<div className="modulo__questao">
-			<Contexto texto={partes.contexto} />
-			<QuizQuestion
-				prompt={<Markdown texto={partes.pergunta} emLinha />}
-				value={null}
-				disabled
-				options={bloco.alternativas.map((alternativa, indice) => {
-					const confusao = gabarito && alternativa.correta !== true ? fraseDaConfusao(alternativa.confusao) : "";
-					return {
-						id: String(indice),
-						label: (
-							<>
-								<Markdown texto={alternativa.texto} emLinha />
-								{confusao ? <span className="body-sm modulo__confusao">{confusao}</span> : null}
-							</>
-						),
-					};
-				})}
-				{...(gabarito && correta !== undefined ? { correctId: correta } : {})}
-			/>
-		</div>
-	);
-}
-
-/** A pergunta da dissertativa (o contexto e o enunciado). */
-function QuestaoDissertativa({ bloco }: { bloco: BlocoDissertativa }) {
-	const partes = partesDaQuestao(bloco);
-	return (
-		<div className="modulo__questao">
-			<Contexto texto={partes.contexto} />
-			<h3 className="ap-quiz__prompt heading">
-				<Markdown texto={partes.pergunta} emLinha />
-			</h3>
-		</div>
-	);
-}
-
-/** A resposta esperada da verificação, num bloco recuado. */
-function RespostaEsperada({ bloco }: { bloco: BlocoVerificacao }) {
-	return (
-		<div className="modulo__gabarito modulo__gabarito--recuado">
-			<p className="overline modulo__gabarito-rotulo">Resposta esperada</p>
-			<Markdown texto={bloco.respostaEsperada} />
-		</div>
-	);
-}
-
-/** Os critérios da rubrica (nome, descrição e pontos) e a resposta-modelo da dissertativa. */
-function RubricaEResposta({ bloco }: { bloco: BlocoDissertativa }) {
-	const pontos = bloco.rubrica.reduce((soma, item) => soma + (item.pontos || 0), 0);
-	return (
-		<>
-			<div className="modulo__gabarito">
-				<p className="overline modulo__gabarito-rotulo">Rubrica · {numeroCurto(pontos)} pontos</p>
-				<ul className="modulo__rubrica">
-					{bloco.rubrica.map((item) => (
-						<li key={item.criterio} className="modulo__criterio">
-							<p className="body-strong modulo__criterio-nome">
-								{item.criterio} <span className="data modulo__criterio-pontos">{numeroCurto(item.pontos)} {item.pontos === 1 ? "ponto" : "pontos"}</span>
-							</p>
-							{item.descricao ? <p className="body modulo__criterio-descricao">{item.descricao}</p> : null}
-						</li>
-					))}
-				</ul>
-			</div>
-			<div className="modulo__gabarito modulo__gabarito--recuado">
-				<p className="overline modulo__gabarito-rotulo">Resposta-modelo</p>
-				<Markdown texto={bloco.respostaModelo} />
-			</div>
-		</>
 	);
 }

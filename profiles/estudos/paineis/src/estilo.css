@@ -839,6 +839,7 @@
 .mod__gerando { display: flex; flex-direction: column; gap: var(--space-2); }
 .mod__etapa { flex: 1; min-width: 0; margin: 0; color: var(--ink); }
 .mod__resumo { color: var(--ink-muted); }
+.mod__feitas { margin: 0; color: var(--ink-muted); }
 .mod__de-novo { margin-left: auto; }
 .mod__nota { min-width: 0; color: var(--ink); overflow-wrap: anywhere; }
 .mod__rodape .ap-callout p { margin: 0; }
@@ -954,7 +955,9 @@
 .modulo__cartao > .ap-block__actions { margin-top: var(--space-2); }
 .modulo__cartao .modulo__revelado { margin-top: var(--space-6); padding-top: var(--space-6); border-top: var(--border-hair) solid var(--line-strong); }
 /* Dentro do cartão (surface-raised), as alternativas num tom mais fundo, para se destacarem do cartão e não só pela borda. */
-.modulo__cartao .ap-opt { background: var(--surface-panel); }
+/* Só a livre e a apagada: a escolhida, a certa e a errada ficam com o fundo da cor delas (o QuizQuestion). */
+.modulo__cartao .ap-opt:is(.ap-opt--idle, .ap-opt--dim) { background: var(--surface-panel); }
+.modulo__cartao .ap-opt--idle:hover { background: var(--surface-hover); }
 /* A questão (docs/modulos.md, "A tela das questões"): a borda fina e um fundo levíssimo na cor do tipo, e o post-it
    (o Sticker) preso no canto superior direito, com o texto preto em qualquer tom. */
 .retorno__conteudo { position: relative; }
@@ -974,8 +977,9 @@
 
 .modulo__questao { display: flex; flex-direction: column; gap: var(--space-5); }
 .modulo__questao .ap-quiz { max-width: none; }
-.modulo__questao .ap-opt, .modulo__questao .ap-opt:hover { cursor: default; }
-.modulo__questao .ap-opt--idle:hover { background: var(--surface-raised); }
+/* Desligadas (antes da confiança, enquanto envia, depois de acabar), as alternativas não reagem ao mouse. */
+.modulo__questao .ap-quiz__options[aria-disabled="true"] .ap-opt, .modulo__questao .ap-quiz__options[aria-disabled="true"] .ap-opt:hover { cursor: default; }
+.modulo__questao .ap-quiz__options[aria-disabled="true"] .ap-opt--idle:hover { background: var(--surface-panel); }
 .modulo__questao .ap-opt__label { display: flex; flex-direction: column; gap: 2px; }
 .modulo__confusao { color: var(--ink-muted); }
 .modulo__contexto { padding: var(--space-4) var(--space-5); border-radius: var(--radius-md); background: var(--surface-well); }
@@ -995,6 +999,40 @@
 .modulo__erro .ap-callout p { margin: 0; }
 .modulo__erro-botoes { display: flex; gap: var(--space-2); margin-top: var(--space-3); }
 
+/* ── As questões respondidas (QuestaoModulo.tsx, docs/modulos.md, "Responder as questões"). ── */
+/* O quiz: a pergunta, a confiança e as alternativas, nessa ordem (o QuizQuestion vira só os filhos dele); o resto depois. */
+.modulo__questao--quiz > * { order: 4; }
+.modulo__questao--quiz > .modulo__contexto { order: 0; }
+.modulo__questao--quiz > .modulo__confianca { order: 2; }
+.modulo__questao--quiz > .modulo__alternativas, .modulo__questao--quiz > .modulo__alternativas > .ap-quiz { display: contents; }
+.modulo__questao--quiz .ap-quiz__prompt { order: 1; }
+.modulo__questao--quiz .ap-quiz__options { order: 3; }
+/* A errada de uma tentativa anterior: marcada como a "Sua resposta" do QuizQuestion e, enquanto dá para escolher outra, desligada. */
+.modulo__questao .ap-opt:has(.modulo__alt-errada) { border-color: var(--brick-text); background: var(--brick-tint); box-shadow: inset 0 0 0 1px var(--brick-text); }
+.modulo__questao .ap-opt:has(.modulo__alt-errada) .ap-key { background: var(--brick); color: var(--on-brick); }
+.modulo__questao .ap-quiz__options:not([aria-disabled="true"]) .ap-opt:has(.modulo__alt-errada) { opacity: var(--opacity-disabled); cursor: not-allowed; }
+.modulo__questao .ap-opt__label:has(> .modulo__alt-errada) { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: var(--space-3); row-gap: 2px; }
+.modulo__alt-errada { grid-column: 2; grid-row: 1 / span 2; }
+.modulo__pista .ap-callout__body { padding-bottom: var(--space-4); }
+.modulo__pista p, .modulo__questao-erro p { margin: 0; }
+.modulo__questao > .modulo__revelado { margin-top: 0; }
+.modulo__conferindo { margin: 0; color: var(--ink-muted); }
+.modulo__nao-sei { align-self: flex-start; }
+.modulo__avaliacao { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); }
+.modulo__retorno { margin: 0; }
+.modulo__correcao { display: flex; flex-direction: column; gap: var(--space-4); }
+.modulo__placar-texto { margin: 0; }
+.modulo__bloco .modulo__criterios { padding: 0; }
+.modulo__bloco .modulo__criterios > li + li { margin-top: 0; }
+.modulo__criterio-linha { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
+.modulo__primeira { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-3); }
+.modulo__primeira-corpo { display: flex; flex-direction: column; gap: var(--space-4); align-self: stretch; overflow: hidden; }
+/* O progresso: o placar no topo do índice, "3 de 5" em cada lição e a frase do pé. */
+.modulo__placar { width: auto; margin: 0 var(--space-3) var(--space-2); }
+.modulo__item:has(.modulo__item-feitas) { grid-template-columns: auto minmax(0, 1fr) auto; }
+.modulo__item-feitas { color: var(--ink-muted); white-space: nowrap; }
+.modulo__todas-feitas { color: var(--ink-muted); }
+
 /* Largo: o índice à esquerda (≈260 px), fixo no alto do corpo que rola. */
 @container (min-width: 900px) {
 	.modulo__grade { grid-template-columns: 260px minmax(0, 1fr); gap: var(--space-8); }
@@ -1006,6 +1044,7 @@
 	.modulo__indice { gap: var(--space-2); }
 	.modulo__indice-titulo { margin: 0; }
 	.modulo__concluido { margin: 0; }
+	.modulo__placar { margin: 0; }
 	.modulo__licoes { flex-direction: row; gap: var(--space-1); overflow-x: auto; padding-bottom: var(--space-2); scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
 	.modulo__licoes > li { flex: none; }
 	.modulo__item { display: inline-flex; align-items: center; gap: var(--space-2); width: auto; max-width: 240px; min-height: var(--control-sm); padding: 0 var(--space-3); background: var(--surface-raised); }

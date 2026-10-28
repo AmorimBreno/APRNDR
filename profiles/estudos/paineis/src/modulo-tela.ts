@@ -10,6 +10,7 @@
 // (modulo-tela.test.ts) rodam no Node.
 
 import type { IconName, RulerItem, TrackStep } from "@estudos/design-system";
+import { ehQuestao } from "../../lib/modulo-respostas-tipos.ts";
 import type { Bloco, EstadoModuloNaTela, FormatoExplicacao, Licao, Modulo } from "../../lib/modulo-tipos.ts";
 
 const pad2 = (numero: number) => String(numero).padStart(2, "0");
@@ -205,9 +206,6 @@ export function itensDoIndice(licoes: ReadonlyArray<Pick<Licao, "id" | "titulo">
 
 const contar = (quantos: number, um: string, varios: string) => `${quantos} ${quantos === 1 ? um : varios}`;
 
-/** Questões são as alternativas e as dissertativas (as verificações são perguntas rápidas). */
-const ehQuestao = (bloco: Pick<Bloco, "tipo">) => bloco.tipo === "alternativa" || bloco.tipo === "dissertativa";
-
 /** A linha de dados do cabeçalho da lição: "8 blocos · 2 questões"; sem questão, só os blocos. */
 export function dadosDaLicao(licao: Pick<Licao, "blocos">): string {
 	const questoes = licao.blocos.filter(ehQuestao).length;
@@ -222,7 +220,7 @@ export function diaEMes(iso: string | undefined): string {
 	return `${pad2(data.getDate())}/${pad2(data.getMonth() + 1)}`;
 }
 
-/** "4 lições · 9 questões · gerado em 26/10" (questões são as alternativas e as dissertativas). */
+/** "4 lições · 9 questões · gerado em 26/10" (questões são as perguntas, os quizzes e as dissertativas, como no progresso). */
 export function resumoDoIndice(modulo: Pick<Modulo, "licoes"> & { geradoEm?: string }): string {
 	const blocos = modulo.licoes.flatMap((licao) => licao.blocos);
 	const questoes = blocos.filter(ehQuestao).length;
@@ -248,7 +246,7 @@ export function rotuloConcluido(modulo: Modulo): string {
 // --- O aviso de visualização ---------------------------------------------------------
 
 /** O texto do Callout do topo da lição. */
-export const TEXTO_AVISO = "Visualização do módulo. Responder às questões e pedir outra explicação chegam com a aula (item 7).";
+export const TEXTO_AVISO = "Pedir outra explicação de um trecho chega com a aula (item 7). Por enquanto, use o Retorno de cada bloco.";
 
 /** A chave do localStorage que lembra que o aviso foi fechado. */
 export const CHAVE_AVISO = "estudos:modulo:aviso-fechado";

@@ -233,18 +233,18 @@ describe("o índice das lições", () => {
 		]);
 	});
 
-	it("o resumo: lições, questões (alternativas e dissertativas) e o dia", () => {
+	it("o resumo: lições, questões (perguntas, quizzes e dissertativas) e o dia", () => {
 		const modulo = gerado([
 			licao("l1", "Um", [explicacao("l1-b1", "conceito"), verificacao("l1-b2"), alternativa("l1-b3")]),
 			licao("l2", "Dois", [explicacao("l2-b1", "conceito"), alternativa("l2-b2"), dissertativa("l2-b3")]),
 		]);
-		expect(resumoDoIndice(modulo)).toBe("2 lições · 3 questões · gerado em 26/10");
+		expect(resumoDoIndice(modulo)).toBe("2 lições · 4 questões · gerado em 26/10");
 		expect(resumoDoIndice({ licoes: [licao("l1", "Um", [explicacao("l1-b1", "conceito"), alternativa("l1-b2")])] })).toBe("1 lição · 1 questão");
 		expect(diaEMes("nada")).toBe("");
 	});
 
 	it("a linha de dados da lição: os blocos e as questões (sem questão, só os blocos)", () => {
-		expect(dadosDaLicao(licao("l1", "Um", [explicacao("l1-b1", "conceito"), verificacao("l1-b2"), alternativa("l1-b3"), dissertativa("l1-b4")]))).toBe("4 blocos · 2 questões");
+		expect(dadosDaLicao(licao("l1", "Um", [explicacao("l1-b1", "conceito"), verificacao("l1-b2"), alternativa("l1-b3"), dissertativa("l1-b4")]))).toBe("4 blocos · 3 questões");
 		expect(dadosDaLicao(licao("l1", "Um", [explicacao("l1-b1", "conceito"), alternativa("l1-b2")]))).toBe("2 blocos · 1 questão");
 		expect(dadosDaLicao(licao("l1", "Um", [explicacao("l1-b1", "conceito")]))).toBe("1 bloco");
 	});

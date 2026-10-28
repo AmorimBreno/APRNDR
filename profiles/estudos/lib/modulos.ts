@@ -79,6 +79,8 @@ function moduloLido(valor: unknown, materia: string, curso: string, modulo: stri
 		throw new Error("faltam geradoEm, modelo, custo ou materiaisUsados");
 	} else if (valor.concluidoEm !== undefined && typeof valor.concluidoEm !== "string") {
 		throw new Error("o concluidoEm não é um texto");
+	} else if (valor.respostas !== undefined && !ehObjeto(valor.respostas)) {
+		throw new Error("as respostas não são um objeto");
 	}
 	return moduloNaOrdem(valor as unknown as Modulo);
 }
@@ -101,6 +103,8 @@ function moduloNaOrdem(modulo: Modulo): Modulo {
 		custo: modulo.custo,
 		materiaisUsados: modulo.materiaisUsados,
 		...(modulo.concluidoEm ? { concluidoEm: modulo.concluidoEm } : {}),
+		// As respostas das questões (modulo-respostas-tipos.ts) ficam: a reescrita de um bloco e o concluir gravam o módulo com elas.
+		...(modulo.respostas && Object.keys(modulo.respostas).length > 0 ? { respostas: modulo.respostas } : {}),
 	};
 }
 

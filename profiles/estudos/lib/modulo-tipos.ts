@@ -13,6 +13,7 @@
 import type { ArquivoDoCurso, Curso, Escopo, TipoCurso } from "./curso-tipos.ts";
 import { ErroCurso } from "./curso-tipos.ts";
 import {
+	type Confianca,
 	type DiagnosticoEmAndamento,
 	lerQuestao,
 	type QuestaoAlternativa,
@@ -21,6 +22,7 @@ import {
 } from "./diagnostico-tipos.ts";
 import type { Esqueleto, Modulo as ModuloDoEsqueleto } from "./esqueleto-tipos.ts";
 import type { Referencia } from "./mapa-tipos.ts";
+import type { Progresso, RespostasModulo } from "./modulo-respostas-tipos.ts";
 
 /** Muda quando o formato do <módulo>.json mudar. */
 export const VERSAO_MODULO = 1;
@@ -255,6 +257,14 @@ export interface ModuloGerado extends ModuloBase {
 	materiaisUsados: ArquivoDoCurso[];
 	/** ISO 8601: quando o Breno concluiu o módulo ("Concluir o módulo"). Concluído não volta atrás nem é gerado de novo. */
 	concluidoEm?: string;
+	/**
+	 * As respostas das questões, pelo id do bloco (docs/modulos.md, "Onde as
+	 * respostas ficam"; modulo-respostas-tipos.ts). Só aparece depois da
+	 * primeira resposta. Gerar de novo substitui o arquivo sem elas; a
+	 * reescrita de um bloco as mantém (a do bloco reescrito fica sem valor
+	 * pela versão).
+	 */
+	respostas?: RespostasModulo;
 }
 
 /** O <módulo>.json. */
@@ -274,6 +284,19 @@ export interface AcoesModulos {
 	abrir: { materia: string; curso: string; modulo: string };
 	/** Conclui o módulo gerado (concluirModulo); a recomendação passa para o seguinte. */
 	concluir: { materia: string; curso: string; modulo: string; pedido: string };
+	/**
+	 * Responde uma questão do módulo (docs/modulos.md, "Responder as
+	 * questões"; responderQuestao): uma tentativa (a confiança na primeira, a
+	 * escolha no quiz ou o texto na pergunta e na dissertativa, o tempoMs) ou
+	 * "Não sei" (naoSei: true). Responde com o modulo com o pedido; a pergunta
+	 * e a dissertativa vão com corrigindo, e a conferência chega depois num
+	 * modulo sem pedido.
+	 */
+	responder: { materia: string; curso: string; modulo: string; pedido: string; bloco: string; confianca?: Confianca; escolha?: number; texto?: string; naoSei?: boolean; tempoMs?: number };
+	/** Tenta de novo a conferência da última tentativa sem avaliação ou correção (a que falhou). */
+	corrigir: { materia: string; curso: string; modulo: string; pedido: string; bloco: string };
+	/** "Ver a resposta-modelo": a dissertativa corrigida passa a encerrada (encerrarQuestao). */
+	encerrar: { materia: string; curso: string; modulo: string; pedido: string; bloco: string };
 }
 
 export type AcaoModulos = keyof AcoesModulos;
@@ -308,6 +331,8 @@ export interface EstadoModuloNaTela {
 	reescrevendo?: { licao: string; bloco: string };
 	/** Em aguardando_material: os materiais prontos da matéria mudaram desde que ele começou a aguardar (materialNovo). */
 	materialNovo?: boolean;
+	/** Em gerado: as questões feitas (pergunta, quiz e dissertativa) de quantas, pelas respostas da versão atual de cada bloco (progressoDoModulo). */
+	progresso?: Progresso;
 }
 
 /** A mensagem "estado" (interface:mostrar, gravar: false), mandada a cada mudança. */
@@ -322,21 +347,27 @@ export interface MensagemEstadoModulos {
 	pedido?: string;
 }
 
-/** A mensagem "modulo" (parte B): o <módulo>.json inteiro. */
+/** A mensagem "modulo" (parte B): o <módulo>.json inteiro, com as respostas. */
 export interface MensagemModulo {
 	materia: string;
 	curso: string;
 	modulo: Modulo;
+	/** Os blocos do módulo cuja resposta está sendo conferida pelo modelo agora, na ordem do módulo (vazio sem nenhum). Vem em toda mensagem modulo. */
+	corrigindo: string[];
+	/** O da tela, quando a mensagem respondeu a responder, corrigir ou encerrar. */
+	pedido?: string;
 }
 
 /** A mensagem "erro". */
 export interface MensagemErroModulos {
 	mensagem: string;
-	/** A ação que falhou (listar, gerar, aguardar, concluir…). */
+	/** A ação que falhou (listar, gerar, aguardar, concluir, responder, corrigir, encerrar…). */
 	ao?: string;
 	materia?: string;
 	curso?: string;
 	modulo?: string;
+	/** Em responder, corrigir e encerrar: o bloco da questão. */
+	bloco?: string;
 	pedido?: string;
 }
 

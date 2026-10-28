@@ -19,7 +19,8 @@ import { type Conceito, gravarMapa, lerMapa, mapaVazio, pastaExtraidoArquivo } f
 import { criarMateria, eventosAprendiz, eventosMateria } from "../lib/materias.ts";
 import { ARQUIVOS_METODO, caminhoDoModulo, type EstadoModuloNaTela, lerModulo, MINIMO_CARACTERES_EXEMPLO, type ModuloGerado } from "../lib/modulos.ts";
 import { hashDoPrompt, lerMetodo, PASTA_METODO } from "./cursos.ts";
-import modulos, { CAMINHO_PROMPT_BLOCO, CAMINHO_PROMPT_LICAO, CAMINHO_PROMPT_PLANO, type MensagemEstado, type OpcoesModulos } from "./modulos.ts";
+import type { RespostaModulo } from "../lib/modulo-respostas.ts";
+import modulos, { CAMINHO_PROMPT_BLOCO, CAMINHO_PROMPT_LICAO, CAMINHO_PROMPT_PLANO, CAMINHO_PROMPT_VERIFICACAO, type MensagemEstado, type OpcoesModulos } from "./modulos.ts";
 import { lerPromptMapeador } from "./mapa.ts";
 
 type Resultado = { content: Array<{ text: string }>; details: unknown; isError?: boolean };
@@ -34,6 +35,8 @@ const CURSO = "p1-busca";
 const PROMPT_PLANO = "---\nmodel: teste/modelo-x\n---\nPlaneje as lições.\n";
 const PROMPT_LICAO = "---\nmodel: teste/modelo-x\n---\nEscreva a lição.\n";
 const PROMPT_BLOCO = "---\nmodel: teste/modelo-x\n---\nReescreva o bloco.\n";
+const PROMPT_VERIFICACAO = "---\nmodel: teste/modelo-x\n---\nConfira a pergunta.\n";
+const PROMPT_CORRETOR = "---\nmodel: teste/modelo-x\n---\nCorrija pela rubrica.\n";
 /** Os arquivos da metodologia de mentira, em <dados>/metodo. */
 const METODO: Record<string, string> = Object.fromEntries(ARQUIVOS_METODO.map((arquivo) => [arquivo, `Como escrever (${arquivo}).\n`]));
 /** O system prompt com a metodologia de mentira, como instrucoesComMetodo o monta. */
@@ -108,6 +111,8 @@ const opcoesDeTeste = (extra: OpcoesModulos = {}): OpcoesModulos => ({
 	caminhoPromptPlano: join(dados, "modulo-plano.md"),
 	caminhoPromptLicao: join(dados, "modulo-licao.md"),
 	caminhoPromptBloco: join(dados, "modulo-bloco.md"),
+	caminhoPromptVerificacao: join(dados, "verificacao.md"),
+	caminhoPromptCorretor: join(dados, "corretor.md"),
 	pastaMetodo: join(dados, "metodo"),
 	...extra,
 });
@@ -173,6 +178,8 @@ beforeEach(async () => {
 	await writeFile(join(dados, "modulo-plano.md"), PROMPT_PLANO, "utf8");
 	await writeFile(join(dados, "modulo-licao.md"), PROMPT_LICAO, "utf8");
 	await writeFile(join(dados, "modulo-bloco.md"), PROMPT_BLOCO, "utf8");
+	await writeFile(join(dados, "verificacao.md"), PROMPT_VERIFICACAO, "utf8");
+	await writeFile(join(dados, "corretor.md"), PROMPT_CORRETOR, "utf8");
 	await mkdir(join(dados, "metodo"), { recursive: true });
 	for (const [arquivo, conteudo] of Object.entries(METODO)) await writeFile(join(dados, "metodo", arquivo), conteudo, "utf8");
 	await gravarMapa(dados, materia, {
@@ -322,6 +329,10 @@ describe("os prompts e a metodologia do perfil", () => {
 			expect(prompt.instrucoes).toContain("metodologia");
 		}
 		expect(lerPromptMapeador(await readFile(CAMINHO_PROMPT_LICAO, "utf8")).instrucoes).toContain('"tipo": "ideia_central"');
+		const verificacao = lerPromptMapeador(await readFile(CAMINHO_PROMPT_VERIFICACAO, "utf8"));
+		expect(verificacao.modelo).toBe("openrouter/openai/gpt-6.1-sol");
+		expect(verificacao.instrucoes).toContain('"avaliacao"');
+		expect(verificacao.instrucoes).toContain("metodologia");
 		const lidos = await lerMetodo(PASTA_METODO, ARQUIVOS_METODO);
 		expect(lidos.map((item) => item.usado.nome)).toEqual(ARQUIVOS_METODO.map((arquivo) => `metodo/${arquivo}`));
 		for (const item of lidos) expect(item.conteudo).toMatch(/^# \S/);
@@ -1142,5 +1153,282 @@ describe("as regras de escrita nas mensagens dos módulos", () => {
 		geracaoQueDaCerto();
 		await gerarM1();
 		for (const chamada of chamadas) expect(textoDaChamada(chamada)).not.toContain("Regras de escrita");
+	});
+});
+
+// --- As respostas das questões (docs/modulos.md, "Responder as questões") -------------------------
+
+/** A correção que o modelo falso devolve para a dissertativa l2-b5 (3 de 5 pontos). */
+const CORRECAO_M1 = JSON.stringify({
+	criterios: [
+		{ criterio: "Raridade", trechos: ["poucos documentos"], pontos: 2, justificativa: "Disse." },
+		{ criterio: "Log", trechos: [], pontos: 0, justificativa: "Não disse." },
+		{ criterio: "Exemplo", trechos: ["um exemplo"], pontos: 1, justificativa: "Deu." },
+	],
+});
+const CONFERENCIA_PARCIAL = JSON.stringify({ avaliacao: "parcial", retorno: "Você disse o que conta, faltou dizer onde." });
+
+type MensagemModuloDoTeste = { materia: string; curso: string; modulo: ModuloGerado; corrigindo: string[]; pedido?: string };
+const mensagensModulo = () => recebidas("modulo").map((mensagem) => mensagem.dados as unknown as MensagemModuloDoTeste);
+const ultimoModulo = () => mensagensModulo().at(-1)!;
+const moduloDoPedido = (pedido: string) => comPedido(pedido).find((mensagem) => mensagem.acao === "modulo")?.dados as unknown as MensagemModuloDoTeste | undefined;
+const respostaNa = (mensagem: MensagemModuloDoTeste | undefined, bloco: string) => mensagem?.modulo.respostas?.[bloco] as RespostaModulo | undefined;
+const progressoDe = () => doModulo(ultimo(), "m1")?.progresso;
+/** O prompt da lição que gerou os blocos (o contexto dos eventos das respostas). */
+const PROMPT_DA_LICAO = () => ({ nome: "modulo-licao.md", hash: hashDoPrompt(PROMPT_LICAO) });
+
+const responder = async (pedido: string, dadosAcao: Record<string, unknown>) => {
+	acao("responder", { modulo: "m1", pedido, ...dadosAcao });
+	await respondeu(pedido);
+};
+
+describe("responder as questões", () => {
+	beforeEach(async () => {
+		ligar();
+		geracaoQueDaCerto();
+		await gerarM1();
+	});
+
+	it("o estado leva o progresso de cada módulo gerado (a pergunta, o quiz e a dissertativa contam)", async () => {
+		expect(progressoDe()).toEqual({ feitas: 0, questoes: 3 });
+		expect(doModulo(ultimo(), "m2")?.progresso).toBeUndefined();
+	});
+
+	it("quiz: sem confiança é erro com o bloco; errada na primeira, a confusão e o evento; escolha repetida é erro; certa na segunda acaba; sem modelo", async () => {
+		const chamadasAntes = chamadas.length;
+		await responder("q0", { bloco: "l1-b6", escolha: 0, tempoMs: 1000 });
+		expect(erroDe("q0")).toMatchObject({ ao: "responder", modulo: "m1", bloco: "l1-b6", mensagem: expect.stringContaining("confiança") });
+
+		await responder("q1", { bloco: "l1-b6", confianca: 2, escolha: 0, tempoMs: 41000 });
+		const primeira = moduloDoPedido("q1")!;
+		expect(primeira.corrigindo).toEqual([]);
+		expect(respostaNa(primeira, "l1-b6")).toMatchObject({ tipo: "alternativa", versao: 1, confianca: 2, tentativas: [{ escolha: 0, correta: false, confusao: "Conta documentos.", tempoMs: 41000 }] });
+		const [evento] = await doAprendiz("respondeu_questao");
+		expect(evento).toMatchObject({
+			sessao: "sessao-1",
+			objeto: { materia, curso: CURSO, modulo: "m1", licao: "l1", questao: "l1-b6", conceitos: ["c-tf"] },
+			resultado: { tentativa: 1, escolha: 0, correta: false, confusao: "Conta documentos.", confianca: 2, tempoMs: 41000 },
+			contexto: { fase: "modulo", versao: 1, modelo: "teste/modelo-x", prompt: PROMPT_DA_LICAO() },
+		});
+		expect(respostaNa(primeira, "l1-b6")!.tentativas[0]!.evento).toBe(evento!.id);
+		await esperar(() => estados().length > 0 && progressoDe() !== undefined);
+
+		await responder("q2", { bloco: "l1-b6", escolha: 0, tempoMs: 1 });
+		expect(erroDe("q2")?.mensagem).toContain("já foi escolhida");
+		await responder("q3", { bloco: "l1-b6", escolha: 1, tempoMs: 12000 });
+		expect(respostaNa(moduloDoPedido("q3"), "l1-b6")!.tentativas).toHaveLength(2);
+		await esperar(() => progressoDe()?.feitas === 1);
+		expect((await doAprendiz("respondeu_questao")).map((item) => item.resultado)).toEqual([
+			{ tentativa: 1, escolha: 0, correta: false, confusao: "Conta documentos.", confianca: 2, tempoMs: 41000 },
+			{ tentativa: 2, escolha: 1, correta: true, confianca: 2, tempoMs: 12000 },
+		]);
+		await responder("q4", { bloco: "l1-b6", escolha: 2, tempoMs: 1 });
+		expect(erroDe("q4")?.mensagem).toContain("já acabou");
+		expect(chamadas.length).toBe(chamadasAntes);
+	});
+
+	it("Não sei: sem confiança, o evento nao_sabia_questao e a questão feita", async () => {
+		await responder("n1", { bloco: "l2-b5", naoSei: true });
+		expect(respostaNa(moduloDoPedido("n1"), "l2-b5")).toMatchObject({ tipo: "dissertativa", naoSei: { em: expect.any(String) }, tentativas: [] });
+		const [evento] = await doAprendiz("nao_sabia_questao");
+		expect(evento).toMatchObject({ objeto: { questao: "l2-b5", licao: "l2", conceitos: ["c-idf"] }, resultado: { tipo: "dissertativa", tentativas: 0 }, contexto: { fase: "modulo", versao: 1 } });
+		await esperar(() => progressoDe()?.feitas === 1);
+		await responder("n2", { bloco: "l2-b5", confianca: 2, texto: "Agora sei.", tempoMs: 1 });
+		expect(erroDe("n2")?.mensagem).toContain("já acabou");
+	});
+
+	it("pergunta: corrigindo até a conferência chegar; a mensagem ao modelo; a avaliação e o evento com o corretor", async () => {
+		const adiado = adiada();
+		respostas.push(adiado.resposta);
+		const chamadasAntes = chamadas.length;
+		await responder("v1", { bloco: "l1-b3", confianca: 3, texto: "  As ocorrências do termo.  ", tempoMs: 30000 });
+		expect(moduloDoPedido("v1")!.corrigindo).toEqual(["l1-b3"]);
+		expect(respostaNa(moduloDoPedido("v1"), "l1-b3")).toEqual({ tipo: "verificacao", versao: 1, confianca: 3, tentativas: [{ texto: "As ocorrências do termo.", tempoMs: 30000, em: expect.any(String) }] });
+		await esperar(() => chamadas.length > chamadasAntes);
+		// Uma mensagem modulo no meio (abrir) também leva o corrigindo.
+		acao("abrir", { modulo: "m1" });
+		await esperar(() => mensagensModulo().length >= 2);
+		expect(ultimoModulo().corrigindo).toEqual(["l1-b3"]);
+		// Responder de novo enquanto confere é erro.
+		await responder("v2", { bloco: "l1-b3", texto: "Outra.", tempoMs: 1 });
+		expect(erroDe("v2")?.mensagem).toContain("sendo conferida");
+
+		const pedido = chamadas.at(-1)!;
+		expect(pedido.contexto.systemPrompt).toBe(comMetodo("Confira a pergunta.", ["pergunta.md"]));
+		expect((pedido.opcoes as { temperature?: number }).temperature).toBe(0);
+		const mensagem = textoDaChamada(pedido);
+		expect(mensagem).toContain("Pergunta: O que o TF conta?");
+		expect(mensagem).toContain("Resposta esperada: As ocorrências do termo no documento.");
+		expect(mensagem).toContain("<explicacoes>\nTexto sobre c-tf. x");
+		expect(mensagem.match(/Texto sobre c-tf\./g)).toHaveLength(2);
+		expect(mensagem).toContain("Resposta do aluno:\n<resposta>\nAs ocorrências do termo.\n</resposta>");
+
+		adiado.soltar(CONFERENCIA_PARCIAL);
+		await esperar(() => ultimoModulo().corrigindo.length === 0 && respostaNa(ultimoModulo(), "l1-b3")?.tentativas[0] !== undefined && "avaliacao" in respostaNa(ultimoModulo(), "l1-b3")!.tentativas[0]!);
+		const conferida = ultimoModulo();
+		expect(conferida.pedido).toBeUndefined();
+		expect(respostaNa(conferida, "l1-b3")!.tentativas[0]).toMatchObject({ avaliacao: "parcial", retorno: "Você disse o que conta, faltou dizer onde.", modelo: "teste/modelo-x", custo: 0.01 });
+		await esperar(() => progressoDe()?.feitas === 1);
+		const [evento] = await doAprendiz("respondeu_verificacao");
+		expect(evento).toMatchObject({
+			objeto: { questao: "l1-b3", licao: "l1", conceitos: ["c-tf"] },
+			resultado: { texto: "As ocorrências do termo.", avaliacao: "parcial", retorno: "Você disse o que conta, faltou dizer onde.", confianca: 3, tempoMs: 30000 },
+			contexto: {
+				fase: "modulo",
+				versao: 1,
+				modelo: "teste/modelo-x",
+				prompt: PROMPT_DA_LICAO(),
+				corretor: { modelo: "teste/modelo-x", prompt: { nome: "verificacao.md + metodo/pergunta.md", hash: `${hashDoPrompt(PROMPT_VERIFICACAO)} + ${hashDoPrompt(METODO["pergunta.md"]!)}` }, custo: 0.01 },
+			},
+		});
+		expect(respostaNa(conferida, "l1-b3")!.tentativas[0]!.evento).toBe(evento!.id);
+		expect(recebidas("erro").filter((mensagem) => mensagem.dados.ao === "corrigir")).toEqual([]);
+	});
+
+	it("dissertativa: a correção pela rubrica; a reescrita corrigida encerra; encerrar depois é erro", async () => {
+		respostas.push(CORRECAO_M1);
+		await responder("d1", { bloco: "l2-b5", confianca: 2, texto: "Poucos documentos têm o termo.", tempoMs: 180000 });
+		expect(moduloDoPedido("d1")!.corrigindo).toEqual(["l2-b5"]);
+		await esperar(() => ultimoModulo().corrigindo.length === 0 && Boolean((respostaNa(ultimoModulo(), "l2-b5")?.tentativas[0] as { correcao?: unknown } | undefined)?.correcao));
+		const corretor = chamadas.at(-1)!;
+		expect(corretor.contexto.systemPrompt).toBe(comMetodo("Corrija pela rubrica.", ["dissertativa.md"]));
+		expect((corretor.opcoes as { temperature?: number }).temperature).toBe(0);
+		expect(textoDaChamada(corretor)).toContain("Pergunta: Por que termos raros pesam mais?");
+		expect(respostaNa(ultimoModulo(), "l2-b5")!.tentativas[0]).toMatchObject({ correcao: { total: 3, max: 5, modelo: "teste/modelo-x", custo: 0.01 } });
+		await esperar(() => progressoDe()?.feitas === 1);
+
+		respostas.push(JSON.stringify({ criterios: JSON.parse(CORRECAO_M1).criterios.map((item: { pontos: number }, indice: number) => ({ ...item, pontos: [2, 2, 1][indice] })) }));
+		await responder("d2", { bloco: "l2-b5", texto: "Poucos documentos têm o termo, e o log suaviza. Por exemplo...", tempoMs: 60000 });
+		await esperar(() => Boolean((respostaNa(ultimoModulo(), "l2-b5") as { encerradaEm?: string } | undefined)?.encerradaEm));
+		const final = respostaNa(ultimoModulo(), "l2-b5")!;
+		expect(final.tentativas).toHaveLength(2);
+		expect(final.tentativas[1]).toMatchObject({ correcao: { total: 5, max: 5 } });
+		const eventos = await doAprendiz("respondeu_dissertativa");
+		expect(eventos.map((evento) => [evento.resultado?.tentativa, evento.resultado?.total])).toEqual([
+			[1, 3],
+			[2, 5],
+		]);
+		expect(eventos[0]).toMatchObject({
+			objeto: { questao: "l2-b5", licao: "l2", conceitos: ["c-idf"] },
+			resultado: { texto: "Poucos documentos têm o termo.", max: 5, criterios: [{ criterio: "Raridade", pontos: 2, max: 2 }, {}, {}], confianca: 2, tempoMs: 180000 },
+			contexto: { fase: "modulo", corretor: { modelo: "teste/modelo-x", prompt: { nome: "corretor.md + metodo/dissertativa.md" }, custo: 0.01 } },
+		});
+		acao("encerrar", { modulo: "m1", bloco: "l2-b5", pedido: "e1" });
+		await respondeu("e1");
+		expect(erroDe("e1")).toMatchObject({ ao: "encerrar", bloco: "l2-b5", mensagem: expect.stringContaining("já está encerrada") });
+	});
+
+	it("encerrar (Ver a resposta-modelo) depois da primeira correção: o módulo com o pedido e o encerradaEm", async () => {
+		const adiado = adiada();
+		respostas.push(adiado.resposta);
+		await responder("d1", { bloco: "l2-b5", confianca: 2, texto: "Poucos documentos.", tempoMs: 1 });
+		acao("encerrar", { modulo: "m1", bloco: "l2-b5", pedido: "e0" });
+		await respondeu("e0");
+		// Antes da correção chegar, encerrar é erro.
+		expect(erroDe("e0")?.mensagem).toContain("sendo corrigida");
+		adiado.soltar(CORRECAO_M1);
+		await esperar(() => ultimoModulo().corrigindo.length === 0 && Boolean((respostaNa(ultimoModulo(), "l2-b5")?.tentativas[0] as { correcao?: unknown } | undefined)?.correcao));
+		acao("encerrar", { modulo: "m1", bloco: "l2-b5", pedido: "e1" });
+		await respondeu("e1");
+		expect(respostaNa(moduloDoPedido("e1"), "l2-b5")).toMatchObject({ encerradaEm: expect.any(String) });
+		await responder("d2", { bloco: "l2-b5", texto: "Reescrita.", tempoMs: 1 });
+		expect(erroDe("d2")?.mensagem).toContain("já acabou");
+	});
+
+	it("a conferência que falha vira erro com o bloco, sem pedido; corrigir tenta de novo com o pedido", async () => {
+		respostas.push("ruim", '{"avaliacao": "talvez", "retorno": ""}');
+		await responder("v1", { bloco: "l1-b3", confianca: 1, texto: "Não lembro bem.", tempoMs: 1 });
+		await esperar(() => recebidas("erro").some((mensagem) => mensagem.dados.ao === "corrigir"));
+		const erro = recebidas("erro").find((mensagem) => mensagem.dados.ao === "corrigir")!.dados;
+		expect(erro).toMatchObject({ ao: "corrigir", materia, curso: CURSO, modulo: "m1", bloco: "l1-b3" });
+		expect(erro.pedido).toBeUndefined();
+		expect(String(erro.mensagem)).toContain("continua sem conferência");
+		await esperar(() => ultimoModulo().corrigindo.length === 0);
+		expect(await doAprendiz("respondeu_verificacao")).toHaveLength(0);
+
+		respostas.push(CONFERENCIA_PARCIAL);
+		acao("corrigir", { modulo: "m1", bloco: "l1-b3", pedido: "c1" });
+		await respondeu("c1");
+		expect(moduloDoPedido("c1")!.corrigindo).toEqual([]);
+		expect(respostaNa(moduloDoPedido("c1"), "l1-b3")!.tentativas[0]).toMatchObject({ avaliacao: "parcial" });
+		expect(await doAprendiz("respondeu_verificacao")).toHaveLength(1);
+		acao("corrigir", { modulo: "m1", bloco: "l1-b3", pedido: "c2" });
+		await respondeu("c2");
+		expect(erroDe("c2")).toMatchObject({ ao: "corrigir", bloco: "l1-b3", mensagem: expect.stringContaining("esperando a conferência") });
+	});
+
+	it("a conferência que ficou velha (o módulo foi gerado de novo) é jogada fora sem gravar", async () => {
+		const adiado = adiada();
+		respostas.push(adiado.resposta);
+		const chamadasAntes = chamadas.length;
+		await responder("v1", { bloco: "l1-b3", confianca: 3, texto: "Ocorrências.", tempoMs: 1 });
+		await esperar(() => chamadas.length > chamadasAntes);
+		geracaoQueDaCerto();
+		acao("gerar", { modulo: "m1", pedido: "g2" });
+		await respondeu("g2");
+		await esperar(() => chamadas.length === chamadasAntes + 4 && situacaoDe("m1") === "gerado" && doModulo(ultimo(), "m1")?.geradoEm !== undefined);
+		await esperar(async () => (await doVerbo("gerou_modulo")).length === 2);
+		// O módulo novo não tem as respostas, e a conferência em andamento não conta mais.
+		acao("abrir", { modulo: "m1" });
+		await esperar(() => mensagensModulo().length >= 2 && ultimoModulo().modulo.respostas === undefined);
+		expect(ultimoModulo().corrigindo).toEqual([]);
+		const mensagensAntes = mensagensModulo().length;
+		adiado.soltar(CONFERENCIA_PARCIAL);
+		await esperar(() => mensagensModulo().length > mensagensAntes);
+		expect(ultimoModulo().modulo.respostas).toBeUndefined();
+		expect(await doAprendiz("respondeu_verificacao")).toHaveLength(0);
+		expect(recebidas("erro")).toEqual([]);
+		expect(((await lerModulo(dados, materia, CURSO, "m1")) as ModuloGerado).respostas).toBeUndefined();
+	});
+
+	it("reescrever um bloco mantém as respostas; a do bloco reescrito fica sem valor (o progresso cai), sem apagar nada", async () => {
+		await responder("q1", { bloco: "l1-b6", confianca: 3, escolha: 1, tempoMs: 1 });
+		await responder("n1", { bloco: "l2-b5", naoSei: true });
+		await esperar(() => progressoDe()?.feitas === 2);
+		acao("retorno", { modulo: "m1", licao: "l1", bloco: "l1-b6", pedido: "r1", avaliacao: "melhorar", motivos: ["confuso"], texto: "" });
+		await respondeu("r1");
+		const retorno = retornoDe("r1")!;
+		respostas.push(JSON.stringify({ bloco: { ...alternativa("c-tf"), enunciado: "Quantas vezes aparece?" } }));
+		acao("reescrever_bloco", { modulo: "m1", licao: "l1", bloco: "l1-b6", pedido: "w1", retorno });
+		await respondeu("w1");
+		await esperar(() => mensagensModulo().some((mensagem) => (mensagem.modulo.licoes[0]!.blocos[5]!.versao ?? 1) === 2));
+		const novo = ultimoModulo().modulo;
+		expect(novo.respostas!["l1-b6"]).toMatchObject({ versao: 1, tentativas: [{ escolha: 1, correta: true }] });
+		expect(novo.respostas!["l2-b5"]).toMatchObject({ naoSei: { em: expect.any(String) } });
+		await esperar(() => progressoDe()?.feitas === 1);
+		// A questão reescrita é nova: pede a confiança de novo, e a resposta nova substitui a antiga.
+		await responder("q2", { bloco: "l1-b6", escolha: 0, tempoMs: 1 });
+		expect(erroDe("q2")?.mensagem).toContain("confiança");
+		await responder("q3", { bloco: "l1-b6", confianca: 1, escolha: 0, tempoMs: 1 });
+		expect(respostaNa(moduloDoPedido("q3"), "l1-b6")).toMatchObject({ versao: 2, confianca: 1, tentativas: [{ escolha: 0, correta: false }] });
+		const eventos = await doAprendiz("respondeu_questao");
+		expect(eventos.map((evento) => evento.contexto?.versao)).toEqual([1, 2]);
+		expect(eventos[1]!.contexto).toMatchObject({ prompt: { nome: "modulo-bloco.md + metodo/quiz.md" } });
+	});
+
+	it("concluir o módulo mantém as respostas, e ler_modulo continua lendo", async () => {
+		await responder("q1", { bloco: "l1-b6", confianca: 3, escolha: 1, tempoMs: 1 });
+		acao("concluir", { modulo: "m1", pedido: "c" });
+		await respondeu("c");
+		const concluido = moduloDoPedido("c") ?? (recebidas("modulo").at(-1)!.dados as unknown as MensagemModuloDoTeste);
+		expect(concluido.modulo).toMatchObject({ concluidoEm: expect.any(String), respostas: { "l1-b6": { tentativas: [{ correta: true }] } } });
+		const lido = await ferramentas.ler_modulo!.execute("1", { materia, curso: CURSO, modulo: "m1" }, undefined, undefined, ctx);
+		expect(lido.isError).toBeUndefined();
+		expect(lido.content[0]!.text).toContain("concluído pelo aluno");
+	});
+
+	it("depois de session_shutdown a conferência em andamento para sem gravar", async () => {
+		const adiado = adiada();
+		respostas.push(adiado.resposta);
+		const chamadasAntes = chamadas.length;
+		await responder("v1", { bloco: "l1-b3", confianca: 3, texto: "Ocorrências.", tempoMs: 1 });
+		await esperar(() => chamadas.length > chamadasAntes);
+		const antes = mostrados.length;
+		tratadores.session_shutdown?.({}, ctx);
+		await new Promise((resolver) => setTimeout(resolver, 30));
+		expect(mostrados).toHaveLength(antes);
+		expect(await doAprendiz("respondeu_verificacao")).toHaveLength(0);
+		const gravado = (await lerModulo(dados, materia, CURSO, "m1")) as ModuloGerado;
+		expect(gravado.respostas!["l1-b3"]!.tentativas[0]).not.toHaveProperty("avaliacao");
 	});
 });

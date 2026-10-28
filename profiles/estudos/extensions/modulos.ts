@@ -37,7 +37,18 @@
 //   com o arquivo da metodologia do tipo do bloco, fora da trava, com a nova
 //   tentativa; uma operação por curso de cada vez,
 //   junto das gerações). As regras que valem para a matéria entram nas
-//   mensagens do plano, das lições e da reescrita do bloco.
+//   mensagens do plano, das lições e da reescrita do bloco;
+// - as respostas das questões (docs/modulos.md, "Responder as questões"):
+//   responder, corrigir e encerrar no painel "modulos". O quiz é conferido
+//   aqui, sem modelo; a pergunta (../prompts/verificacao.md com a metodologia
+//   pergunta.md) e a dissertativa (o corretor do diagnóstico,
+//   corrigirPelaRubrica em cursos.ts) são conferidas pelo modelo fora da
+//   trava, com temperatura 0; o fim da sessão cancela sem gravar, e a
+//   conferência de uma resposta que mudou nesse meio-tempo (o módulo gerado
+//   de novo, o bloco reescrito) é jogada fora. Toda mensagem "modulo" leva
+//   corrigindo (os blocos em conferência agora), e o "estado" leva o
+//   progresso de cada módulo gerado. Os eventos vão para o
+//   aprendiz/eventos.jsonl pela ../lib/modulo-respostas.ts.
 import { readFile, stat } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -67,6 +78,21 @@ import {
 } from "../lib/escrita.ts";
 import { NOMES_TIPO_MODULO } from "../lib/esqueleto.ts";
 import { type Evento, lerEventos } from "../lib/eventos.ts";
+import {
+	type AlvoConferencia,
+	alvoParaCorrigir,
+	type BlocoQuestao,
+	type Conferencia,
+	conferenciaVale,
+	type Corretor,
+	explicacoesAntes,
+	gravarConferencia,
+	gravarEncerrada,
+	gravarResposta,
+	progressoDoModulo,
+	questaoDoModulo,
+	validarAvaliacao,
+} from "../lib/modulo-respostas.ts";
 import { objetoJsonDoModelo } from "../lib/json-do-modelo.ts";
 import { ErroMapa, lerMapa, PAINEL_MAPA } from "../lib/mapa.ts";
 import { arquivoMateria, ErroMaterias, eventosAprendiz, eventosMateria } from "../lib/materias.ts";
@@ -108,7 +134,19 @@ import {
 	marcarAguardando,
 	validarLicao,
 } from "../lib/modulos.ts";
-import { hashDoPrompt, instrucoesComMetodo, lerMetodo, type MetodoLido, PASTA_METODO, PedirDeNovo, pedirJson, type RegistroCursos, usadoComMetodo } from "./cursos.ts";
+import {
+	CAMINHO_PROMPT_CORRETOR,
+	corrigirPelaRubrica,
+	hashDoPrompt,
+	instrucoesComMetodo,
+	lerMetodo,
+	type MetodoLido,
+	PASTA_METODO,
+	PedirDeNovo,
+	pedirJson,
+	type RegistroCursos,
+	usadoComMetodo,
+} from "./cursos.ts";
 import { arquivoDoAviso, lerPromptMapeador } from "./mapa.ts";
 import { materiaDaConversa } from "./notas.ts";
 
@@ -121,6 +159,12 @@ export const CAMINHO_PROMPT_LICAO = join(dirname(fileURLToPath(import.meta.url))
 /** O prompt da reescrita de um bloco (mesmo formato). */
 export const CAMINHO_PROMPT_BLOCO = join(dirname(fileURLToPath(import.meta.url)), "..", "prompts", "modulo-bloco.md");
 
+/** O prompt que confere a pergunta rápida (bloco verificacao) (mesmo formato). */
+export const CAMINHO_PROMPT_VERIFICACAO = join(dirname(fileURLToPath(import.meta.url)), "..", "prompts", "verificacao.md");
+
+/** O arquivo da metodologia que a conferência da pergunta carrega (docs/modulos.md, "A metodologia em arquivos"). */
+export const METODO_VERIFICACAO = ["pergunta.md"] as const;
+
 /** Quanto a geração espera os materiais do formulário ficarem prontos antes de desistir. */
 export const TEMPO_ESPERA_MATERIAIS_MS = 30 * 60_000;
 
@@ -131,6 +175,7 @@ export const INTERVALO_VARREDURA_MS = 5_000;
 const MAX_TOKENS_PLANO = 16_000;
 const MAX_TOKENS_LICAO = 32_000;
 const MAX_TOKENS_BLOCO = 16_000;
+const MAX_TOKENS_VERIFICACAO = 8_000;
 
 /** Até quantos caracteres ler_modulo devolve de uma vez (as explicações vão inteiras). */
 const LIMITE_LEITURA = 100_000;
@@ -138,7 +183,10 @@ const LIMITE_LEITURA = 100_000;
 /** As ações da tela no painel modulos: as da lib (AcoesModulos) e as do retorno e da reescrita (AcoesModulosEscrita). */
 type AcaoDaTela = keyof (AcoesModulos & AcoesModulosEscrita);
 
-const ACOES: ReadonlyArray<AcaoDaTela> = ["listar", "gerar", "aguardar", "cancelar", "abrir", "concluir", "retorno", "reescrever_bloco"];
+const ACOES: ReadonlyArray<AcaoDaTela> = ["listar", "gerar", "aguardar", "cancelar", "abrir", "concluir", "responder", "corrigir", "encerrar", "retorno", "reescrever_bloco"];
+
+/** As ações que são de uma questão: o erro leva o bloco. */
+const ACOES_DA_QUESTAO: ReadonlyArray<AcaoDaTela> = ["responder", "corrigir", "encerrar"];
 
 /** As ações do painel escrita. */
 const ACOES_ESCRITA: ReadonlyArray<keyof AcoesEscrita> = ["listar", "salvar", "apagar"];
@@ -159,6 +207,10 @@ interface DadosAcao {
 	texto?: unknown;
 	virarRegra?: unknown;
 	retorno?: unknown;
+	confianca?: unknown;
+	escolha?: unknown;
+	naoSei?: unknown;
+	tempoMs?: unknown;
 }
 
 const FRASES: Record<AcaoDaTela | "ler", string> = {
@@ -168,6 +220,9 @@ const FRASES: Record<AcaoDaTela | "ler", string> = {
 	cancelar: "parar a geração do módulo",
 	abrir: "abrir o módulo",
 	concluir: "concluir o módulo",
+	responder: "gravar a resposta",
+	corrigir: "conferir a resposta",
+	encerrar: "encerrar a questão",
 	retorno: "gravar o retorno do bloco",
 	reescrever_bloco: "reescrever o bloco",
 	ler: "ler o módulo",
@@ -471,6 +526,34 @@ export function mensagemDosConsertos(consertos: readonly ConsertoPlano[]): strin
 	].join("\n");
 }
 
+/** O que vai na mensagem da conferência da pergunta. */
+export interface EntradaVerificacao {
+	pergunta: string;
+	respostaEsperada: string;
+	/** Os textos das explicações logo antes da pergunta na lição (explicacoesAntes), na ordem. */
+	explicacoes: readonly string[];
+	/** A resposta do Breno. */
+	texto: string;
+}
+
+/**
+ * A mensagem do modelo que confere a pergunta rápida (docs/modulos.md,
+ * "Pergunta rápida"): a pergunta, a resposta esperada, as explicações logo
+ * antes dela (o que acabou de ser explicado, até uns 6 mil caracteres) e a
+ * resposta do Breno.
+ */
+export function mensagemDaVerificacao(entrada: EntradaVerificacao): string {
+	const explicacoes = entrada.explicacoes.map((texto) => texto.trim()).filter(Boolean);
+	return [
+		`Pergunta: ${entrada.pergunta}`,
+		`Resposta esperada: ${entrada.respostaEsperada}`,
+		explicacoes.length > 0
+			? `O que o aluno acabou de ler (as explicações logo antes da pergunta, na ordem):\n<explicacoes>\n${explicacoes.join("\n\n---\n\n")}\n</explicacoes>`
+			: "O que o aluno acabou de ler: nenhuma explicação logo antes da pergunta.",
+		`Resposta do aluno:\n<resposta>\n${entrada.texto}\n</resposta>`,
+	].join("\n\n");
+}
+
 /** Os arquivos da metodologia usados, sem repetir, na ordem em que apareceram (para o contexto do gerou_modulo). */
 function metodoUsado(lidos: readonly MetodoLido[]) {
 	const vistos = new Set<string>();
@@ -561,6 +644,10 @@ export interface OpcoesModulos {
 	caminhoPromptLicao?: string;
 	/** O modulo-bloco.md (nos testes, um prompt de mentira). */
 	caminhoPromptBloco?: string;
+	/** O verificacao.md (nos testes, um prompt de mentira). */
+	caminhoPromptVerificacao?: string;
+	/** O corretor.md da dissertativa, o mesmo do diagnóstico (nos testes, um prompt de mentira). */
+	caminhoPromptCorretor?: string;
 	/** A pasta da metodologia (nos testes, arquivos de mentira). */
 	pastaMetodo?: string;
 	/** Quanto esperar os materiais do formulário (nos testes, pouco). */
@@ -598,6 +685,18 @@ interface ReescritaEmAndamento {
 	controle: AbortController;
 	/** Só depois de conferida a reescrita aparece no estado (reescrevendo). */
 	aceita: boolean;
+}
+
+/** Uma conferência em andamento (pergunta ou dissertativa): a tentativa conferida e o cancelamento. */
+interface Conferindo {
+	alvo: AlvoConferencia;
+	controle: AbortController;
+}
+
+/** Uma conferência a fazer: a tentativa, a lição e o bloco (lidos na trava) e o cancelamento. */
+interface AConferir extends Conferindo {
+	licao: Licao;
+	bloco: BlocoQuestao;
 }
 
 /** Um retorno gravado (o avaliou_bloco): de onde é o bloco e o que o Breno disse. */
@@ -639,6 +738,8 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 	const caminhoPlano = opcoes.caminhoPromptPlano ?? CAMINHO_PROMPT_PLANO;
 	const caminhoLicao = opcoes.caminhoPromptLicao ?? CAMINHO_PROMPT_LICAO;
 	const caminhoBloco = opcoes.caminhoPromptBloco ?? CAMINHO_PROMPT_BLOCO;
+	const caminhoVerificacao = opcoes.caminhoPromptVerificacao ?? CAMINHO_PROMPT_VERIFICACAO;
+	const caminhoCorretor = opcoes.caminhoPromptCorretor ?? CAMINHO_PROMPT_CORRETOR;
 	const pastaMetodo = opcoes.pastaMetodo ?? PASTA_METODO;
 	const tempoEspera = opcoes.tempoEsperaMateriaisMs ?? TEMPO_ESPERA_MATERIAIS_MS;
 	const intervalo = opcoes.intervaloVarreduraMs ?? INTERVALO_VARREDURA_MS;
@@ -661,6 +762,8 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 	const reescritas = new Map<string, ReescritaEmAndamento>();
 	/** Os retornos gravados nesta sessão, pelo id do evento (os outros são lidos do aprendiz/eventos.jsonl). */
 	const retornos = new Map<string, RetornoGravado>();
+	/** As conferências em andamento (pergunta e dissertativa), por "matéria/curso/módulo" e pelo id do bloco. */
+	const conferencias = new Map<string, Map<string, Conferindo>>();
 
 	const daSessao = () => (sessao ? { sessao } : {});
 	const chaveDo = (materia: string, curso: string) => `${materia}/${curso}`;
@@ -678,6 +781,41 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 	function mostrarEscrita(acao: keyof MensagensEscrita, dados: unknown): void {
 		pi.events.emit("interface:mostrar", { painel: PAINEL_ESCRITA, acao, dados, gravar: false });
 	}
+
+	/**
+	 * Os blocos do módulo em conferência agora, na ordem do módulo: só os
+	 * cuja conferência ainda vale (conferenciaVale; a de uma resposta que
+	 * mudou, por o módulo ter sido gerado de novo ou o bloco reescrito, será
+	 * jogada fora e não conta).
+	 */
+	const corrigindoNo = (modulo: Modulo): string[] => {
+		const doModulo = conferencias.get(chaveDoModulo(modulo.materia, modulo.curso, modulo.id));
+		if (!doModulo || modulo.situacao !== "gerado") return [];
+		return modulo.licoes
+			.flatMap((licao) => licao.blocos.map((bloco) => bloco.id))
+			.filter((id) => {
+				const conferindo = doModulo.get(id);
+				return conferindo !== undefined && conferenciaVale(modulo, conferindo.alvo);
+			});
+	};
+
+	/** Manda o módulo inteiro (com as respostas) e os blocos em conferência; com o pedido, quando responde a uma ação. Chamado dentro da trava. */
+	const mostrarModulo = (materia: string, curso: string, modulo: Modulo, pedido?: string) =>
+		mostrar("modulo", { materia, curso, modulo, corrigindo: corrigindoNo(modulo), ...(pedido ? { pedido } : {}) });
+
+	const marcarConferindo = (chave: string, alvo: AlvoConferencia): AbortController => {
+		const doModulo = conferencias.get(chave) ?? new Map<string, Conferindo>();
+		conferencias.set(chave, doModulo);
+		const controle = new AbortController();
+		doModulo.set(alvo.bloco, { alvo, controle });
+		return controle;
+	};
+	const tirarConferindo = (chave: string, bloco: string, controle: AbortController) => {
+		const doModulo = conferencias.get(chave);
+		if (doModulo?.get(bloco)?.controle !== controle) return;
+		doModulo.delete(bloco);
+		if (doModulo.size === 0) conferencias.delete(chave);
+	};
 
 	/** Roda `tarefa` na trava da matéria (depois da anterior, mesmo que ela tenha falhado). */
 	const naTrava = <T>(materia: string, tarefa: () => Promise<T>): Promise<T> => {
@@ -798,12 +936,14 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 			let doGravado: Partial<EstadoModuloNaTela> = {};
 			if (gravado?.situacao === "gerado") {
 				const resumo = resumoDoModulo(gravado);
+				const progresso = progressoDoModulo(gravado);
 				doGravado = {
 					geradoEm: gravado.geradoEm,
 					custo: gravado.custo,
 					licoesGeradas: resumo.licoes,
 					blocos: resumo.blocos,
 					questoes: resumo.questoes,
+					progresso: { feitas: progresso.feitas, questoes: progresso.questoes },
 					concluido: Boolean(gravado.concluidoEm),
 					...(gravado.concluidoEm ? { concluidoEm: gravado.concluidoEm } : {}),
 					...(reescrita?.aceita && reescrita.modulo === id ? { reescrevendo: { licao: reescrita.licao, bloco: reescrita.bloco } } : {}),
@@ -1285,7 +1425,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 					{ retornoId, modelo: prompt.modelo, prompt: usadoComMetodo(prompt.usado, metodo), custo: resposta.custo },
 					daSessao(),
 				);
-				mostrar("modulo", { materia, curso, modulo: novo });
+				mostrarModulo(materia, curso, novo);
 				await mostrarEstado(dados, materia, curso);
 			});
 		} catch (erro) {
@@ -1303,6 +1443,121 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 		}
 	};
 
+	/** A origem do bloco para o contexto dos eventos das respostas (a mesma do avaliou_bloco: origemDoBloco). */
+	const origemPara = (dados: string) => (modulo: ModuloGerado, licao: string, bloco: Bloco) => origemDoBloco(dados, modulo, licao, bloco);
+
+	/**
+	 * Confere uma tentativa já marcada em conferencias (pela resposta ou por
+	 * corrigir): fora da trava, chama o modelo (a pergunta pelo
+	 * verificacao.md com a metodologia pergunta.md e validarAvaliacao; a
+	 * dissertativa pelo corretor, corrigirPelaRubrica; temperatura 0, com a
+	 * nova tentativa) e, dentro dela, grava a conferência e o evento
+	 * (gravarConferencia) e manda o módulo (com o pedido, quando veio de
+	 * corrigir) e o estado. Se a resposta mudou nesse meio-tempo, a
+	 * conferência é jogada fora (nada gravado) e o módulo vai como está. Com
+	 * erro, o erro (ao "corrigir", com o bloco) e o módulo como está: a
+	 * tentativa fica sem avaliação ou correção, e corrigir tenta de novo.
+	 * Cancelada (fim da sessão), nada.
+	 */
+	const conferir = async (dados: string, materia: string, curso: string, modulo: string, alvo: AConferir, pedido: string | undefined) => {
+		const chave = chaveDoModulo(materia, curso, modulo);
+		const { controle, bloco, licao } = alvo;
+		const sinal = controle.signal;
+		const comPedido = pedido ? { pedido } : {};
+		const depois = `A resposta da questão ${bloco.id} continua sem ${bloco.tipo === "dissertativa" ? "correção" : "conferência"}.`;
+		try {
+			let conferencia: Conferencia;
+			let corretor: Corretor;
+			if (bloco.tipo === "dissertativa") {
+				const corrigida = await corrigirPelaRubrica(registro, { caminhoPrompt: caminhoCorretor, pastaMetodo }, bloco, alvo.alvo.texto, sinal, depois);
+				conferencia = { tipo: "dissertativa", correcao: corrigida.correcao };
+				corretor = { modelo: corrigida.correcao.modelo, prompt: corrigida.prompt, custo: corrigida.correcao.custo };
+			} else if (bloco.tipo === "verificacao") {
+				const prompt = await lerPrompt(caminhoVerificacao);
+				const metodo = await lerMetodo(pastaMetodo, METODO_VERIFICACAO);
+				if (!registro) throw new ErroModulo("A sessão não tem o registro de modelos do pi; não dá para chamar o modelo que confere a pergunta.");
+				const modelo = resolverModelo(registro, prompt.modelo, "da conferência da pergunta");
+				const mensagem = mensagemDaVerificacao({ pergunta: bloco.pergunta, respostaEsperada: bloco.respostaEsperada, explicacoes: explicacoesAntes(licao, bloco.id), texto: alvo.alvo.texto });
+				const resposta = await pedirJson(registro, modelo, instrucoesComMetodo(prompt.instrucoes, metodo), mensagem, (texto) => validarAvaliacao(objetoJsonDoModelo(texto)), sinal, {
+					temperatura: 0,
+					maxTokens: MAX_TOKENS_VERIFICACAO,
+					formato: '{"avaliacao": "certa" | "parcial" | "errada", "retorno": "…"}',
+					oQue: "a conferência da pergunta",
+					depois,
+				});
+				conferencia = { tipo: "verificacao", ...resposta.resultado, modelo: prompt.modelo, custo: resposta.custo };
+				corretor = { modelo: prompt.modelo, prompt: usadoComMetodo(prompt.usado, metodo), custo: resposta.custo };
+			} else {
+				throw new ErroModulo(`A questão ${bloco.id} é um quiz; ele é conferido sem modelo.`);
+			}
+			await naTrava(materia, async () => {
+				if (sinal.aborted) throw new Cancelado();
+				tirarConferindo(chave, bloco.id, controle);
+				const novo = await gravarConferencia(dados, materia, curso, modulo, alvo.alvo, conferencia, { ...daSessao(), origem: origemPara(dados), corretor });
+				// A resposta mudou enquanto era conferida: a conferência é jogada fora, e o módulo vai como está.
+				const atual = novo ?? (await lerModulo(dados, materia, curso, modulo));
+				if (!atual) throw new ErroModulo(`O módulo ${modulo} não existe mais.`);
+				mostrarModulo(materia, curso, atual, pedido);
+				if (novo) await mostrarEstado(dados, materia, curso);
+			});
+		} catch (erro) {
+			tirarConferindo(chave, bloco.id, controle);
+			if (pastaDados !== dados || erro instanceof Cancelado || sinal.aborted) return;
+			mostrar("erro", { mensagem: mensagemDe(erro, "corrigir"), ao: "corrigir", materia, curso, modulo, bloco: bloco.id, ...comPedido });
+			await naTrava(materia, async () => {
+				if (pastaDados !== dados) return;
+				const atual = await lerModulo(dados, materia, curso, modulo);
+				if (atual) mostrarModulo(materia, curso, atual);
+			}).catch(() => undefined);
+		} finally {
+			tirarConferindo(chave, bloco.id, controle);
+		}
+	};
+
+	/**
+	 * Grava a resposta da tela (responder; gravarResposta, na trava): o quiz
+	 * já sai conferido, com o evento; o "Não sei" também. Manda o módulo com o
+	 * pedido (com corrigindo, na pergunta e na dissertativa) e o estado (o
+	 * progresso); a pergunta e a dissertativa vão em seguida para a
+	 * conferência do modelo (conferir), que chega num módulo sem pedido.
+	 */
+	const responder = async (dados: string, materia: string, curso: string, modulo: string, dadosAcao: DadosAcao, pedido: string | undefined) => {
+		const chave = chaveDoModulo(materia, curso, modulo);
+		const entrada = { confianca: dadosAcao.confianca, escolha: dadosAcao.escolha, texto: dadosAcao.texto, naoSei: dadosAcao.naoSei, tempoMs: dadosAcao.tempoMs };
+		const aConferir = await naTrava(materia, async (): Promise<AConferir | undefined> => {
+			const gravada = await gravarResposta(dados, materia, curso, modulo, dadosAcao.bloco, entrada, { ...daSessao(), origem: origemPara(dados) });
+			const marcada = gravada.alvo
+				? { alvo: gravada.alvo, controle: marcarConferindo(chave, gravada.alvo), licao: gravada.aplicada.licao, bloco: gravada.aplicada.bloco }
+				: undefined;
+			// A resposta está gravada: o pedido vai aqui; a conferência chega depois, num módulo sem pedido.
+			mostrarModulo(materia, curso, gravada.modulo, pedido);
+			await mostrarEstado(dados, materia, curso);
+			return marcada;
+		});
+		if (aConferir) await conferir(dados, materia, curso, modulo, aConferir, undefined);
+	};
+
+	/**
+	 * Tenta de novo a conferência que falhou (corrigir): na trava, a tentativa
+	 * que espera a conferência (alvoParaCorrigir; uma já conferida, um quiz ou
+	 * uma que está sendo conferida agora é erro), e manda o módulo com
+	 * corrigindo, sem pedido; o pedido vai no módulo com a conferência, ou no
+	 * erro.
+	 */
+	const corrigir = async (dados: string, materia: string, curso: string, modulo: string, dadosAcao: DadosAcao, pedido: string | undefined) => {
+		const chave = chaveDoModulo(materia, curso, modulo);
+		const aConferir = await naTrava(materia, async (): Promise<AConferir> => {
+			const { modulo: lido, alvo } = await alvoParaCorrigir(dados, materia, curso, modulo, dadosAcao.bloco);
+			const emAndamento = conferencias.get(chave)?.get(alvo.bloco);
+			if (emAndamento && JSON.stringify(emAndamento.alvo) === JSON.stringify(alvo)) throw new ErroModulo(`A resposta da questão ${alvo.bloco} já está sendo conferida.`);
+			const { licao, bloco } = questaoDoModulo(lido, alvo.bloco);
+			const controle = marcarConferindo(chave, alvo);
+			mostrarModulo(materia, curso, lido);
+			return { alvo, controle, licao, bloco };
+		});
+		await conferir(dados, materia, curso, modulo, aConferir, pedido);
+	};
+
 	pi.on("session_start", (_evento, ctx) => {
 		pastaDados = ctx.cwd;
 		sessao = ctx.sessionManager.getSessionId();
@@ -1317,6 +1572,8 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 		geracoes.clear();
 		for (const reescrita of reescritas.values()) reescrita.controle.abort();
 		reescritas.clear();
+		for (const doModulo of conferencias.values()) for (const conferindo of doModulo.values()) conferindo.controle.abort();
+		conferencias.clear();
 		retornos.clear();
 		erros.clear();
 		avisos.clear();
@@ -1406,6 +1663,16 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 						avisos.delete(chaveDoModulo(materia, curso, modulo));
 						await mostrarEstado(dados, materia, curso, pedido);
 					});
+				} else if (ao === "responder") {
+					await responder(dados, materia, curso, modulo, dadosAcao, pedido);
+				} else if (ao === "corrigir") {
+					await corrigir(dados, materia, curso, modulo, dadosAcao, pedido);
+				} else if (ao === "encerrar") {
+					// "Ver a resposta-modelo": a dissertativa corrigida passa a encerrada (sem evento; o progresso não muda).
+					await naTrava(materia, async () => {
+						const encerrado = await gravarEncerrada(dados, materia, curso, modulo, dadosAcao.bloco);
+						mostrarModulo(materia, curso, encerrado, pedido);
+					});
 				} else if (ao === "retorno") {
 					await gravarRetorno(dados, materia, curso, modulo, dadosAcao, pedido);
 				} else if (ao === "reescrever_bloco") {
@@ -1430,7 +1697,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 					await naTrava(materia, async () => {
 						const lido = await lerModulo(dados, materia, curso, modulo);
 						if (!lido) throw new ErroModulo(`O módulo ${modulo} ainda não foi gerado.`);
-						mostrar("modulo", { materia, curso, modulo: lido });
+						mostrarModulo(materia, curso, lido);
 					});
 				} else if (ao === "concluir") {
 					// Na trava do curso (a da matéria): grava o concluidoEm e o
@@ -1442,12 +1709,13 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 						const concluido = await concluirModulo(dados, materia, curso, modulo, daSessao());
 						erros.delete(chaveDoModulo(materia, curso, modulo));
 						avisos.delete(chaveDoModulo(materia, curso, modulo));
-						mostrar("modulo", { materia, curso, modulo: concluido });
+						mostrarModulo(materia, curso, concluido);
 						await mostrarEstado(dados, materia, curso, pedido);
 					});
 				}
 			} catch (erro) {
-				mostrar("erro", { mensagem: mensagemDe(erro, ao), ao, materia, curso, ...comModulo, ...comPedido });
+				const comBloco = ACOES_DA_QUESTAO.includes(ao) && typeof dadosAcao.bloco === "string" && dadosAcao.bloco ? { bloco: dadosAcao.bloco } : {};
+				mostrar("erro", { mensagem: mensagemDe(erro, ao), ao, materia, curso, ...comModulo, ...comBloco, ...comPedido });
 			}
 		})();
 	});

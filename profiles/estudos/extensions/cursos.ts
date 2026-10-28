@@ -67,6 +67,7 @@ import {
 	autoavaliacaoCompleta,
 	concluirDiagnostico,
 	type ConceitosEscolhidos,
+	type Correcao,
 	type DiagnosticoEmAndamento,
 	ErroDiagnostico,
 	escolherConceitos,
@@ -498,6 +499,46 @@ export function mensagemDoCorretor(questao: Pick<QuestaoDissertativa, "contexto"
 		...(questao.respostaModelo ? [`Resposta-modelo (só uma referência; outras formas de dizer a mesma coisa valem):\n${questao.respostaModelo}`] : []),
 		`Resposta do aluno:\n<resposta>\n${texto}\n</resposta>`,
 	].join("\n\n");
+}
+
+/**
+ * Corrige uma dissertativa pela rubrica: o prompt do corretor
+ * (prompts/corretor.md) com a metodologia METODO_CORRETOR, temperatura 0,
+ * a mensagem do corretor (mensagemDoCorretor) e validarCorrecao na leitura,
+ * com a nova tentativa do pedirJson. A mesma correção serve ao diagnóstico e
+ * às dissertativas das lições do módulo (extensions/modulos.ts). Devolve a
+ * correção com o custo das chamadas e o prompt usado (com a metodologia,
+ * usadoComMetodo), para o evento. Fora da trava: a chamada pode levar
+ * minutos. `depois` é o que ficou como estava, para a frase do erro.
+ */
+export async function corrigirPelaRubrica(
+	registro: RegistroCursos | undefined,
+	arquivos: { caminhoPrompt: string; pastaMetodo: string },
+	questao: QuestaoDissertativa,
+	texto: string,
+	sinal: AbortSignal,
+	depois: string,
+): Promise<{ correcao: Correcao; prompt: PromptUsado }> {
+	const prompt = await lerPrompt(arquivos.caminhoPrompt);
+	const metodo = await lerMetodo(arquivos.pastaMetodo, METODO_CORRETOR);
+	if (!registro) throw new ErroDiagnostico("A sessão não tem o registro de modelos do pi; não dá para chamar o modelo do corretor.");
+	const modelo = resolverModelo(registro, prompt.modelo, "do corretor");
+	const corrigida = await pedirJson(
+		registro,
+		modelo,
+		instrucoesComMetodo(prompt.instrucoes, metodo),
+		mensagemDoCorretor(questao, texto),
+		(resposta) => validarCorrecao(objetoJsonDoModelo(resposta), questao, { modelo: prompt.modelo, custo: 0 }),
+		sinal,
+		{
+			temperatura: 0,
+			maxTokens: MAX_TOKENS_CORRECAO,
+			formato: '{"criterios": [...]}, com um item por critério da rubrica',
+			oQue: "a correção da dissertativa",
+			depois,
+		},
+	);
+	return { correcao: { ...corrigida.resultado, custo: corrigida.custo }, prompt: usadoComMetodo(prompt.usado, metodo) };
 }
 
 /** 7, 6,5: o número com vírgula, para os textos. */
@@ -957,8 +998,8 @@ export default function cursos(pi: ExtensionAPI, opcoes: OpcoesCursos = {}) {
 
 	/**
 	 * Corrige uma dissertativa já marcada em `corrigindo` (pela resposta ou
-	 * por corrigir): chama o corretor fora da trava (temperatura 0;
-	 * validarCorrecao na leitura, com a nova tentativa) e, dentro dela, grava a
+	 * por corrigir): chama o corretor fora da trava (corrigirPelaRubrica:
+	 * temperatura 0; validarCorrecao na leitura, com a nova tentativa) e, dentro dela, grava a
 	 * correção (gravarCorrecao) e manda o curso (com o pedido, quando veio de
 	 * corrigir). Se a resposta mudou nesse meio tempo (as questões foram
 	 * geradas de novo), a correção é jogada fora. Com erro, o erro (ao
@@ -971,34 +1012,22 @@ export default function cursos(pi: ExtensionAPI, opcoes: OpcoesCursos = {}) {
 		const sinal = controle.signal;
 		const comPedido = pedido ? { pedido } : {};
 		try {
-			const prompt = await lerPrompt(caminhoCorretor);
-			const metodo = await lerMetodo(pastaMetodo, METODO_CORRETOR);
-			if (!registro) throw new ErroDiagnostico("A sessão não tem o registro de modelos do pi; não dá para chamar o modelo do corretor.");
-			const modelo = resolverModelo(registro, prompt.modelo, "do corretor");
 			// Fora da trava: a chamada pode levar minutos.
-			const corrigida = await pedirJson(
+			const { correcao, prompt } = await corrigirPelaRubrica(
 				registro,
-				modelo,
-				instrucoesComMetodo(prompt.instrucoes, metodo),
-				mensagemDoCorretor(questao, resposta.texto),
-				(texto) => validarCorrecao(objetoJsonDoModelo(texto), questao, { modelo: prompt.modelo, custo: 0 }),
+				{ caminhoPrompt: caminhoCorretor, pastaMetodo },
+				questao,
+				resposta.texto,
 				sinal,
-				{
-					temperatura: 0,
-					maxTokens: MAX_TOKENS_CORRECAO,
-					formato: '{"criterios": [...]}, com um item por critério da rubrica',
-					oQue: "a correção da dissertativa",
-					depois: `A resposta da questão ${questao.id} continua sem correção.`,
-				},
+				`A resposta da questão ${questao.id} continua sem correção.`,
 			);
-			const correcao = { ...corrigida.resultado, custo: corrigida.custo };
 			await naTrava(materia, async () => {
 				if (sinal.aborted) throw new Cancelado();
 				const atual = await lerCurso(dados, materia, curso);
 				const agora = atual.diagnosticoEmAndamento?.respostas[questao.id] as RespostaDissertativa | undefined;
 				tirarCorrigindo(chave, questao.id, controle);
 				const mesma = agora !== undefined && !agora.correcao && agora.texto === resposta.texto && agora.respondidaEm === resposta.respondidaEm;
-				const novo = mesma ? await gravarCorrecao(dados, materia, curso, questao.id, correcao, { ...daSessao(), prompt: usadoComMetodo(prompt.usado, metodo) }) : atual;
+				const novo = mesma ? await gravarCorrecao(dados, materia, curso, questao.id, correcao, { ...daSessao(), prompt }) : atual;
 				await mostrarCurso(dados, materia, novo, comPedido);
 			});
 		} catch (erro) {

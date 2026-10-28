@@ -29,12 +29,24 @@
 // O módulo vem da ponte "modulos" (useModuloAberto, a ação "abrir"); o nome
 // e a ordem dos módulos, do curso (useCurso); quais estão gerados, do estado
 // dos módulos (useModulos), que também conclui (a ação "concluir").
+//
+// A escrita dos módulos (docs/escrita.md, "A tela"): no pé de cada bloco,
+// "Retorno" abre um balão embaixo do bloco (Bom / Precisa melhorar, os
+// motivos, o texto, "Virar regra de escrita"), que grava pela ação retorno e,
+// com "Salvar e reescrever o bloco", pede a reescrita (reescrever_bloco).
+// Enquanto o bloco é reescrito (o estado do módulo traz reescrevendo), ele
+// fica apagado com a faixa "Reescrevendo este bloco…", a foto do professor e
+// o Parar (cancelar); o bloco novo entra com uma transição curta. Um bloco
+// reescrito tem a etiqueta "Reescrito" e "Ver a versão anterior". No índice,
+// o link "Como o professor escreve" abre as regras de escrita (ModalEscrita).
 
 import {
 	Button,
 	Callout,
+	Checkbox,
 	CourseBar,
 	EmptyState,
+	Icon,
 	LessonBlock,
 	Modal,
 	type OrnamentGlyph,
@@ -42,17 +54,56 @@ import {
 	QuizQuestion,
 	SectionRuler,
 	Tag,
+	TextArea,
 	type Tone,
 } from "@estudos/design-system";
-import { type JanelaPerfilHook, Markdown, semMovimento } from "@estudos/ui";
+import { AgenteAnimado, type DadosAvatarAgente, type JanelaPerfilHook, Markdown, MenuSuspenso, semMovimento } from "@estudos/ui";
 import { AnimatePresence, motion } from "motion/react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { MOTIVOS_RETORNO, NOMES_AVALIACAO, NOMES_MOTIVO, TEXTO_REGRA_MAXIMO, TEXTO_RETORNO_MAXIMO } from "../../lib/escrita-tipos.ts";
 import type { Materia } from "../../lib/materia-tipos.ts";
-import type { Bloco, BlocoAlternativa, BlocoDissertativa, BlocoVerificacao, EstadoModuloNaTela, Licao, Modulo } from "../../lib/modulo-tipos.ts";
+import {
+	type Bloco,
+	type BlocoAlternativa,
+	type BlocoAnterior,
+	type BlocoDissertativa,
+	type BlocoVerificacao,
+	type EstadoModuloNaTela,
+	type Licao,
+	type Modulo,
+	versaoDoBloco,
+} from "../../lib/modulo-tipos.ts";
 import { ExplicacaoComCodigo } from "./CodigoCitado.tsx";
 import { rotuloCapa } from "./comum.ts";
 import { useCurso } from "./cursos-ponte.ts";
 import { numeroCurto, partesDaQuestao } from "./diagnostico-tela.ts";
+import { useEscrita } from "./escrita-ponte.ts";
+import {
+	alternarMotivo,
+	anteriorInicial,
+	balaoVazio,
+	chaveDoBloco,
+	type DadosDoRetorno,
+	dadosDoRetorno,
+	dataDaVersao,
+	escolherAvaliacao,
+	EXEMPLO_REGRA,
+	foiReescrito,
+	marcarVirarRegra,
+	mudarTextoRegra,
+	mudarTextoRetorno,
+	NOME_TODAS,
+	podeReescrever,
+	problemaDoBalao,
+	ROTULO_REESCRITO,
+	rotuloDaVersao,
+	TEXTO_REESCREVENDO,
+	TEXTO_RETORNO_SALVO,
+	TITULO_ESCRITA,
+	tituloDoReescrito,
+	versoesAnteriores,
+} from "./escrita-tela.ts";
+import { ModalEscrita } from "./ModalEscrita.tsx";
 import { agruparReferencias } from "./mapa-ponte.ts";
 import {
 	type Abertura,
@@ -79,7 +130,7 @@ import {
 	TEXTO_AVISO,
 	tituloDoModulo,
 } from "./modulo-tela.ts";
-import { useModuloAberto, useModulos } from "./modulos-ponte.ts";
+import { type ErroVistoModulo, reescrevendoNoModulo, useModuloAberto, useModulos } from "./modulos-ponte.ts";
 import { EtiquetaReferencia } from "./SecaoMapa.tsx";
 
 const MOLA = { type: "spring", stiffness: 380, damping: 32 } as const;
@@ -99,6 +150,27 @@ export interface PropsTelaModulo {
 	licaoId?: string;
 	navegar(caminho: string): void;
 	tom: Tone;
+	/** As matérias (para o seletor das regras de escrita); sem a lista, só esta. */
+	materias?: ReadonlyArray<{ id: string; nome: string }>;
+	/** O agente da sessão (a foto enquanto um bloco é reescrito). */
+	agente?: { nome: string; avatar?: DadosAvatarAgente };
+}
+
+/** O retorno por bloco e a reescrita (docs/escrita.md): o que os blocos da lição recebem da ponte. */
+export interface AcoesRetorno {
+	/** A matéria do módulo ("esta matéria" do "Virar regra de escrita"). */
+	materia: { id: string; nome?: string };
+	agente?: { nome: string; avatar?: DadosAvatarAgente };
+	/** O bloco sendo reescrito agora, pelo estado do módulo. */
+	reescrevendo?: { licao: string; bloco: string };
+	/** Os erros da reescrita, pela chave lição/bloco. */
+	erros: Record<string, ErroVistoModulo>;
+	/** Grava o retorno; resolve com o id do evento, se a resposta trouxe. */
+	salvar(licao: string, bloco: string, dados: DadosDoRetorno): Promise<{ retorno?: string }>;
+	/** Pede a reescrita do bloco; resolve quando ela começou. */
+	reescrever(licao: string, bloco: string, retorno: string): Promise<unknown>;
+	/** Para a reescrita (o cancelar do módulo). */
+	parar(): Promise<void>;
 }
 
 /** Os hooks da ponte e a navegação; quem desenha é a VisaoModulo. */
@@ -109,8 +181,33 @@ export function TelaModulo(props: PropsTelaModulo) {
 	const aberto = useModuloAberto(props.janela, materiaId, cursoId, moduloId);
 	const doCurso = curso?.esqueleto?.modulos.map((modulo, indice) => ({ id: modulo.id, numero: indice + 1, nome: modulo.nome })) ?? [];
 	const abertura: Abertura = !curso && erroCurso ? { tipo: "ilegivel", mensagem: erroCurso } : aberturaDoModulo(aberto);
+
+	// "Como o professor escreve": as regras são pedidas quando o modal abre.
+	const [vendoEscrita, setVendoEscrita] = useState(false);
+	const escrita = useEscrita(props.janela, vendoEscrita);
+	const materias = props.materias ?? (props.materia ? [props.materia] : []);
+
+	// A reescrita de um bloco: quando ela acaba (o estado não traz mais o bloco), o módulo é aberto de novo (o "modulo" novo também chega sozinho).
+	const reescrevendo = reescrevendoNoModulo(modulos.estado, moduloId);
+	const chaveReescrevendo = reescrevendo ? chaveDoBloco(reescrevendo.licao, reescrevendo.bloco) : undefined;
+	const antes = useRef(chaveReescrevendo);
+	const { abrirDeNovo } = aberto;
+	useEffect(() => {
+		if (antes.current && !chaveReescrevendo) abrirDeNovo();
+		antes.current = chaveReescrevendo;
+	}, [chaveReescrevendo, abrirDeNovo]);
+	const retornos: AcoesRetorno = {
+		materia: { id: materiaId, ...(props.materia?.nome ? { nome: props.materia.nome } : {}) },
+		...(props.agente ? { agente: props.agente } : {}),
+		...(reescrevendo ? { reescrevendo } : {}),
+		erros: modulos.errosReescrita(moduloId),
+		salvar: (licao, bloco, dados) => modulos.retorno(moduloId, licao, bloco, dados),
+		reescrever: (licao, bloco, retorno) => modulos.reescreverBloco(moduloId, licao, bloco, retorno),
+		parar: () => modulos.cancelar(moduloId),
+	};
 	return (
-		<VisaoModulo
+		<>
+			<VisaoModulo
 			{...(props.materia ? { materia: props.materia } : {})}
 			{...(props.numero ? { numero: props.numero } : {})}
 			tom={props.tom}
@@ -126,7 +223,11 @@ export function TelaModulo(props: PropsTelaModulo) {
 			abrirMaterial={(arquivo) => props.navegar(`caderno/${materiaId}/materiais/${arquivo}`)}
 			tentarDeNovo={aberto.abrirDeNovo}
 			concluir={() => modulos.concluir(moduloId)}
-		/>
+			retornos={retornos}
+			abrirEscrita={() => setVendoEscrita(true)}
+			/>
+			<ModalEscrita aberto={vendoEscrita} fechar={() => setVendoEscrita(false)} escrita={escrita} materias={materias} />
+		</>
 	);
 }
 
@@ -149,6 +250,10 @@ export interface PropsVisaoModulo {
 	tentarDeNovo(): void;
 	/** "Concluir o módulo": resolve quando a extensão concluiu; rejeita com a frase do erro. */
 	concluir?(): Promise<unknown>;
+	/** O retorno por bloco e a reescrita; sem ele, os blocos não têm "Retorno". */
+	retornos?: AcoesRetorno;
+	/** Abre "Como o professor escreve"; sem ele, o índice não tem o link. */
+	abrirEscrita?(): void;
 }
 
 /** A CourseBar e o corpo da visão, pelos dados (sem ponte: dá para desenhar no servidor). */
@@ -209,6 +314,8 @@ export function VisaoModulo(props: PropsVisaoModulo) {
 				abrirMaterial={props.abrirMaterial}
 				voltarAoCurso={props.voltarAoCurso}
 				{...(props.concluir ? { concluir: props.concluir } : {})}
+				{...(props.retornos ? { retornos: props.retornos } : {})}
+				{...(props.abrirEscrita ? { abrirEscrita: props.abrirEscrita } : {})}
 			/>
 		);
 	}
@@ -262,6 +369,8 @@ function LicaoAberta(props: {
 	abrirMaterial(arquivo: string): void;
 	voltarAoCurso(): void;
 	concluir?(): Promise<unknown>;
+	retornos?: AcoesRetorno;
+	abrirEscrita?(): void;
 }) {
 	const { modulo, licao, indice } = props;
 	const total = modulo.licoes.length;
@@ -364,6 +473,12 @@ function LicaoAberta(props: {
 						))}
 					</ol>
 					<p className="data modulo__resumo">{resumoDoIndice(modulo)}</p>
+					{props.abrirEscrita ? (
+						<button type="button" className="body-sm escrita__link" onClick={props.abrirEscrita}>
+							<Icon name="book" size={16} strokeWidth={2.25} />
+							{TITULO_ESCRITA}
+						</button>
+					) : null}
 				</nav>
 				<div className="modulo__leitura">
 					<SectionRuler className="modulo__regua" label="Blocos da lição" items={itensDaRegua(licao)} {...(atual ? { current: atual } : {})} onSelect={irParaBloco} />
@@ -402,7 +517,14 @@ function LicaoAberta(props: {
 						</header>
 						<div className="modulo__blocos">
 							{licao.blocos.map((bloco, posicao) => (
-								<BlocoDaLicao key={bloco.id} bloco={bloco} numero={posicao + 1} abrirMaterial={props.abrirMaterial} />
+								<BlocoDaLicao
+									key={bloco.id}
+									bloco={bloco}
+									numero={posicao + 1}
+									licao={licao.id}
+									abrirMaterial={props.abrirMaterial}
+									{...(props.retornos ? { retornos: props.retornos } : {})}
+								/>
 							))}
 						</div>
 						<footer className="modulo__pe">
@@ -459,80 +581,225 @@ function LicaoAberta(props: {
 	);
 }
 
-/** Um bloco da lição num LessonBlock: o rótulo (e "Além do material"), o conteúdo, o gabarito para ver e as referências. */
-export function BlocoDaLicao(props: { bloco: Bloco; numero: number; abrirMaterial(arquivo: string): void }) {
-	const { bloco } = props;
+/** Quanto tempo "Retorno salvo" fica no pé do bloco. */
+const TEMPO_RETORNO_SALVO = 3500;
+
+/**
+ * O que abre e fecha pela altura embaixo do bloco (o balão de retorno, o erro,
+ * a versão anterior) e dentro do balão (os motivos, a regra). Corta o conteúdo
+ * só enquanto anima: aberta, o menu suspenso de dentro pode passar da borda.
+ */
+function Dobra(props: { className: string; children: ReactNode }) {
+	const [aberta, setAberta] = useState(false);
+	return (
+		<motion.div
+			className={props.className}
+			initial={{ height: 0, opacity: 0 }}
+			animate={{ height: "auto", opacity: 1 }}
+			exit={{ height: 0, opacity: 0 }}
+			transition={semMovimento() ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 38 }}
+			style={{ overflow: aberta ? "visible" : "hidden" }}
+			onAnimationStart={() => setAberta(false)}
+			onAnimationComplete={(alvo) => setAberta((alvo as { height?: unknown }).height === "auto")}
+		>
+			{props.children}
+		</motion.div>
+	);
+}
+
+/**
+ * Um bloco da lição num LessonBlock: o rótulo (e "Além do material",
+ * "Reescrito"), o conteúdo, o gabarito para ver e as referências. Com
+ * `retornos`, o pé tem "Retorno" (o balão embaixo do bloco), "Ver a versão
+ * anterior" (num bloco reescrito) e, durante a reescrita, a faixa com o Parar.
+ */
+export function BlocoDaLicao(props: { bloco: Bloco; numero: number; licao?: string; abrirMaterial(arquivo: string): void; retornos?: AcoesRetorno }) {
+	const { bloco, retornos } = props;
+	const licao = props.licao ?? "";
 	const [aberto, setAberto] = useState(false);
 	const { rotulo, icone } = rotuloDoBloco(bloco);
 	const referencias = "referencias" in bloco ? agruparReferencias(bloco.referencias) : [];
 	// A prática (pergunta rápida, questão e dissertativa) vai num cartão; a explicação, solta, como texto de artigo.
 	const pratica = bloco.tipo !== "explicacao";
+	const versao = versaoDoBloco(bloco);
+	const anteriores = versoesAnteriores(bloco);
 
-	let conteudo: ReactNode;
-	let gabarito: ReactNode = null;
+	// O retorno e a reescrita.
+	const chave = chaveDoBloco(licao, bloco.id);
+	const [balao, setBalao] = useState(false);
+	const [salvo, setSalvo] = useState(false);
+	const [vendoAnterior, setVendoAnterior] = useState(false);
+	const [comecando, setComecando] = useState(false);
+	// O erro de pedir ou parar a reescrita (com o retorno, para tentar de novo).
+	const [erroLocal, setErroLocal] = useState<{ mensagem: string; retorno?: string } | undefined>(undefined);
+	const [dispensado, setDispensado] = useState<string | undefined>(undefined);
+	const reescrevendo = comecando || (retornos?.reescrevendo?.licao === licao && retornos.reescrevendo.bloco === bloco.id);
+	const erroPonte = retornos?.erros[chave];
+	const erroReescrita = reescrevendo ? undefined : (erroLocal ?? (erroPonte && erroPonte.chave !== dispensado ? { mensagem: erroPonte.mensagem } : undefined));
+	const ultimoRetorno = useRef<string | undefined>(undefined);
+
+	useEffect(() => {
+		if (!salvo) return;
+		const tempo = setTimeout(() => setSalvo(false), TEMPO_RETORNO_SALVO);
+		return () => clearTimeout(tempo);
+	}, [salvo]);
+	// Começou a reescrita: o balão e a versão anterior fecham.
+	useEffect(() => {
+		if (reescrevendo) setBalao(false);
+	}, [reescrevendo]);
+
+	const reescrever = (retorno: string) => {
+		if (!retornos) return;
+		ultimoRetorno.current = retorno;
+		setErroLocal(undefined);
+		if (erroPonte) setDispensado(erroPonte.chave);
+		setComecando(true);
+		retornos
+			.reescrever(licao, bloco.id, retorno)
+			.catch((falha: unknown) => setErroLocal({ mensagem: falha instanceof Error ? falha.message : String(falha), retorno }))
+			.finally(() => setComecando(false));
+	};
+	const enviar = async (dados: DadosDoRetorno, reescreverTambem: boolean) => {
+		if (!retornos) return;
+		const resposta = await retornos.salvar(licao, bloco.id, dados);
+		setBalao(false);
+		setSalvo(true);
+		if (!reescreverTambem) return;
+		if (resposta.retorno) reescrever(resposta.retorno);
+		else setErroLocal({ mensagem: "O retorno foi salvo, mas a resposta não trouxe o id dele, e a reescrita não começou." });
+	};
+	const parar = () => {
+		retornos?.parar().catch((falha: unknown) => setErroLocal({ mensagem: falha instanceof Error ? falha.message : String(falha) }));
+	};
+	const fecharErro = () => {
+		setErroLocal(undefined);
+		if (erroPonte) setDispensado(erroPonte.chave);
+	};
+	const repetir = erroLocal?.retorno ?? (erroPonte ? ultimoRetorno.current : undefined);
+
 	let botao: { ver: string; esconder: string } | undefined;
-	if (bloco.tipo === "explicacao") {
-		conteudo = <ExplicacaoComCodigo texto={bloco.texto} />;
-	} else if (bloco.tipo === "verificacao") {
-		conteudo = <Markdown texto={bloco.pergunta} />;
-		botao = { ver: "Ver resposta", esconder: "Esconder resposta" };
-		gabarito = <RespostaEsperada bloco={bloco} />;
-	} else if (bloco.tipo === "alternativa") {
-		conteudo = <QuestaoAlternativa bloco={bloco} gabarito={aberto} />;
-		botao = { ver: "Ver gabarito", esconder: "Esconder gabarito" };
-		gabarito = bloco.explicacao ? (
-			<div className="modulo__gabarito">
-				<p className="overline modulo__gabarito-rotulo">Explicação</p>
-				<Markdown texto={bloco.explicacao} />
-			</div>
-		) : null;
-	} else {
-		conteudo = <QuestaoDissertativa bloco={bloco} />;
-		botao = { ver: "Ver rubrica e resposta-modelo", esconder: "Esconder rubrica e resposta-modelo" };
-		gabarito = <RubricaEResposta bloco={bloco} />;
-	}
+	if (bloco.tipo === "verificacao") botao = { ver: "Ver resposta", esconder: "Esconder resposta" };
+	else if (bloco.tipo === "alternativa") botao = { ver: "Ver gabarito", esconder: "Esconder gabarito" };
+	else if (bloco.tipo === "dissertativa") botao = { ver: "Ver rubrica e resposta-modelo", esconder: "Esconder rubrica e resposta-modelo" };
 
-	return (
-		<div className={`modulo__bloco${pratica ? " modulo__bloco--pratica" : ""}`} data-bloco={bloco.id}>
-			<LessonBlock
-				index={props.numero}
-				{...(pratica ? { className: "modulo__cartao" } : {})}
-				{...(botao
-					? {
-							actions: (
-								<Button variant="ghost" size="sm" aria-expanded={aberto} onClick={() => setAberto(!aberto)}>
-									{aberto ? botao.esconder : botao.ver}
-								</Button>
-							),
-						}
-					: {})}
-			>
-				<header className="ap-block__head modulo__bloco-cabeca">
-					<Tag className="ap-block__label" tone="steel" size="sm" icon={icone}>
-						{rotulo}
-					</Tag>
-					{ehComplemento(bloco) ? (
-						<Tag tone="amber" size="sm" title="Este bloco vai além dos seus materiais.">
-							Além do material
-						</Tag>
-					) : null}
-				</header>
-				{conteudo}
-				<AnimatePresence initial={false}>
-					{aberto && gabarito ? (
-						<motion.div
-							key="gabarito"
-							className="modulo__revelado"
-							initial={semMovimento() ? false : { opacity: 0, y: -4 }}
-							animate={{ opacity: 1, y: 0 }}
-							exit={semMovimento() ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, transition: { duration: 0.12 } }}
-							transition={MOLA}
+	const acoes =
+		botao || (retornos && !reescrevendo) ? (
+			<>
+				{botao ? (
+					<Button variant="ghost" size="sm" aria-expanded={aberto} onClick={() => setAberto(!aberto)}>
+						{aberto ? botao.esconder : botao.ver}
+					</Button>
+				) : null}
+				{retornos && !reescrevendo ? (
+					<Button variant="ghost" size="sm" icon="message" aria-expanded={balao} onClick={() => setBalao(!balao)}>
+						Retorno
+					</Button>
+				) : null}
+				{retornos && anteriores.length > 0 && !reescrevendo ? (
+					<Button variant="ghost" size="sm" icon="refresh" aria-expanded={vendoAnterior} onClick={() => setVendoAnterior(!vendoAnterior)}>
+						{vendoAnterior ? "Esconder a versão anterior" : "Ver a versão anterior"}
+					</Button>
+				) : null}
+				<AnimatePresence>
+					{salvo ? (
+						<motion.span
+							key="salvo"
+							className="body-sm retorno__salvo"
+							role="status"
+							initial={semMovimento() ? false : { opacity: 0, x: -4 }}
+							animate={{ opacity: 1, x: 0 }}
+							exit={{ opacity: 0, transition: { duration: semMovimento() ? 0 : 0.2 } }}
 						>
-							{gabarito}
-						</motion.div>
+							<Icon name="check" size={16} strokeWidth={2.5} />
+							{TEXTO_RETORNO_SALVO}
+						</motion.span>
 					) : null}
 				</AnimatePresence>
-			</LessonBlock>
+			</>
+		) : undefined;
+
+	return (
+		<div className={`modulo__bloco${pratica ? " modulo__bloco--pratica" : ""}${reescrevendo ? " retorno__bloco--reescrevendo" : ""}`} data-bloco={bloco.id} aria-busy={reescrevendo || undefined}>
+			<AnimatePresence initial={false}>
+				{reescrevendo ? (
+					<motion.div
+						key="reescrevendo"
+						className="retorno__faixa"
+						role="status"
+						initial={semMovimento() ? false : { opacity: 0, y: -4 }}
+						animate={{ opacity: 1, y: 0 }}
+						exit={{ opacity: 0, transition: { duration: semMovimento() ? 0 : 0.12 } }}
+					>
+						<AgenteAnimado nome={retornos?.agente?.nome ?? "professor"} {...(retornos?.agente?.avatar ? { avatar: retornos.agente.avatar } : {})} atividade="pensando" tamanho={32} />
+						<span className="body-sm retorno__faixa-texto">{TEXTO_REESCREVENDO}</span>
+						<Button variant="ghost" size="sm" icon="stop" onClick={parar}>
+							Parar
+						</Button>
+					</motion.div>
+				) : null}
+			</AnimatePresence>
+			<AnimatePresence initial={false} mode="wait">
+				<motion.div
+					key={versao}
+					className="retorno__conteudo"
+					initial={semMovimento() ? false : { opacity: 0, y: 6 }}
+					animate={{ opacity: 1, y: 0 }}
+					exit={semMovimento() ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, transition: { duration: 0.12 } }}
+					transition={MOLA}
+				>
+					<LessonBlock index={props.numero} {...(pratica ? { className: "modulo__cartao" } : {})} {...(acoes ? { actions: acoes } : {})}>
+						<header className="ap-block__head modulo__bloco-cabeca">
+							<Tag className="ap-block__label" tone="steel" size="sm" icon={icone}>
+								{rotulo}
+							</Tag>
+							{ehComplemento(bloco) ? (
+								<Tag tone="amber" size="sm" title="Este bloco vai além dos seus materiais.">
+									Além do material
+								</Tag>
+							) : null}
+							{foiReescrito(bloco) ? (
+								<Tag tone="neutral" size="sm" icon="refresh" className="retorno__reescrito" title={tituloDoReescrito(bloco)}>
+									{ROTULO_REESCRITO}
+								</Tag>
+							) : null}
+						</header>
+						<ConteudoDoBloco bloco={bloco} gabarito={aberto} />
+					</LessonBlock>
+				</motion.div>
+			</AnimatePresence>
+			<AnimatePresence initial={false}>
+				{balao && retornos && !reescrevendo ? (
+					<Dobra key="balao" className="retorno__dobra">
+						<BalaoDeRetorno materia={retornos.materia} enviar={enviar} fechar={() => setBalao(false)} />
+					</Dobra>
+				) : null}
+			</AnimatePresence>
+			<AnimatePresence initial={false}>
+				{erroReescrita ? (
+					<Dobra key="erro" className="retorno__erro">
+						<Callout tone="amber" label="A reescrita não deu certo" icon="alert" quote={false}>
+							<p>{erroReescrita.mensagem}</p>
+							<div className="retorno__erro-botoes">
+								{repetir ? (
+									<Button variant="secondary" size="sm" icon="refresh" onClick={() => reescrever(repetir)}>
+										Tentar de novo
+									</Button>
+								) : null}
+								<Button variant="ghost" size="sm" onClick={fecharErro}>
+									Fechar
+								</Button>
+							</div>
+						</Callout>
+					</Dobra>
+				) : null}
+			</AnimatePresence>
+			<AnimatePresence initial={false}>
+				{vendoAnterior && anteriores.length > 0 && !reescrevendo ? (
+					<Dobra key="anterior" className="retorno__dobra">
+						<VersaoAnterior bloco={bloco} anteriores={anteriores} />
+					</Dobra>
+				) : null}
+			</AnimatePresence>
 			{referencias.length > 0 ? (
 				<div className="mapa__marcas modulo__referencias" aria-label="Referências ao material">
 					{referencias.map((referencia) => (
@@ -541,6 +808,235 @@ export function BlocoDaLicao(props: { bloco: Bloco; numero: number; abrirMateria
 				</div>
 			) : null}
 		</div>
+	);
+}
+
+/** O conteúdo de um bloco (ou de uma versão anterior dele) e, com `gabarito`, o gabarito revelado. */
+function ConteudoDoBloco({ bloco, gabarito: aberto }: { bloco: Bloco | BlocoAnterior; gabarito: boolean }) {
+	let conteudo: ReactNode;
+	let gabarito: ReactNode = null;
+	if (bloco.tipo === "explicacao") {
+		conteudo = <ExplicacaoComCodigo texto={bloco.texto} />;
+	} else if (bloco.tipo === "verificacao") {
+		conteudo = <Markdown texto={bloco.pergunta} />;
+		gabarito = <RespostaEsperada bloco={bloco} />;
+	} else if (bloco.tipo === "alternativa") {
+		conteudo = <QuestaoAlternativa bloco={bloco} gabarito={aberto} />;
+		gabarito = bloco.explicacao ? (
+			<div className="modulo__gabarito">
+				<p className="overline modulo__gabarito-rotulo">Explicação</p>
+				<Markdown texto={bloco.explicacao} />
+			</div>
+		) : null;
+	} else {
+		conteudo = <QuestaoDissertativa bloco={bloco} />;
+		gabarito = <RubricaEResposta bloco={bloco} />;
+	}
+	return (
+		<>
+			{conteudo}
+			<AnimatePresence initial={false}>
+				{aberto && gabarito ? (
+					<motion.div
+						key="gabarito"
+						className="modulo__revelado"
+						initial={semMovimento() ? false : { opacity: 0, y: -4 }}
+						animate={{ opacity: 1, y: 0 }}
+						exit={semMovimento() ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, transition: { duration: 0.12 } }}
+						transition={MOLA}
+					>
+						{gabarito}
+					</motion.div>
+				) : null}
+			</AnimatePresence>
+		</>
+	);
+}
+
+/** As opções do "Virar regra de escrita": todas as matérias ou só esta. */
+const OPCAO_ESTA = "esta";
+const OPCAO_TODAS_RETORNO = "todas";
+
+/**
+ * O balão de retorno de um bloco (docs/escrita.md, "Retorno em cada bloco"):
+ * Bom / Precisa melhorar, os motivos (só com Precisa melhorar), o texto, "Virar
+ * regra de escrita" (o texto da regra e onde ela vale) e os botões. Salvar
+ * espera a resposta; com erro, o balão fica aberto com a frase.
+ */
+function BalaoDeRetorno(props: { materia: { id: string; nome?: string }; enviar(dados: DadosDoRetorno, reescrever: boolean): Promise<void>; fechar(): void }) {
+	const [balao, setBalao] = useState(balaoVazio);
+	const [enviando, setEnviando] = useState<"salvar" | "reescrever" | undefined>(undefined);
+	const [erro, setErro] = useState<string | undefined>(undefined);
+	const [tentou, setTentou] = useState(false);
+	const problema = problemaDoBalao(balao);
+	const melhorar = podeReescrever(balao);
+	const nomeEsta = props.materia.nome ?? "Esta matéria";
+	const nomeAvaliacao = useId();
+
+	const enviar = (reescrever: boolean) => {
+		if (enviando) return;
+		setTentou(true);
+		if (problema) return;
+		let dados: DadosDoRetorno;
+		try {
+			dados = dadosDoRetorno(balao, props.materia.id);
+		} catch (falha) {
+			setErro((falha as Error).message);
+			return;
+		}
+		setErro(undefined);
+		setEnviando(reescrever ? "reescrever" : "salvar");
+		props.enviar(dados, reescrever).catch((falha: unknown) => {
+			setErro(falha instanceof Error ? falha.message : String(falha));
+			setEnviando(undefined);
+		});
+	};
+
+	return (
+		<section className="retorno" aria-label="Retorno sobre este bloco">
+			<div className="retorno__cabeca">
+				<p className="overline retorno__titulo">Retorno sobre este bloco</p>
+				<Button variant="ghost" size="sm" iconOnly icon="close" aria-label="Fechar o retorno" onClick={props.fechar} disabled={Boolean(enviando)} />
+			</div>
+			<div role="radiogroup" aria-label="Avaliação do bloco" className="diag__teclas retorno__avaliacao">
+				{(["bom", "melhorar"] as const).map((avaliacao) => {
+					const marcada = balao.avaliacao === avaliacao;
+					return (
+						<label key={avaliacao} className={`diag__tecla${marcada ? " diag__tecla--marcada" : ""}`}>
+							<input
+								type="radio"
+								className="diag__radio"
+								name={nomeAvaliacao}
+								value={avaliacao}
+								checked={marcada}
+								onChange={() => setBalao((atual) => escolherAvaliacao(atual, avaliacao))}
+							/>
+							<span className="body-sm diag__tecla-texto">{NOMES_AVALIACAO[avaliacao]}</span>
+						</label>
+					);
+				})}
+			</div>
+			<AnimatePresence initial={false}>
+				{melhorar ? (
+					<Dobra key="motivos" className="retorno__sub">
+						<div className="retorno__motivos" role="group" aria-label="O que precisa melhorar">
+							{MOTIVOS_RETORNO.map((motivo) => {
+								const marcado = balao.motivos.includes(motivo);
+								return (
+									<button
+										key={motivo}
+										type="button"
+										className="retorno__motivo"
+										aria-pressed={marcado}
+										onClick={() => setBalao((atual) => alternarMotivo(atual, motivo))}
+									>
+										<Tag size="sm" tone={marcado ? "amber" : "neutral"} {...(marcado ? { icon: "check" as const } : {})}>
+											{NOMES_MOTIVO[motivo]}
+										</Tag>
+									</button>
+								);
+							})}
+						</div>
+					</Dobra>
+				) : null}
+			</AnimatePresence>
+			<TextArea
+				label="O que você quer diferente? (opcional)"
+				rows={3}
+				maxLength={TEXTO_RETORNO_MAXIMO}
+				value={balao.texto}
+				onChange={(evento) => setBalao((atual) => mudarTextoRetorno(atual, evento.target.value))}
+			/>
+			<Checkbox label="Virar regra de escrita" checked={balao.virarRegra} onChange={(evento) => setBalao((atual) => marcarVirarRegra(atual, evento.target.checked))} />
+			<AnimatePresence initial={false}>
+				{balao.virarRegra ? (
+					<Dobra key="regra" className="retorno__sub">
+						<div className="retorno__regra">
+							<TextArea
+								label="Texto da regra"
+								rows={2}
+								maxLength={TEXTO_REGRA_MAXIMO}
+								placeholder={EXEMPLO_REGRA}
+								value={balao.textoRegra}
+								onChange={(evento) => setBalao((atual) => mudarTextoRegra(atual, evento.target.value))}
+							/>
+							<div className="retorno__onde">
+								<span className="body-sm retorno__onde-rotulo">Vale para</span>
+								<MenuSuspenso
+									opcoes={[
+										{ id: OPCAO_TODAS_RETORNO, titulo: NOME_TODAS },
+										{ id: OPCAO_ESTA, titulo: nomeEsta },
+									]}
+									atual={balao.soEstaMateria ? OPCAO_ESTA : OPCAO_TODAS_RETORNO}
+									escolher={(opcao) => setBalao((atual) => ({ ...atual, soEstaMateria: opcao === OPCAO_ESTA }))}
+									conteudoBotao={<span className="body-sm">{balao.soEstaMateria ? nomeEsta : NOME_TODAS}</span>}
+									classeBotao="escrita__materia-botao"
+									rotulo={`A regra vale para: ${balao.soEstaMateria ? nomeEsta : NOME_TODAS}`}
+									rotuloMenu="Onde a regra vale"
+									className="escrita__materia"
+								/>
+							</div>
+						</div>
+					</Dobra>
+				) : null}
+			</AnimatePresence>
+			{erro ? (
+				<Callout tone="amber" label="Não deu certo" icon="alert" quote={false}>
+					<p>{erro}</p>
+				</Callout>
+			) : null}
+			<div className="retorno__pe">
+				{tentou && problema ? <span className="body-sm retorno__falta">{problema}</span> : null}
+				<span className="retorno__botoes">
+					<Button variant={melhorar ? "secondary" : "primary"} size="sm" onClick={() => enviar(false)} disabled={Boolean(enviando)} aria-busy={enviando === "salvar"}>
+						{enviando === "salvar" ? "Salvando…" : "Salvar retorno"}
+					</Button>
+					{melhorar ? (
+						<Button variant="primary" size="sm" icon="refresh" onClick={() => enviar(true)} disabled={Boolean(enviando)} aria-busy={enviando === "reescrever"}>
+							{enviando === "reescrever" ? "Salvando…" : "Salvar e reescrever o bloco"}
+						</Button>
+					) : null}
+				</span>
+			</div>
+		</section>
+	);
+}
+
+/**
+ * "Ver a versão anterior": a mais recente das anteriores primeiro, só para
+ * leitura, num fundo mais apagado com a data; com mais de uma, "Versão 1 de 3"
+ * e as setas.
+ */
+function VersaoAnterior(props: { bloco: Bloco; anteriores: BlocoAnterior[] }) {
+	const { bloco, anteriores } = props;
+	const [indice, setIndice] = useState(() => anteriorInicial(anteriores));
+	const atual = Math.min(indice, anteriores.length - 1);
+	const anterior = anteriores[atual]!;
+	const data = dataDaVersao(anterior);
+	return (
+		<section className="retorno__anterior" aria-label="Versão anterior do bloco">
+			<div className="retorno__anterior-cabeca">
+				<p className="overline retorno__anterior-titulo">{anteriores.length > 1 ? rotuloDaVersao(anterior, bloco) : "Versão anterior"}</p>
+				{data ? <span className="data retorno__anterior-data">{data}</span> : null}
+				{anteriores.length > 1 ? (
+					<span className="retorno__setas">
+						<Button variant="ghost" size="sm" iconOnly icon="arrow-left" aria-label="Versão mais antiga" disabled={atual === 0} onClick={() => setIndice(atual - 1)} />
+						<Button
+							variant="ghost"
+							size="sm"
+							iconOnly
+							icon="arrow-right"
+							aria-label="Versão mais nova"
+							disabled={atual >= anteriores.length - 1}
+							onClick={() => setIndice(atual + 1)}
+						/>
+					</span>
+				) : null}
+			</div>
+			<div className="ap-prose lesson-body retorno__anterior-corpo">
+				<ConteudoDoBloco key={atual} bloco={anterior} gabarito={false} />
+			</div>
+		</section>
 	);
 }
 

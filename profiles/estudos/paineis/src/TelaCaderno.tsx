@@ -379,6 +379,8 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 					{...(moduloAberto.licao ? { licaoId: moduloAberto.licao } : {})}
 					navegar={props.navegar}
 					tom={tom}
+					{...(lista ? { materias: lista.materias } : {})}
+					{...(nomeAgente ? { agente: { nome: nomeAgente, ...(avatarAgente ? { avatar: avatarAgente } : {}) } } : {})}
 				/>
 			) : (
 			<>

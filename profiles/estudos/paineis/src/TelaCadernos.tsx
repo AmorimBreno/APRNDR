@@ -3,7 +3,8 @@
 // SubjectWheel do design system, um por matéria, com a capa NotebookCover na
 // cor e no ideograma dela. "Abrir" leva ao caderno (TelaCaderno); a última
 // linha, "Nova matéria", abre o modal de criar; a tecla Materiais abre os
-// materiais da matéria do meio da roda.
+// materiais da matéria do meio da roda, e a tecla Escrita, "Como o professor
+// escreve" (as regras de escrita, ModalEscrita.tsx, docs/escrita.md).
 //
 // A sessão do perfil vem da TelaEstudos; a lista vem da extensão de matérias
 // (extensions/materias.ts) pela ponte, no painel "cadernos".
@@ -13,6 +14,9 @@ import { type ControleFaixaMarca, FaixaMarca, type JanelaPerfilHook, type PropsT
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { type Materia, pastaMateriaisRelativa } from "../../lib/materia-tipos.ts";
 import { dataCurta, lerAcoes, PAINEL_CADERNOS, prepararConversa, proximaProva, quando, rotuloCapa } from "./comum.ts";
+import { useEscrita } from "./escrita-ponte.ts";
+import { TITULO_ESCRITA } from "./escrita-tela.ts";
+import { ModalEscrita } from "./ModalEscrita.tsx";
 import { ModalMateria } from "./ModalMateria.tsx";
 import { ModalMateriais } from "./ModalMateriais.tsx";
 
@@ -68,6 +72,9 @@ export function TelaCadernos(props: PropsTelaCadernos) {
 	const [criando, setCriando] = useState(false);
 	const [vendoMateriais, setVendoMateriais] = useState(false);
 	const [abrindoConversa, setAbrindoConversa] = useState(false);
+	const [vendoEscrita, setVendoEscrita] = useState(false);
+	// As regras de escrita: pedidas quando o modal abre.
+	const escrita = useEscrita(props.janela, vendoEscrita);
 
 	// A faixa entra como bandeira; para sair (para os perfis, a conversa ou um caderno), ela sobe antes.
 	const faixa = useRef<ControleFaixaMarca>(null);
@@ -183,6 +190,10 @@ export function TelaCadernos(props: PropsTelaCadernos) {
 							<Icon name="paperclip" size={18} strokeWidth={2.25} />
 							Materiais
 						</button>
+						<button type="button" className="tecla-papel button" title={TITULO_ESCRITA} onClick={() => setVendoEscrita(true)}>
+							<Icon name="book" size={18} strokeWidth={2.25} />
+							Escrita
+						</button>
 						<button type="button" className="tecla-papel button" onClick={conversarGeral} disabled={abrindoConversa} aria-busy={abrindoConversa}>
 							{abrindoConversa ? "Abrindo a conversa…" : "Conversa geral"}
 							<Icon name="arrow-right" size={18} strokeWidth={2.25} />
@@ -199,6 +210,7 @@ export function TelaCadernos(props: PropsTelaCadernos) {
 				enviar={(arquivos) => (materiaAtual ? acoes.enviarMateriais(pastaMateriaisRelativa(materiaAtual.id), arquivos) : Promise.resolve([]))}
 				reprocessar={(caminho) => acoes.reprocessarMaterial(caminho)}
 			/>
+			<ModalEscrita aberto={vendoEscrita} fechar={() => setVendoEscrita(false)} escrita={escrita} materias={materias} />
 			<ModalMateria
 				aberto={criando}
 				fechar={() => setCriando(false)}

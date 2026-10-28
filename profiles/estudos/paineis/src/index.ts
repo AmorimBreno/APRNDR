@@ -6,6 +6,7 @@ import type { EntradaTelaInicial, RegistroPaineis } from "@estudos/ui";
 import { ehPergunta, PainelQuiz } from "./PainelQuiz.tsx";
 import { PAINEL_CADERNOS, usarAparenciaMaterias } from "./comum.ts";
 import { PAINEL_CURSOS } from "./cursos-ponte.ts";
+import { PAINEL_ESCRITA } from "./escrita-ponte.ts";
 import { PAINEL_MAPA } from "./mapa-ponte.ts";
 import { PAINEL_MODULOS } from "./modulos-ponte.ts";
 import { PAINEL_NOTAS } from "./notas-ponte.ts";
@@ -37,6 +38,8 @@ export const paineisEstudos: RegistroPaineis = {
 	[PAINEL_CURSOS]: { componente: () => null, titulo: "Cursos", foraDaArea: true },
 	// A ponte da visão do curso com a extensão de módulos: a geração aparece nos cards do curso.
 	[PAINEL_MODULOS]: { componente: () => null, titulo: "Módulos", foraDaArea: true },
+	// A ponte de "Como o professor escreve" com a extensão dos módulos: as regras de escrita são do modal.
+	[PAINEL_ESCRITA]: { componente: () => null, titulo: "Regras de escrita", foraDaArea: true },
 	// Só pedidos: cada questão é respondida no modal, pelo botão na conversa,
 	// e o modal continua aberto depois de conferir, com o retorno.
 	quiz: {

@@ -246,7 +246,7 @@ export function rotuloConcluido(modulo: Modulo): string {
 // --- O aviso de visualização ---------------------------------------------------------
 
 /** O texto do Callout do topo da lição. */
-export const TEXTO_AVISO = "Pedir outra explicação de um trecho chega com a aula (item 7). Por enquanto, use o Retorno de cada bloco.";
+export const TEXTO_AVISO = "Pedir outra explicação de um trecho chega com a aula (item 7). Por enquanto, use o Feedback de cada bloco.";
 
 /** A chave do localStorage que lembra que o aviso foi fechado. */
 export const CHAVE_AVISO = "estudos:modulo:aviso-fechado";

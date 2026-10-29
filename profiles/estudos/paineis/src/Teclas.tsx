@@ -1,7 +1,8 @@
 // As teclas de papel (um seletor segmentado com radios nativos) e a confiança
 // antes de responder (seção 8 da especificação: de 1 = chute a 4 = certeza),
-// usadas no diagnóstico (EtapaDiagnostico.tsx) e nas questões do módulo
-// (QuestaoModulo.tsx).
+// usadas no diagnóstico (EtapaDiagnostico.tsx), nas questões do módulo
+// (QuestaoModulo.tsx) e na nota rápida do feedback de cada bloco
+// (TelaModulo.tsx: Ruim, Bom e Ótimo).
 
 import { useId } from "react";
 import { CONFIANCAS, type Confianca, NOMES_CONFIANCA } from "../../lib/diagnostico-tipos.ts";
@@ -10,16 +11,17 @@ import { CONFIANCAS, type Confianca, NOMES_CONFIANCA } from "../../lib/diagnosti
  * Um seletor segmentado com radios nativos (as setas andam, Tab entra e sai
  * do grupo), no visual das teclas de papel; a marcada fica âmbar.
  */
-export function Teclas<V extends number>(props: {
+export function Teclas<V extends string | number>(props: {
 	rotulo: string;
 	opcoes: Array<{ valor: V; texto: string; tecla?: string }>;
 	valor: V | undefined;
 	mudar(valor: V): void;
 	desligado?: boolean;
+	className?: string;
 }) {
 	const nome = useId();
 	return (
-		<div role="radiogroup" aria-label={props.rotulo} aria-disabled={props.desligado || undefined} className="diag__teclas">
+		<div role="radiogroup" aria-label={props.rotulo} aria-disabled={props.desligado || undefined} className={`diag__teclas${props.className ? ` ${props.className}` : ""}`}>
 			{props.opcoes.map((opcao) => {
 				const marcada = props.valor === opcao.valor;
 				return (

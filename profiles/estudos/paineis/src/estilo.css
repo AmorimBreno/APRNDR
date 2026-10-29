@@ -1152,6 +1152,39 @@
 	.retorno__motivo:hover { transform: none; }
 }
 
+/* ── O feedback (TelaModulo.tsx, docs/modulos.md, "O feedback"): no pé do bloco, as teclas Ruim, Bom e Ótimo
+ * (as teclas de papel do Teclas.tsx), o "Detalhar" e o fechar, no lugar do botão "Feedback". O margin-left
+ * desfaz o recuo das ações do LessonBlock, que é para alinhar o texto dos botões ghost, não as teclas. */
+.feedback { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-left: 10px; }
+.feedback__teclas, .feedback__fim { flex-wrap: nowrap; }
+.feedback__fim { display: inline-flex; align-items: center; gap: var(--space-1); }
+
+/* O questionário do fim da lição: um cartão como os da prática (modulo__cartao), depois do último bloco. */
+.questionario { display: flex; flex-direction: column; gap: var(--space-6); margin-top: calc(var(--space-12) + var(--space-6)); }
+.questionario__cabeca { display: flex; flex-direction: column; gap: var(--space-1); }
+.questionario__titulo { margin: 0; color: var(--ink); }
+.questionario__linha { margin: 0; color: var(--ink-muted); }
+.questionario__perguntas { display: flex; flex-direction: column; gap: var(--space-6); }
+.questionario__perguntas > .pergunta-slider + .pergunta-slider { padding-top: var(--space-6); border-top: var(--border-hair) solid var(--line); }
+.questionario .ap-callout p { margin: 0; }
+.questionario__pe { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-2); }
+/* Enviado: recolhido, com a marca, o título, "Responder de novo" e as notas resumidas. */
+.questionario--enviado { gap: var(--space-4); padding-top: var(--space-6); padding-bottom: var(--space-6); }
+.questionario__enviado-cabeca { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
+.questionario__enviado-marca { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: var(--radius-full); background: var(--sage-tint); color: var(--sage-text); box-shadow: inset 0 0 0 var(--border-hair) var(--sage); }
+.questionario__enviado-titulos { display: flex; flex: 1 1 12em; flex-direction: column; min-width: 0; }
+.questionario__rotulo { margin: 0; color: var(--ink-muted); }
+.questionario__enviado-titulo { margin: 0; color: var(--ink); }
+.questionario__resumo { display: flex; flex-direction: column; margin: 0; padding: 0; }
+.questionario__resumo-linha { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0 var(--space-4); padding: var(--space-2) 0; }
+.questionario__resumo-linha + .questionario__resumo-linha { border-top: var(--border-hair) solid var(--line); }
+.questionario__resumo-pergunta { flex: 1 1 16em; min-width: 0; margin: 0; color: var(--ink-muted); }
+.questionario__resumo-nota { flex: none; margin: 0; font-weight: 600; color: var(--ink); }
+@media (max-width: 640px) {
+	.questionario { margin-top: var(--space-12); }
+	.questionario--enviado { padding-top: var(--space-5); padding-bottom: var(--space-5); }
+}
+
 /* ── O professor em bolha (ProfessorBolha.tsx) e a pergunta com slider (PerguntaSlider.tsx) do questionário do fim da lição ──
  * As cores de cada humor, da tinta (contorno e rosto) e da barra, a partir dos tokens; o componente mistura
  * as vizinhas com color-mix (professor-tela.ts). "neutro" é a cor apagada de sem resposta. */
@@ -1225,6 +1258,8 @@
 .pergunta-slider--desligada .pergunta-slider__faixa { cursor: not-allowed; }
 @media (max-width: 520px) {
 	.pergunta-slider { grid-template-columns: minmax(0, 1fr); justify-items: start; }
+	/* A bolha fica à esquerda, em cima; o slider usa a largura toda. */
+	.pergunta-slider__corpo { justify-self: stretch; }
 }
 @media (prefers-reduced-motion: reduce) {
 	.pergunta-slider__marca { transition: none; }

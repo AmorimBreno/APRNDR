@@ -34,10 +34,18 @@
 // dos módulos (useModulos), que também conclui (a ação "concluir") e responde
 // as questões (responder, corrigir e encerrar).
 //
-// A escrita dos módulos (docs/escrita.md, "A tela"): no pé de cada bloco,
-// "Retorno" abre um balão embaixo do bloco (Bom / Precisa melhorar, os
-// motivos, o texto, "Virar regra de escrita"), que grava pela ação retorno e,
-// com "Salvar e reescrever o bloco", pede a reescrita (reescrever_bloco).
+// O feedback (docs/modulos.md, "O feedback"): no pé de cada bloco,
+// "Feedback" (ou "Feedback: Bom", com a nota que vale para a versão atual do
+// bloco) abre no lugar as teclas Ruim, Bom e Ótimo, que gravam na hora a nota
+// rápida (avaliar_bloco), e "Detalhar", que abre o balão de retorno embaixo do
+// bloco (docs/escrita.md, "A tela": Ruim / Bom / Ótimo com a nota já
+// marcada, os motivos, o texto, "Virar regra de escrita"), que grava pela ação
+// retorno (com o detalha da nota) e, com "Salvar e reescrever o bloco", pede
+// a reescrita (reescrever_bloco). No fim de cada lição, depois do último bloco
+// (e antes do pé, onde fica o "Concluir o módulo"), o questionário "Como foi
+// esta lição?" (as cinco PerguntaSlider e o texto, no estado local até o
+// "Enviar", que grava pelo avaliar_licao); enviado, o cartão recolhe para
+// "Respostas enviadas em dd/mm", com as notas e "Responder de novo".
 // Enquanto o bloco é reescrito (o estado do módulo traz reescrevendo), ele
 // fica apagado com a faixa "Reescrevendo este bloco…", a foto do professor e
 // o Parar (cancelar); o bloco novo entra com uma transição curta. Um bloco
@@ -67,6 +75,17 @@ import { AnimatePresence, motion } from "motion/react";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { AVALIACOES_BLOCO, MOTIVOS_RETORNO, NOMES_AVALIACAO, NOMES_MOTIVO, TEXTO_REGRA_MAXIMO, TEXTO_RETORNO_MAXIMO } from "../../lib/escrita-tipos.ts";
 import type { Materia } from "../../lib/materia-tipos.ts";
+import {
+	type AvaliacaoNova,
+	type FeedbackBloco,
+	feedbackDoBloco,
+	type NotasLicao,
+	PERGUNTAS_LICAO,
+	questionarioDaLicao,
+	type QuestionarioLicao,
+	resumoDoQuestionario,
+	TEXTO_QUESTIONARIO_MAXIMO,
+} from "../../lib/modulo-feedback-tipos.ts";
 import { ehQuestao, progressoDoModulo, respostaDoBloco, type RespostaModulo } from "../../lib/modulo-respostas-tipos.ts";
 import { type Bloco, type BlocoAnterior, type EstadoModuloNaTela, type Licao, type Modulo, versaoDoBloco } from "../../lib/modulo-tipos.ts";
 import { ExplicacaoComCodigo } from "./CodigoCitado.tsx";
@@ -76,7 +95,8 @@ import { useEscrita } from "./escrita-ponte.ts";
 import {
 	alternarMotivo,
 	anteriorInicial,
-	balaoVazio,
+	type BalaoRetorno,
+	balaoDetalhando,
 	chaveDoBloco,
 	type DadosDoRetorno,
 	dadosDoRetorno,
@@ -99,6 +119,24 @@ import {
 	tituloDoReescrito,
 	versoesAnteriores,
 } from "./escrita-tela.ts";
+import {
+	dadosDoQuestionario,
+	LINHA_QUESTIONARIO,
+	mudarNota,
+	notaDaPergunta,
+	notaMarcada,
+	notaParaDetalhar,
+	OPCOES_DA_NOTA,
+	problemaDoQuestionario,
+	type RascunhoQuestionario,
+	rascunhoDoEnviado,
+	rascunhoVazio,
+	ROTULO_DETALHAR,
+	ROTULO_TEXTO_QUESTIONARIO,
+	rotuloDoFeedback,
+	TITULO_QUESTIONARIO,
+	tituloDoEnviado,
+} from "./feedback-tela.ts";
 import { ModalEscrita } from "./ModalEscrita.tsx";
 import { agruparReferencias } from "./mapa-ponte.ts";
 import {
@@ -127,9 +165,11 @@ import {
 	tituloDoModulo,
 } from "./modulo-tela.ts";
 import { type ErroVistoModulo, reescrevendoNoModulo, useModuloAberto, useModulos } from "./modulos-ponte.ts";
+import { PerguntaSlider } from "./PerguntaSlider.tsx";
 import { type AcoesQuestoes, QuestaoModulo, QuestaoParaLer } from "./QuestaoModulo.tsx";
 import { placarDoModulo, TEXTO_TODAS_FEITAS, textoDoProgresso, todasFeitas } from "./questao-modulo-tela.ts";
 import { EtiquetaReferencia } from "./SecaoMapa.tsx";
+import { Teclas } from "./Teclas.tsx";
 
 const MOLA = { type: "spring", stiffness: 380, damping: 32 } as const;
 
@@ -169,6 +209,16 @@ export interface AcoesRetorno {
 	reescrever(licao: string, bloco: string, retorno: string): Promise<unknown>;
 	/** Para a reescrita (o cancelar do módulo). */
 	parar(): Promise<void>;
+	/** A nota rápida do bloco (avaliar_bloco); resolve quando o módulo com a nota chegou. */
+	avaliar(licao: string, bloco: string, avaliacao: AvaliacaoNova): Promise<unknown>;
+	/** Os erros da nota rápida, pelo id do bloco. */
+	errosFeedback: Record<string, ErroVistoModulo>;
+}
+
+/** O questionário do fim da lição (docs/modulos.md, "O questionário do fim da lição"). */
+export interface AcoesQuestionario {
+	/** Grava o questionário da lição (avaliar_licao); resolve quando o módulo com ele chegou; rejeita com a frase do erro. */
+	enviar(licao: string, dados: { notas: NotasLicao; texto?: string }): Promise<unknown>;
 }
 
 /** Os hooks da ponte e a navegação; quem desenha é a VisaoModulo. */
@@ -202,6 +252,11 @@ export function TelaModulo(props: PropsTelaModulo) {
 		salvar: (licao, bloco, dados) => modulos.retorno(moduloId, licao, bloco, dados),
 		reescrever: (licao, bloco, retorno) => modulos.reescreverBloco(moduloId, licao, bloco, retorno),
 		parar: () => modulos.cancelar(moduloId),
+		avaliar: (licao, bloco, avaliacao) => modulos.avaliarBloco(moduloId, licao, bloco, avaliacao),
+		errosFeedback: modulos.errosFeedback(moduloId),
+	};
+	const questionario: AcoesQuestionario = {
+		enviar: (licao, dados) => modulos.avaliarLicao(moduloId, licao, dados),
 	};
 	const questoes: AcoesQuestoes = {
 		corrigindo: aberto.corrigindo ?? [],
@@ -230,6 +285,7 @@ export function TelaModulo(props: PropsTelaModulo) {
 			concluir={() => modulos.concluir(moduloId)}
 			retornos={retornos}
 			questoes={questoes}
+			questionario={questionario}
 			abrirEscrita={() => setVendoEscrita(true)}
 			/>
 			<ModalEscrita aberto={vendoEscrita} fechar={() => setVendoEscrita(false)} escrita={escrita} materias={materias} />
@@ -260,6 +316,8 @@ export interface PropsVisaoModulo {
 	retornos?: AcoesRetorno;
 	/** Responder as questões; sem ele, os botões delas ficam desligados. */
 	questoes?: AcoesQuestoes;
+	/** O questionário do fim da lição; sem ele, a lição não tem o cartão. */
+	questionario?: AcoesQuestionario;
 	/** Abre "Como o professor escreve"; sem ele, o índice não tem o link. */
 	abrirEscrita?(): void;
 }
@@ -324,6 +382,7 @@ export function VisaoModulo(props: PropsVisaoModulo) {
 				{...(props.concluir ? { concluir: props.concluir } : {})}
 				{...(props.retornos ? { retornos: props.retornos } : {})}
 				{...(props.questoes ? { questoes: props.questoes } : {})}
+				{...(props.questionario ? { questionario: props.questionario } : {})}
 				{...(props.abrirEscrita ? { abrirEscrita: props.abrirEscrita } : {})}
 			/>
 		);
@@ -380,10 +439,13 @@ function LicaoAberta(props: {
 	concluir?(): Promise<unknown>;
 	retornos?: AcoesRetorno;
 	questoes?: AcoesQuestoes;
+	questionario?: AcoesQuestionario;
 	abrirEscrita?(): void;
 }) {
 	const { modulo, licao, indice } = props;
 	const respostas = modulo.situacao === "gerado" ? modulo.respostas : undefined;
+	const feedback = modulo.situacao === "gerado" ? modulo.feedback : undefined;
+	const questionarios = modulo.situacao === "gerado" ? modulo.questionarios : undefined;
 	const progresso = progressoDoModulo({ licoes: modulo.licoes, ...(respostas ? { respostas } : {}) });
 	const placar = placarDoModulo({ licoes: modulo.licoes, ...(respostas ? { respostas } : {}) });
 	const total = modulo.licoes.length;
@@ -547,12 +609,19 @@ function LicaoAberta(props: {
 									numero={posicao + 1}
 									licao={licao.id}
 									abrirMaterial={props.abrirMaterial}
-									{...(props.retornos ? { retornos: props.retornos } : {})}
+									{...(props.retornos ? { retornos: props.retornos, nota: feedbackDoBloco(feedback, bloco) } : {})}
 									{...(ehQuestao(bloco) ? { resposta: respostaDoBloco(respostas, bloco) } : {})}
 									{...(props.questoes ? { questoes: props.questoes } : {})}
 								/>
 							))}
 						</div>
+						{props.questionario && modulo.situacao === "gerado" ? (
+							<QuestionarioDaLicao
+								key={licao.id}
+								enviado={questionarioDaLicao(questionarios, licao.id)}
+								enviar={(dados) => props.questionario!.enviar(licao.id, dados)}
+							/>
+						) : null}
 						<footer className="modulo__pe">
 							<Button
 								variant="ghost"
@@ -637,8 +706,9 @@ function Dobra(props: { className: string; children: ReactNode }) {
 /**
  * Um bloco da lição num LessonBlock: o rótulo (e "Além do material",
  * "Reescrito"), o conteúdo (a questão para responder, QuestaoModulo) e as referências. Com
- * `retornos`, o pé tem "Retorno" (o balão embaixo do bloco), "Ver a versão
- * anterior" (num bloco reescrito) e, durante a reescrita, a faixa com o Parar.
+ * `retornos`, o pé tem "Feedback" (as teclas Ruim, Bom e Ótimo e o
+ * "Detalhar", que abre o balão embaixo do bloco), "Ver a versão anterior" (num
+ * bloco reescrito) e, durante a reescrita, a faixa com o Parar.
  */
 export function BlocoDaLicao(props: {
 	bloco: Bloco;
@@ -646,6 +716,8 @@ export function BlocoDaLicao(props: {
 	licao?: string;
 	abrirMaterial(arquivo: string): void;
 	retornos?: AcoesRetorno;
+	/** A nota que vale para a versão atual do bloco (feedbackDoBloco). */
+	nota?: FeedbackBloco | undefined;
 	/** A resposta que vale para a questão (respostaDoBloco). */
 	resposta?: RespostaModulo | undefined;
 	questoes?: AcoesQuestoes;
@@ -665,7 +737,8 @@ export function BlocoDaLicao(props: {
 
 	// O retorno e a reescrita.
 	const chave = chaveDoBloco(licao, bloco.id);
-	const [balao, setBalao] = useState(false);
+	// O balão de retorno aberto, com o que ele começa (a nota marcada e o detalha).
+	const [balao, setBalao] = useState<BalaoRetorno | undefined>(undefined);
 	const [salvo, setSalvo] = useState(false);
 	const [vendoAnterior, setVendoAnterior] = useState(false);
 	const [comecando, setComecando] = useState(false);
@@ -677,14 +750,25 @@ export function BlocoDaLicao(props: {
 	const erroReescrita = reescrevendo ? undefined : (erroLocal ?? (erroPonte && erroPonte.chave !== dispensado ? { mensagem: erroPonte.mensagem } : undefined));
 	const ultimoRetorno = useRef<string | undefined>(undefined);
 
+	// O feedback: as teclas abertas no pé, a nota sendo gravada e o erro dela (o local, de mandar, ou o da ponte, até ser dispensado).
+	const [feedbackAberto, setFeedbackAberto] = useState(false);
+	const [pendente, setPendente] = useState<AvaliacaoNova | undefined>(undefined);
+	const [erroNotaLocal, setErroNotaLocal] = useState<string | undefined>(undefined);
+	const [notaDispensada, setNotaDispensada] = useState<string | undefined>(undefined);
+	const erroNotaPonte = retornos?.errosFeedback[bloco.id];
+	const erroNota = erroNotaLocal ?? (erroNotaPonte && erroNotaPonte.chave !== notaDispensada ? erroNotaPonte.mensagem : undefined);
+	const marcada = notaMarcada(pendente, props.nota);
+
 	useEffect(() => {
 		if (!salvo) return;
 		const tempo = setTimeout(() => setSalvo(false), TEMPO_RETORNO_SALVO);
 		return () => clearTimeout(tempo);
 	}, [salvo]);
-	// Começou a reescrita: o balão e a versão anterior fecham.
+	// Começou a reescrita: o balão e as teclas do feedback fecham.
 	useEffect(() => {
-		if (reescrevendo) setBalao(false);
+		if (!reescrevendo) return;
+		setBalao(undefined);
+		setFeedbackAberto(false);
 	}, [reescrevendo]);
 
 	const reescrever = (retorno: string) => {
@@ -701,7 +785,7 @@ export function BlocoDaLicao(props: {
 	const enviar = async (dados: DadosDoRetorno, reescreverTambem: boolean) => {
 		if (!retornos) return;
 		const resposta = await retornos.salvar(licao, bloco.id, dados);
-		setBalao(false);
+		setBalao(undefined);
 		setSalvo(true);
 		if (!reescreverTambem) return;
 		if (resposta.retorno) reescrever(resposta.retorno);
@@ -716,15 +800,52 @@ export function BlocoDaLicao(props: {
 	};
 	const repetir = erroLocal?.retorno ?? (erroPonte ? ultimoRetorno.current : undefined);
 
+	// A nota rápida: grava na hora; a tecla fica marcada enquanto vai e, depois, pela nota que vale no módulo novo.
+	const avaliar = (avaliacao: AvaliacaoNova) => {
+		if (!retornos || pendente || avaliacao === props.nota?.avaliacao) return;
+		setPendente(avaliacao);
+		setErroNotaLocal(undefined);
+		if (erroNotaPonte) setNotaDispensada(erroNotaPonte.chave);
+		retornos
+			.avaliar(licao, bloco.id, avaliacao)
+			.catch((falha: unknown) => setErroNotaLocal(falha instanceof Error ? falha.message : String(falha)))
+			.finally(() => setPendente(undefined));
+	};
+	const detalhar = () => setBalao(balao ? undefined : balaoDetalhando(notaParaDetalhar(pendente, props.nota)));
+	const fecharFeedback = () => {
+		setFeedbackAberto(false);
+		setBalao(undefined);
+	};
+	const fecharErroNota = () => {
+		setErroNotaLocal(undefined);
+		if (erroNotaPonte) setNotaDispensada(erroNotaPonte.chave);
+	};
+
 	const acoes =
 		retornos && !reescrevendo ? (
 			<>
-				{retornos && !reescrevendo ? (
-					<Button variant="ghost" size="sm" icon="message" aria-expanded={balao} onClick={() => setBalao(!balao)}>
-						Retorno
+				{feedbackAberto ? (
+					<span className="feedback" role="group" aria-label="Feedback sobre este bloco">
+						<Teclas<AvaliacaoNova>
+							rotulo="Nota do bloco"
+							opcoes={[...OPCOES_DA_NOTA]}
+							valor={marcada}
+							mudar={avaliar}
+							className="feedback__teclas"
+						/>
+						<span className="feedback__fim">
+							<Button variant="ghost" size="sm" icon="message" aria-expanded={balao !== undefined} onClick={detalhar}>
+								{ROTULO_DETALHAR}
+							</Button>
+							<Button variant="ghost" size="sm" iconOnly icon="close" aria-label="Fechar o feedback" onClick={fecharFeedback} />
+						</span>
+					</span>
+				) : (
+					<Button variant="ghost" size="sm" icon="message" aria-expanded={false} onClick={() => setFeedbackAberto(true)}>
+						{rotuloDoFeedback(props.nota)}
 					</Button>
-				) : null}
-				{retornos && anteriores.length > 0 && !reescrevendo ? (
+				)}
+				{anteriores.length > 0 ? (
 					<Button variant="ghost" size="sm" icon="refresh" aria-expanded={vendoAnterior} onClick={() => setVendoAnterior(!vendoAnterior)}>
 						{vendoAnterior ? "Esconder a versão anterior" : "Ver a versão anterior"}
 					</Button>
@@ -817,7 +938,21 @@ export function BlocoDaLicao(props: {
 			<AnimatePresence initial={false}>
 				{balao && retornos && !reescrevendo ? (
 					<Dobra key="balao" className="retorno__dobra">
-						<BalaoDeRetorno materia={retornos.materia} enviar={enviar} fechar={() => setBalao(false)} />
+						<BalaoDeRetorno materia={retornos.materia} inicial={balao} enviar={enviar} fechar={() => setBalao(undefined)} />
+					</Dobra>
+				) : null}
+			</AnimatePresence>
+			<AnimatePresence initial={false}>
+				{erroNota && retornos && !reescrevendo ? (
+					<Dobra key="erro-nota" className="retorno__erro">
+						<Callout tone="amber" label="O feedback não foi salvo" icon="alert" quote={false}>
+							<p>{erroNota}</p>
+							<div className="retorno__erro-botoes">
+								<Button variant="ghost" size="sm" onClick={fecharErroNota}>
+									Fechar
+								</Button>
+							</div>
+						</Callout>
 					</Dobra>
 				) : null}
 			</AnimatePresence>
@@ -882,8 +1017,14 @@ const OPCAO_TODAS_RETORNO = "todas";
  * e os botões. Salvar espera a resposta; com erro, o balão fica aberto com a
  * frase.
  */
-function BalaoDeRetorno(props: { materia: { id: string; nome?: string }; enviar(dados: DadosDoRetorno, reescrever: boolean): Promise<void>; fechar(): void }) {
-	const [balao, setBalao] = useState(balaoVazio);
+function BalaoDeRetorno(props: {
+	materia: { id: string; nome?: string };
+	/** Com o que o balão abre (a nota marcada e o detalha, pelo "Detalhar"). */
+	inicial: BalaoRetorno;
+	enviar(dados: DadosDoRetorno, reescrever: boolean): Promise<void>;
+	fechar(): void;
+}) {
+	const [balao, setBalao] = useState(props.inicial);
 	const [enviando, setEnviando] = useState<"salvar" | "reescrever" | undefined>(undefined);
 	const [erro, setErro] = useState<string | undefined>(undefined);
 	const [tentou, setTentou] = useState(false);
@@ -1055,6 +1196,127 @@ function VersaoAnterior(props: { bloco: Bloco; anteriores: BlocoAnterior[] }) {
 			</div>
 			<div className="ap-prose lesson-body retorno__anterior-corpo">
 				<ConteudoDoBloco key={atual} bloco={anterior} />
+			</div>
+		</section>
+	);
+}
+
+/**
+ * O questionário do fim da lição (docs/modulos.md, "O questionário do fim da
+ * lição"): o cartão "Como foi esta lição?" com as cinco perguntas
+ * (PerguntaSlider), o texto e "Enviar" (ligado com pelo menos uma resposta).
+ * As notas ficam no estado local até o envio. Enviado, o cartão recolhe para
+ * "Respostas enviadas em dd/mm", com as notas, e "Responder de novo" reabre
+ * com as da última vez (e "Cancelar" volta ao recolhido).
+ */
+function QuestionarioDaLicao(props: { enviado: QuestionarioLicao | undefined; enviar(dados: { notas: NotasLicao; texto?: string }): Promise<unknown> }) {
+	const { enviado } = props;
+	const [editando, setEditando] = useState(false);
+	const [rascunho, setRascunho] = useState<RascunhoQuestionario>(rascunhoVazio);
+	const [enviando, setEnviando] = useState(false);
+	const [erro, setErro] = useState<string | undefined>(undefined);
+	const titulo = useId();
+	const problema = problemaDoQuestionario(rascunho);
+
+	const enviar = () => {
+		if (enviando || problema) return;
+		let dados: { notas: NotasLicao; texto?: string };
+		try {
+			dados = dadosDoQuestionario(rascunho);
+		} catch (falha) {
+			setErro((falha as Error).message);
+			return;
+		}
+		setErro(undefined);
+		setEnviando(true);
+		props
+			.enviar(dados)
+			.then(() => setEditando(false))
+			.catch((falha: unknown) => setErro(falha instanceof Error ? falha.message : String(falha)))
+			.finally(() => setEnviando(false));
+	};
+	const responderDeNovo = () => {
+		setRascunho(rascunhoDoEnviado(enviado));
+		setErro(undefined);
+		setEditando(true);
+	};
+
+	if (enviado && !editando) {
+		const resumo = resumoDoQuestionario(enviado);
+		return (
+			<section className="modulo__cartao questionario questionario--enviado" aria-labelledby={titulo}>
+				<div className="questionario__enviado-cabeca">
+					<span className="questionario__enviado-marca" aria-hidden="true">
+						<Icon name="check" size={16} strokeWidth={2.5} />
+					</span>
+					<div className="questionario__enviado-titulos">
+						<p className="overline questionario__rotulo">{TITULO_QUESTIONARIO}</p>
+						<h3 id={titulo} className="body-strong questionario__enviado-titulo">
+							{tituloDoEnviado(enviado)}
+						</h3>
+					</div>
+					<Button variant="ghost" size="sm" icon="refresh" onClick={responderDeNovo}>
+						Responder de novo
+					</Button>
+				</div>
+				{resumo.length > 0 ? (
+					<dl className="questionario__resumo">
+						{resumo.map((item) => (
+							<div key={item.pergunta} className="questionario__resumo-linha">
+								<dt className="body-sm questionario__resumo-pergunta">{item.texto}</dt>
+								<dd className="body-sm questionario__resumo-nota">{item.nome}</dd>
+							</div>
+						))}
+					</dl>
+				) : null}
+			</section>
+		);
+	}
+
+	return (
+		<section className="modulo__cartao questionario" aria-labelledby={titulo}>
+			<header className="questionario__cabeca">
+				<h3 id={titulo} className="heading questionario__titulo">
+					{TITULO_QUESTIONARIO}
+				</h3>
+				<p className="body-sm questionario__linha">{LINHA_QUESTIONARIO}</p>
+			</header>
+			<div className="questionario__perguntas">
+				{PERGUNTAS_LICAO.map((pergunta) => (
+					<PerguntaSlider
+						key={pergunta.id}
+						pergunta={pergunta.texto}
+						valor={notaDaPergunta(rascunho, pergunta.id)}
+						aoMudar={(nivel) => setRascunho((atual) => mudarNota(atual, pergunta.id, nivel))}
+						desligado={enviando}
+					/>
+				))}
+			</div>
+			<TextArea
+				label={ROTULO_TEXTO_QUESTIONARIO}
+				rows={3}
+				maxLength={TEXTO_QUESTIONARIO_MAXIMO}
+				value={rascunho.texto}
+				disabled={enviando}
+				onChange={(evento) => {
+					const texto = evento.target.value;
+					setRascunho((atual) => ({ ...atual, texto }));
+				}}
+			/>
+			{erro ? (
+				<Callout tone="amber" label="Não deu certo" icon="alert" quote={false}>
+					<p>{erro}</p>
+				</Callout>
+			) : null}
+			<div className="questionario__pe">
+				{enviado ? (
+					<Button variant="ghost" size="sm" onClick={() => setEditando(false)} disabled={enviando}>
+						Cancelar
+					</Button>
+				) : null}
+				<Button variant="primary" size="sm" icon="send" onClick={enviar} disabled={Boolean(problema) || enviando} aria-busy={enviando}>
+					{enviando ? "Enviando…" : "Enviar"}
+				</Button>
 			</div>
 		</section>
 	);

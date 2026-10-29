@@ -106,14 +106,21 @@ import { arquivoMateria, ErroMaterias, eventosAprendiz, eventosMateria } from ".
 import {
 	type ExplicadoDeNovo,
 	type Glossario,
+	glossarioParaATela,
 	gravarGlossario,
 	incorporarTermosDaLicao,
+	incorporarTermosMarcados,
 	juntarNoDisco,
 	LIMITE_GLOSSARIO_MENSAGEM,
 	lerGlossario,
+	lerTermosMarcados,
 	linhaDoGlossario,
+	type MarcaAPor,
+	registrarMarcacao,
 	type Termo,
+	type TermoNaTela,
 	termosParaMensagem,
+	textosDoBloco,
 	trocarMarcasNasLicoes,
 } from "../lib/termos.ts";
 import {
@@ -186,6 +193,16 @@ export const CAMINHO_PROMPT_VERIFICACAO = join(dirname(fileURLToPath(import.meta
 /** O arquivo da metodologia que a conferência da pergunta carrega (docs/modulos.md, "A metodologia em arquivos"). */
 export const METODO_VERIFICACAO = ["pergunta.md"] as const;
 
+/** O prompt de "Marcar os termos" num módulo já gerado (docs/termos.md; mesmo formato). */
+export const CAMINHO_PROMPT_TERMOS = join(dirname(fileURLToPath(import.meta.url)), "..", "prompts", "modulo-termos.md");
+
+/** O prompt da explicação de um trecho ("Não sei o que é isso", "Explique melhor"; mesmo formato). */
+export const CAMINHO_PROMPT_EXPLICAR = join(dirname(fileURLToPath(import.meta.url)), "..", "prompts", "explicar-trecho.md");
+
+/** Os arquivos da metodologia de "Marcar os termos" e da explicação de um trecho. */
+export const METODO_TERMOS = [ARQUIVO_TERMOS] as const;
+export const METODO_EXPLICAR = ["conceito.md", ARQUIVO_TERMOS] as const;
+
 /** Quanto a geração espera os materiais do formulário ficarem prontos antes de desistir. */
 export const TEMPO_ESPERA_MATERIAIS_MS = 30 * 60_000;
 
@@ -197,6 +214,8 @@ const MAX_TOKENS_PLANO = 16_000;
 const MAX_TOKENS_LICAO = 32_000;
 const MAX_TOKENS_BLOCO = 16_000;
 const MAX_TOKENS_VERIFICACAO = 8_000;
+const MAX_TOKENS_TERMOS = 16_000;
+const MAX_TOKENS_EXPLICAR = 8_000;
 
 /** Até quantos caracteres ler_modulo devolve de uma vez (as explicações vão inteiras). */
 const LIMITE_LEITURA = 100_000;
@@ -218,10 +237,13 @@ const ACOES: ReadonlyArray<AcaoDaTela> = [
 	"reescrever_bloco",
 	"avaliar_bloco",
 	"avaliar_licao",
+	"marcar_termos",
+	"explicar_trecho",
+	"guardar_termo",
 ];
 
-/** As ações que são de uma questão, e a nota rápida de um bloco: o erro leva o bloco. */
-const ACOES_DA_QUESTAO: ReadonlyArray<AcaoDaTela> = ["responder", "corrigir", "encerrar", "avaliar_bloco"];
+/** As ações que são de uma questão, a nota rápida de um bloco e o pedido de explicação: o erro leva o bloco. */
+const ACOES_DA_QUESTAO: ReadonlyArray<AcaoDaTela> = ["responder", "corrigir", "encerrar", "avaliar_bloco", "explicar_trecho"];
 
 /** As ações do painel escrita. */
 const ACOES_ESCRITA: ReadonlyArray<keyof AcoesEscrita> = ["listar", "salvar", "apagar"];
@@ -248,6 +270,9 @@ interface DadosAcao {
 	tempoMs?: unknown;
 	detalha?: unknown;
 	notas?: unknown;
+	trecho?: unknown;
+	tipo?: unknown;
+	explicacao?: unknown;
 }
 
 const FRASES: Record<AcaoDaTela | "ler", string> = {
@@ -264,6 +289,9 @@ const FRASES: Record<AcaoDaTela | "ler", string> = {
 	reescrever_bloco: "reescrever o bloco",
 	avaliar_bloco: "gravar a nota do bloco",
 	avaliar_licao: "gravar o questionário da lição",
+	marcar_termos: "marcar os termos do módulo",
+	explicar_trecho: "explicar o trecho",
+	guardar_termo: "guardar o termo no glossário",
 	ler: "ler o módulo",
 };
 
@@ -614,6 +642,51 @@ export function mensagemDaVerificacao(entrada: EntradaVerificacao): string {
 	].join("\n\n");
 }
 
+/** O rótulo de cada texto do bloco onde a marca vale (textosDoBloco), na mensagem de "Marcar os termos". */
+function rotuloDoCampo(campo: string): string {
+	const alternativa = /^alternativas\.(\d+)$/.exec(campo);
+	if (alternativa) return `Alternativa ${LETRAS[Number(alternativa[1])] ?? Number(alternativa[1]) + 1}`;
+	return { texto: "Texto", pergunta: "Pergunta", contexto: "Contexto", enunciado: "Enunciado", explicacao: "Explicação" }[campo] ?? campo;
+}
+
+/** O que vai na mensagem de "Marcar os termos" de uma lição. */
+export interface EntradaTermos {
+	curso: EntradaPlano["curso"];
+	modulo: EntradaPlano["modulo"];
+	licao: Licao;
+	/** O glossário do curso (o da marcação, que cresce com os termos novos das lições já marcadas). */
+	glossario: readonly Termo[];
+	/** O nome de um conceito pelo id. */
+	nomeDe?: (id: string) => string;
+}
+
+/**
+ * A mensagem de "Marcar os termos" de uma lição (docs/termos.md): o curso e o
+ * módulo, a lição (id, título, objetivo, conceitos), os blocos na ordem, cada
+ * um com o id e os textos onde a marca vale (textosDoBloco, com as marcas que
+ * já existem), e o glossário do curso (secaoDoGlossario, os termos dos
+ * conceitos da lição primeiro).
+ */
+export function mensagemDosTermos(entrada: EntradaTermos): string {
+	const nomeDe = entrada.nomeDe ?? ((id: string) => id);
+	const { licao } = entrada;
+	const blocos = licao.blocos.map((bloco) => {
+		const extras = bloco.tipo === "explicacao" ? ` (${NOMES_FORMATO[bloco.formato] ?? bloco.formato})` : "";
+		const textos = textosDoBloco(bloco).map(({ campo, texto }) => `${rotuloDoCampo(campo)}:\n${texto}`);
+		return [`### ${bloco.id} · ${NOMES_TIPO_BLOCO[bloco.tipo]}${extras}`, ...textos].join("\n");
+	});
+	return [
+		...linhasDoCurso({ ...entrada, formulario: {} }),
+		[
+			`Lição: ${licao.id}, ${JSON.stringify(licao.titulo)}`,
+			`Objetivo da lição: ${licao.objetivo || "(sem objetivo)"}`,
+			`Conceitos da lição: ${licao.conceitos.map((id) => `${id} (${nomeDe(id)})`).join(", ")}`,
+		].join("\n"),
+		`Os blocos da lição, na ordem (${licao.blocos.length}), com os textos onde a marca vale:\n\n${blocos.join("\n\n")}`,
+		secaoDoGlossario(entrada.glossario, licao.conceitos),
+	].join("\n\n");
+}
+
 /** Os arquivos da metodologia usados, sem repetir, na ordem em que apareceram (para o contexto do gerou_modulo). */
 function metodoUsado(lidos: readonly MetodoLido[]) {
 	const vistos = new Set<string>();
@@ -708,6 +781,10 @@ export interface OpcoesModulos {
 	caminhoPromptVerificacao?: string;
 	/** O corretor.md da dissertativa, o mesmo do diagnóstico (nos testes, um prompt de mentira). */
 	caminhoPromptCorretor?: string;
+	/** O modulo-termos.md de "Marcar os termos" (nos testes, um prompt de mentira). */
+	caminhoPromptTermos?: string;
+	/** O explicar-trecho.md (nos testes, um prompt de mentira). */
+	caminhoPromptExplicar?: string;
 	/** A pasta da metodologia (nos testes, arquivos de mentira). */
 	pastaMetodo?: string;
 	/** Quanto esperar os materiais do formulário (nos testes, pouco). */
@@ -745,6 +822,15 @@ interface ReescritaEmAndamento {
 	controle: AbortController;
 	/** Só depois de conferida a reescrita aparece no estado (reescrevendo). */
 	aceita: boolean;
+}
+
+/** "Marcar os termos" em andamento num módulo: a lição sendo marcada (a partir de 1), quantas são e o cancelamento. */
+interface MarcacaoEmAndamento {
+	controle: AbortController;
+	/** Só depois de conferida a marcação aparece no estado (marcando). */
+	aceita: boolean;
+	licao: number;
+	licoes: number;
 }
 
 /** Uma conferência em andamento (pergunta ou dissertativa): a tentativa conferida e o cancelamento. */
@@ -801,6 +887,8 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 	const caminhoBloco = opcoes.caminhoPromptBloco ?? CAMINHO_PROMPT_BLOCO;
 	const caminhoVerificacao = opcoes.caminhoPromptVerificacao ?? CAMINHO_PROMPT_VERIFICACAO;
 	const caminhoCorretor = opcoes.caminhoPromptCorretor ?? CAMINHO_PROMPT_CORRETOR;
+	const caminhoTermos = opcoes.caminhoPromptTermos ?? CAMINHO_PROMPT_TERMOS;
+	const caminhoExplicar = opcoes.caminhoPromptExplicar ?? CAMINHO_PROMPT_EXPLICAR;
 	const pastaMetodo = opcoes.pastaMetodo ?? PASTA_METODO;
 	const tempoEspera = opcoes.tempoEsperaMateriaisMs ?? TEMPO_ESPERA_MATERIAIS_MS;
 	const intervalo = opcoes.intervaloVarreduraMs ?? INTERVALO_VARREDURA_MS;
@@ -825,6 +913,10 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 	const retornos = new Map<string, RetornoGravado>();
 	/** As conferências em andamento (pergunta e dissertativa), por "matéria/curso/módulo" e pelo id do bloco. */
 	const conferencias = new Map<string, Map<string, Conferindo>>();
+	/** "Marcar os termos" em andamento, por "matéria/curso/módulo" (uma por módulo). */
+	const marcacoes = new Map<string, MarcacaoEmAndamento>();
+	/** As explicações de um trecho em andamento, por "matéria/curso/módulo" e pelo id do pedido. */
+	const explicacoesEmAndamento = new Map<string, Map<string, AbortController>>();
 
 	const daSessao = () => (sessao ? { sessao } : {});
 	const chaveDo = (materia: string, curso: string) => `${materia}/${curso}`;
@@ -860,9 +952,34 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 			});
 	};
 
-	/** Manda o módulo inteiro (com as respostas) e os blocos em conferência; com o pedido, quando responde a uma ação. Chamado dentro da trava. */
-	const mostrarModulo = (materia: string, curso: string, modulo: Modulo, pedido?: string) =>
-		mostrar("modulo", { materia, curso, modulo, corrigindo: corrigindoNo(modulo), ...(pedido ? { pedido } : {}) });
+	/** Os pedidos de explicação do módulo que o modelo está explicando agora, na ordem de explicacoes. */
+	const explicandoNo = (modulo: Modulo): string[] => {
+		const doModulo = explicacoesEmAndamento.get(chaveDoModulo(modulo.materia, modulo.curso, modulo.id));
+		if (!doModulo || modulo.situacao !== "gerado") return [];
+		return (modulo.explicacoes ?? []).map((item) => item.id).filter((id) => doModulo.has(id));
+	};
+
+	/**
+	 * Manda o módulo inteiro (com as respostas), os blocos em conferência, os
+	 * pedidos de explicação em andamento e o glossário do curso
+	 * (glossarioParaATela: com o lugar de cada termo, pelo esqueleto e pelos
+	 * módulos do disco; um glossário ou curso ilegível vai vazio, e a marca
+	 * aparece como texto); com o pedido, quando responde a uma ação. Chamado
+	 * dentro da trava.
+	 */
+	const mostrarModulo = async (materia: string, curso: string, modulo: Modulo, pedido?: string) => {
+		const dados = pastaDados;
+		let glossario: TermoNaTela[] = [];
+		if (dados) {
+			try {
+				const doCurso = await lerCurso(dados, materia, curso);
+				glossario = await glossarioParaATela(dados, materia, curso, modulo, doCurso.esqueleto?.modulos ?? []);
+			} catch {
+				glossario = [];
+			}
+		}
+		mostrar("modulo", { materia, curso, modulo, corrigindo: corrigindoNo(modulo), explicando: explicandoNo(modulo), glossario, ...(pedido ? { pedido } : {}) });
+	};
 
 	const marcarConferindo = (chave: string, alvo: AlvoConferencia): AbortController => {
 		const doModulo = conferencias.get(chave) ?? new Map<string, Conferindo>();
@@ -998,6 +1115,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 			if (gravado?.situacao === "gerado") {
 				const resumo = resumoDoModulo(gravado);
 				const progresso = progressoDoModulo(gravado);
+				const marcacao = marcacoes.get(chaveDoModulo(materia, atual.id, id));
 				doGravado = {
 					geradoEm: gravado.geradoEm,
 					custo: gravado.custo,
@@ -1008,6 +1126,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 					concluido: Boolean(gravado.concluidoEm),
 					...(gravado.concluidoEm ? { concluidoEm: gravado.concluidoEm } : {}),
 					...(reescrita?.aceita && reescrita.modulo === id ? { reescrevendo: { licao: reescrita.licao, bloco: reescrita.bloco } } : {}),
+					...(marcacao?.aceita ? { marcando: { licao: marcacao.licao, licoes: marcacao.licoes } } : {}),
 				};
 			} else if (gravado?.situacao === "aguardando_material") {
 				doGravado = { nota: gravado.aguardando.nota, materialNovo: materialNovo(gravado.aguardando, prontos) };
@@ -1407,10 +1526,10 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 			retornos.set(registrado.retorno, { objeto: { materia, curso, modulo, licao, bloco }, resultado: { avaliacao: limpo.avaliacao, motivos: limpo.motivos, texto: limpo.texto } });
 			const novo = await gravarFeedback(dados, materia, curso, modulo, licao, bloco, { avaliacao: limpo.avaliacao, evento: registrado.retorno, agora });
 			if (rapida) {
-				mostrarModulo(materia, curso, novo, pedido);
+				await mostrarModulo(materia, curso, novo, pedido);
 				return;
 			}
-			mostrarModulo(materia, curso, novo);
+			await mostrarModulo(materia, curso, novo);
 			await mostrarEstado(dados, materia, curso, pedido, { retorno: registrado.retorno });
 			if (registrado.regras) mostrarEscrita("regras", { regras: registrado.regras });
 		});
@@ -1440,7 +1559,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 				if (prompt && !prompts.some((item) => item.nome === prompt.nome && item.hash === prompt.hash)) prompts.push(prompt);
 			}
 			const { modulo: novo } = await registrarQuestionario(dados, materia, curso, modulo, licao, { notas: dadosAcao.notas, texto: dadosAcao.texto }, { ...daSessao(), modelo: lido.modelo, prompts });
-			mostrarModulo(materia, curso, novo, pedido);
+			await mostrarModulo(materia, curso, novo, pedido);
 		});
 
 	/**
@@ -1567,7 +1686,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 					{ retornoId, modelo: prompt.modelo, prompt: usadoComMetodo(prompt.usado, metodo), custo: resposta.custo },
 					daSessao(),
 				);
-				mostrarModulo(materia, curso, novo);
+				await mostrarModulo(materia, curso, novo);
 				await mostrarEstado(dados, materia, curso);
 			});
 		} catch (erro) {
@@ -1639,7 +1758,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 				// A resposta mudou enquanto era conferida: a conferência é jogada fora, e o módulo vai como está.
 				const atual = novo ?? (await lerModulo(dados, materia, curso, modulo));
 				if (!atual) throw new ErroModulo(`O módulo ${modulo} não existe mais.`);
-				mostrarModulo(materia, curso, atual, pedido);
+				await mostrarModulo(materia, curso, atual, pedido);
 				if (novo) await mostrarEstado(dados, materia, curso);
 			});
 		} catch (erro) {
@@ -1649,7 +1768,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 			await naTrava(materia, async () => {
 				if (pastaDados !== dados) return;
 				const atual = await lerModulo(dados, materia, curso, modulo);
-				if (atual) mostrarModulo(materia, curso, atual);
+				if (atual) await mostrarModulo(materia, curso, atual);
 			}).catch(() => undefined);
 		} finally {
 			tirarConferindo(chave, bloco.id, controle);
@@ -1672,7 +1791,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 				? { alvo: gravada.alvo, controle: marcarConferindo(chave, gravada.alvo), licao: gravada.aplicada.licao, bloco: gravada.aplicada.bloco }
 				: undefined;
 			// A resposta está gravada: o pedido vai aqui; a conferência chega depois, num módulo sem pedido.
-			mostrarModulo(materia, curso, gravada.modulo, pedido);
+			await mostrarModulo(materia, curso, gravada.modulo, pedido);
 			await mostrarEstado(dados, materia, curso);
 			return marcada;
 		});
@@ -1694,10 +1813,110 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 			if (emAndamento && JSON.stringify(emAndamento.alvo) === JSON.stringify(alvo)) throw new ErroModulo(`A resposta da questão ${alvo.bloco} já está sendo conferida.`);
 			const { licao, bloco } = questaoDoModulo(lido, alvo.bloco);
 			const controle = marcarConferindo(chave, alvo);
-			mostrarModulo(materia, curso, lido);
+			await mostrarModulo(materia, curso, lido);
 			return { alvo, controle, licao, bloco };
 		});
 		await conferir(dados, materia, curso, modulo, aConferir, pedido);
+	};
+
+	/**
+	 * "Marcar os termos" num módulo já gerado (marcar_termos; docs/termos.md):
+	 * lê o prompt (modulo-termos.md com a metodologia termos.md) e resolve o
+	 * modelo; na trava, confere o módulo gerado e lê o glossário, e manda o
+	 * estado com o pedido e marcando (a marcação aceita); fora dela, uma
+	 * chamada por lição, em sequência (temperatura 0, com a nova tentativa;
+	 * lerTermosMarcados), com o glossário da marcação crescendo com os termos
+	 * novos de cada lição (incorporarTermosMarcados) e o estado a cada lição;
+	 * na trava de novo, grava (registrarMarcacao: as marcas, o glossário e o
+	 * marcou_termos) e manda o módulo e o estado. Uma marcação por módulo; um
+	 * módulo sendo gerado não é marcado. Com erro antes de aceitar, o erro
+	 * com o pedido; depois, o erro (sem pedido, com o gasto) e o estado. O
+	 * fim da sessão cancela sem gravar.
+	 */
+	const marcarTermos = async (dados: string, materia: string, curso: string, modulo: string, pedido: string | undefined) => {
+		const chave = chaveDoModulo(materia, curso, modulo);
+		const comPedido = pedido ? { pedido } : {};
+		if (marcacoes.has(chave)) throw new ErroModulo("Os termos deste módulo já estão sendo marcados. Espere terminar.");
+		if (geracoes.get(chaveDo(materia, curso))?.modulo === modulo) throw new ErroModulo("Este módulo está sendo gerado. Espere terminar antes de marcar os termos.");
+		const marcacao: MarcacaoEmAndamento = { controle: new AbortController(), aceita: false, licao: 1, licoes: 0 };
+		marcacoes.set(chave, marcacao);
+		const sinal = marcacao.controle.signal;
+		let custo = 0;
+		const comGasto = (mensagem: string) => (custo > 0 ? `${mensagem} Gasto das lições já marcadas: US$ ${custo.toFixed(4)}.` : mensagem);
+		try {
+			const prompt = await lerPrompt(caminhoTermos);
+			const metodo = await lerMetodo(pastaMetodo, METODO_TERMOS);
+			if (!registro) throw new ErroModulo("A sessão não tem o registro de modelos do pi; não dá para chamar o modelo que marca os termos.");
+			const modelo = resolverModelo(registro, prompt.modelo, "de Marcar os termos");
+			const inicio = await naTrava(materia, async () => {
+				const lido = await lerModulo(dados, materia, curso, modulo);
+				if (!lido) throw new ErroModulo(`O módulo ${modulo} ainda não foi gerado.`);
+				if (lido.situacao !== "gerado") throw new ErroModulo(`O módulo ${modulo} está aguardando material; não há termo para marcar.`);
+				const glossario = await lerGlossario(dados, materia, curso);
+				marcacao.licoes = lido.licoes.length;
+				marcacao.aceita = true;
+				await mostrarEstado(dados, materia, curso, pedido);
+				return { modulo: lido, glossario };
+			});
+
+			const entrada = await entradaDoModelo(dados, materia, curso, modulo);
+			const nomes = new Map(entrada.plano.conceitos.map((conceito) => [conceito.id, conceito.nome]));
+			let glossario = inicio.glossario;
+			const novos: Termo[] = [];
+			const marcas: MarcaAPor[] = [];
+			const reexplicados: ExplicadoDeNovo[] = [];
+			const total = inicio.modulo.licoes.length;
+			for (const [indice, licao] of inicio.modulo.licoes.entries()) {
+				if (sinal.aborted) throw new Cancelado();
+				if (indice > 0) {
+					marcacao.licao = indice + 1;
+					await mostrarNaTrava(dados, materia, curso, "marcar_termos");
+				}
+				const doGlossario = glossario.termos;
+				const resposta = await pedirJson(
+					registro,
+					modelo,
+					instrucoesComMetodo(prompt.instrucoes, metodo),
+					mensagemDosTermos({ curso: entrada.plano.curso, modulo: entrada.plano.modulo, licao, glossario: doGlossario, nomeDe: (id) => nomes.get(id) ?? id }),
+					(texto) => lerTermosMarcados(objetoJsonDoModelo(texto), { licao, modulo: inicio.modulo, glossario: doGlossario }).termos,
+					sinal,
+					{
+						temperatura: 0,
+						maxTokens: MAX_TOKENS_TERMOS,
+						formato: '{"termos": [...]}',
+						oQue: `os termos da lição ${indice + 1} de ${total} ("${licao.titulo}")`,
+						depois: "Nenhum termo foi marcado.",
+					},
+				);
+				custo += resposta.custo;
+				const incorporado = incorporarTermosMarcados(glossario, resposta.resultado, { modulo: inicio.modulo, agora: new Date() });
+				glossario = incorporado.glossario;
+				novos.push(...incorporado.novos);
+				marcas.push(...incorporado.marcas);
+				reexplicados.push(...incorporado.reexplicados);
+			}
+
+			await naTrava(materia, async () => {
+				if (sinal.aborted) throw new Cancelado();
+				if (marcacoes.get(chave) === marcacao) marcacoes.delete(chave);
+				const versoes = Object.fromEntries(inicio.modulo.licoes.flatMap((licao) => licao.blocos.map((bloco) => [bloco.id, versaoDoBloco(bloco)] as const)));
+				const feito = await registrarMarcacao(dados, materia, curso, modulo, { geradoEm: inicio.modulo.geradoEm, versoes, marcas, novos, reexplicados, custo }, daSessao());
+				await mostrarModulo(materia, curso, feito.modulo);
+				await mostrarEstado(dados, materia, curso);
+			});
+		} catch (erro) {
+			if (marcacoes.get(chave) === marcacao) marcacoes.delete(chave);
+			if (pastaDados !== dados || erro instanceof Cancelado || sinal.aborted) return;
+			const mensagem = comGasto(mensagemDe(erro, "marcar_termos"));
+			if (!marcacao.aceita) {
+				mostrar("erro", { mensagem, ao: "marcar_termos", materia, curso, modulo, ...comPedido });
+				return;
+			}
+			mostrar("erro", { mensagem, ao: "marcar_termos", materia, curso, modulo });
+			await mostrarNaTrava(dados, materia, curso, "marcar_termos");
+		} finally {
+			if (marcacoes.get(chave) === marcacao) marcacoes.delete(chave);
+		}
 	};
 
 	pi.on("session_start", (_evento, ctx) => {
@@ -1716,6 +1935,10 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 		reescritas.clear();
 		for (const doModulo of conferencias.values()) for (const conferindo of doModulo.values()) conferindo.controle.abort();
 		conferencias.clear();
+		for (const marcacao of marcacoes.values()) marcacao.controle.abort();
+		marcacoes.clear();
+		for (const doModulo of explicacoesEmAndamento.values()) for (const controle of doModulo.values()) controle.abort();
+		explicacoesEmAndamento.clear();
 		retornos.clear();
 		erros.clear();
 		avisos.clear();
@@ -1813,7 +2036,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 					// "Ver a resposta-modelo": a dissertativa corrigida passa a encerrada (sem evento; o progresso não muda).
 					await naTrava(materia, async () => {
 						const encerrado = await gravarEncerrada(dados, materia, curso, modulo, dadosAcao.bloco);
-						mostrarModulo(materia, curso, encerrado, pedido);
+						await mostrarModulo(materia, curso, encerrado, pedido);
 					});
 				} else if (ao === "retorno") {
 					await avaliarBloco(dados, materia, curso, modulo, dadosAcao, pedido, false);
@@ -1823,6 +2046,8 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 					await avaliarLicao(dados, materia, curso, modulo, dadosAcao, pedido);
 				} else if (ao === "reescrever_bloco") {
 					await reescrever(dados, materia, curso, modulo, dadosAcao, pedido);
+				} else if (ao === "marcar_termos") {
+					await marcarTermos(dados, materia, curso, modulo, pedido);
 				} else if (ao === "cancelar") {
 					// Para a geração ou a reescrita de um bloco do módulo (o que estava gravado fica).
 					const chave = chaveDo(materia, curso);
@@ -1843,7 +2068,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 					await naTrava(materia, async () => {
 						const lido = await lerModulo(dados, materia, curso, modulo);
 						if (!lido) throw new ErroModulo(`O módulo ${modulo} ainda não foi gerado.`);
-						mostrarModulo(materia, curso, lido);
+						await mostrarModulo(materia, curso, lido);
 					});
 				} else if (ao === "concluir") {
 					// Na trava do curso (a da matéria): grava o concluidoEm e o
@@ -1855,7 +2080,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 						const concluido = await concluirModulo(dados, materia, curso, modulo, daSessao());
 						erros.delete(chaveDoModulo(materia, curso, modulo));
 						avisos.delete(chaveDoModulo(materia, curso, modulo));
-						mostrarModulo(materia, curso, concluido);
+						await mostrarModulo(materia, curso, concluido);
 						await mostrarEstado(dados, materia, curso, pedido);
 					});
 				}

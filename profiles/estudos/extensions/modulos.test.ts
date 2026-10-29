@@ -21,7 +21,15 @@ import { criarMateria, eventosAprendiz, eventosMateria } from "../lib/materias.t
 import { ARQUIVOS_METODO, caminhoDoModulo, type EstadoModuloNaTela, lerModulo, MINIMO_CARACTERES_EXEMPLO, type ModuloGerado } from "../lib/modulos.ts";
 import { hashDoPrompt, lerMetodo, PASTA_METODO } from "./cursos.ts";
 import type { RespostaModulo } from "../lib/modulo-respostas.ts";
-import modulos, { CAMINHO_PROMPT_BLOCO, CAMINHO_PROMPT_LICAO, CAMINHO_PROMPT_PLANO, CAMINHO_PROMPT_VERIFICACAO, type MensagemEstado, type OpcoesModulos } from "./modulos.ts";
+import modulos, {
+	CAMINHO_PROMPT_BLOCO,
+	CAMINHO_PROMPT_LICAO,
+	CAMINHO_PROMPT_PLANO,
+	CAMINHO_PROMPT_TERMOS,
+	CAMINHO_PROMPT_VERIFICACAO,
+	type MensagemEstado,
+	type OpcoesModulos,
+} from "./modulos.ts";
 import { lerPromptMapeador } from "./mapa.ts";
 
 type Resultado = { content: Array<{ text: string }>; details: unknown; isError?: boolean };
@@ -38,6 +46,8 @@ const PROMPT_LICAO = "---\nmodel: teste/modelo-x\n---\nEscreva a lição.\n";
 const PROMPT_BLOCO = "---\nmodel: teste/modelo-x\n---\nReescreva o bloco.\n";
 const PROMPT_VERIFICACAO = "---\nmodel: teste/modelo-x\n---\nConfira a pergunta.\n";
 const PROMPT_CORRETOR = "---\nmodel: teste/modelo-x\n---\nCorrija pela rubrica.\n";
+const PROMPT_TERMOS = "---\nmodel: teste/modelo-x\n---\nMarque os termos.\n";
+const PROMPT_EXPLICAR = "---\nmodel: teste/modelo-x\n---\nExplique o trecho.\n";
 /** Os arquivos da metodologia de mentira, em <dados>/metodo. */
 const METODO: Record<string, string> = Object.fromEntries(ARQUIVOS_METODO.map((arquivo) => [arquivo, `Como escrever (${arquivo}).\n`]));
 /** O system prompt com a metodologia de mentira, como instrucoesComMetodo o monta. */
@@ -114,6 +124,8 @@ const opcoesDeTeste = (extra: OpcoesModulos = {}): OpcoesModulos => ({
 	caminhoPromptBloco: join(dados, "modulo-bloco.md"),
 	caminhoPromptVerificacao: join(dados, "verificacao.md"),
 	caminhoPromptCorretor: join(dados, "corretor.md"),
+	caminhoPromptTermos: join(dados, "modulo-termos.md"),
+	caminhoPromptExplicar: join(dados, "explicar-trecho.md"),
 	pastaMetodo: join(dados, "metodo"),
 	...extra,
 });
@@ -181,6 +193,8 @@ beforeEach(async () => {
 	await writeFile(join(dados, "modulo-bloco.md"), PROMPT_BLOCO, "utf8");
 	await writeFile(join(dados, "verificacao.md"), PROMPT_VERIFICACAO, "utf8");
 	await writeFile(join(dados, "corretor.md"), PROMPT_CORRETOR, "utf8");
+	await writeFile(join(dados, "modulo-termos.md"), PROMPT_TERMOS, "utf8");
+	await writeFile(join(dados, "explicar-trecho.md"), PROMPT_EXPLICAR, "utf8");
 	await mkdir(join(dados, "metodo"), { recursive: true });
 	for (const [arquivo, conteudo] of Object.entries(METODO)) await writeFile(join(dados, "metodo", arquivo), conteudo, "utf8");
 	await gravarMapa(dados, materia, {
@@ -324,7 +338,7 @@ async function gerarM1(pedido = "p-gerar", extra: Record<string, unknown> = {}) 
 
 describe("os prompts e a metodologia do perfil", () => {
 	it("os prompts dizem o modelo e o formato; os arquivos da metodologia existem, cada um com o título", async () => {
-		for (const caminho of [CAMINHO_PROMPT_PLANO, CAMINHO_PROMPT_LICAO, CAMINHO_PROMPT_BLOCO]) {
+		for (const caminho of [CAMINHO_PROMPT_PLANO, CAMINHO_PROMPT_LICAO, CAMINHO_PROMPT_BLOCO, CAMINHO_PROMPT_TERMOS]) {
 			const prompt = lerPromptMapeador(await readFile(caminho, "utf8"));
 			expect(prompt.modelo).toBe("openrouter/openai/gpt-6.1-sol");
 			expect(prompt.instrucoes).toContain("metodologia");
@@ -1751,5 +1765,115 @@ describe("os termos-chave na geração e na reescrita", () => {
 		expect(textoDaChamada(chamadas.at(-1)!)).toContain("- t-contagem · contagem:");
 		const gravado = (await lerModulo(dados, materia, CURSO, "m1")) as ModuloGerado;
 		expect(textoDoBloco(gravado, 0, 0).startsWith("A [contagem](termo:t-contagem) e o lema.")).toBe(true);
+	});
+});
+
+// --- Marcar os termos num módulo já gerado (docs/termos.md) -------------------------------------
+
+/** As respostas de "Marcar os termos" para as duas lições de m1 (LICAO_1 e LICAO_2, sem marcas). */
+const TERMOS_L1 = JSON.stringify({
+	termos: [
+		{ bloco: "l1-b2", trecho: "Texto", id: null, termo: "texto", definicao: "O conteúdo de um documento.", explicadoEm: "l1-b2" },
+		{ bloco: "l1-b3", trecho: "TF", id: null, termo: "TF", definicao: "Quantas vezes o termo aparece no documento.", explicadoEm: null },
+		{ bloco: "l1-b9", trecho: "x", id: null, termo: "fora", definicao: "Bloco que não existe." },
+	],
+});
+const TERMOS_L2 = JSON.stringify({ termos: [{ bloco: "l2-b2", trecho: "Texto", id: "t-texto", explicadoEm: null }] });
+
+type MensagemModuloComTermos = { modulo: ModuloGerado; glossario: Array<{ id: string; lugar: unknown }>; explicando: string[]; pedido?: string };
+const ultimaModulo = () => recebidas("modulo").at(-1)?.dados as unknown as MensagemModuloComTermos;
+const textoDoBlocoGravado = async (licao: number, bloco: number) => {
+	const atual = ((await lerModulo(dados, materia, CURSO, "m1")) as ModuloGerado).licoes[licao]!.blocos[bloco]! as { texto?: string; pergunta?: string };
+	return atual.texto ?? atual.pergunta ?? "";
+};
+
+describe("Marcar os termos (marcar_termos)", () => {
+	beforeEach(async () => {
+		ligar();
+		geracaoQueDaCerto();
+		await gerarM1();
+	});
+
+	it("uma chamada por lição com o glossário que cresce; as marcas, o glossário, o evento e o modulo com o glossário na tela", async () => {
+		const chamadasAntes = chamadas.length;
+		respostas.push(TERMOS_L1, TERMOS_L2);
+		acao("marcar_termos", { modulo: "m1", pedido: "mt" });
+		await respondeu("mt");
+		expect(doModulo(comPedido("mt")[0]!.dados as unknown as MensagemEstado, "m1")).toMatchObject({ situacao: "gerado", marcando: { licao: 1, licoes: 2 } });
+		await esperar(async () => (await doVerbo("marcou_termos")).length === 1 && doModulo(ultimo(), "m1")?.marcando === undefined);
+		expect(estados().some((estado) => doModulo(estado, "m1")?.marcando?.licao === 2)).toBe(true);
+
+		expect(chamadas).toHaveLength(chamadasAntes + 2);
+		const primeira = chamadas[chamadasAntes]!;
+		expect(primeira.contexto.systemPrompt).toBe(comMetodo("Marque os termos.", ["termos.md"]));
+		expect((primeira.opcoes as { temperature?: number }).temperature).toBe(0);
+		const mensagem = textoDaChamada(primeira);
+		expect(mensagem).toContain('Lição: l1, "Contando termos"');
+		expect(mensagem).toContain("### l1-b3 · Verificação\nPergunta:\nO que o TF conta?");
+		expect(mensagem).toContain("### l1-b6 · Questão de alternativa\nContexto:\n");
+		expect(mensagem).toContain("Alternativa B:\n2");
+		expect(mensagem).toContain("Glossário do curso: nenhum termo ainda.");
+		// A segunda lição já vê o termo novo da primeira, pelo id.
+		expect(textoDaChamada(chamadas[chamadasAntes + 1]!)).toContain("- t-texto · texto: O conteúdo de um documento.");
+
+		expect((await textoDoBlocoGravado(0, 1)).startsWith("[Texto](termo:t-texto) sobre c-tf.")).toBe(true);
+		expect(await textoDoBlocoGravado(0, 2)).toBe("O que o [TF](termo:t-tf) conta?");
+		expect((await textoDoBlocoGravado(1, 1)).startsWith("[Texto](termo:t-texto) sobre c-idf.")).toBe(true);
+		// A versão dos blocos não muda.
+		expect(((await lerModulo(dados, materia, CURSO, "m1")) as ModuloGerado).licoes.flatMap((licao) => licao.blocos.map((bloco) => bloco.versao ?? 1))).toEqual(Array(11).fill(1));
+		const glossario = await lerGlossario(dados, materia, CURSO);
+		expect(glossario.termos).toMatchObject([
+			{ id: "t-texto", termo: "texto", origem: "anotacao", explicado: { modulo: "m1", licao: "l1", bloco: "l1-b2" } },
+			{ id: "t-tf", termo: "TF", origem: "anotacao", explicado: null },
+		]);
+		const [evento] = await doVerbo("marcou_termos");
+		expect(evento).toMatchObject({ sessao: "sessao-1", objeto: { materia, curso: CURSO, modulo: "m1" }, resultado: { termosNovos: 2, marcas: 3, custo: 0.02 } });
+
+		const final = ultimaModulo();
+		expect(final.pedido).toBeUndefined();
+		expect(final.explicando).toEqual([]);
+		expect(final.glossario).toEqual([
+			expect.objectContaining({ id: "t-texto", lugar: { modulo: "m1", licao: "l1", bloco: "l1-b2", numeroModulo: 1, tituloModulo: "Pesos dos termos", numeroLicao: 1, tituloLicao: "Contando termos" } }),
+			expect.objectContaining({ id: "t-tf", lugar: null }),
+		]);
+		// Toda mensagem modulo leva o glossário (abrir também).
+		acao("abrir", { modulo: "m1" });
+		await esperar(() => recebidas("modulo").length >= 2 && ultimaModulo().glossario.length === 2);
+	});
+
+	it("JSON inválido tem uma nova tentativa; duas vezes inválido é erro sem pedido, sem gravar, e o estado sem marcando", async () => {
+		respostas.push("ruim", TERMOS_L1, "{}", '{"x": 1}');
+		acao("marcar_termos", { modulo: "m1", pedido: "mt" });
+		await respondeu("mt");
+		await esperar(() => recebidas("erro").some((mensagem) => mensagem.dados.ao === "marcar_termos"));
+		const erro = recebidas("erro").find((mensagem) => mensagem.dados.ao === "marcar_termos")!.dados;
+		expect(erro).toMatchObject({ materia, curso: CURSO, modulo: "m1", mensagem: expect.stringContaining("Nenhum termo foi marcado.") });
+		expect(erro.pedido).toBeUndefined();
+		expect(String(erro.mensagem)).toContain("Gasto das lições já marcadas: US$ 0.0200");
+		await esperar(() => doModulo(ultimo(), "m1")?.marcando === undefined);
+		expect(await doVerbo("marcou_termos")).toHaveLength(0);
+		expect((await lerGlossario(dados, materia, CURSO)).termos).toEqual([]);
+		expect(await textoDoBlocoGravado(0, 2)).toBe("O que o TF conta?");
+	});
+
+	it("módulo não gerado, ou já sendo marcado, é erro com o pedido; o fim da sessão cancela sem gravar", async () => {
+		acao("marcar_termos", { modulo: "m2", pedido: "e1" });
+		await respondeu("e1");
+		expect(erroDe("e1")).toMatchObject({ ao: "marcar_termos", modulo: "m2", mensagem: "O módulo m2 ainda não foi gerado." });
+
+		const adiado = adiada();
+		respostas.push(adiado.resposta);
+		const chamadasAntes = chamadas.length;
+		acao("marcar_termos", { modulo: "m1", pedido: "mt" });
+		await respondeu("mt");
+		await esperar(() => chamadas.length > chamadasAntes);
+		acao("marcar_termos", { modulo: "m1", pedido: "e2" });
+		await respondeu("e2");
+		expect(erroDe("e2")?.mensagem).toContain("já estão sendo marcados");
+		const antes = mostrados.length;
+		tratadores.session_shutdown?.({}, ctx);
+		await new Promise((resolver) => setTimeout(resolver, 30));
+		expect(mostrados).toHaveLength(antes);
+		expect(await doVerbo("marcou_termos")).toHaveLength(0);
 	});
 });

@@ -24,7 +24,16 @@ import type { Esqueleto, Modulo as ModuloDoEsqueleto } from "./esqueleto-tipos.t
 import type { Referencia } from "./mapa-tipos.ts";
 import type { AvaliacaoNova, FeedbackModulo, NotasLicao, QuestionariosModulo } from "./modulo-feedback-tipos.ts";
 import type { Progresso, RespostasModulo } from "./modulo-respostas-tipos.ts";
-import { conferirTermosDaLicao, type ExplicacaoPedida, limparMarcasDoBloco, type Termo, type TermoDoModelo, type TermosDaLicao } from "./termos-tipos.ts";
+import {
+	conferirTermosDaLicao,
+	type ExplicacaoPedida,
+	limparMarcasDoBloco,
+	type Termo,
+	type TermoDoModelo,
+	type TermoNaTela,
+	type TermosDaLicao,
+	type TipoExplicacao,
+} from "./termos-tipos.ts";
 
 /** Muda quando o formato do <módulo>.json mudar. */
 export const VERSAO_MODULO = 1;
@@ -327,6 +336,21 @@ export interface AcoesModulos {
 	 * em questionarios; responde com o modulo com o pedido.
 	 */
 	avaliar_licao: { materia: string; curso: string; modulo: string; licao: string; pedido: string; notas: NotasLicao; texto?: string };
+	/**
+	 * "Marcar os termos" num módulo já gerado (docs/termos.md): uma chamada ao
+	 * modelo por lição, fora da trava; o estado com o pedido aceita (com
+	 * marcando) e, no fim, o modulo e o estado sem pedido.
+	 */
+	marcar_termos: { materia: string; curso: string; modulo: string; pedido: string };
+	/**
+	 * Pede a explicação de um trecho selecionado num bloco ("Não sei o que é
+	 * isso", "Explique melhor"): grava o pedido e responde com o modulo com o
+	 * pedido (o id do pedido em explicando); a explicação chega depois num
+	 * modulo sem pedido.
+	 */
+	explicar_trecho: { materia: string; curso: string; modulo: string; licao: string; bloco: string; pedido: string; trecho: string; tipo: TipoExplicacao };
+	/** "Guardar no glossário": o termo do pedido de explicação (o id em `explicacao`) entra no glossário e o trecho ganha a marca; responde com o modulo com o pedido. */
+	guardar_termo: { materia: string; curso: string; modulo: string; pedido: string; explicacao: string };
 }
 
 export type AcaoModulos = keyof AcoesModulos;
@@ -363,6 +387,8 @@ export interface EstadoModuloNaTela {
 	materialNovo?: boolean;
 	/** Em gerado: as questões feitas (pergunta, quiz e dissertativa) de quantas, pelas respostas da versão atual de cada bloco (progressoDoModulo). */
 	progresso?: Progresso;
+	/** Em gerado, enquanto "Marcar os termos" roda (docs/termos.md): a lição sendo marcada, a partir de 1, e quantas o módulo tem. */
+	marcando?: { licao: number; licoes: number };
 }
 
 /** A mensagem "estado" (interface:mostrar, gravar: false), mandada a cada mudança. */
@@ -384,7 +410,16 @@ export interface MensagemModulo {
 	modulo: Modulo;
 	/** Os blocos do módulo cuja resposta está sendo conferida pelo modelo agora, na ordem do módulo (vazio sem nenhum). Vem em toda mensagem modulo. */
 	corrigindo: string[];
-	/** O da tela, quando a mensagem respondeu a responder, corrigir ou encerrar. */
+	/**
+	 * O glossário do curso (docs/termos.md; glossarioNaTela), para os cartões
+	 * dos termos: cada termo com o lugar que vale (o módulo e a lição com o
+	 * número e o título; null: "Não explicado no curso"). Vazio sem glossário
+	 * (ou com ele ilegível). Vem em toda mensagem modulo.
+	 */
+	glossario: TermoNaTela[];
+	/** Os ids dos pedidos de explicação do módulo que o modelo está explicando agora, na ordem de explicacoes (vazio sem nenhum). Vem em toda mensagem modulo. */
+	explicando: string[];
+	/** O da tela, quando a mensagem respondeu a responder, corrigir, encerrar, avaliar_bloco, avaliar_licao, explicar_trecho ou guardar_termo. */
 	pedido?: string;
 }
 
@@ -396,8 +431,10 @@ export interface MensagemErroModulos {
 	materia?: string;
 	curso?: string;
 	modulo?: string;
-	/** Em responder, corrigir, encerrar e avaliar_bloco: o bloco. */
+	/** Em responder, corrigir, encerrar, avaliar_bloco e explicar_trecho: o bloco. */
 	bloco?: string;
+	/** Em explicar_trecho (a explicação que falhou depois de aceita) e guardar_termo: o id do pedido de explicação. */
+	explicacao?: string;
 	pedido?: string;
 }
 

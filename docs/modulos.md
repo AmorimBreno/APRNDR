@@ -188,6 +188,55 @@ A mensagem `modulo` passa a levar `corrigindo` (os blocos em conferência agora,
 
 Os tipos e as funções puras que a tela usa ficam em `profiles/estudos/lib/modulo-respostas-tipos.ts` (a resposta que vale pela versão, a situação da questão, o que mostrar, o placar da dissertativa e o progresso); a gravação e os eventos, em `lib/modulo-respostas.ts`.
 
+## O feedback (parte 3 do plano de 2026-10-28)
+
+Pedido do Breno: dar retorno rápido em cada bloco e, no fim de cada lição, dizer como ela foi, para o professor aprender a ensinar melhor (a parte 4 lê esses retornos). Tudo opcional.
+
+### Feedback em cada bloco
+
+O "Retorno" do pé de cada bloco vira "Feedback" (em todo bloco: explicações, ideia central e questões). Clicar abre, no lugar, três teclas: **Ruim**, **Bom** e **Ótimo**, e um **Detalhar**.
+- Clicar numa nota grava na hora o evento `avaliou_bloco` com `avaliacao` `ruim`, `bom` ou `otimo` (sem motivos nem texto). A tecla escolhida fica marcada, e o pé do bloco mostra a nota dada ("Feedback: Bom") quando o bloco é reaberto. Clicar em outra nota grava outro evento (a nota que vale é a última).
+- "Detalhar" abre o balão de retorno de hoje (docs/escrita.md), com a nota já marcada (Ruim / Bom / Ótimo no lugar de Bom / Precisa melhorar), os motivos, o texto, "Virar regra de escrita", "Salvar retorno" e "Salvar e reescrever o bloco". Salvar grava um `avaliou_bloco` completo; quando ele detalha uma nota já dada no mesmo bloco, o resultado leva `detalha` com o id do evento da nota.
+- As avaliações antigas `melhorar` continuam válidas nos eventos (equivalem a `ruim` na leitura); as novas são só `ruim`, `bom` e `otimo`.
+
+A última nota de cada bloco fica no `<módulo>.json`, em `feedback`, pelo id do bloco: `{avaliacao, versao, em, evento}` (a versão do bloco avaliada: depois de uma reescrita, o bloco novo começa sem nota). Gerar o módulo de novo começa sem nenhuma.
+
+### O questionário do fim da lição
+
+No fim de cada lição (depois do último bloco; na última lição, antes do "Concluir o módulo"), um cartão "Como foi esta lição?", com a linha "Opcional. Ajuda o professor a ajustar o jeito de ensinar." e cinco perguntas fixas do perfil:
+1. `entendimento`: "Você sente que entendeu os conceitos?"
+2. `clareza`: "As explicações estavam claras?"
+3. `exemplos`: "Os exemplos ajudaram a entender?"
+4. `questoes`: "As questões ajudaram a fixar o que foi explicado?"
+5. `ritmo`: "O tamanho e o ritmo da lição foram bons para você?"
+
+Cada pergunta tem, à esquerda, o professor em forma de bolha e, à direita, a pergunta em cima e um slider de 5 níveis: 1 Muito ruim, 2 Ruim, 3 Bom, 4 Ótimo, 5 Excelente, com o nome do nível ao lado. Embaixo do slider, uma barra que enche e esquenta de cor com o nível, e uma chama animada no Excelente.
+
+A bolha (componente do perfil, SVG nosso, inspirado na imagem que o Breno mandou) muda de humor com o slider: 1 chorando (olhos T T e lágrimas), 2 triste, 3 contente (^ ^), 4 animado (> <), 5 maravilhado (olhos de estrela). A cor do corpo acompanha o humor.
+
+As transições são contínuas:
+- o slider anda solto enquanto é arrastado e encaixa no nível mais próximo ao soltar, com uma mola;
+- no meio do caminho, os olhos se misturam: os traços se transformam de um humor no outro com as molas do Motion, em vez de só trocar de opacidade;
+- a cor e o achatamento do corpo também se misturam;
+- a bolha dá um quique ao cruzar um nível.
+
+Com o sistema pedindo menos movimento (`prefers-reduced-motion`), não há quique nem chama animada: a troca é direta.
+
+Uma pergunta não tocada fica sem resposta: a bolha neutra, o nome "—" e o slider apagado no meio. Só as tocadas vão. Há também um campo opcional "Quer dizer mais alguma coisa?" (até 1000 caracteres). "Enviar" fica ligado com pelo menos uma pergunta respondida e grava o evento `avaliou_licao`:
+- objeto `{materia, curso, modulo, licao, conceitos}`;
+- resultado `{notas: {entendimento?: 1-5, …}, texto}`;
+- contexto `{fase: "modulo", modelo, prompts}`, com os prompts que geraram a lição.
+
+Depois de enviado, o cartão recolhe para "Respostas enviadas em dd/mm", com as notas resumidas e "Responder de novo", que grava outro evento quando enviado. A última resposta fica no `<módulo>.json`, em `questionarios`, pelo id da lição: `{notas, texto, em, evento}`.
+
+### Ponte (painel "modulos")
+
+- `avaliar_bloco {materia, curso, modulo, licao, bloco, pedido, avaliacao}` grava a nota rápida e responde com o `modulo`.
+- O `retorno` de hoje aceita `avaliacao` `ruim`, `bom` ou `otimo` e o `detalha` opcional. Ele também grava a nota em `feedback`.
+- `avaliar_licao {materia, curso, modulo, licao, pedido, notas, texto?}` grava o questionário e responde com o `modulo`.
+
+Tudo na trava da matéria, com o arquivo inteiro.
+
 ## O nível de cada conceito
 
 Calculado pelo código a partir do diagnóstico concluído do curso (por enquanto; o perfil do aprendiz é o item 9): `iniciante` (disse "nunca vi" ou "já ouvi falar", ou errou a questão dele), `intermediario` (disse "sei explicar", ou acertou em parte), `domina` (disse "sei aplicar" e acertou); sem questão, vale o que ele disse. O nível escolhe o formato da explicação (9.1: exemplo resolvido completo para iniciante, com passos faltando para intermediário, problema aberto para quem domina; exemplos resolvidos demais atrapalham quem já sabe).

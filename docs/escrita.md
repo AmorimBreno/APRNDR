@@ -28,8 +28,8 @@ Eventos (no `aprendiz/eventos.jsonl`): `criou_regra_escrita`, `alterou_regra_esc
 
 ## 2. Retorno em cada bloco
 
-Na visão do módulo, cada bloco tem "Retorno". O Breno escolhe:
-- a avaliação: `bom` ou `melhorar`;
+Na visão do módulo, cada bloco tem "Feedback" (desde a parte 3 do plano de 2026-10-28; antes, "Retorno"): as notas rápidas Ruim, Bom e Ótimo e o "Detalhar", que abre este retorno (docs/modulos.md, "O feedback"). No retorno detalhado, o Breno escolhe:
+- a avaliação: `ruim`, `bom` ou `otimo` (os eventos antigos têm `bom` ou `melhorar`; `melhorar` vale como `ruim`);
 - os motivos (vários, opcionais): `longo`, `abstrato`, `faltou_exemplo`, `codigo_sem_explicacao`, `pulou_passo`, `repetitivo`, `confuso`, `nivel_errado` (fácil ou difícil demais para ele), `erro` (algo errado no conteúdo);
 - um texto livre (opcional, até 1000 caracteres).
 

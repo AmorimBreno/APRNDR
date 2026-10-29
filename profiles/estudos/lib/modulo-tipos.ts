@@ -24,6 +24,7 @@ import type { Esqueleto, Modulo as ModuloDoEsqueleto } from "./esqueleto-tipos.t
 import type { Referencia } from "./mapa-tipos.ts";
 import type { AvaliacaoNova, FeedbackModulo, NotasLicao, QuestionariosModulo } from "./modulo-feedback-tipos.ts";
 import type { Progresso, RespostasModulo } from "./modulo-respostas-tipos.ts";
+import type { ExplicacaoPedida } from "./termos-tipos.ts";
 
 /** Muda quando o formato do <módulo>.json mudar. */
 export const VERSAO_MODULO = 1;
@@ -276,6 +277,13 @@ export interface ModuloGerado extends ModuloBase {
 	feedback?: FeedbackModulo;
 	/** O último questionário de cada lição, pelo id da lição ("O questionário do fim da lição"). Gerar de novo começa sem eles. */
 	questionarios?: QuestionariosModulo;
+	/**
+	 * Os pedidos de explicação de um trecho ("Não sei o que é isso", "Explique
+	 * melhor"), na ordem (docs/termos.md; termos-tipos.ts). Só aparece depois
+	 * do primeiro. Gerar de novo começa sem nenhum; a reescrita de um bloco e
+	 * as respostas os mantêm.
+	 */
+	explicacoes?: ExplicacaoPedida[];
 }
 
 /** O <módulo>.json. */

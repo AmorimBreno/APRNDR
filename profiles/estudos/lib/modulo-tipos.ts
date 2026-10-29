@@ -22,6 +22,7 @@ import {
 } from "./diagnostico-tipos.ts";
 import type { Esqueleto, Modulo as ModuloDoEsqueleto } from "./esqueleto-tipos.ts";
 import type { Referencia } from "./mapa-tipos.ts";
+import type { AvaliacaoNova, FeedbackModulo, NotasLicao, QuestionariosModulo } from "./modulo-feedback-tipos.ts";
 import type { Progresso, RespostasModulo } from "./modulo-respostas-tipos.ts";
 
 /** Muda quando o formato do <módulo>.json mudar. */
@@ -265,6 +266,16 @@ export interface ModuloGerado extends ModuloBase {
 	 * pela versão).
 	 */
 	respostas?: RespostasModulo;
+	/**
+	 * A última nota de cada bloco, pelo id do bloco (docs/modulos.md, "O
+	 * feedback"; modulo-feedback-tipos.ts), com a versão do bloco avaliada.
+	 * Só aparece depois da primeira nota. Gerar de novo começa sem ele; a
+	 * reescrita de um bloco o mantém (a nota do bloco reescrito fica sem
+	 * valor pela versão).
+	 */
+	feedback?: FeedbackModulo;
+	/** O último questionário de cada lição, pelo id da lição ("O questionário do fim da lição"). Gerar de novo começa sem eles. */
+	questionarios?: QuestionariosModulo;
 }
 
 /** O <módulo>.json. */
@@ -297,6 +308,17 @@ export interface AcoesModulos {
 	corrigir: { materia: string; curso: string; modulo: string; pedido: string; bloco: string };
 	/** "Ver a resposta-modelo": a dissertativa corrigida passa a encerrada (encerrarQuestao). */
 	encerrar: { materia: string; curso: string; modulo: string; pedido: string; bloco: string };
+	/**
+	 * A nota rápida de um bloco (docs/modulos.md, "O feedback"): grava o
+	 * avaliou_bloco (sem motivos nem texto) e a nota em feedback; responde com
+	 * o modulo com o pedido.
+	 */
+	avaliar_bloco: { materia: string; curso: string; modulo: string; licao: string; bloco: string; pedido: string; avaliacao: AvaliacaoNova };
+	/**
+	 * O questionário do fim da lição: grava o avaliou_licao e o questionário
+	 * em questionarios; responde com o modulo com o pedido.
+	 */
+	avaliar_licao: { materia: string; curso: string; modulo: string; licao: string; pedido: string; notas: NotasLicao; texto?: string };
 }
 
 export type AcaoModulos = keyof AcoesModulos;
@@ -361,12 +383,12 @@ export interface MensagemModulo {
 /** A mensagem "erro". */
 export interface MensagemErroModulos {
 	mensagem: string;
-	/** A ação que falhou (listar, gerar, aguardar, concluir, responder, corrigir, encerrar…). */
+	/** A ação que falhou (listar, gerar, aguardar, concluir, responder, corrigir, encerrar, avaliar_bloco, avaliar_licao…). */
 	ao?: string;
 	materia?: string;
 	curso?: string;
 	modulo?: string;
-	/** Em responder, corrigir e encerrar: o bloco da questão. */
+	/** Em responder, corrigir, encerrar e avaliar_bloco: o bloco. */
 	bloco?: string;
 	pedido?: string;
 }

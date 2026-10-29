@@ -9,6 +9,7 @@
 // sem mexer no que receberam.
 
 import { ErroCurso } from "./curso-tipos.ts";
+import { type AvaliacaoBloco, ehAvaliacaoGravada } from "./modulo-feedback-tipos.ts";
 import type { Bloco, BlocoAnterior, BlocoSemId, Modulo, ModuloGerado } from "./modulo-tipos.ts";
 import { versaoDoBloco } from "./modulo-tipos.ts";
 
@@ -75,11 +76,20 @@ export type OrigemDaRegra = { origem: "escrita" } | { origem: "retorno"; retorno
 
 // --- Retorno em cada bloco -----------------------------------------------------------
 
-export const AVALIACOES_BLOCO = ["bom", "melhorar"] as const;
-export type AvaliacaoBloco = (typeof AVALIACOES_BLOCO)[number];
-
-/** Os nomes que a tela mostra. */
-export const NOMES_AVALIACAO: Record<AvaliacaoBloco, string> = { bom: "Bom", melhorar: "Precisa melhorar" };
+// As avaliações (desde a parte 3 do plano de 2026-10-28: ruim, bom e otimo;
+// a antiga melhorar vale como ruim na leitura) ficam em
+// modulo-feedback-tipos.ts, com o feedback rápido; daqui elas são reexportadas.
+export {
+	AVALIACOES_ANTIGAS,
+	AVALIACOES_BLOCO,
+	type AvaliacaoAntiga,
+	type AvaliacaoBloco,
+	type AvaliacaoNova,
+	avaliacaoLida,
+	ehAvaliacaoBloco,
+	ehAvaliacaoGravada,
+	NOMES_AVALIACAO,
+} from "./modulo-feedback-tipos.ts";
 
 /** Os motivos de um retorno (vários, opcionais), na ordem em que a tela mostra. */
 export const MOTIVOS_RETORNO = ["longo", "abstrato", "faltou_exemplo", "codigo_sem_explicacao", "pulou_passo", "repetitivo", "confuso", "nivel_errado", "erro"] as const;
@@ -98,7 +108,6 @@ export const NOMES_MOTIVO: Record<MotivoRetorno, string> = {
 	erro: "Algo errado",
 };
 
-export const ehAvaliacaoBloco = (valor: unknown): valor is AvaliacaoBloco => (AVALIACOES_BLOCO as readonly unknown[]).includes(valor);
 export const ehMotivoRetorno = (valor: unknown): valor is MotivoRetorno => (MOTIVOS_RETORNO as readonly unknown[]).includes(valor);
 
 /** O retorno conferido (validarRetorno). */
@@ -140,10 +149,13 @@ export interface AcoesModulosEscrita {
 		licao: string;
 		bloco: string;
 		pedido: string;
+		/** ruim, bom ou otimo; a extensão recusa a antiga melhorar (o tipo ainda a aceita por causa da tela de antes da parte 3). */
 		avaliacao: AvaliacaoBloco;
 		motivos: MotivoRetorno[];
 		texto?: string;
 		virarRegra?: { texto: string; materia: string | null };
+		/** O id do avaliou_bloco da nota rápida (avaliar_bloco) do mesmo bloco que este retorno detalha. */
+		detalha?: string;
 	};
 	/** Gera de novo só aquele bloco; o estado do módulo mostra reescrevendo enquanto isso e, no fim, vai a mensagem modulo. */
 	reescrever_bloco: {
@@ -235,14 +247,16 @@ export function secaoDasRegras(regras: readonly Pick<RegraEscrita, "texto">[]): 
 }
 
 /**
- * Confere o retorno que a tela mandou: a avaliação (bom ou melhorar); os
+ * Confere o retorno que a tela mandou: a avaliação (ruim, bom ou otimo e,
+ * por enquanto, a antiga melhorar: a tela de antes da parte 3 ainda confere
+ * por aqui; a extensão recusa a antiga em registrarRetorno); os
  * motivos (opcionais) só dos conhecidos, sem repetir, na ordem; o texto
  * (opcional) aparado, até 1000 caracteres; e, com virarRegra, o texto e a
  * matéria da regra pelas regras de validarRegra. Fora disso, ErroEscrita.
  */
 export function validarRetorno(entrada: unknown): RetornoBloco {
 	if (!ehObjeto(entrada)) throw new ErroEscrita("O retorno não veio no formato (avaliação, motivos e texto).");
-	if (!ehAvaliacaoBloco(entrada.avaliacao)) throw new ErroEscrita(`A avaliação do bloco não é válida ("${mostrar(entrada.avaliacao)}"): é bom ou melhorar.`);
+	if (!ehAvaliacaoGravada(entrada.avaliacao)) throw new ErroEscrita(`A avaliação do bloco não é válida ("${mostrar(entrada.avaliacao)}"): é ruim, bom ou otimo.`);
 	const lista = entrada.motivos ?? [];
 	if (!Array.isArray(lista)) throw new ErroEscrita("Os motivos do retorno não vieram numa lista.");
 	const motivos: MotivoRetorno[] = [];

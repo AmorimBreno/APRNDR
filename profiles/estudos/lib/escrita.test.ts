@@ -109,13 +109,17 @@ describe("secaoDasRegras", () => {
 
 describe("validarRetorno", () => {
 	it("avaliação, motivos sem repetir na ordem, texto aparado; virarRegra conferida", () => {
-		expect(validarRetorno({ avaliacao: "melhorar", motivos: ["longo", "confuso", "longo"], texto: "  Muito longo.  " })).toEqual({ avaliacao: "melhorar", motivos: ["longo", "confuso"], texto: "Muito longo." });
+		expect(validarRetorno({ avaliacao: "ruim", motivos: ["longo", "confuso", "longo"], texto: "  Muito longo.  " })).toEqual({ avaliacao: "ruim", motivos: ["longo", "confuso"], texto: "Muito longo." });
 		expect(validarRetorno({ avaliacao: "bom" })).toEqual({ avaliacao: "bom", motivos: [], texto: "" });
-		expect(validarRetorno({ avaliacao: "melhorar", virarRegra: { texto: " Mais curto. ", materia: "calc" } }).virarRegra).toEqual({ texto: "Mais curto.", materia: "calc" });
+		expect(validarRetorno({ avaliacao: "otimo" })).toEqual({ avaliacao: "otimo", motivos: [], texto: "" });
+		expect(validarRetorno({ avaliacao: "ruim", virarRegra: { texto: " Mais curto. ", materia: "calc" } }).virarRegra).toEqual({ texto: "Mais curto.", materia: "calc" });
+		// A antiga ainda passa aqui (a tela de antes da parte 3 confere por esta função); a extensão a recusa em registrarRetorno.
+		expect(validarRetorno({ avaliacao: "melhorar" }).avaliacao).toBe("melhorar");
 	});
 
 	it("avaliação, motivo ou texto inválido, regra sem texto: erro", () => {
-		expect(() => validarRetorno({ avaliacao: "otimo" })).toThrow(/avaliação/);
+		expect(() => validarRetorno({ avaliacao: "excelente" })).toThrow(/avaliação/);
+		expect(() => validarRetorno({})).toThrow(/ruim, bom ou otimo/);
 		expect(() => validarRetorno({ avaliacao: "bom", motivos: ["chato"] })).toThrow(/desconhecido/);
 		expect(() => validarRetorno({ avaliacao: "bom", motivos: "longo" })).toThrow(/lista/);
 		expect(() => validarRetorno({ avaliacao: "bom", texto: "a".repeat(1001) })).toThrow(/1001/);
@@ -320,7 +324,7 @@ describe("no disco", () => {
 		bloco: "l1-b1",
 		tipo: "explicacao" as const,
 		conceitos: ["c-a"],
-		avaliacao: "melhorar",
+		avaliacao: "ruim",
 		motivos: ["longo", "abstrato"],
 		texto: " Longo e sem exemplo. ",
 		modelo: MODELO,
@@ -340,11 +344,21 @@ describe("no disco", () => {
 			sessao: "s1",
 			verbo: "avaliou_bloco",
 			objeto: { materia: MATERIA, curso: CURSO, modulo: "m1", licao: "l1", bloco: "l1-b1", tipo: "explicacao", conceitos: ["c-a"] },
-			resultado: { avaliacao: "melhorar", motivos: ["longo", "abstrato"], texto: "Longo e sem exemplo." },
+			resultado: { avaliacao: "ruim", motivos: ["longo", "abstrato"], texto: "Longo e sem exemplo." },
 			contexto: { modelo: MODELO, prompt: { nome: "modulo-licao.md", hash: "abc" }, versao: 1 },
 		});
 		expect(eventos[1]).toMatchObject({ resultado: { avaliacao: "bom", motivos: [], texto: "" }, contexto: { modelo: MODELO, versao: 2 } });
 		expect(eventos[1]!.contexto).not.toHaveProperty("prompt");
+		expect(eventos[1]!.resultado).not.toHaveProperty("detalha");
+	});
+
+	it("registrarRetorno com detalha: o id da nota que ele detalha vai no resultado", async () => {
+		const nota = await registrarRetorno(dados, dadosRetorno({ avaliacao: "otimo", motivos: [], texto: "" }), { agora: AGORA });
+		const detalhe = await registrarRetorno(dados, dadosRetorno({ avaliacao: "otimo", motivos: [], texto: "Gostei do exemplo.", detalha: nota.retorno }), { agora: DEPOIS });
+		const eventos = await doAprendiz();
+		expect(eventos.map((evento) => evento.id)).toEqual([nota.retorno, detalhe.retorno]);
+		expect(eventos[1]!.resultado).toEqual({ avaliacao: "otimo", motivos: [], texto: "Gostei do exemplo.", detalha: nota.retorno });
+		await expect(registrarRetorno(dados, dadosRetorno({ detalha: 42 }))).rejects.toThrow(/detalha/);
 		expect(await lerEscrita(dados)).toEqual({ versao: 1, regras: [] });
 	});
 
@@ -360,7 +374,9 @@ describe("no disco", () => {
 	});
 
 	it("registrarRetorno inválido (avaliação, matéria da regra, limite): erro e nenhum evento", async () => {
-		await expect(registrarRetorno(dados, dadosRetorno({ avaliacao: "otimo" }))).rejects.toThrow(/avaliação/);
+		await expect(registrarRetorno(dados, dadosRetorno({ avaliacao: "excelente" }))).rejects.toThrow(/avaliação/);
+		// A antiga "melhorar" só vale nos eventos já gravados: um retorno novo com ela é erro.
+		await expect(registrarRetorno(dados, dadosRetorno({ avaliacao: "melhorar" }))).rejects.toThrow(/ruim, bom ou otimo/);
 		await expect(registrarRetorno(dados, dadosRetorno({ virarRegra: { texto: "x", materia: "outra" } }))).rejects.toThrow(/matéria do bloco/);
 		await expect(registrarRetorno(dados, dadosRetorno({ bloco: "" }))).rejects.toThrow(/sem bloco/);
 		await expect(registrarRetorno(dados, dadosRetorno({ tipo: "video" }))).rejects.toThrow(/tipo do bloco/);

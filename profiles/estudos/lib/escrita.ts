@@ -16,6 +16,7 @@ import type { PromptUsado } from "./diagnostico.ts";
 import {
 	type ArquivoEscrita,
 	conferirLimite,
+	ehAvaliacaoBloco,
 	type EntradaRegra,
 	ErroEscrita,
 	ORIGENS_REGRA,
@@ -243,13 +244,17 @@ export interface DadosRetorno {
 	modelo: string;
 	/** O nome e o hash do prompt que gerou o bloco, quando se sabe. */
 	prompt?: PromptUsado | null;
+	/** O id do avaliou_bloco (a nota rápida) do mesmo bloco que este retorno detalha; quem chama confere que é do bloco. */
+	detalha?: string | null;
 }
 
 /**
  * Grava o retorno do Breno num bloco (docs/escrita.md, "Retorno em cada
  * bloco"): o evento avaliou_bloco no aprendiz/eventos.jsonl, com objeto
  * {materia, curso, modulo, licao, bloco, tipo, conceitos}, resultado
- * {avaliacao, motivos, texto} e contexto {modelo, prompt?, versao}. Com
+ * {avaliacao, motivos, texto, detalha?} e contexto {modelo, prompt?, versao}.
+ * A avaliação é uma das novas (ruim, bom ou otimo): a antiga melhorar só
+ * vale nos eventos já gravados. Com
  * virarRegra, cria também a regra (salvarRegra, ativa, origem "retorno" com o
  * id do evento); o limite de regras é conferido antes de gravar o evento.
  * Devolve o id do evento (o que o reescrever_bloco manda de volta) e a regra
@@ -261,6 +266,8 @@ export async function registrarRetorno(dados: string, entrada: DadosRetorno, con
 	}
 	if (!ehTipoBloco(entrada.tipo)) throw new ErroEscrita(`O tipo do bloco não é válido ("${String(entrada.tipo)}").`);
 	if (!Array.isArray(entrada.conceitos) || !entrada.conceitos.every((id) => typeof id === "string")) throw new ErroEscrita("Os conceitos do bloco não vieram numa lista de ids.");
+	if (!ehAvaliacaoBloco(entrada.avaliacao)) throw new ErroEscrita(`A avaliação do bloco não é válida ("${String(entrada.avaliacao)}"): é ruim, bom ou otimo.`);
+	if (entrada.detalha !== undefined && entrada.detalha !== null && (typeof entrada.detalha !== "string" || !entrada.detalha)) throw new ErroEscrita("O detalha do retorno não é o id de um evento.");
 	const retorno = validarRetorno({ avaliacao: entrada.avaliacao, motivos: entrada.motivos, texto: entrada.texto, virarRegra: entrada.virarRegra });
 	if (retorno.virarRegra && retorno.virarRegra.materia !== null && retorno.virarRegra.materia !== entrada.materia) {
 		throw new ErroEscrita("A regra criada de um retorno vale para todas as matérias ou só para a matéria do bloco.");
@@ -283,7 +290,7 @@ export async function registrarRetorno(dados: string, entrada: DadosRetorno, con
 				tipo: entrada.tipo,
 				conceitos: [...entrada.conceitos],
 			},
-			resultado: { avaliacao: retorno.avaliacao, motivos: retorno.motivos, texto: retorno.texto },
+			resultado: { avaliacao: retorno.avaliacao, motivos: retorno.motivos, texto: retorno.texto, ...(entrada.detalha ? { detalha: entrada.detalha } : {}) },
 			contexto: {
 				modelo: entrada.modelo,
 				...(entrada.prompt ? { prompt: { nome: entrada.prompt.nome, hash: entrada.prompt.hash } } : {}),

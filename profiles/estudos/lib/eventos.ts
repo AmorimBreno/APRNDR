@@ -57,6 +57,8 @@ export type VerboEvento =
 	| "apagou_regra_escrita"
 	| "avaliou_bloco"
 	| "reescreveu_bloco"
+	// O questionário do fim da lição: docs/modulos.md, "O feedback". Também no aprendiz/eventos.jsonl.
+	| "avaliou_licao"
 	// Aprendizagem (seção 9.2), usados a partir dos itens 7 e 8:
 	| "pediu_reexplicacao"
 	| "pediu_outro_jeito"

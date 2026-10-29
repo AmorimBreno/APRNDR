@@ -81,6 +81,10 @@ function moduloLido(valor: unknown, materia: string, curso: string, modulo: stri
 		throw new Error("o concluidoEm não é um texto");
 	} else if (valor.respostas !== undefined && !ehObjeto(valor.respostas)) {
 		throw new Error("as respostas não são um objeto");
+	} else if (valor.feedback !== undefined && !ehObjeto(valor.feedback)) {
+		throw new Error("o feedback não é um objeto");
+	} else if (valor.questionarios !== undefined && !ehObjeto(valor.questionarios)) {
+		throw new Error("os questionarios não são um objeto");
 	}
 	return moduloNaOrdem(valor as unknown as Modulo);
 }
@@ -105,6 +109,9 @@ function moduloNaOrdem(modulo: Modulo): Modulo {
 		...(modulo.concluidoEm ? { concluidoEm: modulo.concluidoEm } : {}),
 		// As respostas das questões (modulo-respostas-tipos.ts) ficam: a reescrita de um bloco e o concluir gravam o módulo com elas.
 		...(modulo.respostas && Object.keys(modulo.respostas).length > 0 ? { respostas: modulo.respostas } : {}),
+		// O feedback de cada bloco e os questionários das lições (modulo-feedback-tipos.ts) também ficam.
+		...(modulo.feedback && Object.keys(modulo.feedback).length > 0 ? { feedback: modulo.feedback } : {}),
+		...(modulo.questionarios && Object.keys(modulo.questionarios).length > 0 ? { questionarios: modulo.questionarios } : {}),
 	};
 }
 

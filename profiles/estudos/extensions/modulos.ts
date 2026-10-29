@@ -104,8 +104,22 @@ import { objetoJsonDoModelo } from "../lib/json-do-modelo.ts";
 import { ErroMapa, lerMapa, PAINEL_MAPA } from "../lib/mapa.ts";
 import { arquivoMateria, ErroMaterias, eventosAprendiz, eventosMateria } from "../lib/materias.ts";
 import {
+	type ExplicadoDeNovo,
+	type Glossario,
+	gravarGlossario,
+	incorporarTermosDaLicao,
+	juntarNoDisco,
+	LIMITE_GLOSSARIO_MENSAGEM,
+	lerGlossario,
+	linhaDoGlossario,
+	type Termo,
+	termosParaMensagem,
+	trocarMarcasNasLicoes,
+} from "../lib/termos.ts";
+import {
 	type AcoesModulos,
 	ARQUIVO_ESTRUTURA_LICAO,
+	ARQUIVO_TERMOS,
 	arquivoDeMetodo,
 	arquivosDeMetodo,
 	type Bloco,
@@ -405,6 +419,22 @@ export function mensagemDoPlano(entrada: EntradaPlano, regras = ""): string {
 /** A seção das regras de escrita, quando há (sem regras, nada). */
 const comRegras = (regras: string) => (regras.trim() ? [regras.trim()] : []);
 
+/**
+ * A seção do glossário do curso nas mensagens (docs/termos.md): os termos
+ * que cabem em uns 8 mil caracteres (termosParaMensagem: os dos `conceitos`
+ * da chamada primeiro), um por linha (linhaDoGlossario), e quantos ficaram
+ * de fora. Sem termo, a frase que diz que o glossário está vazio.
+ */
+export function secaoDoGlossario(termos: readonly Termo[], conceitos: readonly string[], limite: number = LIMITE_GLOSSARIO_MENSAGEM): string {
+	if (termos.length === 0) return "Glossário do curso: nenhum termo ainda.";
+	const escolhidos = termosParaMensagem(termos, conceitos, limite);
+	const fora = termos.length - escolhidos.length;
+	return [
+		`Glossário do curso (${termos.length} ${termos.length === 1 ? "termo" : "termos"}, os já explicados no curso: marque-os com o id deles, sem explicar de novo${fora > 0 ? `; ${fora} de fora por falta de espaço` : ""}):`,
+		...escolhidos.map(linhaDoGlossario),
+	].join("\n");
+}
+
 /** Os trechos do material de um conceito, como vão para o modelo da lição e da reescrita do bloco. */
 function linhasDosTrechos(trechos: TrechosDoConceito["trechos"]): string[] {
 	if (trechos.length === 0) return ["Trechos do material: nenhum trecho do material cita este conceito."];
@@ -420,10 +450,11 @@ function linhasDosTrechos(trechos: TrechosDoConceito["trechos"]): string[] {
  * A mensagem do modelo de uma lição (docs/modulos.md, "A geração", 3): o
  * curso, o módulo, o formulário, o plano inteiro, a lição com o roteiro e os
  * conceitos dela com o nível e, nos escopos com material, os trechos do
- * .extraido citados por eles. Com `regras`, a seção das regras de escrita no
- * fim, como no plano.
+ * .extraido citados por eles; o glossário do curso (secaoDoGlossario, com os
+ * termos dos conceitos da lição primeiro; o da geração, que cresce a cada
+ * lição). Com `regras`, a seção das regras de escrita no fim, como no plano.
  */
-export function mensagemDaLicao(entrada: EntradaLicao, regras = ""): string {
+export function mensagemDaLicao(entrada: EntradaLicao, regras = "", glossario: readonly Termo[] = []): string {
 	const comMaterial = entrada.curso.escopo !== "livre";
 	const plano = entrada.plano.map(
 		(licao, indice) =>
@@ -446,6 +477,7 @@ export function mensagemDaLicao(entrada: EntradaLicao, regras = ""): string {
 			`Roteiro (${licao.roteiro.length} blocos, nesta ordem): ${licao.roteiro.map((tipo, indice) => `${indice + 1}. ${tipo}`).join("; ")}`,
 		].join("\n"),
 		`Conceitos da lição (${blocos.length}):\n\n${blocos.join("\n\n")}`,
+		secaoDoGlossario(glossario, licao.conceitos),
 		...comRegras(regras),
 	].join("\n\n");
 }
@@ -474,6 +506,8 @@ export interface EntradaBloco {
 	trechos: TrechosDoConceito[];
 	/** O nome de um conceito pelo id (os conceitos da lição na mensagem). */
 	nomeDe?: (id: string) => string;
+	/** O glossário do curso (docs/termos.md): a reescrita mantém as marcas e só usa ids dele. */
+	glossario?: readonly Termo[];
 }
 
 /** Os campos que o código põe num bloco (o id e as versões): ficam fora do bloco mandado ao modelo. */
@@ -534,6 +568,7 @@ export function mensagemDoBloco(entrada: EntradaBloco, regras = ""): string {
 			`Texto do aluno: ${retorno.texto || "(não escreveu)"}`,
 		].join("\n"),
 		`Conceitos do bloco (${conceitos.length}):\n\n${conceitos.join("\n\n")}`,
+		secaoDoGlossario(entrada.glossario ?? [], atual.conceitos),
 		...comRegras(regras),
 	].join("\n\n");
 }
@@ -1139,12 +1174,14 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 			// As regras de escrita que valem para a matéria, lidas uma vez (as mesmas no plano e em todas as lições).
 			const regras = await regrasDaMateria(dados, materia);
 
-			const escopo = await naTrava(materia, async () => {
+			const { escopo, glossario: glossarioInicial } = await naTrava(materia, async () => {
 				const atual = await lerCurso(dados, materia, curso);
 				const { situacoes, concluidos } = await situacoesDoCurso(dados, materia, curso);
 				podeGerar(atual, situacoes, modulo, concluidos);
 				// Um arquivo ilegível no lugar é ErroModulo (gravarModuloGerado também recusaria no fim).
 				await lerModulo(dados, materia, curso, modulo);
+				// O glossário do curso (docs/termos.md): um ilegível também impede a geração, antes de gastar.
+				const glossario = await lerGlossario(dados, materia, curso);
 				if (materiaisNovos.length > 0) {
 					const prontos = new Set((await materiaisProntos(dados, materia)).map((item) => item.arquivo));
 					const faltam = materiaisNovos.filter((nome) => !prontos.has(nome));
@@ -1158,7 +1195,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 				erros.delete(chaveModulo);
 				avisos.delete(chaveModulo);
 				await mostrarEstado(dados, materia, curso, pedido);
-				return atual.objetivo?.escopo;
+				return { escopo: atual.objetivo?.escopo, glossario };
 			});
 
 			if (materiaisNovos.length > 0) {
@@ -1216,21 +1253,34 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 				return metodoLicoes.filter((item) => arquivos.includes(item.arquivo));
 			};
 			const licoes: Licao[] = [];
+			// O glossário da geração (docs/termos.md): o do disco mais os termos novos das lições já escritas,
+			// para as seguintes os reusarem pelo id. É juntado ao do disco só no fim (juntarNoDisco).
+			let glossarioDaGeracao: Glossario = glossarioInicial;
+			const termosNovos: Termo[] = [];
+			const reexplicados: ExplicadoDeNovo[] = [];
 			for (const [indice, entradaLicao] of entradas.entries()) {
 				if (sinal.aborted) throw new Cancelado();
 				geracao.situacao = "escrevendo";
 				geracao.licao = indice + 1;
 				geracao.licoes = entradas.length;
 				await mostrarNaTrava(dados, materia, curso, "gerar");
+				const doGlossario = glossarioDaGeracao.termos;
 				const escrita = await pedirJson(
 					registro,
 					modeloLicao,
 					instrucoesComMetodo(promptLicao.instrucoes, metodoDe(entradaLicao.licao.roteiro)),
-					mensagemDaLicao(entradaLicao, regras),
+					mensagemDaLicao(entradaLicao, regras, doGlossario),
 					(texto, tentativa) => {
 						const lido = objetoJsonDoModelo(texto);
 						try {
-							return validarLicao(lido, { licao: entradaLicao.licao, trechos: entradaLicao.referencias, escopo: entradaLicao.curso.escopo }).licao;
+							// Na segunda tentativa, um termo que não vale sai, em vez de derrubar a lição.
+							return validarLicao(lido, {
+								licao: entradaLicao.licao,
+								trechos: entradaLicao.referencias,
+								escopo: entradaLicao.curso.escopo,
+								glossario: doGlossario,
+								rigidoNosTermos: tentativa === 1,
+							});
 						} catch (erro) {
 							// Fora do esquema (ou sem explicação ou prática): a nova tentativa leva os problemas; na segunda, o erro como está.
 							if (erro instanceof ErroModulo && tentativa === 1) throw new PedirDeNovo(`${erro.message}\n\n${PEDIDO_DA_LICAO_DE_NOVO}`);
@@ -1246,7 +1296,13 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 					},
 				);
 				custo += escrita.custo;
-				licoes.push(escrita.resultado);
+				// Os termos novos ganham os ids e entram no glossário da geração; as marcas novo-n viram os ids.
+				const { termos } = escrita.resultado;
+				const incorporado = incorporarTermosDaLicao(glossarioDaGeracao, escrita.resultado.licao, termos.novos, { modulo, agora: new Date() });
+				termosNovos.push(...incorporado.glossario.termos.slice(glossarioDaGeracao.termos.length));
+				glossarioDaGeracao = incorporado.glossario;
+				for (const item of termos.reexplicados) reexplicados.push({ id: item.id, explicado: { modulo, licao: incorporado.licao.id, bloco: item.bloco } });
+				licoes.push(incorporado.licao);
 			}
 
 			await naTrava(materia, async () => {
@@ -1254,13 +1310,18 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 				if (geracoes.get(chave) === geracao) geracoes.delete(chave);
 				if (geracao.aviso) avisos.set(chaveModulo, geracao.aviso);
 				const modelo = promptPlano.modelo === promptLicao.modelo ? promptPlano.modelo : `${promptPlano.modelo} (plano) e ${promptLicao.modelo} (lições)`;
+				// Os termos da geração juntados ao glossário do disco (que pode ter mudado nesse meio-tempo):
+				// as marcas seguem as trocas de id; o glossário é gravado depois do módulo.
+				const juntado = await juntarNoDisco(dados, materia, curso, { novos: termosNovos, reexplicados }, { agora: new Date(), moduloRegerado: modulo });
+				const comTrocas = Object.keys(juntado.trocas).length > 0 ? trocarMarcasNasLicoes(licoes, (id) => juntado.trocas[id] ?? id) : licoes;
 				await gravarModuloGerado(
 					dados,
 					materia,
 					curso,
-					{ id: modulo, licoes, pedido: doPedido, modelo, custo, materiaisUsados: comLicoes.materiaisUsados },
+					{ id: modulo, licoes: comTrocas, pedido: doPedido, modelo, custo, materiaisUsados: comLicoes.materiaisUsados },
 					{ ...daSessao(), modelo, prompts: [promptPlano.usado, promptLicao.usado, ...metodoUsado([...metodoPlano, ...metodoLicoes])] },
 				);
+				if (juntado.mudou) await gravarGlossario(dados, materia, curso, juntado.glossario);
 				await mostrarEstado(dados, materia, curso);
 			});
 		} catch (erro) {
@@ -1438,17 +1499,19 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 				if (objeto.materia !== materia || objeto.curso !== curso || objeto.modulo !== modulo || objeto.licao !== licao || objeto.bloco !== bloco) {
 					throw new ErroEscrita(`O retorno "${retornoId}" é de outro bloco (${objeto.modulo}, ${objeto.bloco}); a reescrita usa um retorno do próprio bloco.`);
 				}
+				// O glossário do curso (docs/termos.md): a reescrita mantém as marcas e só usa ids dele.
+				const glossario = await lerGlossario(dados, materia, curso);
 				reescrita.aceita = true;
 				await mostrarEstado(dados, materia, curso, pedido);
-				return { curso: atual, modulo: lido, licao: daLicao, bloco: doBloco, retorno: retorno.resultado };
+				return { curso: atual, modulo: lido, licao: daLicao, bloco: doBloco, retorno: retorno.resultado, glossario };
 			});
 
 			// A entrada: a lição com só os conceitos do bloco, para os trechos virem deles (como na lição).
 			if (sinal.aborted) throw new Cancelado();
 			const conceitosDoBloco = alvo.bloco.conceitos.filter((id) => alvo.licao.conceitos.includes(id));
 			const naEntrada = { id: alvo.licao.id, titulo: alvo.licao.titulo, objetivo: alvo.licao.objetivo, conceitos: conceitosDoBloco, roteiro: roteiroDaLicao(alvo.licao) };
-			// O arquivo da metodologia do tipo do bloco (a explicação pelo formato).
-			const metodo = await lerMetodo(pastaMetodo, [arquivoDeMetodo(itemDoRoteiro(alvo.bloco))]);
+			// O arquivo da metodologia do tipo do bloco (a explicação pelo formato) e o dos termos-chave.
+			const metodo = await lerMetodo(pastaMetodo, [arquivoDeMetodo(itemDoRoteiro(alvo.bloco)), ARQUIVO_TERMOS]);
 			const entrada = await entradaDoModelo(dados, materia, alvo.curso, modulo, { pedido: alvo.modulo.pedido, plano: [naEntrada] });
 			const doBloco = entrada.licoes?.[0];
 			if (!doBloco) throw new ErroModulo("Não consegui montar a entrada da reescrita do bloco.");
@@ -1464,6 +1527,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 					conceitos: doBloco.conceitos,
 					trechos: doBloco.trechos,
 					nomeDe: (id) => nomes.get(id) ?? id,
+					glossario: alvo.glossario.termos,
 				},
 				regras,
 			);
@@ -1478,6 +1542,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 						trechos: doBloco.referencias,
 						escopo: entrada.plano.curso.escopo,
 						tipo: alvo.bloco.tipo,
+						glossario: alvo.glossario.termos,
 					}),
 				sinal,
 				{

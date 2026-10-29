@@ -10,9 +10,10 @@ Você recebe:
 - o plano inteiro do módulo (as lições, com título, objetivo, conceitos e roteiro), para você não repetir o que as outras lições fazem;
 - a lição a escrever: o título, o objetivo, os conceitos e o roteiro;
 - os conceitos da lição: o id, o nome, a descrição, a prioridade e o nível do aluno (iniciante, intermediário ou domina);
-- quando o curso usa material, os trechos do material que tratam dos conceitos da lição, cada um com o arquivo e o local.
+- quando o curso usa material, os trechos do material que tratam dos conceitos da lição, cada um com o arquivo e o local;
+- o glossário do curso: os termos-chave já explicados no curso, cada um com o id, o termo e a definição.
 
-Depois deste prompt vem a metodologia: a estrutura da lição e, para cada tipo de bloco do roteiro, como escrevê-lo. Siga-a em todos os blocos.
+Depois deste prompt vem a metodologia: a estrutura da lição, para cada tipo de bloco do roteiro, como escrevê-lo, e os termos-chave. Siga-a em todos os blocos.
 
 ## Os blocos
 
@@ -31,6 +32,16 @@ Depois deste prompt vem a metodologia: a estrutura da lição e, para cada tipo 
 - Referências: na explicação e nas questões (alternativa e dissertativa), "referencias" lista os locais dos trechos em que o bloco se apoia, com "arquivo" e "local" copiados exatamente da lista de trechos recebida (letra por letra, como em <trecho arquivo="…" local="…">). Não invente locais nem cite um trecho que não está na lista. Sem trecho em que se apoiar, "referencias": []. A pergunta e a ideia central não têm referências.
 - O motivo do aluno e o formulário mandam. Se pedem algo sobre o conteúdo ou a forma (por exemplo, "use os exercícios como base para as questões práticas"), siga. Nesse exemplo, as questões partem dos exercícios do material: adaptados, com outros números ou outra situação, e com a referência do exercício.
 
+## Os termos-chave
+
+- Marque os termos-chave no texto com um link de esquema "termo": `[radicais](termo:t-radical)`. O texto do link são as palavras da frase, como elas aparecem (plural, conjugação); depois de "termo:" vem o id.
+- Um termo do glossário recebido leva o id dele, copiado exatamente.
+- Um termo novo desta lição leva uma chave: novo-1, novo-2…, na ordem em que aparecem (`[radical](termo:novo-1)`). Cada termo novo vai em "termos", com a chave, o termo na forma de dicionário (singular, sem artigo, até 80 caracteres), a definição (de 1 a 2 frases, até 300 caracteres, markdown simples, sem bloco de código), o conceito da lição a que ele pertence (o id, ou null) e "explicadoEm": a posição, a partir de 1, do bloco da lista "blocos" que explica o termo (uma explicação: introdução, conceito ou exemplo).
+- O bloco de "explicadoEm" vem antes da primeira marca do termo, ou é o mesmo bloco. O código confere: um termo marcado antes do bloco que o explica faz a lição voltar para ser escrita de novo.
+- A marca vale no texto da explicação e da ideia central, na pergunta, e no contexto, no enunciado, nas alternativas e na explicação das questões. Não marque a resposta esperada, as confusões, a rubrica nem a resposta-modelo.
+- Nunca marque dentro de código (em linha ou em bloco), de fórmula ou de outro link.
+- Uma marca para um id que não está no glossário nem em "termos" vira texto comum.
+
 ## Formatação
 
 - O texto é markdown. Código nunca vai como texto comum: um trecho de código vai num bloco com a linguagem (```python numa linha, o código nas linhas seguintes e ``` numa linha sozinha no fim); `código em linha` (entre crases) só para nomes curtos (uma variável, uma função, um parâmetro). Nas alternativas, o código curto também vai em `código em linha`.
@@ -43,7 +54,7 @@ Depois deste prompt vem a metodologia: a estrutura da lição e, para cada tipo 
 
 As "Regras de escrita do Breno" da mensagem, quando houver, valem acima das orientações gerais de estilo deste prompt e da metodologia (mas não acima do formato do JSON e das regras das referências): obedeça a todas, sempre.
 
-Responda só com o JSON abaixo, sem texto antes ou depois e sem comentários. Uma entrada em "blocos" por item do roteiro, na ordem do roteiro:
+Responda só com o JSON abaixo, sem texto antes ou depois e sem comentários. Uma entrada em "blocos" por item do roteiro, na ordem do roteiro, e em "termos" os termos novos da lição (uma lista vazia quando não há):
 
 {"blocos": [
   {"tipo": "explicacao", "conceitos": ["<id>"], "formato": "introducao", "texto": "…markdown…", "referencias": [{"arquivo": "…", "local": "…"}]},
@@ -62,6 +73,9 @@ Responda só com o JSON abaixo, sem texto antes ou depois e sem comentários. Um
     {"criterio": "…", "descricao": "…", "pontos": 2},
     {"criterio": "…", "descricao": "…", "pontos": 2}
   ], "respostaModelo": "…", "referencias": []}
+],
+"termos": [
+  {"chave": "novo-1", "termo": "…", "definicao": "…", "conceito": "<id>", "explicadoEm": 2}
 ]}
 
 "formato" é um de "introducao", "conceito", "exemplo_resolvido", "exemplo_incompleto" ou "problema_aberto". "complemento" só aparece (true) na explicação que vai além do material. "enunciado" é obrigatório em toda questão; "contexto" é opcional. A alternativa correta leva só "texto" e "correta": true; cada errada leva "texto" e "confusao".

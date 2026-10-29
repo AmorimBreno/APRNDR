@@ -14,6 +14,7 @@ import { confirmarEtapa, type Curso, gravarCurso, novoCurso } from "../lib/curso
 import type { Diagnostico } from "../lib/diagnostico.ts";
 import { calcularCalendario, type Modulo as ModuloDoEsqueleto } from "../lib/esqueleto.ts";
 import { arquivoEscrita, lerEscrita, type RegraEscrita, salvarRegra } from "../lib/escrita.ts";
+import { gravarGlossario, lerGlossario } from "../lib/termos.ts";
 import { acrescentarEvento, criarEvento, lerEventos } from "../lib/eventos.ts";
 import { type Conceito, gravarMapa, lerMapa, mapaVazio, pastaExtraidoArquivo } from "../lib/mapa.ts";
 import { criarMateria, eventosAprendiz, eventosMateria } from "../lib/materias.ts";
@@ -414,7 +415,7 @@ describe("ponte", () => {
 		// O plano leva a estrutura da lição; cada lição, a estrutura e os arquivos dos itens do roteiro dela.
 		expect(chamadas[0]!.contexto.systemPrompt).toBe(comMetodo("Planeje as lições.", ["estrutura-da-licao.md"]));
 		expect(chamadas[1]!.contexto.systemPrompt).toBe(
-			comMetodo("Escreva a lição.", ["estrutura-da-licao.md", "introducao.md", "conceito.md", "exemplos.md", "pergunta.md", "ideia-central.md", "quiz.md"]),
+			comMetodo("Escreva a lição.", ["estrutura-da-licao.md", "introducao.md", "conceito.md", "exemplos.md", "pergunta.md", "ideia-central.md", "quiz.md", "termos.md"]),
 		);
 		expect(plano).toContain("Lições pedidas: exatamente 2.");
 		expect(plano).toContain("Motivo do aluno: Use os exercícios como base para as questões práticas.");
@@ -423,7 +424,7 @@ describe("ponte", () => {
 		expect(plano).toContain("Nível do aluno: intermediário (exemplo no formato exemplo_incompleto");
 		expect(plano).toContain("- aula.pdf, página 2");
 		const licao2 = textoDaChamada(chamadas[2]!);
-		expect(chamadas[2]!.contexto.systemPrompt).toBe(comMetodo("Escreva a lição.", ["estrutura-da-licao.md", "introducao.md", "conceito.md", "exemplos.md", "ideia-central.md", "dissertativa.md"]));
+		expect(chamadas[2]!.contexto.systemPrompt).toBe(comMetodo("Escreva a lição.", ["estrutura-da-licao.md", "introducao.md", "conceito.md", "exemplos.md", "ideia-central.md", "dissertativa.md", "termos.md"]));
 		expect(licao2).toContain("Roteiro (5 blocos, nesta ordem): 1. introducao; 2. conceito; 3. exemplo_incompleto; 4. ideia_central; 5. dissertativa");
 		expect(licao2).toContain('Lição a escrever: l2, "Termos raros pesam mais"');
 		expect(licao2).toContain('1. l1, "Contando termos"');
@@ -921,7 +922,7 @@ async function retornoNoB1(pedido = "r1", extra: Record<string, unknown> = {}): 
 }
 
 /** O prompt da reescrita com a metodologia da introdução (o l1-b1), como o reescreveu_bloco o guarda. */
-const PROMPT_BLOCO_COM_INTRODUCAO = () => ({ nome: "modulo-bloco.md + metodo/introducao.md", hash: `${hashDoPrompt(PROMPT_BLOCO)} + ${hashDoPrompt(METODO["introducao.md"]!)}` });
+const PROMPT_BLOCO_COM_INTRODUCAO = () => ({ nome: "modulo-bloco.md + metodo/introducao.md + metodo/termos.md", hash: `${hashDoPrompt(PROMPT_BLOCO)} + ${hashDoPrompt(METODO["introducao.md"]!)} + ${hashDoPrompt(METODO["termos.md"]!)}` });
 
 const reescrever = (pedido: string, retorno: string, bloco = "l1-b1") => acao("reescrever_bloco", { modulo: "m1", licao: "l1", bloco, pedido, retorno });
 
@@ -989,7 +990,7 @@ describe("retorno e reescrita do bloco", () => {
 		// A mensagem: a lição com os outros blocos, o bloco atual, o retorno, o nível e os trechos do conceito do bloco.
 		const pedido = chamadas.at(-1)!;
 		// O system prompt leva o arquivo da metodologia do tipo do bloco (l1-b1 é a introdução).
-		expect(pedido.contexto.systemPrompt).toBe(comMetodo("Reescreva o bloco.", ["introducao.md"]));
+		expect(pedido.contexto.systemPrompt).toBe(comMetodo("Reescreva o bloco.", ["introducao.md", "termos.md"]));
 		const mensagem = textoDaChamada(pedido);
 		expect(mensagem).toContain('Lição do bloco: l1, "Contando termos"');
 		expect(mensagem).toContain("### l1-b1 · Explicação (posição 1): ESTE É O BLOCO A REESCREVER");
@@ -1043,13 +1044,13 @@ describe("retorno e reescrita do bloco", () => {
 		reescrever("w1", id, "l1-b5");
 		await respondeu("w1");
 		await reescritoNa("l1-b5");
-		expect(chamadas.at(-1)!.contexto.systemPrompt).toBe(comMetodo("Reescreva o bloco.", ["ideia-central.md"]));
+		expect(chamadas.at(-1)!.contexto.systemPrompt).toBe(comMetodo("Reescreva o bloco.", ["ideia-central.md", "termos.md"]));
 		expect(textoDaChamada(chamadas.at(-1)!)).toContain("### l1-b5 · Ideia central (posição 5): ESTE É O BLOCO A REESCREVER");
 		const bloco = ((await lerModulo(dados, materia, CURSO, "m1")) as ModuloGerado).licoes[0]!.blocos[4]!;
 		expect(bloco).toMatchObject({ id: "l1-b5", tipo: "ideia_central", texto: "O TF conta as ocorrências do termo no documento.", versao: 2 });
 		const [evento] = await doAprendiz("reescreveu_bloco");
 		expect(evento!.contexto).toMatchObject({
-			prompt: { nome: "modulo-bloco.md + metodo/ideia-central.md", hash: `${hashDoPrompt(PROMPT_BLOCO)} + ${hashDoPrompt(METODO["ideia-central.md"]!)}` },
+			prompt: { nome: "modulo-bloco.md + metodo/ideia-central.md + metodo/termos.md", hash: `${hashDoPrompt(PROMPT_BLOCO)} + ${hashDoPrompt(METODO["ideia-central.md"]!)} + ${hashDoPrompt(METODO["termos.md"]!)}` },
 		});
 	});
 
@@ -1418,7 +1419,7 @@ describe("responder as questões", () => {
 		expect(respostaNa(moduloDoPedido("q3"), "l1-b6")).toMatchObject({ versao: 2, confianca: 1, tentativas: [{ escolha: 0, correta: false }] });
 		const eventos = await doAprendiz("respondeu_questao");
 		expect(eventos.map((evento) => evento.contexto?.versao)).toEqual([1, 2]);
-		expect(eventos[1]!.contexto).toMatchObject({ prompt: { nome: "modulo-bloco.md + metodo/quiz.md" } });
+		expect(eventos[1]!.contexto).toMatchObject({ prompt: { nome: "modulo-bloco.md + metodo/quiz.md + metodo/termos.md" } });
 	});
 
 	it("concluir o módulo mantém as respostas, e ler_modulo continua lendo", async () => {
@@ -1658,5 +1659,97 @@ describe("o feedback", () => {
 		expect(novo).not.toHaveProperty("questionarios");
 		expect(await doAprendiz("avaliou_bloco")).toHaveLength(1);
 		expect(await doAprendiz("avaliou_licao")).toHaveLength(1);
+	});
+});
+
+// --- Os termos-chave (docs/termos.md) ----------------------------------------------------------
+
+/** Um texto de explicação acima do mínimo, começando por `comeco` (com as marcas). */
+const textoCom = (comeco: string) => `${comeco} ${"x".repeat(MINIMO_CARACTERES_EXEMPLO)}`;
+/** A lição 1 com um termo novo (contagem), marcado no conceito que o explica e na pergunta. */
+const LICAO_1_COM_TERMO = (antes = false) =>
+	JSON.stringify({
+		blocos: [
+			{ ...explicacao("c-tf", "introducao", "página 1"), texto: textoCom(antes ? "A [contagem](termo:novo-1) importa." : "A contagem importa.") },
+			{ ...explicacao("c-tf", "conceito", "página 1"), texto: textoCom("Uma [contagem](termo:novo-1) é o número de ocorrências; o [x](termo:t-x) some.") },
+			{ tipo: "verificacao", conceitos: ["c-tf"], pergunta: "O que a [contagem](termo:novo-1) mede?", respostaEsperada: "As ocorrências." },
+			explicacao("c-tf", "exemplo_resolvido", "página 1"),
+			ideiaCentral("c-tf"),
+			alternativa("c-tf"),
+		],
+		termos: [{ chave: "novo-1", termo: "contagem", definicao: "O número de vezes que o termo aparece.", conceito: "c-tf", explicadoEm: 2 }],
+	});
+/** A lição 2 reusa o termo da lição 1 pelo id. */
+const LICAO_2_COM_TERMO = JSON.stringify({
+	blocos: [
+		explicacao("c-idf", "introducao", "página 2"),
+		{ ...explicacao("c-idf", "conceito", "página 2"), texto: textoCom("Diferente da [contagem](termo:t-contagem), o IDF olha a coleção.") },
+		explicacao("c-idf", "exemplo_incompleto", "página 2"),
+		ideiaCentral("c-idf"),
+		dissertativa("c-idf"),
+	],
+	termos: [],
+});
+
+const textoDoBloco = (modulo: ModuloGerado, licao: number, bloco: number) => {
+	const atual = modulo.licoes[licao]!.blocos[bloco]! as { texto?: string; pergunta?: string };
+	return atual.texto ?? atual.pergunta ?? "";
+};
+
+describe("os termos-chave na geração e na reescrita", () => {
+	beforeEach(() => ligar());
+
+	it("a lição leva o glossário da geração; os termos novos ganham id, as marcas também, e o glossário é gravado", async () => {
+		await gravarGlossario(dados, materia, CURSO, { versao: 1, termos: [{ id: "t-peso", termo: "peso", definicao: "Quanto o termo vale.", conceito: "c-idf", explicado: null, origem: "geracao", criadoEm: AGORA.toISOString(), alteradoEm: AGORA.toISOString() }] });
+		respostas.push(PLANO_M1, LICAO_1_COM_TERMO(), LICAO_2_COM_TERMO);
+		await gerarM1();
+		expect(situacaoDe("m1")).toBe("gerado");
+		const primeira = textoDaChamada(chamadas[1]!);
+		expect(primeira).toContain("Glossário do curso (1 termo, os já explicados no curso: marque-os com o id deles, sem explicar de novo):\n- t-peso · peso: Quanto o termo vale.");
+		// A lição 2 já vê o termo da lição 1, pelo id.
+		expect(textoDaChamada(chamadas[2]!)).toContain("- t-contagem · contagem: O número de vezes que o termo aparece.");
+
+		const gravado = (await lerModulo(dados, materia, CURSO, "m1")) as ModuloGerado;
+		expect(textoDoBloco(gravado, 0, 1).startsWith("Uma [contagem](termo:t-contagem) é o número de ocorrências; o x some.")).toBe(true);
+		expect(textoDoBloco(gravado, 0, 2)).toBe("O que a [contagem](termo:t-contagem) mede?");
+		expect(textoDoBloco(gravado, 1, 1).startsWith("Diferente da [contagem](termo:t-contagem)")).toBe(true);
+		const glossario = await lerGlossario(dados, materia, CURSO);
+		expect(glossario.termos.map((termo) => termo.id)).toEqual(["t-peso", "t-contagem"]);
+		expect(glossario.termos[1]).toMatchObject({ termo: "contagem", conceito: "c-tf", explicado: { modulo: "m1", licao: "l1", bloco: "l1-b2" }, origem: "geracao" });
+	});
+
+	it("um termo usado antes de explicado pede a lição de novo com o problema; na segunda, as marcas antes viram texto", async () => {
+		respostas.push(PLANO_M1, LICAO_1_COM_TERMO(true), LICAO_1_COM_TERMO(true), LICAO_2_COM_TERMO);
+		await gerarM1();
+		expect(situacaoDe("m1")).toBe("gerado");
+		expect(chamadas).toHaveLength(4);
+		expect(textoDaChamada(chamadas[2]!)).toContain('O termo "contagem" (novo-1) é usado no bloco 1 antes de ser explicado no bloco 2');
+		const gravado = (await lerModulo(dados, materia, CURSO, "m1")) as ModuloGerado;
+		expect(textoDoBloco(gravado, 0, 0).startsWith("A contagem importa.")).toBe(true);
+		expect(textoDoBloco(gravado, 0, 1).startsWith("Uma [contagem](termo:t-contagem)")).toBe(true);
+	});
+
+	it("um glossário ilegível impede a geração antes de chamar o modelo, com o pedido", async () => {
+		await mkdir(join(dados, "materias", materia, "cursos", CURSO), { recursive: true });
+		await writeFile(join(dados, "materias", materia, "cursos", CURSO, "glossario.json"), "{x", "utf8");
+		acao("gerar", { modulo: "m1", pedido: "g1" });
+		await respondeu("g1");
+		expect(erroDe("g1")).toMatchObject({ ao: "gerar", mensagem: expect.stringContaining("Não consegui ler o glossário") });
+		expect(chamadas).toHaveLength(0);
+	});
+
+	it("a reescrita leva o glossário, mantém as marcas do glossário e desfaz as outras", async () => {
+		respostas.push(PLANO_M1, LICAO_1_COM_TERMO(), LICAO_2_COM_TERMO);
+		await gerarM1();
+		const id = await retornoNoB1();
+		respostas.push(
+			JSON.stringify({ bloco: { ...JSON.parse(EXPLICACAO_NOVA).bloco, formato: "introducao", texto: textoCom("A [contagem](termo:t-contagem) e o [lema](termo:novo-1).") } }),
+		);
+		reescrever("w1", id);
+		await respondeu("w1");
+		await reescritoNa("l1-b1");
+		expect(textoDaChamada(chamadas.at(-1)!)).toContain("- t-contagem · contagem:");
+		const gravado = (await lerModulo(dados, materia, CURSO, "m1")) as ModuloGerado;
+		expect(textoDoBloco(gravado, 0, 0).startsWith("A [contagem](termo:t-contagem) e o lema.")).toBe(true);
 	});
 });

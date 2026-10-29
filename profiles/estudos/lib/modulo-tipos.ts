@@ -24,7 +24,7 @@ import type { Esqueleto, Modulo as ModuloDoEsqueleto } from "./esqueleto-tipos.t
 import type { Referencia } from "./mapa-tipos.ts";
 import type { AvaliacaoNova, FeedbackModulo, NotasLicao, QuestionariosModulo } from "./modulo-feedback-tipos.ts";
 import type { Progresso, RespostasModulo } from "./modulo-respostas-tipos.ts";
-import type { ExplicacaoPedida } from "./termos-tipos.ts";
+import { conferirTermosDaLicao, type ExplicacaoPedida, limparMarcasDoBloco, type Termo, type TermoDoModelo, type TermosDaLicao } from "./termos-tipos.ts";
 
 /** Muda quando o formato do <módulo>.json mudar. */
 export const VERSAO_MODULO = 1;
@@ -451,6 +451,13 @@ export interface ResultadoLicao {
 		rubrica?: Array<{ criterio: string; descricao?: string; pontos: number }>;
 		respostaModelo?: string;
 	}>;
+	/**
+	 * Os termos novos da lição (docs/termos.md, "Na geração das lições"): a
+	 * chave das marcas [texto](termo:novo-1), o termo, a definição, o conceito
+	 * e a posição (a partir de 1) do bloco de explicação que o explica.
+	 * Conferidos por validarLicao (conferirTermosDaLicao).
+	 */
+	termos?: TermoDoModelo[];
 }
 
 /** Uma lição do plano depois de validarPlano: com o id dado pelo código e o roteiro consertado pelo esquema da lição. */
@@ -788,6 +795,9 @@ export function problemasDaLicao(blocos: readonly Bloco[]): string[] {
 /** O arquivo da estrutura da lição (profiles/estudos/metodo/), que o plano e cada lição carregam. */
 export const ARQUIVO_ESTRUTURA_LICAO = "estrutura-da-licao.md";
 
+/** O arquivo dos termos-chave (docs/termos.md), que toda lição, a reescrita de um bloco, "Marcar os termos" e a explicação de um trecho carregam. */
+export const ARQUIVO_TERMOS = "termos.md";
+
 /** Os arquivos da metodologia (docs/modulos.md, "A metodologia em arquivos"), na ordem em que arquivosDeMetodo os devolve. */
 export const ARQUIVOS_METODO = [
 	ARQUIVO_ESTRUTURA_LICAO,
@@ -798,6 +808,7 @@ export const ARQUIVOS_METODO = [
 	"ideia-central.md",
 	"quiz.md",
 	"dissertativa.md",
+	ARQUIVO_TERMOS,
 ] as const;
 export type ArquivoMetodo = (typeof ARQUIVOS_METODO)[number];
 
@@ -814,11 +825,12 @@ export function arquivoDeMetodo(item: ItemRoteiro): ArquivoMetodo {
 
 /**
  * Os arquivos da metodologia que a chamada de uma lição carrega: a estrutura
- * da lição e os dos itens do roteiro (arquivoDeMetodo), sem repetir, na ordem
- * de ARQUIVOS_METODO. Itens que não são do roteiro são ignorados.
+ * da lição, os dos itens do roteiro (arquivoDeMetodo) e os termos-chave
+ * (docs/termos.md), sem repetir, na ordem de ARQUIVOS_METODO. Itens que não
+ * são do roteiro são ignorados.
  */
 export function arquivosDeMetodo(roteiro: readonly unknown[]): ArquivoMetodo[] {
-	const usados = new Set<ArquivoMetodo>([ARQUIVO_ESTRUTURA_LICAO]);
+	const usados = new Set<ArquivoMetodo>([ARQUIVO_ESTRUTURA_LICAO, ARQUIVO_TERMOS]);
 	for (const item of roteiro) if (ehItemRoteiro(item)) usados.add(arquivoDeMetodo(item));
 	return ARQUIVOS_METODO.filter((arquivo) => usados.has(arquivo));
 }
@@ -1150,20 +1162,42 @@ function lerBloco(item: unknown, permitidos: ReadonlySet<string>, trechos: reado
  * frases que dizem ao modelo o que corrigir e os descartes (a extensão tenta
  * a lição de novo, uma vez). As lições gravadas antes do esquema não passam
  * por aqui: continuam válidas para ler.
+ *
+ * Os termos (docs/termos.md; conferirTermosDaLicao, com o `glossario` do
+ * curso): as marcas para um termo fora do glossário e de "termos" viram
+ * texto (conserto); um termo novo que não vale ou usado antes do bloco que o
+ * explica é problema da lição, como os do esquema, com `rigidoNosTermos`
+ * (padrão; a extensão passa false na segunda tentativa, e aí o termo sai ou
+ * as marcas antes da explicação viram texto). Um termo novo igual a um do
+ * glossário vira o do glossário. As marcas dos termos novos continuam com a
+ * chave (novo-1…): incorporarTermosDaLicao dá os ids.
  */
 export function validarLicao(
 	resultado: unknown,
-	opcoes: { licao: Pick<LicaoPlanejada, "id" | "titulo" | "objetivo" | "conceitos">; trechos: readonly Referencia[]; escopo: Escopo },
-): { licao: Licao; descartes: string[] } {
+	opcoes: {
+		licao: Pick<LicaoPlanejada, "id" | "titulo" | "objetivo" | "conceitos">;
+		trechos: readonly Referencia[];
+		escopo: Escopo;
+		glossario?: readonly Pick<Termo, "id" | "termo">[];
+		rigidoNosTermos?: boolean;
+	},
+): { licao: Licao; descartes: string[]; termos: TermosDaLicao } {
 	const { licao } = opcoes;
 	if (!ehObjeto(resultado) || !Array.isArray(resultado.blocos)) throw new ErroModulo(`O modelo não devolveu a lista de blocos da lição ${licao.id} (falta "blocos").`);
 	const permitidos = new Set(licao.conceitos);
 	const blocos: BlocoSemId[] = [];
 	const descartes: string[] = [];
+	/** Para cada bloco do modelo, o índice dele nos blocos que ficaram (undefined: descartado). */
+	const posicoes: Array<number | undefined> = [];
 	for (const [indice, item] of (resultado.blocos as unknown[]).entries()) {
 		const lido = lerBloco(item, permitidos, opcoes.trechos, opcoes.escopo);
-		if ("motivo" in lido) descartes.push(`bloco ${indice + 1}: ${lido.motivo}`);
-		else blocos.push(lido.bloco);
+		if ("motivo" in lido) {
+			descartes.push(`bloco ${indice + 1}: ${lido.motivo}`);
+			posicoes.push(undefined);
+		} else {
+			posicoes.push(blocos.length);
+			blocos.push(lido.bloco);
+		}
 	}
 	const faltas: string[] = [];
 	if (!blocos.some((bloco) => bloco.tipo === "explicacao")) faltas.push("explicação");
@@ -1173,7 +1207,13 @@ export function validarLicao(
 		throw new ErroModulo(`A lição ${licao.id} ("${licao.titulo}") veio sem ${faltas.join(" e sem ")} que valha.${motivos}`);
 	}
 	const comIds = blocos.map((bloco, indice) => ({ id: `${licao.id}-b${indice + 1}`, ...structuredClone(bloco) }) as Bloco);
-	const problemas = problemasDaLicao(comIds);
+	const conferidos = conferirTermosDaLicao(comIds, resultado.termos, {
+		glossario: opcoes.glossario ?? [],
+		conceitos: licao.conceitos,
+		posicoes,
+		rigido: opcoes.rigidoNosTermos ?? true,
+	});
+	const problemas = [...problemasDaLicao(conferidos.blocos), ...conferidos.problemas];
 	if (problemas.length > 0) {
 		const motivos = descartes.length > 0 ? ` Descartados: ${descartes.join("; ")}.` : "";
 		throw new ErroModulo(`A lição ${licao.id} ("${licao.titulo}") não segue o esquema da lição. ${problemas.join(" ")}${motivos}`);
@@ -1184,9 +1224,10 @@ export function validarLicao(
 			titulo: licao.titulo,
 			objetivo: licao.objetivo,
 			conceitos: [...licao.conceitos],
-			blocos: comIds,
+			blocos: conferidos.blocos,
 		},
 		descartes,
+		termos: conferidos.termos,
 	};
 }
 
@@ -1201,10 +1242,14 @@ export function validarLicao(
  * solto ou dentro de {"bloco": {...}}. Devolve o bloco sem id (substituirBloco
  * mantém o do antigo). Um bloco que não vale, curto demais ou de outro tipo
  * que `tipo` é ErroModulo com o motivo (a extensão tenta de novo, uma vez).
+ * As marcas de termo (docs/termos.md) seguem as regras da lição
+ * (limparMarcasDoBloco): só para um id do `glossario` (a reescrita não cria
+ * termo novo), só nos textos onde a marca vale e uma por termo; as outras
+ * viram texto.
  */
 export function validarBloco(
 	resultado: unknown,
-	opcoes: { licao: Pick<LicaoPlanejada, "id" | "conceitos">; trechos: readonly Referencia[]; escopo: Escopo; tipo: TipoBloco },
+	opcoes: { licao: Pick<LicaoPlanejada, "id" | "conceitos">; trechos: readonly Referencia[]; escopo: Escopo; tipo: TipoBloco; glossario?: readonly Pick<Termo, "id">[] },
 ): BlocoSemId {
 	const item = ehObjeto(resultado) && ehObjeto(resultado.bloco) ? resultado.bloco : resultado;
 	if (!ehObjeto(item)) throw new ErroModulo(`O modelo não devolveu o bloco da lição ${opcoes.licao.id}.`);
@@ -1215,7 +1260,8 @@ export function validarBloco(
 		const problema = problemaDoTamanho(lido.bloco, "do bloco reescrito");
 		if (problema) throw new ErroModulo(problema);
 	}
-	return structuredClone(lido.bloco);
+	const doGlossario = new Set((opcoes.glossario ?? []).map((termo) => termo.id));
+	return limparMarcasDoBloco(structuredClone(lido.bloco), (id) => doGlossario.has(id)).bloco;
 }
 
 // --- Resumo ----------------------------------------------------------------------------

@@ -10,9 +10,16 @@ Você recebe:
 - o bloco a reescrever, no formato JSON em que ele está gravado;
 - o retorno do aluno sobre esse bloco: a avaliação (Ruim, Bom ou Ótimo), os motivos marcados e o texto que ele escreveu;
 - os conceitos do bloco: o id, o nome, a descrição, a prioridade e o nível do aluno (iniciante, intermediário ou domina) e, quando o curso usa material, os trechos do material que tratam deles, cada um com o arquivo e o local;
+- o glossário do curso: os termos-chave já explicados no curso, cada um com o id, o termo e a definição;
 - quando houver, as "Regras de escrita do Breno".
 
-Depois deste prompt vem a metodologia do tipo do bloco: como escrevê-lo. O bloco novo segue a metodologia e corrige o que o retorno aponta.
+Depois deste prompt vem a metodologia do tipo do bloco (como escrevê-lo) e a dos termos-chave. O bloco novo segue a metodologia e corrige o que o retorno aponta.
+
+## Os termos-chave
+
+- O texto marca os termos-chave do glossário com um link de esquema "termo": `[radicais](termo:t-radical)`, com as palavras da frase como elas aparecem e o id do glossário copiado exatamente. Mantenha as marcas do bloco atual e marque a primeira ocorrência de cada termo do glossário no bloco novo (uma por termo).
+- Só ids do glossário recebido: a reescrita não cria termo novo. Um termo técnico que o glossário não tem é explicado no próprio bloco, sem marca.
+- A marca vale no texto da explicação e da ideia central, na pergunta, e no contexto, no enunciado, nas alternativas e na explicação das questões; nunca dentro de código, de fórmula ou de outro link. Uma marca para um id que não está no glossário vira texto comum.
 
 ## O que fazer
 

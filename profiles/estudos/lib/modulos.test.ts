@@ -412,7 +412,7 @@ describe("violacoesDoEsquema", () => {
 });
 
 describe("arquivosDeMetodo", () => {
-	it("a estrutura e os arquivos dos itens do roteiro, sem repetir, na ordem fixa", () => {
+	it("a estrutura, os arquivos dos itens do roteiro e os termos, sem repetir, na ordem fixa", () => {
 		expect(arquivosDeMetodo(["introducao", "conceito", "exemplo_resolvido", "verificacao", "conceito", "problema_aberto", "verificacao", "ideia_central", "alternativa", "dissertativa"])).toEqual([
 			"estrutura-da-licao.md",
 			"introducao.md",
@@ -422,10 +422,11 @@ describe("arquivosDeMetodo", () => {
 			"ideia-central.md",
 			"quiz.md",
 			"dissertativa.md",
+			"termos.md",
 		]);
-		expect(arquivosDeMetodo(["dissertativa", "ideia_central", "conceito", "introducao", "exemplo_incompleto"])).toEqual(["estrutura-da-licao.md", "introducao.md", "conceito.md", "exemplos.md", "ideia-central.md", "dissertativa.md"]);
-		expect(arquivosDeMetodo([])).toEqual(["estrutura-da-licao.md"]);
-		expect(arquivosDeMetodo(["lixo", "explicacao", 3])).toEqual(["estrutura-da-licao.md"]);
+		expect(arquivosDeMetodo(["dissertativa", "ideia_central", "conceito", "introducao", "exemplo_incompleto"])).toEqual(["estrutura-da-licao.md", "introducao.md", "conceito.md", "exemplos.md", "ideia-central.md", "dissertativa.md", "termos.md"]);
+		expect(arquivosDeMetodo([])).toEqual(["estrutura-da-licao.md", "termos.md"]);
+		expect(arquivosDeMetodo(["lixo", "explicacao", 3])).toEqual(["estrutura-da-licao.md", "termos.md"]);
 		expect(ARQUIVOS_METODO[0]).toBe(ARQUIVO_ESTRUTURA_LICAO);
 	});
 
@@ -642,6 +643,53 @@ describe("caracteresDaLicao e frasesDoTexto", () => {
 		expect(frasesDoTexto("")).toBe(0);
 		expect(frasesDoTexto("Sem ponto final")).toBe(1);
 		expect(frasesDoTexto("O R² vale 0.85 aqui. Por quê? Porque sim!  E mais…\nFim.")).toBe(5);
+	});
+});
+
+describe("validarLicao e validarBloco: os termos-chave (docs/termos.md)", () => {
+	const opcoes = { licao: LICAO, trechos: TRECHOS, escopo: "material_base" as const };
+	const GLOSSARIO = [{ id: "t-reta", termo: "reta" }];
+	const comMarcas = () => [
+		introducao({ texto: texto(MINIMO_CARACTERES_INTRODUCAO + 100, "A [reta](termo:t-reta) e o [x](termo:t-x). ") }),
+		conceito({ texto: texto(MINIMO_CARACTERES_CONCEITO + 100, "Um [resíduo](termo:novo-1) é a distância até a reta. ") }),
+		explicacao(),
+		verificacao({ pergunta: "O [resíduo](termo:novo-1)?" }),
+		ideiaCentral(),
+		questaoAlternativa(),
+	];
+	const resíduo = { chave: "novo-1", termo: "resíduo", definicao: "A distância de um ponto até a reta.", conceito: "c-a", explicadoEm: 2 };
+
+	it("os termos novos com o bloco que os explica; as marcas desconhecidas viram texto; as dos novos ficam com a chave", () => {
+		const { licao, termos } = validarLicao({ blocos: comMarcas(), termos: [resíduo] }, { ...opcoes, glossario: GLOSSARIO });
+		expect(termos.novos).toEqual([{ chave: "novo-1", termo: "resíduo", definicao: "A distância de um ponto até a reta.", conceito: "c-a", bloco: "l2-b2" }]);
+		expect((licao.blocos[0] as { texto: string }).texto.startsWith("A [reta](termo:t-reta) e o x. ")).toBe(true);
+		expect((licao.blocos[3] as { pergunta: string }).pergunta).toBe("O [resíduo](termo:novo-1)?");
+		// Sem glossário (a chamada de antes), as marcas do glossário também viram texto.
+		expect((validarLicao({ blocos: comMarcas(), termos: [resíduo] }, opcoes).licao.blocos[0] as { texto: string }).texto.startsWith("A reta e o x. ")).toBe(true);
+	});
+
+	it("o termo usado antes de explicado é problema da lição (junto dos do esquema); sem rigidoNosTermos, as marcas antes viram texto", () => {
+		const blocos = comMarcas();
+		blocos[0] = introducao({ texto: texto(MINIMO_CARACTERES_INTRODUCAO + 100, "Os [resíduos](termo:novo-1) aparecem. ") });
+		expect(() => validarLicao({ blocos, termos: [resíduo] }, { ...opcoes, glossario: GLOSSARIO })).toThrow(
+			'não segue o esquema da lição. O termo "resíduo" (novo-1) é usado no bloco 1 antes de ser explicado no bloco 2',
+		);
+		const brando = validarLicao({ blocos, termos: [resíduo] }, { ...opcoes, glossario: GLOSSARIO, rigidoNosTermos: false });
+		expect((brando.licao.blocos[0] as { texto: string }).texto.startsWith("Os resíduos aparecem. ")).toBe(true);
+		expect(brando.termos.consertos.some((frase) => frase.includes("viraram texto"))).toBe(true);
+	});
+
+	it("o explicadoEm segue as posições do modelo, mesmo com um bloco descartado antes", () => {
+		const blocos: unknown[] = comMarcas();
+		blocos.splice(1, 0, { tipo: "desconhecido", conceitos: ["c-a"] });
+		const { termos, descartes } = validarLicao({ blocos, termos: [{ ...resíduo, explicadoEm: 3 }] }, { ...opcoes, glossario: GLOSSARIO });
+		expect(descartes).toEqual(['bloco 2: tipo desconhecido ("desconhecido")']);
+		expect(termos.novos[0]!.bloco).toBe("l2-b2");
+	});
+
+	it("validarBloco: só as marcas do glossário ficam (uma por termo; fora do lugar viram texto)", () => {
+		const bloco = verificacao({ pergunta: "A [reta](termo:t-reta), a [reta](termo:t-reta) e o [novo](termo:novo-1)?", respostaEsperada: "A [reta](termo:t-reta)." });
+		expect(validarBloco(bloco, { ...opcoes, tipo: "verificacao", glossario: GLOSSARIO })).toMatchObject({ pergunta: "A [reta](termo:t-reta), a reta e o novo?", respostaEsperada: "A reta." });
 	});
 });
 

@@ -48,7 +48,13 @@
 //   de novo, o bloco reescrito) é jogada fora. Toda mensagem "modulo" leva
 //   corrigindo (os blocos em conferência agora), e o "estado" leva o
 //   progresso de cada módulo gerado. Os eventos vão para o
-//   aprendiz/eventos.jsonl pela ../lib/modulo-respostas.ts.
+//   aprendiz/eventos.jsonl pela ../lib/modulo-respostas.ts;
+// - o feedback (docs/modulos.md, "O feedback"): a nota rápida de um bloco
+//   (avaliar_bloco, o avaliou_bloco sem motivos nem texto), o retorno
+//   detalhado (retorno, com o detalha opcional) e o questionário do fim da
+//   lição (avaliar_licao, o avaliou_licao), na trava da matéria. A última
+//   nota de cada bloco e o último questionário de cada lição ficam no
+//   <módulo>.json (../lib/modulo-feedback.ts).
 import { readFile, stat } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -78,6 +84,7 @@ import {
 } from "../lib/escrita.ts";
 import { NOMES_TIPO_MODULO } from "../lib/esqueleto.ts";
 import { type Evento, lerEventos } from "../lib/eventos.ts";
+import { avaliacaoLida, gravarFeedback, registrarQuestionario } from "../lib/modulo-feedback.ts";
 import {
 	type AlvoConferencia,
 	alvoParaCorrigir,
@@ -183,10 +190,24 @@ const LIMITE_LEITURA = 100_000;
 /** As ações da tela no painel modulos: as da lib (AcoesModulos) e as do retorno e da reescrita (AcoesModulosEscrita). */
 type AcaoDaTela = keyof (AcoesModulos & AcoesModulosEscrita);
 
-const ACOES: ReadonlyArray<AcaoDaTela> = ["listar", "gerar", "aguardar", "cancelar", "abrir", "concluir", "responder", "corrigir", "encerrar", "retorno", "reescrever_bloco"];
+const ACOES: ReadonlyArray<AcaoDaTela> = [
+	"listar",
+	"gerar",
+	"aguardar",
+	"cancelar",
+	"abrir",
+	"concluir",
+	"responder",
+	"corrigir",
+	"encerrar",
+	"retorno",
+	"reescrever_bloco",
+	"avaliar_bloco",
+	"avaliar_licao",
+];
 
-/** As ações que são de uma questão: o erro leva o bloco. */
-const ACOES_DA_QUESTAO: ReadonlyArray<AcaoDaTela> = ["responder", "corrigir", "encerrar"];
+/** As ações que são de uma questão, e a nota rápida de um bloco: o erro leva o bloco. */
+const ACOES_DA_QUESTAO: ReadonlyArray<AcaoDaTela> = ["responder", "corrigir", "encerrar", "avaliar_bloco"];
 
 /** As ações do painel escrita. */
 const ACOES_ESCRITA: ReadonlyArray<keyof AcoesEscrita> = ["listar", "salvar", "apagar"];
@@ -211,6 +232,8 @@ interface DadosAcao {
 	escolha?: unknown;
 	naoSei?: unknown;
 	tempoMs?: unknown;
+	detalha?: unknown;
+	notas?: unknown;
 }
 
 const FRASES: Record<AcaoDaTela | "ler", string> = {
@@ -225,6 +248,8 @@ const FRASES: Record<AcaoDaTela | "ler", string> = {
 	encerrar: "encerrar a questão",
 	retorno: "gravar o retorno do bloco",
 	reescrever_bloco: "reescrever o bloco",
+	avaliar_bloco: "gravar a nota do bloco",
+	avaliar_licao: "gravar o questionário da lição",
 	ler: "ler o módulo",
 };
 
@@ -711,7 +736,8 @@ function retornoDoEvento(evento: Evento): RetornoGravado | undefined {
 	const textos = ["materia", "curso", "modulo", "licao", "bloco"] as const;
 	if (evento.verbo !== "avaliou_bloco" || !textos.every((campo) => typeof objeto?.[campo] === "string") || !resultado) return undefined;
 	const motivos = Array.isArray(resultado.motivos) ? (resultado.motivos as unknown[]).filter((motivo): motivo is MotivoRetorno => typeof motivo === "string" && motivo in NOMES_MOTIVO) : [];
-	const avaliacao = resultado.avaliacao === "bom" || resultado.avaliacao === "melhorar" ? resultado.avaliacao : undefined;
+	// A antiga "melhorar" (antes da parte 3 do plano de 2026-10-28) vale como "ruim".
+	const avaliacao = avaliacaoLida(resultado.avaliacao);
 	if (!avaliacao) return undefined;
 	return {
 		objeto: { materia: objeto.materia as string, curso: objeto.curso as string, modulo: objeto.modulo as string, licao: objeto.licao as string, bloco: objeto.bloco as string },
@@ -1255,14 +1281,18 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 	};
 
 	/**
-	 * Grava o retorno do Breno num bloco (retorno): na trava da matéria, lê o
-	 * módulo gerado e o bloco (o tipo, os conceitos, a versão e como foi
-	 * gerado) e, na trava do escrita.json (o virarRegra grava nele),
-	 * registrarRetorno; guarda o retorno em memória (para a reescrita) e manda
-	 * o estado com o pedido e o id do evento e, se criou regra, as regras no
-	 * painel escrita.
+	 * Grava uma avaliação do Breno num bloco: o retorno detalhado (retorno) ou
+	 * a nota rápida (avaliar_bloco, sem motivos, texto nem regra). Na trava da
+	 * matéria, lê o módulo gerado e o bloco (o tipo, os conceitos, a versão e
+	 * como foi gerado); no retorno, confere o detalha (o id de um avaliou_bloco
+	 * do mesmo bloco, como o reescrever_bloco confere o retorno); na trava do
+	 * escrita.json (o virarRegra grava nele), registrarRetorno; depois grava a
+	 * nota em feedback (gravarFeedback) e guarda o retorno em memória (para a
+	 * reescrita e o detalha). A nota rápida responde com o modulo com o
+	 * pedido. O retorno manda o modulo sem pedido, o estado com o pedido e o
+	 * id do evento e, se criou regra, as regras no painel escrita.
 	 */
-	const gravarRetorno = (dados: string, materia: string, curso: string, modulo: string, dadosAcao: DadosAcao, pedido: string | undefined) =>
+	const avaliarBloco = (dados: string, materia: string, curso: string, modulo: string, dadosAcao: DadosAcao, pedido: string | undefined, rapida: boolean) =>
 		naTrava(materia, async () => {
 			const licao = textoOpcional(dadosAcao.licao);
 			const bloco = textoOpcional(dadosAcao.bloco);
@@ -1275,7 +1305,19 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 			if (!daLicao) throw new ErroModulo(`Não achei a lição "${licao}" no módulo ${modulo}.`);
 			const doBloco = daLicao.blocos.find((item) => item.id === bloco);
 			if (!doBloco) throw new ErroModulo(`Não achei o bloco "${bloco}" na lição ${licao}.`);
+			let detalha: string | undefined;
+			if (!rapida && dadosAcao.detalha !== undefined && dadosAcao.detalha !== null) {
+				detalha = textoOpcional(dadosAcao.detalha);
+				if (!detalha) throw new ErroEscrita("O detalha do retorno não é o id de um evento.");
+				const nota = await lerRetorno(dados, detalha);
+				if (!nota) throw new ErroEscrita(`Não achei a nota "${detalha}" nos eventos.`);
+				const { objeto } = nota;
+				if (objeto.materia !== materia || objeto.curso !== curso || objeto.modulo !== modulo || objeto.licao !== licao || objeto.bloco !== bloco) {
+					throw new ErroEscrita(`A nota "${detalha}" é de outro bloco (${objeto.modulo}, ${objeto.bloco}); o retorno detalha uma nota do próprio bloco.`);
+				}
+			}
 			const origem = await origemDoBloco(dados, lido, licao, doBloco);
+			const agora = new Date();
 			const registrado = await naTravaEscrita(() =>
 				registrarRetorno(
 					dados,
@@ -1288,21 +1330,56 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 						tipo: doBloco.tipo,
 						conceitos: [...doBloco.conceitos],
 						avaliacao: dadosAcao.avaliacao,
-						motivos: dadosAcao.motivos,
-						texto: dadosAcao.texto,
-						virarRegra: dadosAcao.virarRegra as { texto: string; materia: string | null } | null | undefined,
+						motivos: rapida ? [] : dadosAcao.motivos,
+						texto: rapida ? "" : dadosAcao.texto,
+						virarRegra: rapida ? null : (dadosAcao.virarRegra as { texto: string; materia: string | null } | null | undefined),
 						versao: versaoDoBloco(doBloco),
 						modelo: origem.modelo,
 						prompt: origem.prompt ?? null,
+						detalha: detalha ?? null,
 					},
-					daSessao(),
+					{ ...daSessao(), agora },
 				),
 			);
 			// O que foi gravado no evento: registrarRetorno limpa pelo mesmo validarRetorno.
-			const limpo = validarRetorno({ avaliacao: dadosAcao.avaliacao, motivos: dadosAcao.motivos, texto: dadosAcao.texto });
+			const limpo = validarRetorno({ avaliacao: dadosAcao.avaliacao, motivos: rapida ? [] : dadosAcao.motivos, texto: rapida ? "" : dadosAcao.texto });
 			retornos.set(registrado.retorno, { objeto: { materia, curso, modulo, licao, bloco }, resultado: { avaliacao: limpo.avaliacao, motivos: limpo.motivos, texto: limpo.texto } });
+			const novo = await gravarFeedback(dados, materia, curso, modulo, licao, bloco, { avaliacao: limpo.avaliacao, evento: registrado.retorno, agora });
+			if (rapida) {
+				mostrarModulo(materia, curso, novo, pedido);
+				return;
+			}
+			mostrarModulo(materia, curso, novo);
 			await mostrarEstado(dados, materia, curso, pedido, { retorno: registrado.retorno });
 			if (registrado.regras) mostrarEscrita("regras", { regras: registrado.regras });
+		});
+
+	/**
+	 * Grava o questionário do fim da lição (avaliar_licao; registrarQuestionario):
+	 * na trava da matéria, lê o módulo gerado e a lição, junta os prompts que
+	 * geraram a lição (o da lição, da geração, e os das reescritas dos blocos
+	 * dela, pela origemDoBloco, sem repetir) e grava o questionário e o
+	 * avaliou_licao. Responde com o modulo com o pedido.
+	 */
+	const avaliarLicao = (dados: string, materia: string, curso: string, modulo: string, dadosAcao: DadosAcao, pedido: string | undefined) =>
+		naTrava(materia, async () => {
+			const licao = textoOpcional(dadosAcao.licao);
+			if (!licao) throw new ErroModulo("Falta o id da lição.");
+			const lido = await lerModulo(dados, materia, curso, modulo);
+			if (!lido) throw new ErroModulo(`O módulo ${modulo} ainda não foi gerado.`);
+			if (lido.situacao !== "gerado") throw new ErroModulo(`O módulo ${modulo} está aguardando material; não há lição para avaliar.`);
+			const daLicao = lido.licoes.find((item) => item.id === licao);
+			if (!daLicao) throw new ErroModulo(`Não achei a lição "${licao}" no módulo ${modulo}.`);
+			// Os blocos da versão 1 vêm todos da mesma geração: basta a origem de um deles.
+			const primeiro = daLicao.blocos.find((bloco) => versaoDoBloco(bloco) === 1);
+			const reescritos = daLicao.blocos.filter((bloco) => versaoDoBloco(bloco) > 1);
+			const prompts: PromptUsado[] = [];
+			for (const bloco of [...(primeiro ? [primeiro] : []), ...reescritos]) {
+				const { prompt } = await origemDoBloco(dados, lido, licao, bloco);
+				if (prompt && !prompts.some((item) => item.nome === prompt.nome && item.hash === prompt.hash)) prompts.push(prompt);
+			}
+			const { modulo: novo } = await registrarQuestionario(dados, materia, curso, modulo, licao, { notas: dadosAcao.notas, texto: dadosAcao.texto }, { ...daSessao(), modelo: lido.modelo, prompts });
+			mostrarModulo(materia, curso, novo, pedido);
 		});
 
 	/**
@@ -1674,7 +1751,11 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 						mostrarModulo(materia, curso, encerrado, pedido);
 					});
 				} else if (ao === "retorno") {
-					await gravarRetorno(dados, materia, curso, modulo, dadosAcao, pedido);
+					await avaliarBloco(dados, materia, curso, modulo, dadosAcao, pedido, false);
+				} else if (ao === "avaliar_bloco") {
+					await avaliarBloco(dados, materia, curso, modulo, dadosAcao, pedido, true);
+				} else if (ao === "avaliar_licao") {
+					await avaliarLicao(dados, materia, curso, modulo, dadosAcao, pedido);
 				} else if (ao === "reescrever_bloco") {
 					await reescrever(dados, materia, curso, modulo, dadosAcao, pedido);
 				} else if (ao === "cancelar") {

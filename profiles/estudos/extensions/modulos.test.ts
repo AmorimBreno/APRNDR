@@ -14,7 +14,7 @@ import { confirmarEtapa, type Curso, gravarCurso, novoCurso } from "../lib/curso
 import type { Diagnostico } from "../lib/diagnostico.ts";
 import { calcularCalendario, type Modulo as ModuloDoEsqueleto } from "../lib/esqueleto.ts";
 import { arquivoEscrita, lerEscrita, type RegraEscrita, salvarRegra } from "../lib/escrita.ts";
-import { lerEventos } from "../lib/eventos.ts";
+import { acrescentarEvento, criarEvento, lerEventos } from "../lib/eventos.ts";
 import { type Conceito, gravarMapa, lerMapa, mapaVazio, pastaExtraidoArquivo } from "../lib/mapa.ts";
 import { criarMateria, eventosAprendiz, eventosMateria } from "../lib/materias.ts";
 import { ARQUIVOS_METODO, caminhoDoModulo, type EstadoModuloNaTela, lerModulo, MINIMO_CARACTERES_EXEMPLO, type ModuloGerado } from "../lib/modulos.ts";
@@ -901,9 +901,19 @@ const EXPLICACAO_NOVA = JSON.stringify({
 
 const retornoDe = (pedido: string) => (comPedido(pedido).find((mensagem) => mensagem.acao === "estado")?.dados as unknown as MensagemEstado | undefined)?.retorno;
 
-/** Grava um retorno "melhorar" (longo e abstrato) no l1-b1 e devolve o id do evento. */
+/**
+ * Espera a mensagem modulo com o bloco na versão 2 (a reescrita chegou): o
+ * retorno também manda um modulo (com a nota em feedback), então só contar as
+ * mensagens não basta.
+ */
+const reescritoNa = (bloco: string, versao = 2) =>
+	esperar(() =>
+		recebidas("modulo").some((mensagem) => ((mensagem.dados.modulo as ModuloGerado).licoes.flatMap((licao) => licao.blocos).find((item) => item.id === bloco)?.versao ?? 1) === versao),
+	);
+
+/** Grava um retorno "ruim" (longo e abstrato) no l1-b1 e devolve o id do evento. */
 async function retornoNoB1(pedido = "r1", extra: Record<string, unknown> = {}): Promise<string> {
-	acao("retorno", { modulo: "m1", licao: "l1", bloco: "l1-b1", pedido, avaliacao: "melhorar", motivos: ["longo", "abstrato", "longo"], texto: " Muito texto antes do exemplo. ", ...extra });
+	acao("retorno", { modulo: "m1", licao: "l1", bloco: "l1-b1", pedido, avaliacao: "ruim", motivos: ["longo", "abstrato", "longo"], texto: " Muito texto antes do exemplo. ", ...extra });
 	await respondeu(pedido);
 	const id = retornoDe(pedido);
 	if (!id) throw new Error(`o retorno não foi gravado: ${JSON.stringify(erroDe(pedido))}`);
@@ -932,7 +942,7 @@ describe("retorno e reescrita do bloco", () => {
 			sessao: "sessao-1",
 			verbo: "avaliou_bloco",
 			objeto: { materia, curso: CURSO, modulo: "m1", licao: "l1", bloco: "l1-b1", tipo: "explicacao", conceitos: ["c-tf"] },
-			resultado: { avaliacao: "melhorar", motivos: ["longo", "abstrato"], texto: "Muito texto antes do exemplo." },
+			resultado: { avaliacao: "ruim", motivos: ["longo", "abstrato"], texto: "Muito texto antes do exemplo." },
 			contexto: { modelo: "teste/modelo-x", prompt: { nome: "modulo-licao.md", hash: hashDoPrompt(PROMPT_LICAO) }, versao: 1 },
 		});
 		expect(daEscrita("regras")).toHaveLength(0);
@@ -951,9 +961,13 @@ describe("retorno e reescrita do bloco", () => {
 	});
 
 	it("retorno inválido, ou de um bloco que não existe, é erro com o pedido e não grava", async () => {
-		acao("retorno", { modulo: "m1", licao: "l1", bloco: "l1-b1", pedido: "e1", avaliacao: "otimo" });
+		acao("retorno", { modulo: "m1", licao: "l1", bloco: "l1-b1", pedido: "e1", avaliacao: "excelente" });
 		await respondeu("e1");
 		expect(erroDe("e1")).toMatchObject({ ao: "retorno", modulo: "m1", mensagem: expect.stringContaining("A avaliação do bloco não é válida") });
+		// A antiga "melhorar" não vale num retorno novo.
+		acao("retorno", { modulo: "m1", licao: "l1", bloco: "l1-b1", pedido: "e0", avaliacao: "melhorar" });
+		await respondeu("e0");
+		expect(erroDe("e0")?.mensagem).toBe('A avaliação do bloco não é válida ("melhorar"): é ruim, bom ou otimo.');
 		acao("retorno", { modulo: "m1", licao: "l1", bloco: "l1-b9", pedido: "e2", avaliacao: "bom" });
 		await respondeu("e2");
 		expect(erroDe("e2")?.mensagem).toBe('Não achei o bloco "l1-b9" na lição l1.');
@@ -984,7 +998,7 @@ describe("retorno e reescrita do bloco", () => {
 		expect(mensagem).toContain("Bloco a reescrever: l1-b1, do tipo explicacao, posição 1 de 6, versão 1.");
 		expect(mensagem).toContain('"texto": "Texto sobre c-tf. x');
 		expect(mensagem).not.toContain('"id": "l1-b1"');
-		expect(mensagem).toContain("Avaliação: Precisa melhorar\nMotivos: Longo demais (longo); Abstrato demais (abstrato)\nTexto do aluno: Muito texto antes do exemplo.");
+		expect(mensagem).toContain("Avaliação: Ruim\nMotivos: Longo demais (longo); Abstrato demais (abstrato)\nTexto do aluno: Muito texto antes do exemplo.");
 		expect(mensagem).toContain("Nível do aluno: iniciante");
 		expect(mensagem).toContain('<trecho arquivo="aula.pdf" local="página 1">\nTF conta quantas vezes o termo aparece no documento.\n</trecho>');
 		expect(mensagem).not.toContain("IDF é o log");
@@ -993,7 +1007,7 @@ describe("retorno e reescrita do bloco", () => {
 		expect(mensagem).not.toContain("Regras de escrita");
 
 		adiado.soltar(EXPLICACAO_NOVA);
-		await esperar(() => recebidas("modulo").length > 0);
+		await reescritoNa("l1-b1");
 		const novo = recebidas("modulo").at(-1)!.dados.modulo as ModuloGerado;
 		const gravado = (await lerModulo(dados, materia, CURSO, "m1")) as ModuloGerado;
 		expect(novo).toEqual(gravado);
@@ -1022,13 +1036,13 @@ describe("retorno e reescrita do bloco", () => {
 	});
 
 	it("a ideia central também é reescrita, com o arquivo dela na metodologia", async () => {
-		acao("retorno", { modulo: "m1", licao: "l1", bloco: "l1-b5", pedido: "r1", avaliacao: "melhorar", motivos: ["confuso"], texto: "Mais direto." });
+		acao("retorno", { modulo: "m1", licao: "l1", bloco: "l1-b5", pedido: "r1", avaliacao: "ruim", motivos: ["confuso"], texto: "Mais direto." });
 		await respondeu("r1");
 		const id = retornoDe("r1")!;
 		respostas.push(JSON.stringify({ bloco: { tipo: "ideia_central", conceitos: ["c-tf"], texto: "O TF conta as ocorrências do termo no documento." } }));
 		reescrever("w1", id, "l1-b5");
 		await respondeu("w1");
-		await esperar(() => recebidas("modulo").length > 0);
+		await reescritoNa("l1-b5");
 		expect(chamadas.at(-1)!.contexto.systemPrompt).toBe(comMetodo("Reescreva o bloco.", ["ideia-central.md"]));
 		expect(textoDaChamada(chamadas.at(-1)!)).toContain("### l1-b5 · Ideia central (posição 5): ESTE É O BLOCO A REESCREVER");
 		const bloco = ((await lerModulo(dados, materia, CURSO, "m1")) as ModuloGerado).licoes[0]!.blocos[4]!;
@@ -1045,12 +1059,13 @@ describe("retorno e reescrita do bloco", () => {
 		respostas.push(errado, EXPLICACAO_NOVA);
 		reescrever("w1", id);
 		await respondeu("w1");
-		await esperar(() => recebidas("modulo").length > 0);
+		await reescritoNa("l1-b1");
 		expect(textoDaChamada(chamadas.at(-1)!)).toContain('A sua resposta não veio como o pedido: O bloco reescrito veio do tipo "verificacao", e precisava ser "explicacao".');
 		expect((await doAprendiz("reescreveu_bloco"))[0]!.contexto).toMatchObject({ custo: 0.02 });
 
-		const antes = await lerModulo(dados, materia, CURSO, "m1");
 		const id2 = await retornoNoB1("r2");
+		// Depois do retorno (que grava a nota em feedback): a reescrita que falha não muda mais nada.
+		const antes = await lerModulo(dados, materia, CURSO, "m1");
 		respostas.push(errado, "isto não é JSON");
 		reescrever("w2", id2);
 		await respondeu("w2");
@@ -1084,7 +1099,7 @@ describe("retorno e reescrita do bloco", () => {
 		respostas.push(EXPLICACAO_NOVA);
 		reescrever("w1", id);
 		await respondeu("w1");
-		await esperar(() => recebidas("modulo").length > 0);
+		await reescritoNa("l1-b1");
 		expect(textoDaChamada(chamadas.at(-1)!)).toContain("Texto do aluno: Muito texto antes do exemplo.");
 	});
 
@@ -1145,7 +1160,7 @@ describe("as regras de escrita nas mensagens dos módulos", () => {
 		respostas.push(EXPLICACAO_NOVA);
 		reescrever("w1", id);
 		await respondeu("w1");
-		await esperar(() => recebidas("modulo").length > 0);
+		await reescritoNa("l1-b1");
 		expect(textoDaChamada(chamadas.at(-1)!).endsWith(`\n\n${secao}`)).toBe(true);
 	});
 
@@ -1385,7 +1400,7 @@ describe("responder as questões", () => {
 		await responder("q1", { bloco: "l1-b6", confianca: 3, escolha: 1, tempoMs: 1 });
 		await responder("n1", { bloco: "l2-b5", naoSei: true });
 		await esperar(() => progressoDe()?.feitas === 2);
-		acao("retorno", { modulo: "m1", licao: "l1", bloco: "l1-b6", pedido: "r1", avaliacao: "melhorar", motivos: ["confuso"], texto: "" });
+		acao("retorno", { modulo: "m1", licao: "l1", bloco: "l1-b6", pedido: "r1", avaliacao: "ruim", motivos: ["confuso"], texto: "" });
 		await respondeu("r1");
 		const retorno = retornoDe("r1")!;
 		respostas.push(JSON.stringify({ bloco: { ...alternativa("c-tf"), enunciado: "Quantas vezes aparece?" } }));
@@ -1430,5 +1445,218 @@ describe("responder as questões", () => {
 		expect(await doAprendiz("respondeu_verificacao")).toHaveLength(0);
 		const gravado = (await lerModulo(dados, materia, CURSO, "m1")) as ModuloGerado;
 		expect(gravado.respostas!["l1-b3"]!.tentativas[0]).not.toHaveProperty("avaliacao");
+	});
+});
+
+// --- O feedback (docs/modulos.md, "O feedback") -------------------------------------------------
+
+/** A nota rápida de um bloco da lição l1. */
+const avaliar = (pedido: string, bloco: string, avaliacao: unknown, extra: Record<string, unknown> = {}) => acao("avaliar_bloco", { modulo: "m1", licao: "l1", bloco, pedido, avaliacao, ...extra });
+
+describe("o feedback", () => {
+	beforeEach(async () => {
+		ligar();
+		geracaoQueDaCerto();
+		await gerarM1();
+	});
+
+	it("avaliar_bloco: o avaliou_bloco sem motivos nem texto, a nota em feedback e o modulo com o pedido; outra nota fica no lugar", async () => {
+		avaliar("a1", "l1-b2", "bom");
+		await respondeu("a1");
+		expect(comPedido("a1").map((mensagem) => mensagem.acao)).toEqual(["modulo"]);
+		const primeira = moduloDoPedido("a1")!;
+		const [evento] = await doAprendiz("avaliou_bloco");
+		expect(evento).toEqual({
+			id: expect.any(String),
+			ts: expect.any(String),
+			sessao: "sessao-1",
+			verbo: "avaliou_bloco",
+			objeto: { materia, curso: CURSO, modulo: "m1", licao: "l1", bloco: "l1-b2", tipo: "explicacao", conceitos: ["c-tf"] },
+			resultado: { avaliacao: "bom", motivos: [], texto: "" },
+			contexto: { modelo: "teste/modelo-x", prompt: PROMPT_DA_LICAO(), versao: 1 },
+		});
+		expect(primeira.modulo.feedback).toEqual({ "l1-b2": { avaliacao: "bom", versao: 1, em: evento!.ts, evento: evento!.id } });
+		expect(primeira.corrigindo).toEqual([]);
+		expect(await lerModulo(dados, materia, CURSO, "m1")).toEqual(primeira.modulo);
+
+		// Motivos, texto, regra e detalha não entram na nota rápida.
+		avaliar("a2", "l1-b2", "otimo", { motivos: ["longo"], texto: "x", virarRegra: { texto: "Regra.", materia: null }, detalha: evento!.id });
+		await respondeu("a2");
+		const eventos = await doAprendiz("avaliou_bloco");
+		expect(eventos).toHaveLength(2);
+		expect(eventos[1]!.resultado).toEqual({ avaliacao: "otimo", motivos: [], texto: "" });
+		expect(moduloDoPedido("a2")!.modulo.feedback!["l1-b2"]).toMatchObject({ avaliacao: "otimo", evento: eventos[1]!.id });
+		expect(await doAprendiz("criou_regra_escrita")).toHaveLength(0);
+	});
+
+	it("avaliar_bloco com a antiga melhorar, avaliação inválida ou bloco que não existe: erro com o bloco e o pedido, nada gravado", async () => {
+		avaliar("e1", "l1-b2", "melhorar");
+		await respondeu("e1");
+		expect(erroDe("e1")).toEqual({ mensagem: 'A avaliação do bloco não é válida ("melhorar"): é ruim, bom ou otimo.', ao: "avaliar_bloco", materia, curso: CURSO, modulo: "m1", bloco: "l1-b2", pedido: "e1" });
+		avaliar("e2", "l1-b9", "bom");
+		await respondeu("e2");
+		expect(erroDe("e2")?.mensagem).toBe('Não achei o bloco "l1-b9" na lição l1.');
+		expect(await doAprendiz("avaliou_bloco")).toHaveLength(0);
+		expect(((await lerModulo(dados, materia, CURSO, "m1")) as ModuloGerado).feedback).toBeUndefined();
+	});
+
+	it("retorno com detalha: o id da nota no resultado, a nota em feedback; manda o modulo sem pedido e o estado com o pedido", async () => {
+		avaliar("a1", "l1-b1", "ruim");
+		await respondeu("a1");
+		const nota = (await doAprendiz("avaliou_bloco"))[0]!.id;
+		const antes = recebidas("modulo").length;
+		const id = await retornoNoB1("r1", { detalha: nota });
+		const [, detalhado] = await doAprendiz("avaliou_bloco");
+		expect(detalhado).toMatchObject({ id, resultado: { avaliacao: "ruim", motivos: ["longo", "abstrato"], texto: "Muito texto antes do exemplo.", detalha: nota } });
+		const modulos = recebidas("modulo").slice(antes);
+		expect(modulos).toHaveLength(1);
+		expect(modulos[0]!.dados.pedido).toBeUndefined();
+		expect((modulos[0]!.dados as unknown as MensagemModuloDoTeste).modulo.feedback!["l1-b1"]).toEqual({ avaliacao: "ruim", versao: 1, em: detalhado!.ts, evento: id });
+		expect(comPedido("r1").map((mensagem) => mensagem.acao)).toEqual(["estado"]);
+		// Sem detalha, o resultado fica sem o campo.
+		const outro = await retornoNoB1("r2", { avaliacao: "otimo", motivos: [] });
+		const ultimoEvento = (await doAprendiz("avaliou_bloco")).at(-1)!;
+		expect(ultimoEvento).toMatchObject({ id: outro, resultado: { avaliacao: "otimo", motivos: [], texto: "Muito texto antes do exemplo." } });
+		expect(ultimoEvento.resultado).not.toHaveProperty("detalha");
+		expect(((await lerModulo(dados, materia, CURSO, "m1")) as ModuloGerado).feedback!["l1-b1"]).toMatchObject({ avaliacao: "otimo", evento: outro });
+	});
+
+	it("retorno com detalha de outro bloco, que não existe ou que não é um id: erro com o pedido, nada gravado", async () => {
+		avaliar("a1", "l1-b2", "bom");
+		await respondeu("a1");
+		const nota = (await doAprendiz("avaliou_bloco"))[0]!.id;
+		const detalhar = (pedido: string, detalha: unknown) => acao("retorno", { modulo: "m1", licao: "l1", bloco: "l1-b1", pedido, avaliacao: "ruim", motivos: [], detalha });
+		detalhar("e1", nota);
+		await respondeu("e1");
+		expect(erroDe("e1")).toMatchObject({ ao: "retorno", pedido: "e1", mensagem: `A nota "${nota}" é de outro bloco (m1, l1-b2); o retorno detalha uma nota do próprio bloco.` });
+		detalhar("e2", "nao-existe");
+		await respondeu("e2");
+		expect(erroDe("e2")?.mensagem).toBe('Não achei a nota "nao-existe" nos eventos.');
+		detalhar("e3", 42);
+		await respondeu("e3");
+		expect(erroDe("e3")?.mensagem).toBe("O detalha do retorno não é o id de um evento.");
+		expect(await doAprendiz("avaliou_bloco")).toHaveLength(1);
+		expect(Object.keys(((await lerModulo(dados, materia, CURSO, "m1")) as ModuloGerado).feedback!)).toEqual(["l1-b2"]);
+	});
+
+	it("um retorno antigo com melhorar, de uma sessão anterior: vale como Ruim na reescrita e pode ser detalhado", async () => {
+		const antigo = criarEvento({
+			sessao: "sessao-0",
+			verbo: "avaliou_bloco",
+			objeto: { materia, curso: CURSO, modulo: "m1", licao: "l1", bloco: "l1-b1", tipo: "explicacao", conceitos: ["c-tf"] },
+			resultado: { avaliacao: "melhorar", motivos: ["confuso"], texto: "Não entendi." },
+			contexto: { modelo: "teste/modelo-x", versao: 1 },
+		});
+		await acrescentarEvento(eventosAprendiz(dados), antigo);
+		respostas.push(EXPLICACAO_NOVA);
+		reescrever("w1", antigo.id);
+		await respondeu("w1");
+		await reescritoNa("l1-b1");
+		expect(textoDaChamada(chamadas.at(-1)!)).toContain("Avaliação: Ruim\nMotivos: Confuso (confuso)\nTexto do aluno: Não entendi.");
+		const id = await retornoNoB1("r1", { detalha: antigo.id });
+		expect((await doAprendiz("avaliou_bloco")).find((evento) => evento.id === id)!.resultado).toMatchObject({ detalha: antigo.id });
+	});
+
+	it("a reescrita de um bloco e as respostas mantêm feedback e questionarios; a nota do bloco reescrito fica com a versão antiga", async () => {
+		avaliar("a1", "l1-b1", "ruim");
+		await respondeu("a1");
+		avaliar("a2", "l1-b6", "otimo", { licao: "l1" });
+		await respondeu("a2");
+		acao("avaliar_licao", { modulo: "m1", licao: "l1", pedido: "q1", notas: { clareza: 2 } });
+		await respondeu("q1");
+		const antes = (await lerModulo(dados, materia, CURSO, "m1")) as ModuloGerado;
+		expect(Object.keys(antes.feedback!)).toEqual(["l1-b1", "l1-b6"]);
+
+		await responder("r-q", { bloco: "l1-b6", confianca: 3, escolha: 1, tempoMs: 1 });
+		const respondido = (await lerModulo(dados, materia, CURSO, "m1")) as ModuloGerado;
+		expect(respondido.feedback).toEqual(antes.feedback);
+		expect(respondido.questionarios).toEqual(antes.questionarios);
+
+		const retorno = (await doAprendiz("avaliou_bloco"))[0]!.id;
+		respostas.push(EXPLICACAO_NOVA);
+		reescrever("w1", retorno);
+		await respondeu("w1");
+		await reescritoNa("l1-b1");
+		const reescrito = (await lerModulo(dados, materia, CURSO, "m1")) as ModuloGerado;
+		expect(reescrito.licoes[0]!.blocos[0]!.versao).toBe(2);
+		expect(reescrito.feedback).toEqual(antes.feedback);
+		expect(reescrito.feedback!["l1-b1"]!.versao).toBe(1);
+		expect(reescrito.questionarios).toEqual(antes.questionarios);
+		expect(ultimoModulo().modulo).toEqual(reescrito);
+
+		// Uma nota no bloco reescrito leva a versão 2.
+		avaliar("a3", "l1-b1", "bom");
+		await respondeu("a3");
+		expect(moduloDoPedido("a3")!.modulo.feedback!["l1-b1"]).toMatchObject({ avaliacao: "bom", versao: 2 });
+	});
+
+	it("avaliar_licao: o avaliou_licao com os prompts que geraram a lição, o questionário em questionarios e o modulo com o pedido; enviar de novo troca", async () => {
+		acao("avaliar_licao", { modulo: "m1", licao: "l2", pedido: "q1", notas: { ritmo: 5, entendimento: 3 }, texto: "  Ótima lição.  " });
+		await respondeu("q1");
+		expect(comPedido("q1").map((mensagem) => mensagem.acao)).toEqual(["modulo"]);
+		const [evento] = await doAprendiz("avaliou_licao");
+		expect(evento).toEqual({
+			id: expect.any(String),
+			ts: expect.any(String),
+			sessao: "sessao-1",
+			verbo: "avaliou_licao",
+			objeto: { materia, curso: CURSO, modulo: "m1", licao: "l2", conceitos: ["c-idf"] },
+			resultado: { notas: { entendimento: 3, ritmo: 5 }, texto: "Ótima lição." },
+			contexto: { fase: "modulo", modelo: "teste/modelo-x", prompts: [PROMPT_DA_LICAO()] },
+		});
+		const mensagem = moduloDoPedido("q1")!;
+		expect(mensagem.modulo.questionarios).toEqual({ l2: { notas: { entendimento: 3, ritmo: 5 }, texto: "Ótima lição.", em: evento!.ts, evento: evento!.id } });
+		expect(await lerModulo(dados, materia, CURSO, "m1")).toEqual(mensagem.modulo);
+
+		acao("avaliar_licao", { modulo: "m1", licao: "l2", pedido: "q2", notas: { clareza: 1 } });
+		await respondeu("q2");
+		const eventos = await doAprendiz("avaliou_licao");
+		expect(eventos).toHaveLength(2);
+		expect(moduloDoPedido("q2")!.modulo.questionarios).toEqual({ l2: { notas: { clareza: 1 }, texto: "", em: eventos[1]!.ts, evento: eventos[1]!.id } });
+	});
+
+	it("avaliar_licao numa lição com um bloco reescrito leva também o prompt da reescrita", async () => {
+		const retorno = await retornoNoB1();
+		respostas.push(EXPLICACAO_NOVA);
+		reescrever("w1", retorno);
+		await respondeu("w1");
+		await reescritoNa("l1-b1");
+		acao("avaliar_licao", { modulo: "m1", licao: "l1", pedido: "q1", notas: { exemplos: 4 } });
+		await respondeu("q1");
+		const [evento] = await doAprendiz("avaliou_licao");
+		expect(evento!.contexto).toEqual({ fase: "modulo", modelo: "teste/modelo-x", prompts: [PROMPT_DA_LICAO(), PROMPT_BLOCO_COM_INTRODUCAO()] });
+	});
+
+	it("avaliar_licao inválido ou de lição que não existe: erro com o pedido, nada gravado", async () => {
+		acao("avaliar_licao", { modulo: "m1", licao: "l1", pedido: "e1", notas: {} });
+		await respondeu("e1");
+		expect(erroDe("e1")).toEqual({ mensagem: "Responda pelo menos uma pergunta do questionário.", ao: "avaliar_licao", materia, curso: CURSO, modulo: "m1", pedido: "e1" });
+		acao("avaliar_licao", { modulo: "m1", licao: "l1", pedido: "e2", notas: { clareza: 6 } });
+		await respondeu("e2");
+		expect(erroDe("e2")?.mensagem).toBe('A nota de "clareza" não é válida ("6"): é um inteiro de 1 a 5.');
+		acao("avaliar_licao", { modulo: "m1", licao: "l9", pedido: "e3", notas: { clareza: 3 } });
+		await respondeu("e3");
+		expect(erroDe("e3")?.mensagem).toBe('Não achei a lição "l9" no módulo m1.');
+		acao("avaliar_licao", { modulo: "m1", licao: "l1", pedido: "e4", notas: { clareza: 3 }, texto: "x".repeat(1001) });
+		await respondeu("e4");
+		expect(erroDe("e4")?.mensagem).toBe("O texto do questionário tem 1001 caracteres; o máximo é 1000.");
+		expect(await doAprendiz("avaliou_licao")).toHaveLength(0);
+		expect(((await lerModulo(dados, materia, CURSO, "m1")) as ModuloGerado).questionarios).toBeUndefined();
+	});
+
+	it("gerar de novo começa sem feedback e sem questionarios (os eventos ficam)", async () => {
+		avaliar("a1", "l1-b1", "bom");
+		await respondeu("a1");
+		acao("avaliar_licao", { modulo: "m1", licao: "l1", pedido: "q1", notas: { clareza: 4 } });
+		await respondeu("q1");
+		geracaoQueDaCerto();
+		acao("gerar", { modulo: "m1", pedido: "g2" });
+		await respondeu("g2");
+		await esperar(async () => (await doVerbo("gerou_modulo")).length === 2 && situacaoDe("m1") === "gerado");
+		const novo = (await lerModulo(dados, materia, CURSO, "m1")) as ModuloGerado;
+		expect(novo).not.toHaveProperty("feedback");
+		expect(novo).not.toHaveProperty("questionarios");
+		expect(await doAprendiz("avaliou_bloco")).toHaveLength(1);
+		expect(await doAprendiz("avaliou_licao")).toHaveLength(1);
 	});
 });

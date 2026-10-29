@@ -8,7 +8,7 @@ Você recebe:
 - o módulo: o nome, o objetivo, o tipo e as horas, e o que o aluno escreveu no formulário do módulo, quando escreveu;
 - a lição do bloco: o título, o objetivo, os conceitos e todos os blocos dela, na ordem, em texto (com as respostas das questões), com a marca do bloco a reescrever;
 - o bloco a reescrever, no formato JSON em que ele está gravado;
-- o retorno do aluno sobre esse bloco: a avaliação (Bom ou Precisa melhorar), os motivos marcados e o texto que ele escreveu;
+- o retorno do aluno sobre esse bloco: a avaliação (Ruim, Bom ou Ótimo), os motivos marcados e o texto que ele escreveu;
 - os conceitos do bloco: o id, o nome, a descrição, a prioridade e o nível do aluno (iniciante, intermediário ou domina) e, quando o curso usa material, os trechos do material que tratam deles, cada um com o arquivo e o local;
 - quando houver, as "Regras de escrita do Breno".
 
@@ -29,7 +29,7 @@ Depois deste prompt vem a metodologia do tipo do bloco: como escrevê-lo. O bloc
    - "Nível errado" (nivel_errado): o aluno achou o bloco fácil ou difícil demais para ele. Leia no texto do retorno qual dos dois e troque o formato pelo nível dito: difícil demais, desça (um exemplo resolvido por inteiro, passo a passo, em vez de passos para completar ou de um problema aberto; numa questão, uma situação mais direta); fácil demais, suba (um exemplo com passos para completar, ou um problema aberto; numa questão, uma situação menos óbvia). Numa explicação, o "formato" muda junto ("exemplo_resolvido", "exemplo_incompleto" ou "problema_aberto"). Sem dizer qual dos dois, use o nível dos conceitos recebido;
    - "Algo errado" (erro): ache o erro (o texto do retorno costuma dizer qual), corrija-o e não repita o mesmo erro em nenhuma outra parte do bloco. Numa questão, confira de novo a alternativa correta, as confusões das erradas, a rubrica e a resposta-modelo.
 4. O texto do retorno manda tanto quanto os motivos: se ele pede algo concreto (outro exemplo, menos fórmula, uma parte a mais), faça.
-5. Com a avaliação "Bom" e sem motivos, melhore só o que o texto do retorno pedir.
+5. Com a avaliação "Bom" ou "Ótimo" e sem motivos, melhore só o que o texto do retorno pedir.
 6. O bloco novo encaixa com os vizinhos: parte do que os blocos antes dele ensinaram, prepara o que os blocos depois dele usam e não repete o que eles já dizem. Uma prática continua cobrando o que as explicações antes dela ensinaram e não reusa os dados, os números, o código ou o exemplo da explicação anterior. Uma explicação continua ensinando o que a prática seguinte cobra.
 7. As "Regras de escrita do Breno", quando vierem na mensagem, valem acima das orientações gerais de estilo deste prompt e da metodologia (mas não acima do formato do JSON e das regras das referências): obedeça a todas, sempre.
 

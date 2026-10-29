@@ -8,7 +8,7 @@
 // abstrata. Carrega a extensão profiles/estudos/extensions/modulos.ts pelo
 // carregador de extensões do pi e, pela ponte: salva uma regra de escrita
 // ("Comece sempre por um exemplo concreto com números."), grava um retorno
-// "melhorar" com os motivos longo e abstrato nessa explicação e manda
+// "ruim" com os motivos longo e abstrato nessa explicação e manda
 // reescrever o bloco. Mostra o bloco antes e depois (inteiros), o custo, as
 // versões gravadas no arquivo e os eventos. A pasta temporária é apagada no
 // fim.
@@ -247,7 +247,7 @@ try {
 	console.log(JSON.stringify((await lerEscrita(dados)).regras));
 
 	console.log("\n=== O retorno");
-	acao("modulos", "retorno", { materia, curso, modulo: "m1", licao: "l1", bloco: "l1-b1", pedido: "retorno", avaliacao: "melhorar", motivos: ["longo", "abstrato"], texto: "" });
+	acao("modulos", "retorno", { materia, curso, modulo: "m1", licao: "l1", bloco: "l1-b1", pedido: "retorno", avaliacao: "ruim", motivos: ["longo", "abstrato"], texto: "" });
 	await esperar(() => Boolean(comPedido("retorno")));
 	const retorno = (comPedido("retorno")!.dados as unknown as MensagemEstado).retorno;
 	if (!retorno) throw new Error("o retorno não foi gravado");

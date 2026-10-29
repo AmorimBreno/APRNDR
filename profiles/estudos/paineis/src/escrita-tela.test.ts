@@ -12,6 +12,7 @@ import { EsperaDePedidos, lerEscrita, respostaEscrita, respostaQualquer } from "
 import {
 	alternarMotivo,
 	anteriorInicial,
+	balaoDetalhando,
 	balaoVazio,
 	contagemDasRegras,
 	dadosDoRetorno,
@@ -20,6 +21,7 @@ import {
 	foiReescrito,
 	marcarVirarRegra,
 	materiaDaOpcao,
+	mostraMotivos,
 	mudarTextoRegra,
 	mudarTextoRetorno,
 	NOME_TODAS,
@@ -61,15 +63,17 @@ describe("o balão de retorno", () => {
 	it("começa vazio, sem avaliação, e não salva sem ela", () => {
 		const balao = balaoVazio();
 		expect(balao).toEqual({ motivos: [], texto: "", virarRegra: false, textoRegra: "", regraEditada: false, soEstaMateria: false });
-		expect(problemaDoBalao(balao)).toBe("Escolha Bom ou Precisa melhorar.");
-		expect(() => dadosDoRetorno(balao, "calculo")).toThrow("Escolha Bom ou Precisa melhorar.");
+		expect(problemaDoBalao(balao)).toBe("Escolha Ruim, Bom ou Ótimo.");
+		expect(() => dadosDoRetorno(balao, "calculo")).toThrow("Escolha Ruim, Bom ou Ótimo.");
 		expect(podeReescrever(balao)).toBe(false);
 	});
 
-	it("os motivos só valem com Precisa melhorar, na ordem da lista, e saem com Bom", () => {
+	it("os motivos e a reescrita só valem com Ruim, na ordem da lista, e saem com Bom ou Ótimo", () => {
 		let balao = alternarMotivo(balaoVazio(), "longo");
 		expect(balao.motivos).toEqual([]);
-		balao = escolherAvaliacao(balao, "melhorar");
+		expect(mostraMotivos(balao)).toBe(false);
+		balao = escolherAvaliacao(balao, "ruim");
+		expect(mostraMotivos(balao)).toBe(true);
 		balao = alternarMotivo(balao, "erro");
 		balao = alternarMotivo(balao, "longo");
 		balao = alternarMotivo(balao, "faltou_exemplo");
@@ -80,10 +84,28 @@ describe("o balão de retorno", () => {
 		balao = escolherAvaliacao(balao, "bom");
 		expect(balao.motivos).toEqual([]);
 		expect(podeReescrever(balao)).toBe(false);
+		expect(mostraMotivos(balao)).toBe(false);
+		balao = alternarMotivo(escolherAvaliacao(balao, "ruim"), "confuso");
+		balao = escolherAvaliacao(balao, "otimo");
+		expect(balao.motivos).toEqual([]);
+		expect(podeReescrever(balao)).toBe(false);
+		// Com motivos, o Ótimo não os leva para a ponte.
+		expect(alternarMotivo(balao, "longo").motivos).toEqual([]);
+	});
+
+	it("o Detalhar abre com a nota marcada e o detalha com o id do evento da nota", () => {
+		expect(balaoDetalhando()).toEqual(balaoVazio());
+		expect(balaoDetalhando({ avaliacao: "bom" })).toEqual({ ...balaoVazio(), avaliacao: "bom" });
+		const balao = balaoDetalhando({ avaliacao: "ruim", evento: "ev-1" });
+		expect(balao).toEqual({ ...balaoVazio(), avaliacao: "ruim", detalha: "ev-1" });
+		expect(podeReescrever(balao)).toBe(true);
+		expect(dadosDoRetorno(balao, "calculo")).toEqual({ avaliacao: "ruim", motivos: [], detalha: "ev-1" });
+		// Trocar a nota no balão continua detalhando a mesma nota do bloco.
+		expect(dadosDoRetorno(escolherAvaliacao(balao, "otimo"), "calculo")).toEqual({ avaliacao: "otimo", motivos: [], detalha: "ev-1" });
 	});
 
 	it("a regra vem do texto do retorno e acompanha até o Breno mexer nela", () => {
-		let balao = mudarTextoRetorno(escolherAvaliacao(balaoVazio(), "melhorar"), "  Mais exemplos com números.  ");
+		let balao = mudarTextoRetorno(escolherAvaliacao(balaoVazio(), "ruim"), "  Mais exemplos com números.  ");
 		expect(balao.textoRegra).toBe("Mais exemplos com números.");
 		balao = marcarVirarRegra(balao, true);
 		expect(balao.textoRegra).toBe("Mais exemplos com números.");
@@ -117,10 +139,10 @@ describe("o balão de retorno", () => {
 
 	it("o que vai para a ponte: sem texto vazio; a regra de todas as matérias ou desta", () => {
 		expect(dadosDoRetorno(escolherAvaliacao(balaoVazio(), "bom"), "calculo")).toEqual({ avaliacao: "bom", motivos: [] });
-		let balao = alternarMotivo(escolherAvaliacao(balaoVazio(), "melhorar"), "abstrato");
+		let balao = alternarMotivo(escolherAvaliacao(balaoVazio(), "ruim"), "abstrato");
 		balao = marcarVirarRegra(mudarTextoRetorno(balao, " Mais concreto, por favor. "), true);
 		expect(dadosDoRetorno(balao, "calculo")).toEqual({
-			avaliacao: "melhorar",
+			avaliacao: "ruim",
 			motivos: ["abstrato"],
 			texto: "Mais concreto, por favor.",
 			virarRegra: { texto: "Mais concreto, por favor.", materia: null },

@@ -113,12 +113,12 @@ describe("validarRetorno", () => {
 		expect(validarRetorno({ avaliacao: "bom" })).toEqual({ avaliacao: "bom", motivos: [], texto: "" });
 		expect(validarRetorno({ avaliacao: "otimo" })).toEqual({ avaliacao: "otimo", motivos: [], texto: "" });
 		expect(validarRetorno({ avaliacao: "ruim", virarRegra: { texto: " Mais curto. ", materia: "calc" } }).virarRegra).toEqual({ texto: "Mais curto.", materia: "calc" });
-		// A antiga ainda passa aqui (a tela de antes da parte 3 confere por esta função); a extensão a recusa em registrarRetorno.
-		expect(validarRetorno({ avaliacao: "melhorar" }).avaliacao).toBe("melhorar");
 	});
 
 	it("avaliação, motivo ou texto inválido, regra sem texto: erro", () => {
 		expect(() => validarRetorno({ avaliacao: "excelente" })).toThrow(/avaliação/);
+		// A antiga melhorar só vale nos eventos já gravados (avaliacaoLida): num retorno novo, é erro.
+		expect(() => validarRetorno({ avaliacao: "melhorar" })).toThrow('A avaliação do bloco não é válida ("melhorar"): é ruim, bom ou otimo.');
 		expect(() => validarRetorno({})).toThrow(/ruim, bom ou otimo/);
 		expect(() => validarRetorno({ avaliacao: "bom", motivos: ["chato"] })).toThrow(/desconhecido/);
 		expect(() => validarRetorno({ avaliacao: "bom", motivos: "longo" })).toThrow(/lista/);

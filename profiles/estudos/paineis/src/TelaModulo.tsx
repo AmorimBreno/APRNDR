@@ -65,7 +65,7 @@ import {
 import { AgenteAnimado, type DadosAvatarAgente, type JanelaPerfilHook, Markdown, MenuSuspenso, semMovimento } from "@estudos/ui";
 import { AnimatePresence, motion } from "motion/react";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
-import { MOTIVOS_RETORNO, NOMES_AVALIACAO, NOMES_MOTIVO, TEXTO_REGRA_MAXIMO, TEXTO_RETORNO_MAXIMO } from "../../lib/escrita-tipos.ts";
+import { AVALIACOES_BLOCO, MOTIVOS_RETORNO, NOMES_AVALIACAO, NOMES_MOTIVO, TEXTO_REGRA_MAXIMO, TEXTO_RETORNO_MAXIMO } from "../../lib/escrita-tipos.ts";
 import type { Materia } from "../../lib/materia-tipos.ts";
 import { ehQuestao, progressoDoModulo, respostaDoBloco, type RespostaModulo } from "../../lib/modulo-respostas-tipos.ts";
 import { type Bloco, type BlocoAnterior, type EstadoModuloNaTela, type Licao, type Modulo, versaoDoBloco } from "../../lib/modulo-tipos.ts";
@@ -85,6 +85,7 @@ import {
 	EXEMPLO_REGRA,
 	foiReescrito,
 	marcarVirarRegra,
+	mostraMotivos,
 	mudarTextoRegra,
 	mudarTextoRetorno,
 	NOME_TODAS,
@@ -876,9 +877,10 @@ const OPCAO_TODAS_RETORNO = "todas";
 
 /**
  * O balão de retorno de um bloco (docs/escrita.md, "Retorno em cada bloco"):
- * Bom / Precisa melhorar, os motivos (só com Precisa melhorar), o texto, "Virar
- * regra de escrita" (o texto da regra e onde ela vale) e os botões. Salvar
- * espera a resposta; com erro, o balão fica aberto com a frase.
+ * Ruim / Bom / Ótimo, os motivos e "Salvar e reescrever o bloco" (só com
+ * Ruim), o texto, "Virar regra de escrita" (o texto da regra e onde ela vale)
+ * e os botões. Salvar espera a resposta; com erro, o balão fica aberto com a
+ * frase.
  */
 function BalaoDeRetorno(props: { materia: { id: string; nome?: string }; enviar(dados: DadosDoRetorno, reescrever: boolean): Promise<void>; fechar(): void }) {
 	const [balao, setBalao] = useState(balaoVazio);
@@ -887,6 +889,7 @@ function BalaoDeRetorno(props: { materia: { id: string; nome?: string }; enviar(
 	const [tentou, setTentou] = useState(false);
 	const problema = problemaDoBalao(balao);
 	const melhorar = podeReescrever(balao);
+	const motivos = mostraMotivos(balao);
 	const nomeEsta = props.materia.nome ?? "Esta matéria";
 	const nomeAvaliacao = useId();
 
@@ -916,7 +919,7 @@ function BalaoDeRetorno(props: { materia: { id: string; nome?: string }; enviar(
 				<Button variant="ghost" size="sm" iconOnly icon="close" aria-label="Fechar o retorno" onClick={props.fechar} disabled={Boolean(enviando)} />
 			</div>
 			<div role="radiogroup" aria-label="Avaliação do bloco" className="diag__teclas retorno__avaliacao">
-				{(["bom", "melhorar"] as const).map((avaliacao) => {
+				{AVALIACOES_BLOCO.map((avaliacao) => {
 					const marcada = balao.avaliacao === avaliacao;
 					return (
 						<label key={avaliacao} className={`diag__tecla${marcada ? " diag__tecla--marcada" : ""}`}>
@@ -934,7 +937,7 @@ function BalaoDeRetorno(props: { materia: { id: string; nome?: string }; enviar(
 				})}
 			</div>
 			<AnimatePresence initial={false}>
-				{melhorar ? (
+				{motivos ? (
 					<Dobra key="motivos" className="retorno__sub">
 						<div className="retorno__motivos" role="group" aria-label="O que precisa melhorar">
 							{MOTIVOS_RETORNO.map((motivo) => {

@@ -1,15 +1,16 @@
 // As partes puras da escrita dos módulos na tela (docs/escrita.md, "A tela"):
 // os textos de "Como o professor escreve" (a linha do contrato, o vazio, a
 // etiqueta da origem), a matéria de uma regra no seletor (Todas as matérias ou
-// uma pelo nome), o balão de retorno de um bloco (a avaliação, os motivos, o
-// texto e o "Virar regra de escrita", e o que vai para a ponte) e as versões
+// uma pelo nome), o balão de retorno de um bloco (a avaliação Ruim, Bom ou
+// Ótimo, os motivos, o texto e o "Virar regra de escrita", e o que vai para a
+// ponte, com o detalha da nota rápida) e as versões
 // anteriores de um bloco reescrito ("Reescrito", "Ver a versão anterior",
 // "Versão 1 de 3").
 // Sem React e sem o design system: os testes (escrita-tela.test.ts) rodam no
 // Node.
 
 import {
-	type AvaliacaoBloco,
+	type AvaliacaoNova,
 	type MotivoRetorno,
 	MOTIVOS_RETORNO,
 	type RegraEscrita,
@@ -80,8 +81,8 @@ export function opcoesDaRegra(materia: string | null, materias: ReadonlyArray<{ 
 
 /** O que o Breno marcou no balão de retorno de um bloco. */
 export interface BalaoRetorno {
-	avaliacao?: AvaliacaoBloco;
-	/** Só com "Precisa melhorar"; na ordem de MOTIVOS_RETORNO. */
+	avaliacao?: AvaliacaoNova;
+	/** Só com Ruim (a antiga "Precisa melhorar"); na ordem de MOTIVOS_RETORNO. */
 	motivos: MotivoRetorno[];
 	/** "O que você quer diferente?" (opcional). */
 	texto: string;
@@ -92,21 +93,43 @@ export interface BalaoRetorno {
 	regraEditada: boolean;
 	/** A regra vale só para esta matéria (senão, para todas). */
 	soEstaMateria: boolean;
+	/** O id do avaliou_bloco da nota rápida que este retorno detalha ("Detalhar" com uma nota da versão atual do bloco). */
+	detalha?: string;
 }
 
 export const balaoVazio = (): BalaoRetorno => ({ motivos: [], texto: "", virarRegra: false, textoRegra: "", regraEditada: false, soEstaMateria: false });
 
+/**
+ * O balão que o "Detalhar" abre: com a nota já marcada (a da tecla do pé, se
+ * houver) e o detalha com o id do evento da nota que vale para a versão atual
+ * do bloco (feedbackDoBloco), se houver.
+ */
+export function balaoDetalhando(nota?: { avaliacao?: AvaliacaoNova; evento?: string }): BalaoRetorno {
+	const vazio = balaoVazio();
+	return {
+		...vazio,
+		...(nota?.avaliacao ? { avaliacao: nota.avaliacao } : {}),
+		...(nota?.evento ? { detalha: nota.evento } : {}),
+	};
+}
+
 /** O texto da regra a partir do retorno: o texto dele, aparado, até 300 caracteres. */
 export const textoDaRegra = (texto: string): string => texto.trim().slice(0, TEXTO_REGRA_MAXIMO);
 
-/** Bom ou Precisa melhorar; com Bom, os motivos saem (são só do "Precisa melhorar"). */
-export function escolherAvaliacao(balao: BalaoRetorno, avaliacao: AvaliacaoBloco): BalaoRetorno {
-	return { ...balao, avaliacao, motivos: avaliacao === "bom" ? [] : balao.motivos };
+/** Os motivos e a reescrita são só do Ruim (o que antes era "Precisa melhorar"). */
+const comMotivos = (avaliacao: AvaliacaoNova | undefined): boolean => avaliacao === "ruim";
+
+/** Ruim, Bom ou Ótimo; fora do Ruim, os motivos saem (são só dele). */
+export function escolherAvaliacao(balao: BalaoRetorno, avaliacao: AvaliacaoNova): BalaoRetorno {
+	return { ...balao, avaliacao, motivos: comMotivos(avaliacao) ? balao.motivos : [] };
 }
 
-/** Marca ou desmarca um motivo (só com "Precisa melhorar"), mantendo a ordem da lista. */
+/** Os motivos aparecem no balão (só com Ruim). */
+export const mostraMotivos = (balao: Pick<BalaoRetorno, "avaliacao">): boolean => comMotivos(balao.avaliacao);
+
+/** Marca ou desmarca um motivo (só com Ruim), mantendo a ordem da lista. */
 export function alternarMotivo(balao: BalaoRetorno, motivo: MotivoRetorno): BalaoRetorno {
-	if (balao.avaliacao !== "melhorar") return balao;
+	if (!comMotivos(balao.avaliacao)) return balao;
 	const marcados = balao.motivos.includes(motivo) ? balao.motivos.filter((item) => item !== motivo) : [...balao.motivos, motivo];
 	return { ...balao, motivos: MOTIVOS_RETORNO.filter((item) => marcados.includes(item)) };
 }
@@ -126,12 +149,12 @@ export function mudarTextoRegra(balao: BalaoRetorno, textoRegra: string): BalaoR
 	return { ...balao, textoRegra, regraEditada: true };
 }
 
-/** "Salvar e reescrever o bloco" só aparece com "Precisa melhorar". */
-export const podeReescrever = (balao: Pick<BalaoRetorno, "avaliacao">): boolean => balao.avaliacao === "melhorar";
+/** "Salvar e reescrever o bloco" só aparece com Ruim. */
+export const podeReescrever = (balao: Pick<BalaoRetorno, "avaliacao">): boolean => comMotivos(balao.avaliacao);
 
 /** O que falta para salvar, numa frase; pronto, undefined. */
 export function problemaDoBalao(balao: BalaoRetorno): string | undefined {
-	if (!balao.avaliacao) return "Escolha Bom ou Precisa melhorar.";
+	if (!balao.avaliacao) return "Escolha Ruim, Bom ou Ótimo.";
 	if (balao.texto.trim().length > TEXTO_RETORNO_MAXIMO) return `O texto tem ${balao.texto.trim().length} caracteres; o máximo é ${TEXTO_RETORNO_MAXIMO}.`;
 	if (balao.virarRegra) {
 		const regra = balao.textoRegra.trim();
@@ -143,24 +166,26 @@ export function problemaDoBalao(balao: BalaoRetorno): string | undefined {
 
 /** O que vai na ação "retorno" (sem de onde é o bloco nem o pedido). */
 export interface DadosDoRetorno {
-	avaliacao: AvaliacaoBloco;
+	avaliacao: AvaliacaoNova;
 	motivos: MotivoRetorno[];
 	texto?: string;
 	virarRegra?: { texto: string; materia: string | null };
+	/** O id do evento da nota rápida que este retorno detalha. */
+	detalha?: string;
 }
 
 /**
  * O retorno para a ponte, conferido como a extensão confere (validarRetorno):
  * o texto só se não for vazio; com "Virar regra", o texto da regra e a
- * matéria (esta, ou null para todas). Com algo faltando (problemaDoBalao),
- * um Error com a frase.
+ * matéria (esta, ou null para todas); com o detalha, o id da nota. Com algo
+ * faltando (problemaDoBalao), um Error com a frase.
  */
 export function dadosDoRetorno(balao: BalaoRetorno, materia: string): DadosDoRetorno {
 	const problema = problemaDoBalao(balao);
 	if (problema) throw new Error(problema);
 	const conferido = validarRetorno({
 		avaliacao: balao.avaliacao,
-		motivos: balao.avaliacao === "melhorar" ? balao.motivos : [],
+		motivos: comMotivos(balao.avaliacao) ? balao.motivos : [],
 		texto: balao.texto,
 		...(balao.virarRegra ? { virarRegra: { texto: balao.textoRegra, materia: balao.soEstaMateria ? materia : null } } : {}),
 	});
@@ -169,6 +194,7 @@ export function dadosDoRetorno(balao: BalaoRetorno, materia: string): DadosDoRet
 		motivos: conferido.motivos,
 		...(conferido.texto ? { texto: conferido.texto } : {}),
 		...(conferido.virarRegra ? { virarRegra: conferido.virarRegra } : {}),
+		...(balao.detalha ? { detalha: balao.detalha } : {}),
 	};
 }
 

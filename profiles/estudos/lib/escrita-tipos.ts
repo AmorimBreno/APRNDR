@@ -9,7 +9,7 @@
 // sem mexer no que receberam.
 
 import { ErroCurso } from "./curso-tipos.ts";
-import { type AvaliacaoBloco, ehAvaliacaoGravada } from "./modulo-feedback-tipos.ts";
+import { type AvaliacaoNova, ehAvaliacaoBloco } from "./modulo-feedback-tipos.ts";
 import type { Bloco, BlocoAnterior, BlocoSemId, Modulo, ModuloGerado } from "./modulo-tipos.ts";
 import { versaoDoBloco } from "./modulo-tipos.ts";
 
@@ -112,7 +112,8 @@ export const ehMotivoRetorno = (valor: unknown): valor is MotivoRetorno => (MOTI
 
 /** O retorno conferido (validarRetorno). */
 export interface RetornoBloco {
-	avaliacao: AvaliacaoBloco;
+	/** Só as novas: a antiga melhorar vale apenas nos eventos já gravados (avaliacaoLida). */
+	avaliacao: AvaliacaoNova;
 	/** Sem repetir, na ordem em que vieram. */
 	motivos: MotivoRetorno[];
 	/** Aparado; pode ser vazio. */
@@ -149,8 +150,8 @@ export interface AcoesModulosEscrita {
 		licao: string;
 		bloco: string;
 		pedido: string;
-		/** ruim, bom ou otimo; a extensão recusa a antiga melhorar (o tipo ainda a aceita por causa da tela de antes da parte 3). */
-		avaliacao: AvaliacaoBloco;
+		/** ruim, bom ou otimo (a antiga melhorar é recusada). */
+		avaliacao: AvaliacaoNova;
 		motivos: MotivoRetorno[];
 		texto?: string;
 		virarRegra?: { texto: string; materia: string | null };
@@ -247,16 +248,15 @@ export function secaoDasRegras(regras: readonly Pick<RegraEscrita, "texto">[]): 
 }
 
 /**
- * Confere o retorno que a tela mandou: a avaliação (ruim, bom ou otimo e,
- * por enquanto, a antiga melhorar: a tela de antes da parte 3 ainda confere
- * por aqui; a extensão recusa a antiga em registrarRetorno); os
+ * Confere o retorno que a tela mandou: a avaliação (ruim, bom ou otimo; a
+ * antiga melhorar só vale nos eventos já gravados, lida por avaliacaoLida); os
  * motivos (opcionais) só dos conhecidos, sem repetir, na ordem; o texto
  * (opcional) aparado, até 1000 caracteres; e, com virarRegra, o texto e a
  * matéria da regra pelas regras de validarRegra. Fora disso, ErroEscrita.
  */
 export function validarRetorno(entrada: unknown): RetornoBloco {
 	if (!ehObjeto(entrada)) throw new ErroEscrita("O retorno não veio no formato (avaliação, motivos e texto).");
-	if (!ehAvaliacaoGravada(entrada.avaliacao)) throw new ErroEscrita(`A avaliação do bloco não é válida ("${mostrar(entrada.avaliacao)}"): é ruim, bom ou otimo.`);
+	if (!ehAvaliacaoBloco(entrada.avaliacao)) throw new ErroEscrita(`A avaliação do bloco não é válida ("${mostrar(entrada.avaliacao)}"): é ruim, bom ou otimo.`);
 	const lista = entrada.motivos ?? [];
 	if (!Array.isArray(lista)) throw new ErroEscrita("Os motivos do retorno não vieram numa lista.");
 	const motivos: MotivoRetorno[] = [];

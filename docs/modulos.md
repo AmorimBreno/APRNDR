@@ -239,7 +239,7 @@ Tudo na trava da matéria, com o arquivo inteiro. Os erros vêm como os das outr
 
 Os tipos e as funções puras que a tela usa ficam em `profiles/estudos/lib/modulo-feedback-tipos.ts` (as avaliações e os nomes, a leitura da antiga `melhorar`, a nota que vale pela versão, as perguntas e os níveis, a validação e o resumo do questionário); a gravação, em `lib/modulo-feedback.ts`. A reescrita de um bloco e as respostas mantêm `feedback` e `questionarios`; gerar de novo começa sem eles.
 
-Transição: a função `validarRetorno` (escrita-tipos.ts), que a tela de antes da parte 3 usa para conferir o balão, ainda aceita `melhorar`, para essa tela continuar compilando e passando nos testes; quem recusa a antiga num retorno novo é a extensão (`registrarRetorno`). Pelo mesmo motivo, o tipo `AvaliacaoBloco` inclui `melhorar` (o que pode estar gravado), e `AvaliacaoNova` é só `ruim`, `bom` e `otimo`. Quando a tela nova sair, `validarRetorno` pode passar a aceitar só as novas.
+As avaliações num retorno novo: `validarRetorno` (escrita-tipos.ts), que a tela e a extensão usam, aceita só `ruim`, `bom` e `otimo`; a antiga `melhorar` só vale nos eventos já gravados, lida como `ruim` por `avaliacaoLida`. O tipo `AvaliacaoBloco` inclui `melhorar` (o que pode estar gravado), e `AvaliacaoNova` é só `ruim`, `bom` e `otimo`. No balão, os motivos e "Salvar e reescrever o bloco" aparecem só com Ruim (o lugar do antigo "Precisa melhorar"). As partes puras da tela ficam em `paineis/src/feedback-tela.ts`.
 
 ## O nível de cada conceito
 

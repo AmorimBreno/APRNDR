@@ -1151,3 +1151,82 @@
 	.escrita__regra, .escrita__materia-botao, .escrita__link, .retorno__motivo, .retorno__bloco--reescrevendo .retorno__conteudo > :is(.ap-block, .modulo__postit) { transition: none; }
 	.retorno__motivo:hover { transform: none; }
 }
+
+/* ── O professor em bolha (ProfessorBolha.tsx) e a pergunta com slider (PerguntaSlider.tsx) do questionário do fim da lição ──
+ * As cores de cada humor, da tinta (contorno e rosto) e da barra, a partir dos tokens; o componente mistura
+ * as vizinhas com color-mix (professor-tela.ts). "neutro" é a cor apagada de sem resposta. */
+:root {
+	--professor-humor-1: color-mix(in oklab, var(--brick-text) 70%, var(--brick-pastel));
+	--professor-humor-2: color-mix(in oklab, var(--holo-5) 70%, var(--steel));
+	--professor-humor-3: var(--sage-text);
+	--professor-humor-4: color-mix(in oklab, var(--amber) 55%, var(--holo-3));
+	--professor-humor-5: color-mix(in oklab, var(--amber) 80%, var(--brick-text));
+	--professor-humor-neutro: color-mix(in oklab, var(--steel) 45%, var(--surface-hover));
+	--professor-tinta-1: var(--brick-deep);
+	--professor-tinta-2: var(--steel-deep);
+	--professor-tinta-3: var(--sage-deep);
+	--professor-tinta-4: var(--amber-deep);
+	--professor-tinta-5: var(--amber-deep);
+	--professor-tinta-neutro: color-mix(in oklab, var(--steel-deep) 60%, var(--ink-inverse));
+	--professor-lagrima: var(--holo-5);
+	--professor-brilho: var(--paper);
+	--pergunta-barra-1: var(--steel-line);
+	--pergunta-barra-2: var(--steel);
+	--pergunta-barra-3: var(--sage);
+	--pergunta-barra-4: var(--amber);
+	--pergunta-barra-5: var(--brick-text);
+	--pergunta-barra-neutro: var(--line-strong);
+	--pergunta-chama-fora: var(--brick-text);
+	--pergunta-chama-miolo: var(--amber);
+}
+
+.professor-bolha { display: block; flex: none; overflow: visible; }
+.professor-bolha__corpo { stroke: var(--professor-tinta); stroke-width: 5; }
+.professor-bolha__brilho { fill: var(--professor-brilho); opacity: .4; }
+.professor-bolha__lagrimas path { fill: var(--professor-lagrima); stroke: var(--professor-tinta); stroke-width: 2.5; stroke-linejoin: round; }
+.professor-bolha__sobrancelhas path { fill: none; stroke: var(--professor-tinta); stroke-width: 4.5; stroke-linecap: round; }
+.professor-bolha__olho { fill: var(--professor-tinta); stroke: var(--professor-tinta); stroke-linecap: round; stroke-linejoin: round; }
+
+/* O raio do polegar do slider: as marcas e o trilho começam e terminam no centro dele. */
+.pergunta-slider { --pergunta-polegar: 22px; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: var(--space-5); }
+.pergunta-slider__corpo { display: grid; grid-template-columns: minmax(0, 1fr) 7.5em; align-items: center; gap: var(--space-2) var(--space-4); min-width: 0; }
+.pergunta-slider__texto { grid-column: 1 / -1; margin: 0 0 var(--space-1); color: var(--ink); }
+.pergunta-slider__trilho { position: relative; height: 28px; }
+.pergunta-slider__trilho::before { content: ""; position: absolute; top: 50%; right: calc(var(--pergunta-polegar) / 2); left: calc(var(--pergunta-polegar) / 2); height: 4px; margin-top: -2px; border-radius: var(--radius-full); background: var(--line); }
+.pergunta-slider__marcas { position: absolute; inset: 0 calc(var(--pergunta-polegar) / 2 - 4px); display: flex; align-items: center; justify-content: space-between; pointer-events: none; }
+.pergunta-slider__marca { width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--surface-panel); box-shadow: inset 0 0 0 2px var(--line-strong); transition: background-color .2s ease-out, box-shadow .2s ease-out; }
+.pergunta-slider__marca--cheia { background: var(--pergunta-cor); box-shadow: inset 0 0 0 2px var(--pergunta-cor); }
+.pergunta-slider__faixa { position: relative; display: block; width: 100%; height: 28px; margin: 0; background: transparent; cursor: grab; appearance: none; -webkit-appearance: none; }
+.pergunta-slider__faixa:active { cursor: grabbing; }
+.pergunta-slider__faixa:focus-visible { outline: none; }
+.pergunta-slider__faixa::-webkit-slider-runnable-track { height: 28px; background: transparent; }
+.pergunta-slider__faixa::-moz-range-track { height: 28px; background: transparent; }
+.pergunta-slider__faixa::-webkit-slider-thumb { width: var(--pergunta-polegar); height: var(--pergunta-polegar); margin-top: calc((28px - var(--pergunta-polegar)) / 2); border: 3px solid var(--surface-ground); border-radius: var(--radius-full); background: var(--pergunta-cor); box-shadow: 0 0 0 1.5px var(--line-strong); -webkit-appearance: none; appearance: none; }
+.pergunta-slider__faixa::-moz-range-thumb { box-sizing: border-box; width: var(--pergunta-polegar); height: var(--pergunta-polegar); border: 3px solid var(--surface-ground); border-radius: var(--radius-full); background: var(--pergunta-cor); box-shadow: 0 0 0 1.5px var(--line-strong); }
+.pergunta-slider__faixa:focus-visible::-webkit-slider-thumb { box-shadow: var(--focus-ring); }
+.pergunta-slider__faixa:focus-visible::-moz-range-thumb { box-shadow: var(--focus-ring); }
+.pergunta-slider__nome { color: var(--ink); white-space: nowrap; }
+.pergunta-slider__barra { display: block; height: 8px; margin: 0 calc(var(--pergunta-polegar) / 2 - 4px); overflow: hidden; border-radius: var(--radius-full); background: var(--surface-well); box-shadow: inset 0 0 0 var(--border-hair) var(--line); }
+.pergunta-slider__enchimento { display: block; width: var(--pergunta-enchimento); height: 100%; border-radius: inherit; background: var(--pergunta-barra); }
+.pergunta-slider__chama { justify-self: start; overflow: visible; opacity: var(--pergunta-chama); transform: scale(calc(.5 + .5 * var(--pergunta-chama))); transform-origin: 50% 90%; }
+.pergunta-slider__chama path { transform-box: fill-box; transform-origin: 50% 100%; }
+.pergunta-slider__chama-fora { fill: var(--pergunta-chama-fora); }
+.pergunta-slider__chama-miolo { fill: var(--pergunta-chama-miolo); }
+.pergunta-slider--quente .pergunta-slider__chama-fora { animation: pergunta-chama .5s ease-in-out infinite alternate; }
+.pergunta-slider--quente .pergunta-slider__chama-miolo { animation: pergunta-chama .35s ease-in-out infinite alternate-reverse; }
+@keyframes pergunta-chama {
+	from { transform: scale(1, 1) rotate(-5deg); }
+	to { transform: scale(1.12, 1.22) rotate(5deg); }
+}
+/* Sem resposta: o slider apagado no meio e o nome "—". */
+.pergunta-slider--vazia .pergunta-slider__trilho { opacity: .5; }
+.pergunta-slider--vazia .pergunta-slider__nome { color: var(--ink-subtle); }
+.pergunta-slider--desligada .pergunta-slider__corpo { opacity: var(--opacity-disabled); }
+.pergunta-slider--desligada .pergunta-slider__faixa { cursor: not-allowed; }
+@media (max-width: 520px) {
+	.pergunta-slider { grid-template-columns: minmax(0, 1fr); justify-items: start; }
+}
+@media (prefers-reduced-motion: reduce) {
+	.pergunta-slider__marca { transition: none; }
+	.pergunta-slider--quente :is(.pergunta-slider__chama-fora, .pergunta-slider__chama-miolo) { animation: none; }
+}

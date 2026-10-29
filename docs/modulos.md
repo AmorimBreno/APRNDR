@@ -231,11 +231,15 @@ Depois de enviado, o cartão recolhe para "Respostas enviadas em dd/mm", com as 
 
 ### Ponte (painel "modulos")
 
-- `avaliar_bloco {materia, curso, modulo, licao, bloco, pedido, avaliacao}` grava a nota rápida e responde com o `modulo`.
-- O `retorno` de hoje aceita `avaliacao` `ruim`, `bom` ou `otimo` e o `detalha` opcional. Ele também grava a nota em `feedback`.
-- `avaliar_licao {materia, curso, modulo, licao, pedido, notas, texto?}` grava o questionário e responde com o `modulo`.
+- `avaliar_bloco {materia, curso, modulo, licao, bloco, pedido, avaliacao}` grava a nota rápida e responde com o `modulo` com o pedido. O evento é o `avaliou_bloco` do retorno, com `motivos: []` e `texto: ""` (motivos, texto, `virarRegra` e `detalha` mandados junto são ignorados). Contexto como o do retorno (modelo, prompt e versão do bloco).
+- O `retorno` de hoje aceita `avaliacao` `ruim`, `bom` ou `otimo` (a antiga `melhorar` é erro) e o `detalha` opcional: o id de um `avaliou_bloco` do mesmo bloco (mesma matéria, curso, módulo, lição e bloco, de qualquer versão), conferido como o `reescrever_bloco` confere o retorno (lido da memória da sessão ou do `aprendiz/eventos.jsonl`); vai no resultado do evento. Ele também grava a nota em `feedback` e, além do `estado` com o pedido e o id do evento (como antes), manda o `modulo` sem pedido, antes do `estado`.
+- `avaliar_licao {materia, curso, modulo, licao, pedido, notas, texto?}` grava o questionário e responde com o `modulo` com o pedido. As notas: um objeto pelo id da pergunta, só ids conhecidos, cada uma um inteiro de 1 a 5, pelo menos uma; o texto até 1000 caracteres. No contexto do `avaliou_licao`, `modelo` é o do módulo e `prompts` são o prompt da lição da geração (`modulo-licao.md`, o do `gerou_modulo`) e os das reescritas dos blocos da lição (como no `avaliou_bloco`), sem repetir.
 
-Tudo na trava da matéria, com o arquivo inteiro.
+Tudo na trava da matéria, com o arquivo inteiro. Os erros vêm como os das outras ações (`erro` com o pedido e `ao`); o de `avaliar_bloco` leva também o `bloco`.
+
+Os tipos e as funções puras que a tela usa ficam em `profiles/estudos/lib/modulo-feedback-tipos.ts` (as avaliações e os nomes, a leitura da antiga `melhorar`, a nota que vale pela versão, as perguntas e os níveis, a validação e o resumo do questionário); a gravação, em `lib/modulo-feedback.ts`. A reescrita de um bloco e as respostas mantêm `feedback` e `questionarios`; gerar de novo começa sem eles.
+
+Transição: a função `validarRetorno` (escrita-tipos.ts), que a tela de antes da parte 3 usa para conferir o balão, ainda aceita `melhorar`, para essa tela continuar compilando e passando nos testes; quem recusa a antiga num retorno novo é a extensão (`registrarRetorno`). Pelo mesmo motivo, o tipo `AvaliacaoBloco` inclui `melhorar` (o que pode estar gravado), e `AvaliacaoNova` é só `ruim`, `bom` e `otimo`. Quando a tela nova sair, `validarRetorno` pode passar a aceitar só as novas.
 
 ## O nível de cada conceito
 

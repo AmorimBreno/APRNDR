@@ -49,7 +49,7 @@ No arquivo do módulo, o bloco novo entra no lugar do antigo com `versao` + 1 e 
 
 Painel `escrita`, atendido pela extensão dos módulos (`extensions/modulos.ts`), que é a única que grava o `escrita.json`, numa trava só (o retorno com "Virar regra" também grava nele): `listar {}` → `regras {regras}`; `salvar {pedido, regra: {id?, texto, materia, ativa}}`; `apagar {pedido, id}`; mensagens `regras` e `erro`.
 
-Painel `modulos` (a extensão dos módulos): `retorno {materia, curso, modulo, licao, bloco, pedido, avaliacao, motivos, texto, virarRegra?: {texto, materia}}` (grava o evento e, com virarRegra, a regra) e `reescrever_bloco {materia, curso, modulo, licao, bloco, pedido, retorno}` (o id do evento de retorno); o estado do módulo mostra `reescrevendo: {licao, bloco}` enquanto isso; no fim, a mensagem `modulo` com o módulo novo.
+Painel `modulos` (a extensão dos módulos): `retorno {materia, curso, modulo, licao, bloco, pedido, avaliacao, motivos, texto, virarRegra?: {texto, materia}, detalha?}` (grava o evento e, com virarRegra, a regra; desde a parte 3, também a nota em `feedback` e o `detalha`: docs/modulos.md, "O feedback") e `reescrever_bloco {materia, curso, modulo, licao, bloco, pedido, retorno}` (o id do evento de retorno); o estado do módulo mostra `reescrevendo: {licao, bloco}` enquanto isso; no fim, a mensagem `modulo` com o módulo novo.
 
 ## A tela
 

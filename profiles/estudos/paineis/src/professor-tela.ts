@@ -13,17 +13,19 @@
 // a mesma quantidade de vértices, qualquer valor contínuo entre 1 e 5 é uma
 // mistura linear, ponto a ponto, dos dois humores vizinhos.
 
-export type Nivel = 1 | 2 | 3 | 4 | 5;
+import { NIVEIS_LICAO, NOME_SEM_NIVEL, NOMES_NIVEL, type NivelLicao } from "../../lib/modulo-feedback-tipos.ts";
+
+/** Os níveis e os nomes vêm do contrato (lib/modulo-feedback-tipos.ts), a fonte única. */
+export type Nivel = NivelLicao;
 export type Ponto = readonly [number, number];
 
-export const NIVEIS: readonly Nivel[] = [1, 2, 3, 4, 5];
+export const NIVEIS: readonly Nivel[] = NIVEIS_LICAO;
 
-const NOMES: Record<Nivel, string> = { 1: "Muito ruim", 2: "Ruim", 3: "Bom", 4: "Ótimo", 5: "Excelente" };
 const HUMORES: Record<Nivel, string> = { 1: "chorando", 2: "triste", 3: "contente", 4: "animado", 5: "maravilhado" };
 
 /** O nome do nível ("—" sem resposta). */
 export function nomeDoNivel(nivel: Nivel | null): string {
-	return nivel === null ? "—" : NOMES[nivel];
+	return nivel === null ? NOME_SEM_NIVEL : NOMES_NIVEL[nivel];
 }
 
 /** O humor do professor no nível, para o aria-label da bolha. */

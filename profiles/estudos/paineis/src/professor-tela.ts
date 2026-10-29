@@ -236,42 +236,7 @@ export function fracaoDaTrilha(valor: number | null): number {
 	return valor === null ? 0.5 : arredondar((prender(valor) - 1) / 4, 4);
 }
 
-/** A presença das chamas: aparecem a partir de 4,3 e ficam inteiras no Excelente. */
+/** A presença das chamas do pegador e da lava do preenchimento: aparecem a partir de 4,3 e ficam inteiras no Excelente. */
 export function presencaDaChama(valor: number | null): number {
 	return valor === null ? 0 : arredondar(Math.min(1, Math.max(0, (prender(valor) - 4.3) / 0.7)), 3);
-}
-
-/** Uma língua de fogo dentro do preenchimento: onde fica (em px), a altura (fração da trilha) e o tremor. */
-export interface LinguaDeFogo {
-	/** A posição da esquerda, em px a partir do começo do preenchimento. */
-	x: number;
-	/** A largura, em px. */
-	largura: number;
-	/** A altura, de 0 a 1 da altura da trilha (passa um pouco de 1: a ponta é cortada pela borda). */
-	altura: number;
-	/** A duração de um tremor, em segundos. */
-	duracao: number;
-	/** O atraso negativo do tremor, em segundos (para as línguas não tremerem juntas). */
-	atraso: number;
-}
-
-/**
- * As línguas de fogo do preenchimento, lado a lado e um pouco sobrepostas, com
- * altura, tremor e atraso variando de forma fixa (a mesma sequência sempre, sem
- * Math.random, para não mudar a cada render). Ficam numa faixa larga; o
- * preenchimento corta o que passa da largura dele.
- */
-export function linguasDeFogo(quantidade: number, passo = 14): LinguaDeFogo[] {
-	// Um ruído fixo entre 0 e 1 a partir do índice.
-	const ruido = (i: number, semente: number) => {
-		const x = Math.sin(i * 12.9898 + semente * 78.233) * 43758.5453;
-		return x - Math.floor(x);
-	};
-	return Array.from({ length: quantidade }, (_, i) => ({
-		x: i * passo - passo / 2,
-		largura: arredondar(passo * (1.5 + 0.5 * ruido(i, 1)), 1),
-		altura: arredondar(0.6 + 0.55 * ruido(i, 2), 2),
-		duracao: arredondar(0.45 + 0.4 * ruido(i, 3), 2),
-		atraso: -arredondar(ruido(i, 4), 2),
-	}));
 }

@@ -1207,6 +1207,11 @@
 	--pergunta-fogo-fora: var(--brick);
 	--pergunta-fogo-meio: var(--brick-text);
 	--pergunta-fogo-miolo: var(--holo-3);
+	/* A lava do preenchimento do slider perto do Excelente: amarelo, laranja, vermelho e o vermelho escuro do fundo. */
+	--pergunta-lava-amarelo: color-mix(in oklab, var(--holo-3) 40%, var(--amber));
+	--pergunta-lava-laranja: color-mix(in oklab, var(--amber) 65%, var(--brick));
+	--pergunta-lava-vermelho: var(--brick);
+	--pergunta-lava-fundo: var(--brick-deep);
 }
 
 .professor-bolha { display: block; flex: none; overflow: visible; }
@@ -1220,8 +1225,8 @@
  * funda; o preenchimento, da esquerda até o pegador, na cor do humor (--pergunta-cor); e o pegador, uma pílula da
  * altura da trilha, com o nome do nível dentro, de largura fixa (cabe "Muito ruim", e o pegador não pula).
  * --pergunta-fracao (0 a 1) põe o pegador em fração × (trilha − pegador); --pergunta-chama (0 a 1, de 4,3 a 5)
- * acende o fogo. O input range fica por cima, transparente, com o polegar do tamanho do pegador: a posição que o
- * navegador calcula bate com a desenhada. O isolation faz da trilha o contexto de empilhamento: as chamas do
+ * acende a lava do preenchimento e as chamas do pegador. O input range fica por cima, transparente, com o polegar
+ * do tamanho do pegador: a posição que o navegador calcula bate com a desenhada. O isolation faz da trilha o contexto de empilhamento: as chamas do
  * pegador (z-index −1) ficam por trás do preenchimento e do pegador, e só a parte que sobe acima da trilha aparece. */
 .pergunta-slider { --pergunta-altura: 26px; --pergunta-pegador: 92px; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: var(--space-5); }
 .pergunta-slider__corpo { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
@@ -1242,11 +1247,37 @@
 .pergunta-slider__pegador { --pergunta-halo: 0 0 10px 1px color-mix(in oklab, var(--pergunta-cor) 50%, transparent); position: absolute; top: 0; left: calc(var(--pergunta-fracao) * (100% - var(--pergunta-pegador))); display: flex; align-items: center; justify-content: center; width: var(--pergunta-pegador); height: 100%; border-radius: var(--radius-full); background: var(--pergunta-cor); color: var(--ink-inverse); box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--ink-inverse) 28%, transparent), var(--pergunta-halo); pointer-events: none; }
 .pergunta-slider__faixa:focus-visible ~ .pergunta-slider__pegador { box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--ink-inverse) 28%, transparent), var(--focus-ring); }
 .pergunta-slider__nome { position: relative; font-weight: 600; line-height: 1; white-space: nowrap; }
-/* O fogo do preenchimento: línguas lado a lado (a posição, o tamanho e o tremor vêm do professor-tela.ts),
- * que crescem e aparecem com --pergunta-chama. */
-.pergunta-slider__fogo { position: absolute; inset: 0; opacity: var(--pergunta-chama); transform: scaleY(calc(.3 + .7 * var(--pergunta-chama))); transform-origin: 50% 100%; }
-.pergunta-slider__lingua { position: absolute; bottom: -3px; display: block; transform-origin: 50% 100%; animation: pergunta-lingua .6s ease-in-out infinite alternate; }
-.pergunta-slider__lingua svg, .pergunta-slider__chama svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.pergunta-slider__chama svg { display: block; width: 100%; height: 100%; overflow: visible; }
+/* A lava do preenchimento: duas camadas por cima da cor do humor, que aparecem com --pergunta-chama (a opacidade).
+ * Embaixo (::before), um degradê largo de várias paradas (amarelo, laranja, vermelho, de novo e de novo) que
+ * escorrega devagar para um lado e volta; em cima (::after), manchas redondas de amarelo e de vermelho escuro que
+ * se deslocam em outro ritmo e em outra direção, para a lava ondular em vez de parecer uma faixa deslizando.
+ * O degradê é a exceção ao "nada de degradê" do ESTUDOS.md: o Breno pediu (docs/modulos.md, "O questionário do
+ * fim da lição"). Fica só aqui. */
+.pergunta-slider__preenchimento::before, .pergunta-slider__preenchimento::after { content: ""; position: absolute; inset: 0; opacity: var(--pergunta-chama); pointer-events: none; }
+.pergunta-slider__preenchimento::before {
+	background: linear-gradient(100deg, var(--pergunta-lava-vermelho) 0%, var(--pergunta-lava-laranja) 12%, var(--pergunta-lava-amarelo) 22%, var(--pergunta-lava-laranja) 32%, var(--pergunta-lava-vermelho) 44%, var(--pergunta-lava-fundo) 52%, var(--pergunta-lava-vermelho) 60%, var(--pergunta-lava-laranja) 70%, var(--pergunta-lava-amarelo) 80%, var(--pergunta-lava-laranja) 90%, var(--pergunta-lava-vermelho) 100%);
+	background-size: 300% 100%;
+	animation: pergunta-lava 9s ease-in-out infinite alternate;
+}
+.pergunta-slider__preenchimento::after {
+	background:
+		radial-gradient(ellipse 18% 90% at 20% 70%, var(--pergunta-lava-amarelo), transparent 70%),
+		radial-gradient(ellipse 14% 80% at 55% 20%, var(--pergunta-lava-fundo), transparent 70%),
+		radial-gradient(ellipse 20% 100% at 85% 60%, var(--pergunta-lava-amarelo), transparent 70%);
+	background-size: 200% 180%;
+	opacity: calc(.75 * var(--pergunta-chama));
+	animation: pergunta-lava-manchas 6.5s ease-in-out infinite alternate;
+}
+@keyframes pergunta-lava {
+	0% { background-position: 0% 50%; }
+	100% { background-position: 100% 50%; }
+}
+@keyframes pergunta-lava-manchas {
+	0% { background-position: 100% 0%; }
+	50% { background-position: 40% 100%; }
+	100% { background-position: 0% 30%; }
+}
 .pergunta-slider__fogo-fora { fill: var(--pergunta-fogo-fora); }
 .pergunta-slider__fogo-meio { fill: var(--pergunta-fogo-meio); }
 .pergunta-slider__fogo-miolo { fill: var(--pergunta-fogo-miolo); }
@@ -1281,10 +1312,10 @@
 	/* A bolha fica à esquerda, em cima; o slider usa a largura toda. */
 	.pergunta-slider__corpo { justify-self: stretch; }
 }
-/* Menos movimento: as chamas ficam paradas e as faíscas somem (o encaixe direto fica no componente). */
+/* Menos movimento: as chamas e a lava ficam paradas e as faíscas somem (o encaixe direto fica no componente). */
 @media (prefers-reduced-motion: reduce) {
 	.pergunta-slider__preenchimento { transition: none; }
-	:is(.pergunta-slider__lingua, .pergunta-slider__chama) { animation: none; }
+	.pergunta-slider__chama, .pergunta-slider__preenchimento::before, .pergunta-slider__preenchimento::after { animation: none; }
 	.pergunta-slider__faisca { display: none; }
 }
 

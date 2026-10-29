@@ -6,20 +6,20 @@
 // O slider é uma trilha gorda (como o do esforço do modelo no Claude Code): o
 // pegador é uma pílula da altura da trilha, na cor do humor, com o nome do
 // nível dentro, e a parte da esquerda até ele se enche com a mesma cor. Perto
-// do Excelente (de 4,3 a 5, crescendo aos poucos), o preenchimento pega fogo
-// (línguas de fogo subindo e tremulando dentro dele) e o pegador solta chamas
-// e faíscas para cima.
+// do Excelente (de 4,3 a 5, crescendo aos poucos), o preenchimento vira lava
+// (um degradê amarelo, laranja e vermelho que se mexe devagar, por cima da cor
+// do humor) e o pegador solta chamas e faíscas para cima.
 //
 // Por baixo do desenho há um input range transparente, com o polegar da
 // largura do pegador e a altura da trilha: o navegador cuida do ponteiro, do
 // foco e do leitor de tela, e a posição que ele calcula bate com a do pegador
 // desenhado. Com passo livre, enquanto é arrastado o valor contínuo fica no
-// estado local (e a bolha, as cores e o fogo acompanham); ao soltar, encaixa no
+// estado local (e a bolha, as cores, a lava e as chamas acompanham); ao soltar, encaixa no
 // nível mais próximo com uma mola e chama aoMudar. As setas, PageUp/PageDown,
 // Home e End andam de nível em nível (também com a mola). Sem resposta, a
 // trilha fica vazia e apagada, com o pegador neutro no meio, e o primeiro
 // toque ou tecla já dá um valor. Com reduzir movimento, o encaixe é direto e as
-// chamas ficam paradas.
+// chamas e a lava ficam paradas.
 
 import { animate, type AnimationPlaybackControls, useReducedMotion } from "motion/react";
 import { type CSSProperties, type KeyboardEvent, useCallback, useEffect, useId, useRef, useState } from "react";
@@ -27,7 +27,6 @@ import {
 	corComPresenca,
 	encaixar,
 	fracaoDaTrilha,
-	linguasDeFogo,
 	type Nivel,
 	nivelDaTecla,
 	nomeDoNivel,
@@ -46,8 +45,6 @@ export interface PropsPerguntaSlider {
 }
 
 const MOLA_ENCAIXE = { type: "spring" as const, stiffness: 520, damping: 26 };
-/** As línguas do fogo da trilha: uma faixa mais larga que qualquer trilha; o preenchimento corta o resto. */
-const LINGUAS = linguasDeFogo(56);
 
 export function PerguntaSlider({ pergunta, valor, aoMudar, desligado = false }: PropsPerguntaSlider) {
 	const id = useId();
@@ -177,9 +174,7 @@ export function PerguntaSlider({ pergunta, valor, aoMudar, desligado = false }: 
 							<span key={marca} className="pergunta-slider__marca" />
 						))}
 					</span>
-					<span className="pergunta-slider__preenchimento" aria-hidden="true">
-						{chama > 0 ? <FogoDaTrilha /> : null}
-					</span>
+					<span className="pergunta-slider__preenchimento" aria-hidden="true" />
 					<input
 						type="range"
 						className="pergunta-slider__faixa"
@@ -218,31 +213,6 @@ function Lingua() {
 			<path className="pergunta-slider__fogo-meio" d={GOTA} transform="translate(3.5 12) scale(.65 .7)" />
 			<path className="pergunta-slider__fogo-miolo" d={GOTA} transform="translate(6.5 24) scale(.35 .4)" />
 		</svg>
-	);
-}
-
-/** O fogo dentro do preenchimento: as línguas lado a lado, cada uma com a sua altura e o seu tremor. */
-function FogoDaTrilha() {
-	return (
-		<span className="pergunta-slider__fogo">
-			{LINGUAS.map((lingua) => (
-				<span
-					key={lingua.x}
-					className="pergunta-slider__lingua"
-					style={
-						{
-							left: `${lingua.x}px`,
-							width: `${lingua.largura}px`,
-							height: `${Math.round(lingua.altura * 100)}%`,
-							animationDuration: `${lingua.duracao}s`,
-							animationDelay: `${lingua.atraso}s`,
-						} as CSSProperties
-					}
-				>
-					<Lingua />
-				</span>
-			))}
-		</span>
 	);
 }
 

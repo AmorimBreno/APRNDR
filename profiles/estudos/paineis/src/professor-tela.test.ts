@@ -1,6 +1,6 @@
 // As partes puras do professor em bolha e da pergunta com slider
 // (professor-tela.ts): o encaixe, as teclas, a mistura das cores e a
-// interpolação dos pontos dos olhos, a posição do pegador e as línguas de fogo.
+// interpolação dos pontos dos olhos, a posição do pegador e a presença das chamas.
 
 import { describe, expect, it } from "vitest";
 import {
@@ -11,7 +11,6 @@ import {
 	encaixar,
 	espelhar,
 	fracaoDaTrilha,
-	linguasDeFogo,
 	NIVEIS,
 	nivelDaTecla,
 	nomeDoNivel,
@@ -139,23 +138,4 @@ describe("a trilha", () => {
 		expect(presencaDaChama(5)).toBe(1);
 	});
 
-	it("as línguas de fogo são fixas, cobrem a faixa e variam dentro dos limites", () => {
-		const linguas = linguasDeFogo(40);
-		expect(linguas).toHaveLength(40);
-		expect(linguasDeFogo(40)).toEqual(linguas);
-		expect(linguas[0]!.x).toBeLessThanOrEqual(0);
-		for (const [i, lingua] of linguas.entries()) {
-			if (i > 0) expect(lingua.x).toBeGreaterThan(linguas[i - 1]!.x);
-			// Largas o bastante para se sobreporem à vizinha: o fogo não tem buracos.
-			expect(lingua.largura).toBeGreaterThan(14);
-			expect(lingua.altura).toBeGreaterThanOrEqual(0.6);
-			expect(lingua.altura).toBeLessThanOrEqual(1.15);
-			expect(lingua.duracao).toBeGreaterThanOrEqual(0.45);
-			expect(lingua.duracao).toBeLessThanOrEqual(0.85);
-			expect(lingua.atraso).toBeLessThanOrEqual(0);
-			expect(lingua.atraso).toBeGreaterThanOrEqual(-1);
-		}
-		// Não são todas iguais.
-		expect(new Set(linguas.map((lingua) => lingua.altura)).size).toBeGreaterThan(10);
-	});
 });

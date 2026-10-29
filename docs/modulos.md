@@ -217,7 +217,8 @@ O slider segue o do esforço do modelo no Claude Code (pedido do Breno, com imag
 - o preenchimento vai da esquerda até o pegador, na cor do humor (as mesmas cores da bolha, misturadas de forma contínua durante o arrasto);
 - o pegador é uma pílula da altura da trilha, na cor do humor, com o nome do nível dentro ("Bom", "Excelente"). A largura é fixa, a do nome mais longo ("Muito ruim"), para o pegador não pular quando o nome muda;
 - o pegador tem um halo discreto da cor do humor. É uma exceção, só aqui, ao "nada de brilho, degradê ou desfoque" do design-system/ESTUDOS.md: o Breno pediu este visual;
-- perto do Excelente (de 4,3 a 5, crescendo aos poucos), o preenchimento pega fogo: línguas de fogo em SVG (três camadas: `--brick`, `--brick-text` e o miolo `--holo-3`) lado a lado, cada uma com a sua altura e o seu tremor. O pegador solta três línguas e três faíscas que sobem acima dele.
+- perto do Excelente (de 4,3 a 5, crescendo aos poucos), o preenchimento vira lava: um degradê amarelo, laranja e vermelho (`--pergunta-lava-*`, feitas de `--holo-3`, `--amber`, `--brick` e `--brick-deep`) aparece por cima da cor do humor, com a opacidade subindo junto, e se mexe devagar: um degradê largo de várias paradas que escorrega para um lado e volta, e por cima manchas redondas de amarelo e de vermelho escuro que se deslocam em outro ritmo. O degradê é outra exceção, só aqui, ao "nada de degradê" do ESTUDOS.md: o Breno pediu a lava no lugar das línguas de fogo que havia dentro do preenchimento;
+- o pegador continua na cor do humor e solta três línguas de fogo (SVG em três camadas: `--brick`, `--brick-text` e o miolo `--holo-3`) e três faíscas que sobem acima dele.
 
 Por baixo do desenho fica um input range transparente, com o polegar do tamanho do pegador: o navegador cuida do ponteiro, do foco e do leitor de tela, e a posição dele bate com a do pegador desenhado. O foco pelo teclado aparece como o anel de foco em volta do pegador.
 
@@ -229,7 +230,7 @@ As transições são contínuas:
 - a cor e o achatamento do corpo também se misturam;
 - a bolha dá um quique ao cruzar um nível.
 
-Com o sistema pedindo menos movimento (`prefers-reduced-motion`), não há quique, o encaixe é direto e as chamas ficam paradas, sem tremular (as faíscas somem).
+Com o sistema pedindo menos movimento (`prefers-reduced-motion`), não há quique, o encaixe é direto, as chamas ficam paradas, sem tremular (as faíscas somem), e a lava fica parada.
 
 Uma pergunta não tocada fica sem resposta: a bolha neutra e a trilha vazia e apagada, com o pegador neutro no meio e "—" dentro. Só as tocadas vão. Há também um campo opcional "Quer dizer mais alguma coisa?" (até 1000 caracteres). "Enviar" fica ligado com pelo menos uma pergunta respondida e grava o evento `avaliou_licao`:
 - objeto `{materia, curso, modulo, licao, conceitos}`;

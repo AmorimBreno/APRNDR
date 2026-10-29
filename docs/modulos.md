@@ -210,7 +210,16 @@ No fim de cada lição (depois do último bloco; na última lição, antes do "C
 4. `questoes`: "As questões ajudaram a fixar o que foi explicado?"
 5. `ritmo`: "O tamanho e o ritmo da lição foram bons para você?"
 
-Cada pergunta tem, à esquerda, o professor em forma de bolha e, à direita, a pergunta em cima e um slider de 5 níveis: 1 Muito ruim, 2 Ruim, 3 Bom, 4 Ótimo, 5 Excelente, com o nome do nível ao lado. Embaixo do slider, uma barra que enche e esquenta de cor com o nível, e uma chama animada no Excelente.
+Cada pergunta tem, à esquerda, o professor em forma de bolha e, à direita, a pergunta em cima e um slider de 5 níveis: 1 Muito ruim, 2 Ruim, 3 Bom, 4 Ótimo, 5 Excelente.
+
+O slider segue o do esforço do modelo no Claude Code (pedido do Breno, com imagens de referência):
+- a trilha é gorda, da altura do pegador (26 px), arredondada, na superfície funda (`--surface-well`), com pontinhos nas cinco paradas;
+- o preenchimento vai da esquerda até o pegador, na cor do humor (as mesmas cores da bolha, misturadas de forma contínua durante o arrasto);
+- o pegador é uma pílula da altura da trilha, na cor do humor, com o nome do nível dentro ("Bom", "Excelente"). A largura é fixa, a do nome mais longo ("Muito ruim"), para o pegador não pular quando o nome muda;
+- o pegador tem um halo discreto da cor do humor. É uma exceção, só aqui, ao "nada de brilho, degradê ou desfoque" do design-system/ESTUDOS.md: o Breno pediu este visual;
+- perto do Excelente (de 4,3 a 5, crescendo aos poucos), o preenchimento pega fogo: línguas de fogo em SVG (três camadas: `--brick`, `--brick-text` e o miolo `--holo-3`) lado a lado, cada uma com a sua altura e o seu tremor. O pegador solta três línguas e três faíscas que sobem acima dele.
+
+Por baixo do desenho fica um input range transparente, com o polegar do tamanho do pegador: o navegador cuida do ponteiro, do foco e do leitor de tela, e a posição dele bate com a do pegador desenhado. O foco pelo teclado aparece como o anel de foco em volta do pegador.
 
 A bolha (componente do perfil, SVG nosso, inspirado na imagem que o Breno mandou) muda de humor com o slider: 1 chorando (olhos T T e lágrimas), 2 triste, 3 contente (^ ^), 4 animado (> <), 5 maravilhado (olhos de estrela). A cor do corpo acompanha o humor.
 
@@ -220,9 +229,9 @@ As transições são contínuas:
 - a cor e o achatamento do corpo também se misturam;
 - a bolha dá um quique ao cruzar um nível.
 
-Com o sistema pedindo menos movimento (`prefers-reduced-motion`), não há quique nem chama animada: a troca é direta.
+Com o sistema pedindo menos movimento (`prefers-reduced-motion`), não há quique, o encaixe é direto e as chamas ficam paradas, sem tremular (as faíscas somem).
 
-Uma pergunta não tocada fica sem resposta: a bolha neutra, o nome "—" e o slider apagado no meio. Só as tocadas vão. Há também um campo opcional "Quer dizer mais alguma coisa?" (até 1000 caracteres). "Enviar" fica ligado com pelo menos uma pergunta respondida e grava o evento `avaliou_licao`:
+Uma pergunta não tocada fica sem resposta: a bolha neutra e a trilha vazia e apagada, com o pegador neutro no meio e "—" dentro. Só as tocadas vão. Há também um campo opcional "Quer dizer mais alguma coisa?" (até 1000 caracteres). "Enviar" fica ligado com pelo menos uma pergunta respondida e grava o evento `avaliou_licao`:
 - objeto `{materia, curso, modulo, licao, conceitos}`;
 - resultado `{notas: {entendimento?: 1-5, …}, texto}`;
 - contexto `{fase: "modulo", modelo, prompts}`, com os prompts que geraram a lição.

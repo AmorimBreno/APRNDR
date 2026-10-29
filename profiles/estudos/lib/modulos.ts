@@ -85,6 +85,8 @@ function moduloLido(valor: unknown, materia: string, curso: string, modulo: stri
 		throw new Error("o feedback não é um objeto");
 	} else if (valor.questionarios !== undefined && !ehObjeto(valor.questionarios)) {
 		throw new Error("os questionarios não são um objeto");
+	} else if (valor.explicacoes !== undefined && !(Array.isArray(valor.explicacoes) && (valor.explicacoes as unknown[]).every(ehObjeto))) {
+		throw new Error("as explicacoes não são uma lista de objetos");
 	}
 	return moduloNaOrdem(valor as unknown as Modulo);
 }
@@ -112,6 +114,8 @@ function moduloNaOrdem(modulo: Modulo): Modulo {
 		// O feedback de cada bloco e os questionários das lições (modulo-feedback-tipos.ts) também ficam.
 		...(modulo.feedback && Object.keys(modulo.feedback).length > 0 ? { feedback: modulo.feedback } : {}),
 		...(modulo.questionarios && Object.keys(modulo.questionarios).length > 0 ? { questionarios: modulo.questionarios } : {}),
+		// Os pedidos de explicação (termos-tipos.ts, docs/termos.md) também ficam.
+		...(modulo.explicacoes && modulo.explicacoes.length > 0 ? { explicacoes: modulo.explicacoes } : {}),
 	};
 }
 

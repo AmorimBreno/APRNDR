@@ -59,6 +59,11 @@ export type VerboEvento =
 	| "reescreveu_bloco"
 	// O questionário do fim da lição: docs/modulos.md, "O feedback". Também no aprendiz/eventos.jsonl.
 	| "avaliou_licao"
+	// Os termos-chave e os pedidos de explicação: docs/termos.md. marcou_termos vai para o
+	// eventos.jsonl da matéria; pediu_explicacao e guardou_termo, para o aprendiz/eventos.jsonl.
+	| "marcou_termos"
+	| "pediu_explicacao"
+	| "guardou_termo"
 	// Aprendizagem (seção 9.2), usados a partir dos itens 7 e 8:
 	| "pediu_reexplicacao"
 	| "pediu_outro_jeito"

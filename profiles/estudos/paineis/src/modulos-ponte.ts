@@ -28,10 +28,17 @@
 // corrigindo (os blocos em conferência agora), que o useModuloAberto guarda.
 // Uma conferência que falha manda um "erro" com ao "corrigir" e o bloco, que
 // fica na questão (errosDasQuestoes) até a conferência recomeçar.
+//
+// O feedback (docs/modulos.md, "O feedback"): avaliar_bloco (a nota rápida) e
+// avaliar_licao (o questionário do fim da lição) levam um pedido, como o
+// responder, e respondem com o "modulo" com o pedido. O "erro" do
+// avaliar_bloco traz o bloco e fica nele (errosDoFeedback) até uma nota
+// pedida depois para o mesmo bloco dar certo.
 
 import { type AcaoRecebida, type JanelaPerfilHook, semEsperar } from "@estudos/ui";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AcoesModulosEscrita } from "../../lib/escrita-tipos.ts";
+import type { AvaliacaoNova, NotasLicao } from "../../lib/modulo-feedback-tipos.ts";
 import type { EntradaResponder } from "../../lib/modulo-respostas-tipos.ts";
 import { type AcoesModulos, type MensagemErroModulos, type MensagemEstadoModulos, type MensagemModulo, PAINEL_MODULOS } from "../../lib/modulo-tipos.ts";
 import { EsperaDePedidos, respostaQualquer } from "./escrita-ponte.ts";
@@ -66,7 +73,7 @@ const doCurso = (dados: { materia?: string; curso?: string } | undefined, materi
 	!!dados && (dados.materia === undefined || dados.materia === materia) && (dados.curso === undefined || dados.curso === curso);
 
 /** As ações cujos erros são da visão do módulo (lerModuloAberto, errosDaReescrita, errosDasQuestoes), não do card. */
-const AO_DA_VISAO = new Set(["abrir", "retorno", "reescrever_bloco", "responder", "corrigir", "encerrar"]);
+const AO_DA_VISAO = new Set(["abrir", "retorno", "reescrever_bloco", "responder", "corrigir", "encerrar", "avaliar_bloco", "avaliar_licao"]);
 
 /**
  * Lê, em ordem, o que chegou ao painel "modulos" para o curso. Um erro sem
@@ -233,6 +240,36 @@ export function errosDasQuestoes(recebidas: readonly AcaoRecebida[], alvo: { mat
 	return erros;
 }
 
+// --- O feedback (docs/modulos.md, "O feedback") -------------------------------
+
+/**
+ * Os erros da nota rápida de cada bloco do módulo (pelo id do bloco), lidos em
+ * ordem: um "erro" com ao "avaliar_bloco" e o bloco, daquele módulo. Um
+ * "modulo" posterior com o pedido de uma nota desta tela para o mesmo bloco
+ * (`pedidos`: pedido → bloco) apaga o erro dele.
+ */
+export function errosDoFeedback(
+	recebidas: readonly AcaoRecebida[],
+	alvo: { materia: string; curso: string; modulo: string },
+	pedidos: Readonly<Record<string, string>> = {},
+): Record<string, ErroVistoModulo> {
+	const erros: Record<string, ErroVistoModulo> = {};
+	for (const recebida of recebidas) {
+		if (recebida.acao === "modulo") {
+			const dados = recebida.dados as MensagemModulo | undefined;
+			if (!dados || dados.materia !== alvo.materia || dados.curso !== alvo.curso || dados.modulo?.id !== alvo.modulo || typeof dados.pedido !== "string") continue;
+			const bloco = pedidos[dados.pedido];
+			if (bloco) delete erros[bloco];
+		} else if (recebida.acao === "erro") {
+			const dados = recebida.dados as MensagemErroModulos | undefined;
+			if (!dados || dados.ao !== "avaliar_bloco" || typeof dados.bloco !== "string" || !dados.bloco || !doCurso(dados, alvo.materia, alvo.curso)) continue;
+			if (dados.modulo !== undefined && dados.modulo !== alvo.modulo) continue;
+			erros[dados.bloco] = { chave: recebida.chave, mensagem: dados.mensagem || "Erro desconhecido.", ao: "avaliar_bloco" };
+		}
+	}
+	return erros;
+}
+
 // --- A espera pelo pedido ----------------------------------------------------
 
 /** A resposta da extensão a gerar ou aguardar. */
@@ -333,10 +370,16 @@ export interface ModulosDoCurso {
 	encerrar(modulo: string, bloco: string): Promise<void>;
 	/** Os erros da conferência de cada questão do módulo (pelo id do bloco). */
 	errosQuestoes(modulo: string): Record<string, ErroVistoModulo>;
+	/** A nota rápida de um bloco (Ruim, Bom ou Ótimo); resolve com o "modulo" com a nota. */
+	avaliarBloco(modulo: string, licao: string, bloco: string, avaliacao: AvaliacaoNova): Promise<void>;
+	/** Os erros da nota rápida de cada bloco do módulo (pelo id do bloco). */
+	errosFeedback(modulo: string): Record<string, ErroVistoModulo>;
+	/** O questionário do fim da lição; resolve com o "modulo" com ele. */
+	avaliarLicao(modulo: string, licao: string, questionario: { notas: NotasLicao; texto?: string }): Promise<void>;
 }
 
 /** As ações com pedido cuja resposta não tem nome fixo na ponte (respostaQualquer). */
-type AcoesComPedido = AcoesModulosEscrita & Pick<AcoesModulos, "responder" | "corrigir" | "encerrar">;
+type AcoesComPedido = AcoesModulosEscrita & Pick<AcoesModulos, "responder" | "corrigir" | "encerrar" | "avaliar_bloco" | "avaliar_licao">;
 
 /**
  * Os módulos de um curso: pede "listar" ao montar, quando a sessão muda e
@@ -400,6 +443,8 @@ export function useModulos(janela: JanelaPerfilHook, materia: string, curso: str
 	);
 	// Os pedidos de reescrita desta tela (pedido → módulo e chave do bloco) e o último de cada módulo.
 	const [reescritas, setReescritas] = useState<{ pedidos: Record<string, { modulo: string; chave: string }>; ultimo: Record<string, string> }>({ pedidos: {}, ultimo: {} });
+	// Os pedidos de nota rápida desta tela (pedido → módulo e bloco), para apagar o erro de um bloco quando uma nota nova dele dá certo.
+	const [notas, setNotas] = useState<Record<string, { modulo: string; bloco: string }>>({});
 
 	return {
 		...(estado ? { estado } : {}),
@@ -444,6 +489,20 @@ export function useModulos(janela: JanelaPerfilHook, materia: string, curso: str
 			await mandarComPedido("encerrar", { materia, curso, modulo, bloco, pedido: crypto.randomUUID() });
 		},
 		errosQuestoes: (modulo) => errosDasQuestoes(recebidas ?? [], { materia, curso, modulo }),
+		avaliarBloco: async (modulo, licao, bloco, avaliacao) => {
+			const pedido = crypto.randomUUID();
+			setNotas((atuais) => ({ ...atuais, [pedido]: { modulo, bloco } }));
+			await mandarComPedido("avaliar_bloco", { materia, curso, modulo, licao, bloco, pedido, avaliacao });
+		},
+		errosFeedback: (modulo) =>
+			errosDoFeedback(
+				recebidas ?? [],
+				{ materia, curso, modulo },
+				Object.fromEntries(Object.entries(notas).filter(([, item]) => item.modulo === modulo).map(([pedido, item]) => [pedido, item.bloco])),
+			),
+		avaliarLicao: async (modulo, licao, questionario) => {
+			await mandarComPedido("avaliar_licao", { materia, curso, modulo, licao, pedido: crypto.randomUUID(), ...questionario });
+		},
 		cancelar: async (modulo) => {
 			try {
 				await acoes.acaoDaInterface(PAINEL_MODULOS, "cancelar", { materia, curso, modulo } satisfies AcoesModulos["cancelar"]);

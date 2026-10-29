@@ -100,6 +100,49 @@ O balão passa a dizer "Guardado no glossário". Clicar no termo de um pedido le
 - `marcar_termos`, `explicar_trecho`, `guardar_termo`, com pedido, como as outras.
 - A mensagem `modulo` leva também o glossário do curso (`glossario`), para a tela desenhar os cartões, e `explicando: [ids]` (os pedidos em andamento, como `corrigindo`).
 - O `estado` leva `marcando` por módulo.
-- `erro` com `ao` (`marcar_termos`, `explicar_trecho`, `guardar_termo`) e o `bloco` ou o pedido, quando houver.
+- `erro` com `ao` (`marcar_termos`, `explicar_trecho`, `guardar_termo`) e o `bloco` ou o pedido, quando houver; no `explicar_trecho` que falha depois de aceito e no `guardar_termo`, também o id do pedido de explicação (`explicacao`).
 
-Um termo pode ser explicado num módulo diferente do que está aberto: a mensagem `modulo` leva, para os termos com `explicado` em outro módulo, o número e o título desse módulo e da lição (para o cabeçalho do cartão) e a rota da tela.
+Um termo pode ser explicado num módulo diferente do que está aberto: a mensagem `modulo` leva, para os termos com `explicado` em outro módulo, o número e o título desse módulo e da lição (para o cabeçalho do cartão); a tela monta a rota com o módulo, a lição e o bloco (ver "A mensagem `modulo`", abaixo).
+
+## O que a implementação decidiu (2026-10-29)
+
+Os buracos do contrato, decididos pelo mais simples na parte de dados, geração, prompts e extensão. Os tipos e as funções puras que a tela usa ficam em `profiles/estudos/lib/termos-tipos.ts`; o disco, em `lib/termos.ts`; os tipos da ponte, em `lib/modulo-tipos.ts`.
+
+### A marca
+
+- A marca só entra numa palavra inteira: "radical" não marca dentro de "radicais" (o trecho certo é "radicais"). Também não entra logo depois de `!` (viraria imagem) nem de `\`. A ocorrência é exata, com a mesma caixa.
+- Fora de código, fórmula e link também quer dizer fora de endereços (`https://…`, `www.…`, `<…>`) e de embeds (`![[…]]`). Os blocos cercados valem com qualquer recuo (dentro de listas). Na dúvida, a região protegida é maior: uma marca a menos nunca estraga o texto.
+- Uma por termo em cada bloco é conferido pelo código: a segunda marca do mesmo termo no bloco vira texto (conserto). As marcas fora dos textos onde a marca vale (resposta esperada, confusões, rubrica, resposta-modelo) também viram texto.
+- `[x](termo: t-x)` (com espaço) ou `Termo:` são lidas como marca e reescritas do jeito certo.
+
+### Na geração
+
+- `explicadoEm` é a posição do bloco na lista `blocos` do modelo, a partir de 1 (como o roteiro); um bloco descartado conta na posição. As frases dos problemas usam essas posições.
+- Na primeira tentativa, um termo que não vale (chave, termo, definição, explicadoEm) e a marca antes da explicação são problemas da lição (nova tentativa, com as frases). Na segunda, não derrubam a lição: o termo que não vale sai (as marcas dele viram texto) e as marcas antes da explicação viram texto.
+- O tamanho mínimo das explicações é conferido depois de as marcas desconhecidas virarem texto.
+- A mensagem de cada lição leva o glossário da geração: o do disco mais os termos novos das lições já escritas (com os ids já dados), para as seguintes os reusarem. No fim, os termos são juntados ao glossário do disco (que pode ter mudado no meio): um igual (sem acento e caixa) vira o do disco, um id ocupado ganha outro, e as marcas seguem as trocas. O glossário é gravado depois do módulo.
+- Um termo do glossário explicado de novo (um termo novo igual a ele) troca o `explicado` só quando o atual é null, aponta para um bloco que não existe mais ou aponta para o módulo que está sendo gerado de novo. Vale a primeira lição que o explica.
+- Um glossário ilegível impede a geração, a reescrita, "Marcar os termos" e a explicação (nada é gravado por cima); a mensagem `modulo` vai com o glossário vazio.
+- A reescrita de um bloco não cria termo novo: só ids do glossário; as outras marcas viram texto.
+
+### Marcar os termos
+
+- O `explicadoEm` vale se for um bloco de explicação do módulo; senão, null. Só entram no glossário os termos novos que ganharam pelo menos uma marca. Um termo do glossário com `explicadoEm` troca o `explicado` pela mesma regra da geração (sem a do módulo gerado de novo).
+- Uma marcação por módulo; um módulo sendo gerado não é marcado. O estado com o pedido diz que foi aceita (com `marcando`); no fim vão o `modulo` e o `estado` sem pedido. Um erro antes de aceitar vem com o pedido; depois, sem pedido, com o gasto, e o `estado` sem `marcando`.
+- Se o módulo foi gerado de novo durante a marcação, nada é gravado (erro). Um bloco reescrito no meio não recebe marca.
+- O evento `marcou_termos` é gravado mesmo sem nenhuma marca (o modelo foi chamado).
+- Custo aproximado, pelo tamanho das mensagens: por lição, uns 15 a 25 mil caracteres de entrada (o prompt com a metodologia, uns 5 mil; a lição, de 10 a 15 mil; o glossário, até 8 mil) e uns 2 a 5 mil de saída, perto da reescrita de um bloco (US$ 0,017): por volta de US$ 0,01 a 0,02 por lição. A tela pode dizer "Custa por volta de US$ 0,01 a 0,02 por lição com o GPT-6.1 Sol."
+
+### Os pedidos de explicação
+
+- O pedido entra no `<módulo>.json` quando o Breno pede, sem `explicacao` (é o que a tela mostra como "Explicando…", com o id em `explicando`), e a resposta do `explicar_trecho` é o `modulo` com o pedido. A explicação chega num `modulo` sem pedido.
+- Se a explicação falha, o pedido sai do módulo, e o `erro` vem sem pedido, com `ao: "explicar_trecho"`, o `bloco` e o id do pedido em `explicacao`; "Tentar de novo" manda outro `explicar_trecho`. Um pedido sem explicação que não está em `explicando` (a sessão acabou no meio) falhou (`situacaoDaExplicacao`) e sai no próximo pedido do módulo.
+- O trecho tem os espaços juntados e não é procurado no markdown do bloco (a seleção é do texto desenhado, que pode ter fórmula ou formatação). O "Guardar no glossário" põe a marca só se o trecho aparecer no texto do bloco; senão, guarda sem marca.
+- A explicação tem até 2500 caracteres (o prompt pede uns 1500) e as marcas dela viram texto. No `explique_melhor`, o termo é sempre null; um termo fora dos limites é problema na primeira tentativa e vira null na segunda.
+- O contexto do `pediu_explicacao` leva o modelo e o prompt de onde o bloco veio (o da lição, ou o da reescrita que deu aquela versão), como os eventos das respostas.
+- O pedido guardado ganha `guardado` (o id do termo): é por ele que a tela diz "Guardado no glossário". O `guardou_termo` (no aprendiz) tem objeto `{materia, curso, modulo, licao, bloco, explicacao}` e resultado `{id, termo, definicao, novo, marcado}`.
+
+### A mensagem `modulo`
+
+- `glossario` traz todos os termos do curso (`TermoNaTela`): o termo gravado e o `lugar` que vale, com o número e o título do módulo (pela ordem e pelo nome do esqueleto) e da lição, para todo termo explicado (no módulo aberto ou em outro); `lugar: null` é "Não explicado no curso" (sem `explicado`, ou com um que aponta para um bloco ou pedido que não existe mais). A rota da tela não vai na mensagem: a tela a monta com `modulo`, `licao` e `bloco` do lugar (`caminhoDoModulo` de `paineis/src/modulo-tela.ts`).
+- `explicando` vem em toda mensagem `modulo` (vazio sem nenhum), como `corrigindo`.

@@ -54,7 +54,15 @@
 //   detalhado (retorno, com o detalha opcional) e o questionário do fim da
 //   lição (avaliar_licao, o avaliou_licao), na trava da matéria. A última
 //   nota de cada bloco e o último questionário de cada lição ficam no
-//   <módulo>.json (../lib/modulo-feedback.ts).
+//   <módulo>.json (../lib/modulo-feedback.ts);
+// - os termos-chave e os pedidos de explicação (docs/termos.md): o glossário
+//   do curso nas mensagens das lições e da reescrita (as marcas conferidas e
+//   os termos novos juntados ao glossario.json no fim da geração),
+//   marcar_termos (../prompts/modulo-termos.md, uma chamada por lição),
+//   explicar_trecho (../prompts/explicar-trecho.md) e guardar_termo, com as
+//   chamadas fora da trava e canceladas no fim da sessão; toda mensagem
+//   "modulo" leva o glossário com o lugar de cada termo e o explicando
+//   (../lib/termos.ts).
 import { readFile, stat } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";

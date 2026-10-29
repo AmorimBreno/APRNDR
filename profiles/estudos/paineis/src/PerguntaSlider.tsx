@@ -1,22 +1,33 @@
 // Uma pergunta do questionário do fim da lição (docs/modulos.md, "O
 // questionário do fim da lição"): o professor em bolha à esquerda e, à
-// direita, a pergunta, o slider de 5 níveis com o nome do nível ao lado e, por
-// baixo, a barra que enche e esquenta, com a chama no Excelente. Só
-// apresentação: o valor vem por props e cada escolha sai por aoMudar.
+// direita, a pergunta e o slider de 5 níveis. Só apresentação: o valor vem por
+// props e cada escolha sai por aoMudar.
 //
-// O slider é um input range com passo livre: enquanto é arrastado, o valor
-// contínuo fica no estado local (e a bolha, a barra e o nome acompanham); ao
-// soltar, encaixa no nível mais próximo com uma mola e chama aoMudar. As setas,
-// PageUp/PageDown, Home e End andam de nível em nível (também com a mola). Sem
-// resposta, o slider fica apagado no meio, e o primeiro toque ou tecla já dá
-// um valor. Com reduzir movimento, o encaixe é direto e a chama não tremula.
+// O slider é uma trilha gorda (como o do esforço do modelo no Claude Code): o
+// pegador é uma pílula da altura da trilha, na cor do humor, com o nome do
+// nível dentro, e a parte da esquerda até ele se enche com a mesma cor. Perto
+// do Excelente (de 4,3 a 5, crescendo aos poucos), o preenchimento pega fogo
+// (línguas de fogo subindo e tremulando dentro dele) e o pegador solta chamas
+// e faíscas para cima.
+//
+// Por baixo do desenho há um input range transparente, com o polegar da
+// largura do pegador e a altura da trilha: o navegador cuida do ponteiro, do
+// foco e do leitor de tela, e a posição que ele calcula bate com a do pegador
+// desenhado. Com passo livre, enquanto é arrastado o valor contínuo fica no
+// estado local (e a bolha, as cores e o fogo acompanham); ao soltar, encaixa no
+// nível mais próximo com uma mola e chama aoMudar. As setas, PageUp/PageDown,
+// Home e End andam de nível em nível (também com a mola). Sem resposta, a
+// trilha fica vazia e apagada, com o pegador neutro no meio, e o primeiro
+// toque ou tecla já dá um valor. Com reduzir movimento, o encaixe é direto e as
+// chamas ficam paradas.
 
 import { animate, type AnimationPlaybackControls, useReducedMotion } from "motion/react";
 import { type CSSProperties, type KeyboardEvent, useCallback, useEffect, useId, useRef, useState } from "react";
 import {
 	corComPresenca,
 	encaixar,
-	enchimentoDaBarra,
+	fracaoDaTrilha,
+	linguasDeFogo,
 	type Nivel,
 	nivelDaTecla,
 	nomeDoNivel,
@@ -35,6 +46,8 @@ export interface PropsPerguntaSlider {
 }
 
 const MOLA_ENCAIXE = { type: "spring" as const, stiffness: 520, damping: 26 };
+/** As línguas do fogo da trilha: uma faixa mais larga que qualquer trilha; o preenchimento corta o resto. */
+const LINGUAS = linguasDeFogo(56);
 
 export function PerguntaSlider({ pergunta, valor, aoMudar, desligado = false }: PropsPerguntaSlider) {
 	const id = useId();
@@ -144,11 +157,10 @@ export function PerguntaSlider({ pergunta, valor, aoMudar, desligado = false }: 
 	const chama = presencaDaChama(posicao);
 	const estilo = {
 		"--pergunta-cor": corComPresenca("professor-humor", posicao ?? 3, posicao === null ? 0 : 1),
-		"--pergunta-enchimento": `${enchimentoDaBarra(posicao)}%`,
-		"--pergunta-barra": corComPresenca("pergunta-barra", posicao ?? 3, posicao === null ? 0 : 1),
+		"--pergunta-fracao": fracaoDaTrilha(posicao),
 		"--pergunta-chama": chama,
 	} as CSSProperties;
-	const classes = ["pergunta-slider", posicao === null && "pergunta-slider--vazia", desligado && "pergunta-slider--desligada", chama >= 0.5 && "pergunta-slider--quente"]
+	const classes = ["pergunta-slider", posicao === null && "pergunta-slider--vazia", desligado && "pergunta-slider--desligada", chama > 0 && "pergunta-slider--quente"]
 		.filter(Boolean)
 		.join(" ");
 
@@ -162,8 +174,11 @@ export function PerguntaSlider({ pergunta, valor, aoMudar, desligado = false }: 
 				<div className="pergunta-slider__trilho">
 					<span className="pergunta-slider__marcas" aria-hidden="true">
 						{[1, 2, 3, 4, 5].map((marca) => (
-							<span key={marca} className={nivel !== null && marca <= nivel ? "pergunta-slider__marca pergunta-slider__marca--cheia" : "pergunta-slider__marca"} />
+							<span key={marca} className="pergunta-slider__marca" />
 						))}
+					</span>
+					<span className="pergunta-slider__preenchimento" aria-hidden="true">
+						{chama > 0 ? <FogoDaTrilha /> : null}
 					</span>
 					<input
 						type="range"
@@ -179,31 +194,74 @@ export function PerguntaSlider({ pergunta, valor, aoMudar, desligado = false }: 
 						onChange={(evento) => aoMover(Number(evento.currentTarget.value))}
 						onKeyDown={aoTeclar}
 					/>
+					<span className="pergunta-slider__pegador" aria-hidden="true">
+						{chama > 0 ? <ChamasDoPegador /> : null}
+						<span className="pergunta-slider__nome body-sm">{nomeDoNivel(nivel)}</span>
+					</span>
 				</div>
-				<span className="pergunta-slider__nome body-strong" aria-hidden="true">
-					{nomeDoNivel(nivel)}
-				</span>
-				<span className="pergunta-slider__barra" aria-hidden="true">
-					<span className="pergunta-slider__enchimento" />
-				</span>
-				<Chama />
 			</div>
 		</div>
 	);
 }
 
-/** A chama do Excelente: duas camadas (fora e miolo); aparece e cresce com a variável --pergunta-chama. */
-function Chama() {
+/** A gota da língua de fogo, no viewBox 0 0 20 40: ponta em cima, base redonda embaixo. */
+const GOTA = "M10 0C11.5 7 19 14 19.5 25.5 20 34 15.5 40 10 40S0 34 .5 25.5C1 14 8.5 7 10 0Z";
+
+/**
+ * Uma língua de fogo: a mesma gota de ponta fina em três camadas (a de fora,
+ * o meio e o miolo claro), cada uma menor e encostada na base.
+ */
+function Lingua() {
 	return (
-		<svg className="pergunta-slider__chama" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
-			<path
-				className="pergunta-slider__chama-fora"
-				d="M12 2.2c.7 3.3 3.2 4.9 4.6 7.5 1.6 3 1.2 6.6-1.2 8.6a5.7 5.7 0 0 1-7.6-.2c-2.1-2-2.4-5.2-.9-7.8.4 1.3 1.2 2.1 2.3 2.4-.7-3.7.7-7.8 2.8-10.5z"
-			/>
-			<path
-				className="pergunta-slider__chama-miolo"
-				d="M12.3 11c1.4 1.6 2.6 3.1 2.2 5.1a2.5 2.5 0 0 1-4.9.2c-.2-1.2.2-2.2 1-3 .3.6.7 1 1.2 1.1-.2-1.2.1-2.4.5-3.4z"
-			/>
+		<svg viewBox="0 0 20 40" preserveAspectRatio="none" aria-hidden="true">
+			<path className="pergunta-slider__fogo-fora" d={GOTA} />
+			<path className="pergunta-slider__fogo-meio" d={GOTA} transform="translate(3.5 12) scale(.65 .7)" />
+			<path className="pergunta-slider__fogo-miolo" d={GOTA} transform="translate(6.5 24) scale(.35 .4)" />
 		</svg>
+	);
+}
+
+/** O fogo dentro do preenchimento: as línguas lado a lado, cada uma com a sua altura e o seu tremor. */
+function FogoDaTrilha() {
+	return (
+		<span className="pergunta-slider__fogo">
+			{LINGUAS.map((lingua) => (
+				<span
+					key={lingua.x}
+					className="pergunta-slider__lingua"
+					style={
+						{
+							left: `${lingua.x}px`,
+							width: `${lingua.largura}px`,
+							height: `${Math.round(lingua.altura * 100)}%`,
+							animationDuration: `${lingua.duracao}s`,
+							animationDelay: `${lingua.atraso}s`,
+						} as CSSProperties
+					}
+				>
+					<Lingua />
+				</span>
+			))}
+		</span>
+	);
+}
+
+/** As chamas do pegador: três línguas que sobem acima dele (a do meio maior) e três faíscas. */
+function ChamasDoPegador() {
+	return (
+		<span className="pergunta-slider__chamas">
+			<span className="pergunta-slider__chama pergunta-slider__chama--esquerda">
+				<Lingua />
+			</span>
+			<span className="pergunta-slider__chama pergunta-slider__chama--meio">
+				<Lingua />
+			</span>
+			<span className="pergunta-slider__chama pergunta-slider__chama--direita">
+				<Lingua />
+			</span>
+			<span className="pergunta-slider__faisca pergunta-slider__faisca--1" />
+			<span className="pergunta-slider__faisca pergunta-slider__faisca--2" />
+			<span className="pergunta-slider__faisca pergunta-slider__faisca--3" />
+		</span>
 	);
 }

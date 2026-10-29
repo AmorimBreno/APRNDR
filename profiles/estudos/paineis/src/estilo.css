@@ -1186,7 +1186,7 @@
 }
 
 /* ── O professor em bolha (ProfessorBolha.tsx) e a pergunta com slider (PerguntaSlider.tsx) do questionário do fim da lição ──
- * As cores de cada humor, da tinta (contorno e rosto) e da barra, a partir dos tokens; o componente mistura
+ * As cores de cada humor (a bolha e o slider), da tinta (contorno e rosto) e do fogo, a partir dos tokens; o componente mistura
  * as vizinhas com color-mix (professor-tela.ts). "neutro" é a cor apagada de sem resposta. */
 :root {
 	--professor-humor-1: color-mix(in oklab, var(--brick-text) 70%, var(--brick-pastel));
@@ -1203,14 +1203,10 @@
 	--professor-tinta-neutro: color-mix(in oklab, var(--steel-deep) 60%, var(--ink-inverse));
 	--professor-lagrima: var(--holo-5);
 	--professor-brilho: var(--paper);
-	--pergunta-barra-1: var(--steel-line);
-	--pergunta-barra-2: var(--steel);
-	--pergunta-barra-3: var(--sage);
-	--pergunta-barra-4: var(--amber);
-	--pergunta-barra-5: var(--brick-text);
-	--pergunta-barra-neutro: var(--line-strong);
-	--pergunta-chama-fora: var(--brick-text);
-	--pergunta-chama-miolo: var(--amber);
+	/* As três camadas de cada língua de fogo do slider no Excelente: a de fora, o meio e o miolo claro. */
+	--pergunta-fogo-fora: var(--brick);
+	--pergunta-fogo-meio: var(--brick-text);
+	--pergunta-fogo-miolo: var(--holo-3);
 }
 
 .professor-bolha { display: block; flex: none; overflow: visible; }
@@ -1220,40 +1216,64 @@
 .professor-bolha__sobrancelhas path { fill: none; stroke: var(--professor-tinta); stroke-width: 4.5; stroke-linecap: round; }
 .professor-bolha__olho { fill: var(--professor-tinta); stroke: var(--professor-tinta); stroke-linecap: round; stroke-linejoin: round; }
 
-/* O raio do polegar do slider: as marcas e o trilho começam e terminam no centro dele. */
-.pergunta-slider { --pergunta-polegar: 22px; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: var(--space-5); }
-.pergunta-slider__corpo { display: grid; grid-template-columns: minmax(0, 1fr) 7.5em; align-items: center; gap: var(--space-2) var(--space-4); min-width: 0; }
-.pergunta-slider__texto { grid-column: 1 / -1; margin: 0 0 var(--space-1); color: var(--ink); }
-.pergunta-slider__trilho { position: relative; height: 28px; }
-.pergunta-slider__trilho::before { content: ""; position: absolute; top: 50%; right: calc(var(--pergunta-polegar) / 2); left: calc(var(--pergunta-polegar) / 2); height: 4px; margin-top: -2px; border-radius: var(--radius-full); background: var(--line); }
-.pergunta-slider__marcas { position: absolute; inset: 0 calc(var(--pergunta-polegar) / 2 - 4px); display: flex; align-items: center; justify-content: space-between; pointer-events: none; }
-.pergunta-slider__marca { width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--surface-panel); box-shadow: inset 0 0 0 2px var(--line-strong); transition: background-color .2s ease-out, box-shadow .2s ease-out; }
-.pergunta-slider__marca--cheia { background: var(--pergunta-cor); box-shadow: inset 0 0 0 2px var(--pergunta-cor); }
-.pergunta-slider__faixa { position: relative; display: block; width: 100%; height: 28px; margin: 0; background: transparent; cursor: grab; appearance: none; -webkit-appearance: none; }
+/* O slider (PerguntaSlider.tsx), como o do esforço do modelo no Claude Code: uma trilha gorda na superfície
+ * funda; o preenchimento, da esquerda até o pegador, na cor do humor (--pergunta-cor); e o pegador, uma pílula da
+ * altura da trilha, com o nome do nível dentro, de largura fixa (cabe "Muito ruim", e o pegador não pula).
+ * --pergunta-fracao (0 a 1) põe o pegador em fração × (trilha − pegador); --pergunta-chama (0 a 1, de 4,3 a 5)
+ * acende o fogo. O input range fica por cima, transparente, com o polegar do tamanho do pegador: a posição que o
+ * navegador calcula bate com a desenhada. O isolation faz da trilha o contexto de empilhamento: as chamas do
+ * pegador (z-index −1) ficam por trás do preenchimento e do pegador, e só a parte que sobe acima da trilha aparece. */
+.pergunta-slider { --pergunta-altura: 26px; --pergunta-pegador: 92px; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: var(--space-5); }
+.pergunta-slider__corpo { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
+.pergunta-slider__texto { margin: 0; color: var(--ink); }
+.pergunta-slider__trilho { position: relative; isolation: isolate; height: var(--pergunta-altura); border-radius: var(--radius-full); background: var(--surface-well); box-shadow: inset 0 0 0 var(--border-hair) var(--line); }
+/* As cinco marcas dos níveis, pontinhos no centro de cada parada do pegador; o preenchimento passa por cima. */
+.pergunta-slider__marcas { position: absolute; inset: 0 calc(var(--pergunta-pegador) / 2 - 2px); display: flex; align-items: center; justify-content: space-between; pointer-events: none; }
+.pergunta-slider__marca { width: 4px; height: 4px; border-radius: var(--radius-full); background: var(--line-strong); }
+.pergunta-slider__preenchimento { position: absolute; top: 0; bottom: 0; left: 0; width: calc(var(--pergunta-fracao) * (100% - var(--pergunta-pegador)) + var(--pergunta-pegador)); overflow: hidden; border-radius: inherit; background: var(--pergunta-cor); pointer-events: none; transition: opacity .2s ease-out; }
+.pergunta-slider__faixa { position: absolute; inset: 0; display: block; width: 100%; height: 100%; margin: 0; padding: 0; background: transparent; opacity: 0; cursor: grab; appearance: none; -webkit-appearance: none; }
 .pergunta-slider__faixa:active { cursor: grabbing; }
-.pergunta-slider__faixa:focus-visible { outline: none; }
-.pergunta-slider__faixa::-webkit-slider-runnable-track { height: 28px; background: transparent; }
-.pergunta-slider__faixa::-moz-range-track { height: 28px; background: transparent; }
-.pergunta-slider__faixa::-webkit-slider-thumb { width: var(--pergunta-polegar); height: var(--pergunta-polegar); margin-top: calc((28px - var(--pergunta-polegar)) / 2); border: 3px solid var(--surface-ground); border-radius: var(--radius-full); background: var(--pergunta-cor); box-shadow: 0 0 0 1.5px var(--line-strong); -webkit-appearance: none; appearance: none; }
-.pergunta-slider__faixa::-moz-range-thumb { box-sizing: border-box; width: var(--pergunta-polegar); height: var(--pergunta-polegar); border: 3px solid var(--surface-ground); border-radius: var(--radius-full); background: var(--pergunta-cor); box-shadow: 0 0 0 1.5px var(--line-strong); }
-.pergunta-slider__faixa:focus-visible::-webkit-slider-thumb { box-shadow: var(--focus-ring); }
-.pergunta-slider__faixa:focus-visible::-moz-range-thumb { box-shadow: var(--focus-ring); }
-.pergunta-slider__nome { color: var(--ink); white-space: nowrap; }
-.pergunta-slider__barra { display: block; height: 8px; margin: 0 calc(var(--pergunta-polegar) / 2 - 4px); overflow: hidden; border-radius: var(--radius-full); background: var(--surface-well); box-shadow: inset 0 0 0 var(--border-hair) var(--line); }
-.pergunta-slider__enchimento { display: block; width: var(--pergunta-enchimento); height: 100%; border-radius: inherit; background: var(--pergunta-barra); }
-.pergunta-slider__chama { justify-self: start; overflow: visible; opacity: var(--pergunta-chama); transform: scale(calc(.5 + .5 * var(--pergunta-chama))); transform-origin: 50% 90%; }
-.pergunta-slider__chama path { transform-box: fill-box; transform-origin: 50% 100%; }
-.pergunta-slider__chama-fora { fill: var(--pergunta-chama-fora); }
-.pergunta-slider__chama-miolo { fill: var(--pergunta-chama-miolo); }
-.pergunta-slider--quente .pergunta-slider__chama-fora { animation: pergunta-chama .5s ease-in-out infinite alternate; }
-.pergunta-slider--quente .pergunta-slider__chama-miolo { animation: pergunta-chama .35s ease-in-out infinite alternate-reverse; }
-@keyframes pergunta-chama {
-	from { transform: scale(1, 1) rotate(-5deg); }
-	to { transform: scale(1.12, 1.22) rotate(5deg); }
+.pergunta-slider__faixa::-webkit-slider-runnable-track { height: var(--pergunta-altura); background: transparent; }
+.pergunta-slider__faixa::-moz-range-track { height: var(--pergunta-altura); background: transparent; }
+.pergunta-slider__faixa::-webkit-slider-thumb { width: var(--pergunta-pegador); height: var(--pergunta-altura); border: 0; -webkit-appearance: none; appearance: none; }
+.pergunta-slider__faixa::-moz-range-thumb { box-sizing: border-box; width: var(--pergunta-pegador); height: var(--pergunta-altura); border: 0; }
+/* O halo do pegador (o box-shadow de fora) é a exceção ao "nada de brilho" do ESTUDOS.md: o Breno pediu este
+ * visual (docs/modulos.md, "O questionário do fim da lição"). Fica discreto e só aqui. */
+.pergunta-slider__pegador { --pergunta-halo: 0 0 10px 1px color-mix(in oklab, var(--pergunta-cor) 50%, transparent); position: absolute; top: 0; left: calc(var(--pergunta-fracao) * (100% - var(--pergunta-pegador))); display: flex; align-items: center; justify-content: center; width: var(--pergunta-pegador); height: 100%; border-radius: var(--radius-full); background: var(--pergunta-cor); color: var(--ink-inverse); box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--ink-inverse) 28%, transparent), var(--pergunta-halo); pointer-events: none; }
+.pergunta-slider__faixa:focus-visible ~ .pergunta-slider__pegador { box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--ink-inverse) 28%, transparent), var(--focus-ring); }
+.pergunta-slider__nome { position: relative; font-weight: 600; line-height: 1; white-space: nowrap; }
+/* O fogo do preenchimento: línguas lado a lado (a posição, o tamanho e o tremor vêm do professor-tela.ts),
+ * que crescem e aparecem com --pergunta-chama. */
+.pergunta-slider__fogo { position: absolute; inset: 0; opacity: var(--pergunta-chama); transform: scaleY(calc(.3 + .7 * var(--pergunta-chama))); transform-origin: 50% 100%; }
+.pergunta-slider__lingua { position: absolute; bottom: -3px; display: block; transform-origin: 50% 100%; animation: pergunta-lingua .6s ease-in-out infinite alternate; }
+.pergunta-slider__lingua svg, .pergunta-slider__chama svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.pergunta-slider__fogo-fora { fill: var(--pergunta-fogo-fora); }
+.pergunta-slider__fogo-meio { fill: var(--pergunta-fogo-meio); }
+.pergunta-slider__fogo-miolo { fill: var(--pergunta-fogo-miolo); }
+/* As chamas do pegador: três línguas subindo acima dele (a do meio maior) e três faíscas. */
+.pergunta-slider__chamas { position: absolute; z-index: -1; bottom: 35%; left: 50%; width: 64px; height: 40px; margin-left: -32px; opacity: var(--pergunta-chama); transform: scale(calc(.4 + .6 * var(--pergunta-chama))); transform-origin: 50% 100%; }
+.pergunta-slider__chama { position: absolute; bottom: 0; display: block; transform-origin: 50% 100%; animation: pergunta-lingua .5s ease-in-out infinite alternate; }
+.pergunta-slider__chama--meio { left: 18px; width: 28px; height: 40px; animation-duration: .45s; }
+.pergunta-slider__chama--esquerda { left: 4px; width: 20px; height: 27px; animation-duration: .6s; animation-delay: -.2s; }
+.pergunta-slider__chama--direita { right: 4px; width: 20px; height: 30px; animation-duration: .55s; animation-delay: -.4s; }
+.pergunta-slider__faisca { position: absolute; bottom: 30%; width: 3px; height: 3px; border-radius: var(--radius-full); background: var(--pergunta-fogo-miolo); opacity: 0; animation: pergunta-faisca 1.1s ease-out infinite; }
+.pergunta-slider__faisca--1 { --faisca-x: -4px; left: 16px; }
+.pergunta-slider__faisca--2 { --faisca-x: 2px; left: 31px; animation-duration: .9s; animation-delay: -.4s; }
+.pergunta-slider__faisca--3 { --faisca-x: 5px; left: 46px; animation-duration: 1.3s; animation-delay: -.75s; }
+@keyframes pergunta-lingua {
+	0% { transform: scale(1, .82) skewX(4deg); }
+	50% { transform: scale(.9, 1.08) skewX(-5deg); }
+	100% { transform: scale(1.05, .95) skewX(3deg); }
 }
-/* Sem resposta: o slider apagado no meio e o nome "—". */
-.pergunta-slider--vazia .pergunta-slider__trilho { opacity: .5; }
-.pergunta-slider--vazia .pergunta-slider__nome { color: var(--ink-subtle); }
+@keyframes pergunta-faisca {
+	0% { opacity: 0; transform: translate(0, 0); }
+	20% { opacity: 1; }
+	100% { opacity: 0; transform: translate(var(--faisca-x), -28px); }
+}
+/* Sem resposta: a trilha vazia e apagada, com o pegador neutro no meio e o nome "—". */
+.pergunta-slider--vazia .pergunta-slider__trilho { opacity: .6; }
+.pergunta-slider--vazia .pergunta-slider__preenchimento { opacity: 0; }
+.pergunta-slider--vazia .pergunta-slider__pegador { --pergunta-halo: 0 0 0 transparent; color: var(--ink); }
 .pergunta-slider--desligada .pergunta-slider__corpo { opacity: var(--opacity-disabled); }
 .pergunta-slider--desligada .pergunta-slider__faixa { cursor: not-allowed; }
 @media (max-width: 520px) {
@@ -1261,7 +1281,10 @@
 	/* A bolha fica à esquerda, em cima; o slider usa a largura toda. */
 	.pergunta-slider__corpo { justify-self: stretch; }
 }
+/* Menos movimento: as chamas ficam paradas e as faíscas somem (o encaixe direto fica no componente). */
 @media (prefers-reduced-motion: reduce) {
-	.pergunta-slider__marca { transition: none; }
-	.pergunta-slider--quente :is(.pergunta-slider__chama-fora, .pergunta-slider__chama-miolo) { animation: none; }
+	.pergunta-slider__preenchimento { transition: none; }
+	:is(.pergunta-slider__lingua, .pergunta-slider__chama) { animation: none; }
+	.pergunta-slider__faisca { display: none; }
 }
+

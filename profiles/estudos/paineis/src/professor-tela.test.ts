@@ -1,6 +1,6 @@
 // As partes puras do professor em bolha e da pergunta com slider
 // (professor-tela.ts): o encaixe, as teclas, a mistura das cores e a
-// interpolação dos pontos dos olhos.
+// interpolação dos pontos dos olhos, a posição do pegador e as línguas de fogo.
 
 import { describe, expect, it } from "vitest";
 import {
@@ -9,8 +9,9 @@ import {
 	corComPresenca,
 	corDoValor,
 	encaixar,
-	enchimentoDaBarra,
 	espelhar,
+	fracaoDaTrilha,
+	linguasDeFogo,
 	NIVEIS,
 	nivelDaTecla,
 	nomeDoNivel,
@@ -119,14 +120,42 @@ describe("os olhos", () => {
 	});
 });
 
-describe("a barra", () => {
-	it("enche com o valor e a chama só aparece perto do Excelente", () => {
-		expect(enchimentoDaBarra(null)).toBe(0);
-		expect(enchimentoDaBarra(1)).toBe(20);
-		expect(enchimentoDaBarra(3.5)).toBe(70);
+describe("a trilha", () => {
+	it("o pegador anda de 0 a 1 na trilha; sem resposta, fica no meio", () => {
+		expect(fracaoDaTrilha(null)).toBe(0.5);
+		expect(fracaoDaTrilha(1)).toBe(0);
+		expect(fracaoDaTrilha(3)).toBe(0.5);
+		expect(fracaoDaTrilha(4.6)).toBe(0.9);
+		expect(fracaoDaTrilha(5)).toBe(1);
+		expect(fracaoDaTrilha(9)).toBe(1);
+		expect(fracaoDaTrilha(0)).toBe(0);
+	});
+
+	it("as chamas só aparecem perto do Excelente e crescem até ele", () => {
+		expect(presencaDaChama(null)).toBe(0);
 		expect(presencaDaChama(4)).toBe(0);
+		expect(presencaDaChama(4.3)).toBe(0);
 		expect(presencaDaChama(4.65)).toBe(0.5);
 		expect(presencaDaChama(5)).toBe(1);
-		expect(presencaDaChama(null)).toBe(0);
+	});
+
+	it("as línguas de fogo são fixas, cobrem a faixa e variam dentro dos limites", () => {
+		const linguas = linguasDeFogo(40);
+		expect(linguas).toHaveLength(40);
+		expect(linguasDeFogo(40)).toEqual(linguas);
+		expect(linguas[0]!.x).toBeLessThanOrEqual(0);
+		for (const [i, lingua] of linguas.entries()) {
+			if (i > 0) expect(lingua.x).toBeGreaterThan(linguas[i - 1]!.x);
+			// Largas o bastante para se sobreporem à vizinha: o fogo não tem buracos.
+			expect(lingua.largura).toBeGreaterThan(14);
+			expect(lingua.altura).toBeGreaterThanOrEqual(0.6);
+			expect(lingua.altura).toBeLessThanOrEqual(1.15);
+			expect(lingua.duracao).toBeGreaterThanOrEqual(0.45);
+			expect(lingua.duracao).toBeLessThanOrEqual(0.85);
+			expect(lingua.atraso).toBeLessThanOrEqual(0);
+			expect(lingua.atraso).toBeGreaterThanOrEqual(-1);
+		}
+		// Não são todas iguais.
+		expect(new Set(linguas.map((lingua) => lingua.altura)).size).toBeGreaterThan(10);
 	});
 });

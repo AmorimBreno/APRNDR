@@ -105,9 +105,18 @@ import { ErroMapa, lerMapa, PAINEL_MAPA } from "../lib/mapa.ts";
 import { arquivoMateria, ErroMaterias, eventosAprendiz, eventosMateria } from "../lib/materias.ts";
 import {
 	type ExplicadoDeNovo,
+	explicacoesAteOBloco,
 	type Glossario,
 	glossarioParaATela,
+	gravarExplicacao,
 	gravarGlossario,
+	guardarTermo,
+	NOMES_TIPO_EXPLICACAO,
+	registrarPedidoExplicacao,
+	type TipoExplicacao,
+	tirarPedidoExplicacao,
+	validarPedidoExplicacao,
+	validarRespostaExplicacao,
 	incorporarTermosDaLicao,
 	incorporarTermosMarcados,
 	juntarNoDisco,
@@ -684,6 +693,51 @@ export function mensagemDosTermos(entrada: EntradaTermos): string {
 		].join("\n"),
 		`Os blocos da lição, na ordem (${licao.blocos.length}), com os textos onde a marca vale:\n\n${blocos.join("\n\n")}`,
 		secaoDoGlossario(entrada.glossario, licao.conceitos),
+	].join("\n\n");
+}
+
+/** O que vai na mensagem da explicação de um trecho. */
+export interface EntradaExplicacao {
+	curso: EntradaPlano["curso"];
+	modulo: EntradaPlano["modulo"];
+	licao: Licao;
+	/** O id do bloco do trecho. */
+	bloco: string;
+	trecho: string;
+	tipo: TipoExplicacao;
+	/** Os conceitos do bloco, com o nível. */
+	conceitos: ConceitoDoModulo[];
+	glossario: readonly Termo[];
+	nomeDe?: (id: string) => string;
+}
+
+/**
+ * A mensagem da explicação de um trecho (docs/termos.md, "Selecionar um
+ * trecho e pedir explicação"): o curso e o módulo, a lição (título,
+ * objetivo), as explicações antes do bloco (explicacoesAteOBloco: até uns 8
+ * mil caracteres, as mais próximas primeiro), o bloco do trecho inteiro (sem
+ * o gabarito), o trecho, o pedido, os conceitos do bloco com o nível, o
+ * glossário e, com `regras`, as regras de escrita do Breno.
+ */
+export function mensagemDaExplicacao(entrada: EntradaExplicacao, regras = ""): string {
+	const nomeDe = entrada.nomeDe ?? ((id: string) => id);
+	const { licao } = entrada;
+	const bloco = licao.blocos.find((item) => item.id === entrada.bloco);
+	if (!bloco) throw new ErroModulo(`Não achei o bloco "${entrada.bloco}" na lição ${licao.id}.`);
+	const antes = explicacoesAteOBloco(licao, bloco.id);
+	const conceitos = entrada.conceitos.map((conceito) => [...linhasDoConceito(conceito), "</conceito>"].join("\n"));
+	return [
+		...linhasDoCurso({ ...entrada, formulario: {} }),
+		[`Lição: ${licao.id}, ${JSON.stringify(licao.titulo)}`, `Objetivo da lição: ${licao.objetivo || "(sem objetivo)"}`].join("\n"),
+		antes.length > 0
+			? `O que o aluno já leu antes do bloco (as explicações da lição até ele, na ordem):\n<explicacoes>\n${antes.join("\n\n---\n\n")}\n</explicacoes>`
+			: "O que o aluno já leu antes do bloco: nenhuma explicação (o bloco é o primeiro da lição).",
+		`O bloco onde está o trecho:\n${linhasDoBloco(bloco, nomeDe, false).join("\n")}`,
+		`Trecho que o aluno selecionou:\n<trecho>\n${entrada.trecho}\n</trecho>`,
+		`Pedido do aluno: ${NOMES_TIPO_EXPLICACAO[entrada.tipo]} (${entrada.tipo})`,
+		`Conceitos do bloco (${conceitos.length}):\n\n${conceitos.join("\n\n")}`,
+		secaoDoGlossario(entrada.glossario, bloco.conceitos),
+		...comRegras(regras),
 	].join("\n\n");
 }
 
@@ -1819,6 +1873,126 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 		await conferir(dados, materia, curso, modulo, aConferir, pedido);
 	};
 
+	const marcarExplicando = (chave: string, id: string): AbortController => {
+		const doModulo = explicacoesEmAndamento.get(chave) ?? new Map<string, AbortController>();
+		explicacoesEmAndamento.set(chave, doModulo);
+		const controle = new AbortController();
+		doModulo.set(id, controle);
+		return controle;
+	};
+	const tirarExplicando = (chave: string, id: string, controle: AbortController) => {
+		const doModulo = explicacoesEmAndamento.get(chave);
+		if (doModulo?.get(id) !== controle) return;
+		doModulo.delete(id);
+		if (doModulo.size === 0) explicacoesEmAndamento.delete(chave);
+	};
+
+	/**
+	 * Explica um trecho selecionado (explicar_trecho; docs/termos.md): confere
+	 * o pedido da tela (validarPedidoExplicacao), lê o prompt
+	 * (explicar-trecho.md com a metodologia conceito.md e termos.md) e resolve o
+	 * modelo; na trava, grava o pedido sem explicação (registrarPedidoExplicacao,
+	 * que tira os pedidos que ficaram sem explicação) e manda o módulo com o
+	 * pedido e o id dele em explicando; fora dela, chama o modelo
+	 * (validarRespostaExplicacao, com a nova tentativa; na segunda, um termo
+	 * fora dos limites vira null); na trava de novo, grava a explicação e o
+	 * pediu_explicacao (gravarExplicacao) e manda o módulo sem pedido. Se o
+	 * pedido saiu nesse meio-tempo (o módulo foi gerado de novo), a explicação
+	 * é jogada fora e o módulo vai como está. Com erro depois de aceitar, o
+	 * erro sem pedido (com o bloco e o id do pedido), o pedido sai do módulo e
+	 * o módulo vai de novo. O fim da sessão cancela sem gravar.
+	 */
+	const explicarTrecho = async (dados: string, materia: string, curso: string, modulo: string, dadosAcao: DadosAcao, pedido: string | undefined) => {
+		const chave = chaveDoModulo(materia, curso, modulo);
+		const doPedido = validarPedidoExplicacao(dadosAcao);
+		const prompt = await lerPrompt(caminhoExplicar);
+		const metodo = await lerMetodo(pastaMetodo, METODO_EXPLICAR);
+		if (!registro) throw new ErroModulo("A sessão não tem o registro de modelos do pi; não dá para chamar o modelo que explica o trecho.");
+		const modelo = resolverModelo(registro, prompt.modelo, "da explicação do trecho");
+		const regras = await regrasDaMateria(dados, materia);
+		const aceito = await naTrava(materia, async () => {
+			const glossario = await lerGlossario(dados, materia, curso);
+			const emAndamento = new Set(explicacoesEmAndamento.get(chave)?.keys() ?? []);
+			const gravado = await registrarPedidoExplicacao(dados, materia, curso, modulo, doPedido, { emAndamento });
+			const controle = marcarExplicando(chave, gravado.id);
+			await mostrarModulo(materia, curso, gravado.modulo, pedido);
+			return { ...gravado, glossario, controle };
+		});
+		const { id, controle } = aceito;
+		const sinal = controle.signal;
+		try {
+			const licao = aceito.modulo.licoes.find((item) => item.id === doPedido.licao)!;
+			const bloco = licao.blocos.find((item) => item.id === doPedido.bloco)!;
+			const entrada = await entradaDoModelo(dados, materia, curso, modulo);
+			const nomes = new Map(entrada.plano.conceitos.map((conceito) => [conceito.id, conceito.nome]));
+			const mensagem = mensagemDaExplicacao(
+				{
+					curso: entrada.plano.curso,
+					modulo: entrada.plano.modulo,
+					licao,
+					bloco: bloco.id,
+					trecho: doPedido.trecho,
+					tipo: doPedido.tipo,
+					conceitos: entrada.plano.conceitos.filter((conceito) => bloco.conceitos.includes(conceito.id)),
+					glossario: aceito.glossario.termos,
+					nomeDe: (conceito) => nomes.get(conceito) ?? conceito,
+				},
+				regras,
+			);
+			const resposta = await pedirJson(
+				registro,
+				modelo,
+				instrucoesComMetodo(prompt.instrucoes, metodo),
+				mensagem,
+				(texto, tentativa) => validarRespostaExplicacao(objetoJsonDoModelo(texto), doPedido.tipo, tentativa === 1),
+				sinal,
+				{
+					maxTokens: MAX_TOKENS_EXPLICAR,
+					formato: '{"explicacao": "…", "termo": {"termo": "…", "definicao": "…"} | null}',
+					oQue: "a explicação do trecho",
+					depois: "O pedido de explicação saiu; peça de novo.",
+				},
+			);
+			await naTrava(materia, async () => {
+				if (sinal.aborted) throw new Cancelado();
+				tirarExplicando(chave, id, controle);
+				const novo = await gravarExplicacao(dados, materia, curso, modulo, id, resposta.resultado, {
+					...daSessao(),
+					origem: origemPara(dados),
+					explicador: { modelo: prompt.modelo, prompt: usadoComMetodo(prompt.usado, metodo), custo: resposta.custo },
+				});
+				// O pedido saiu nesse meio-tempo (o módulo foi gerado de novo): a explicação é jogada fora.
+				const atual = novo ?? (await lerModulo(dados, materia, curso, modulo));
+				if (atual) await mostrarModulo(materia, curso, atual);
+			});
+		} catch (erro) {
+			tirarExplicando(chave, id, controle);
+			if (pastaDados !== dados || erro instanceof Cancelado || sinal.aborted) return;
+			mostrar("erro", { mensagem: mensagemDe(erro, "explicar_trecho"), ao: "explicar_trecho", materia, curso, modulo, bloco: doPedido.bloco, explicacao: id });
+			await naTrava(materia, async () => {
+				if (pastaDados !== dados) return;
+				const atual = (await tirarPedidoExplicacao(dados, materia, curso, modulo, id)) ?? (await lerModulo(dados, materia, curso, modulo));
+				if (atual) await mostrarModulo(materia, curso, atual);
+			}).catch(() => undefined);
+		} finally {
+			tirarExplicando(chave, id, controle);
+		}
+	};
+
+	/**
+	 * "Guardar no glossário" (guardar_termo; guardarTermo, na trava): o termo
+	 * do pedido de explicação entra no glossário (ou o pedido se liga ao que
+	 * já existe), o trecho ganha a marca e o guardou_termo é gravado. Responde
+	 * com o módulo com o pedido (com o glossário novo).
+	 */
+	const guardar = (dados: string, materia: string, curso: string, modulo: string, dadosAcao: DadosAcao, pedido: string | undefined) =>
+		naTrava(materia, async () => {
+			const explicacao = textoOpcional(dadosAcao.explicacao);
+			if (!explicacao) throw new ErroModulo("Falta o id do pedido de explicação.");
+			const { modulo: novo } = await guardarTermo(dados, materia, curso, modulo, explicacao, daSessao());
+			await mostrarModulo(materia, curso, novo, pedido);
+		});
+
 	/**
 	 * "Marcar os termos" num módulo já gerado (marcar_termos; docs/termos.md):
 	 * lê o prompt (modulo-termos.md com a metodologia termos.md) e resolve o
@@ -2048,6 +2222,10 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 					await reescrever(dados, materia, curso, modulo, dadosAcao, pedido);
 				} else if (ao === "marcar_termos") {
 					await marcarTermos(dados, materia, curso, modulo, pedido);
+				} else if (ao === "explicar_trecho") {
+					await explicarTrecho(dados, materia, curso, modulo, dadosAcao, pedido);
+				} else if (ao === "guardar_termo") {
+					await guardar(dados, materia, curso, modulo, dadosAcao, pedido);
 				} else if (ao === "cancelar") {
 					// Para a geração ou a reescrita de um bloco do módulo (o que estava gravado fica).
 					const chave = chaveDo(materia, curso);
@@ -2086,7 +2264,8 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 				}
 			} catch (erro) {
 				const comBloco = ACOES_DA_QUESTAO.includes(ao) && typeof dadosAcao.bloco === "string" && dadosAcao.bloco ? { bloco: dadosAcao.bloco } : {};
-				mostrar("erro", { mensagem: mensagemDe(erro, ao), ao, materia, curso, ...comModulo, ...comBloco, ...comPedido });
+				const comExplicacao = ao === "guardar_termo" && typeof dadosAcao.explicacao === "string" && dadosAcao.explicacao ? { explicacao: dadosAcao.explicacao } : {};
+				mostrar("erro", { mensagem: mensagemDe(erro, ao), ao, materia, curso, ...comModulo, ...comBloco, ...comExplicacao, ...comPedido });
 			}
 		})();
 	});

@@ -23,6 +23,7 @@ import { hashDoPrompt, lerMetodo, PASTA_METODO } from "./cursos.ts";
 import type { RespostaModulo } from "../lib/modulo-respostas.ts";
 import modulos, {
 	CAMINHO_PROMPT_BLOCO,
+	CAMINHO_PROMPT_EXPLICAR,
 	CAMINHO_PROMPT_LICAO,
 	CAMINHO_PROMPT_PLANO,
 	CAMINHO_PROMPT_TERMOS,
@@ -338,7 +339,7 @@ async function gerarM1(pedido = "p-gerar", extra: Record<string, unknown> = {}) 
 
 describe("os prompts e a metodologia do perfil", () => {
 	it("os prompts dizem o modelo e o formato; os arquivos da metodologia existem, cada um com o título", async () => {
-		for (const caminho of [CAMINHO_PROMPT_PLANO, CAMINHO_PROMPT_LICAO, CAMINHO_PROMPT_BLOCO, CAMINHO_PROMPT_TERMOS]) {
+		for (const caminho of [CAMINHO_PROMPT_PLANO, CAMINHO_PROMPT_LICAO, CAMINHO_PROMPT_BLOCO, CAMINHO_PROMPT_TERMOS, CAMINHO_PROMPT_EXPLICAR]) {
 			const prompt = lerPromptMapeador(await readFile(caminho, "utf8"));
 			expect(prompt.modelo).toBe("openrouter/openai/gpt-6.1-sol");
 			expect(prompt.instrucoes).toContain("metodologia");
@@ -1875,5 +1876,152 @@ describe("Marcar os termos (marcar_termos)", () => {
 		await new Promise((resolver) => setTimeout(resolver, 30));
 		expect(mostrados).toHaveLength(antes);
 		expect(await doVerbo("marcou_termos")).toHaveLength(0);
+	});
+});
+
+// --- Os pedidos de explicação (docs/termos.md) ---------------------------------------------------
+
+type PedidoNaMensagem = { id: string; bloco: string; trecho: string; tipo: string; explicacao?: string; termo?: unknown; evento?: string; modelo?: string; custo?: number; guardado?: string };
+const pedidosDe = (mensagem: MensagemModuloComTermos | undefined) => ((mensagem?.modulo as (ModuloGerado & { explicacoes?: PedidoNaMensagem[] }) | undefined)?.explicacoes ?? []) as PedidoNaMensagem[];
+const moduloComPedido = (pedido: string) => comPedido(pedido).find((mensagem) => mensagem.acao === "modulo")?.dados as unknown as MensagemModuloComTermos | undefined;
+const explicar = (pedido: string, extra: Record<string, unknown> = {}) => acao("explicar_trecho", { modulo: "m1", licao: "l1", bloco: "l1-b2", pedido, trecho: " Texto ", tipo: "nao_sei", ...extra });
+const EXPLICACAO_COM_TERMO = JSON.stringify({ explicacao: "Um [texto](termo:t-x) é o conteúdo do documento.", termo: { termo: "texto", definicao: "O conteúdo de um documento." } });
+
+describe("os pedidos de explicação (explicar_trecho e guardar_termo)", () => {
+	beforeEach(async () => {
+		ligar();
+		geracaoQueDaCerto();
+		await gerarM1();
+	});
+
+	it("o pedido entra com explicando; a mensagem ao modelo; a explicação com o pediu_explicacao; guardar no glossário com a marca", async () => {
+		const adiado = adiada();
+		respostas.push(adiado.resposta);
+		const chamadasAntes = chamadas.length;
+		explicar("x1");
+		await respondeu("x1");
+		const aceito = moduloComPedido("x1")!;
+		const [pedido] = pedidosDe(aceito);
+		expect(pedido).toEqual({ id: expect.stringMatching(/^x-/), licao: "l1", bloco: "l1-b2", versao: 1, trecho: "Texto", tipo: "nao_sei", em: expect.any(String) });
+		expect(aceito.explicando).toEqual([pedido!.id]);
+		await esperar(() => chamadas.length > chamadasAntes);
+
+		const chamada = chamadas.at(-1)!;
+		expect(chamada.contexto.systemPrompt).toBe(comMetodo("Explique o trecho.", ["conceito.md", "termos.md"]));
+		const mensagem = textoDaChamada(chamada);
+		expect(mensagem).toContain('Lição: l1, "Contando termos"');
+		expect(mensagem).toContain("<explicacoes>\nTexto sobre c-tf. x");
+		expect(mensagem).toContain("O bloco onde está o trecho:\n### l1-b2 · Explicação");
+		expect(mensagem).toContain("<trecho>\nTexto\n</trecho>");
+		expect(mensagem).toContain("Pedido do aluno: Não sei o que é isso (nao_sei)");
+		expect(mensagem).toContain("Nível do aluno: iniciante");
+		expect(mensagem).toContain("Glossário do curso: nenhum termo ainda.");
+
+		adiado.soltar(EXPLICACAO_COM_TERMO);
+		await esperar(() => pedidosDe(ultimaModulo())[0]?.explicacao !== undefined);
+		const respondido = ultimaModulo();
+		expect(respondido.pedido).toBeUndefined();
+		expect(respondido.explicando).toEqual([]);
+		expect(pedidosDe(respondido)[0]).toMatchObject({ explicacao: "Um texto é o conteúdo do documento.", termo: { termo: "texto", definicao: "O conteúdo de um documento." }, modelo: "teste/modelo-x", custo: 0.01 });
+		const [evento] = await doAprendiz("pediu_explicacao");
+		expect(evento).toMatchObject({
+			sessao: "sessao-1",
+			objeto: { materia, curso: CURSO, modulo: "m1", licao: "l1", bloco: "l1-b2", conceitos: ["c-tf"] },
+			resultado: { trecho: "Texto", tipo: "nao_sei", explicacao: "Um texto é o conteúdo do documento." },
+			contexto: {
+				fase: "modulo",
+				versao: 1,
+				modelo: "teste/modelo-x",
+				prompt: PROMPT_DA_LICAO(),
+				explicador: {
+					modelo: "teste/modelo-x",
+					prompt: { nome: "explicar-trecho.md + metodo/conceito.md + metodo/termos.md", hash: `${hashDoPrompt(PROMPT_EXPLICAR)} + ${hashDoPrompt(METODO["conceito.md"]!)} + ${hashDoPrompt(METODO["termos.md"]!)}` },
+					custo: 0.01,
+				},
+			},
+		});
+		expect(pedidosDe(respondido)[0]!.evento).toBe(evento!.id);
+
+		acao("guardar_termo", { modulo: "m1", pedido: "g1", explicacao: pedido!.id });
+		await respondeu("g1");
+		const guardado = moduloComPedido("g1")!;
+		expect(pedidosDe(guardado)[0]!.guardado).toBe("t-texto");
+		expect((await textoDoBlocoGravado(0, 1)).startsWith("[Texto](termo:t-texto) sobre c-tf.")).toBe(true);
+		expect(guardado.glossario).toEqual([
+			expect.objectContaining({
+				id: "t-texto",
+				origem: "pedido",
+				lugar: { modulo: "m1", licao: "l1", bloco: "l1-b2", explicacao: pedido!.id, numeroModulo: 1, tituloModulo: "Pesos dos termos", numeroLicao: 1, tituloLicao: "Contando termos" },
+			}),
+		]);
+		const [guardou] = await doAprendiz("guardou_termo");
+		expect(guardou).toMatchObject({ objeto: { modulo: "m1", licao: "l1", bloco: "l1-b2", explicacao: pedido!.id }, resultado: { id: "t-texto", termo: "texto", novo: true, marcado: true } });
+		acao("guardar_termo", { modulo: "m1", pedido: "g2", explicacao: pedido!.id });
+		await respondeu("g2");
+		expect(erroDe("g2")).toMatchObject({ ao: "guardar_termo", explicacao: pedido!.id, mensagem: "O termo deste pedido já foi guardado no glossário." });
+	});
+
+	it("Explique melhor: o termo é sempre null; o pedido que falha duas vezes sai, com o erro sem pedido (bloco e id)", async () => {
+		respostas.push(EXPLICACAO_COM_TERMO);
+		explicar("x1", { tipo: "explique_melhor" });
+		await respondeu("x1");
+		await esperar(() => pedidosDe(ultimaModulo())[0]?.explicacao !== undefined);
+		expect(pedidosDe(ultimaModulo())[0]!.termo).toBeNull();
+		expect(textoDaChamada(chamadas.at(-1)!)).toContain("Pedido do aluno: Explique melhor (explique_melhor)");
+
+		respostas.push("ruim", '{"explicacao": ""}');
+		explicar("x2", { bloco: "l1-b3", trecho: "conta" });
+		await respondeu("x2");
+		const id = pedidosDe(moduloComPedido("x2")).at(-1)!.id;
+		await esperar(() => recebidas("erro").some((mensagem) => mensagem.dados.ao === "explicar_trecho"));
+		const erro = recebidas("erro").find((mensagem) => mensagem.dados.ao === "explicar_trecho")!.dados;
+		expect(erro).toMatchObject({ modulo: "m1", bloco: "l1-b3", explicacao: id, mensagem: expect.stringContaining("O pedido de explicação saiu; peça de novo.") });
+		expect(erro.pedido).toBeUndefined();
+		await esperar(() => pedidosDe(ultimaModulo()).length === 1);
+		expect(((await lerModulo(dados, materia, CURSO, "m1")) as ModuloGerado).explicacoes!.map((item) => item.id)).not.toContain(id);
+		expect(await doAprendiz("pediu_explicacao")).toHaveLength(1);
+	});
+
+	it("o que vem da tela é conferido: trecho, tipo, lição e bloco; o erro vem com o pedido e o bloco", async () => {
+		const casos: Array<[Record<string, unknown>, string]> = [
+			[{ trecho: "x".repeat(301) }, "301 caracteres"],
+			[{ trecho: "   " }, "vazio"],
+			[{ tipo: "outro" }, "nao_sei ou explique_melhor"],
+			[{ bloco: "l1-b9" }, 'Não achei o bloco "l1-b9"'],
+			[{ licao: "l9" }, 'Não achei a lição "l9"'],
+		];
+		for (const [indice, [extra, frase]] of casos.entries()) {
+			explicar(`e${indice}`, extra);
+			await respondeu(`e${indice}`);
+			expect(erroDe(`e${indice}`)).toMatchObject({ ao: "explicar_trecho", modulo: "m1", bloco: extra.bloco ?? "l1-b2", mensagem: expect.stringContaining(frase) });
+		}
+		acao("guardar_termo", { modulo: "m1", pedido: "g0" });
+		await respondeu("g0");
+		expect(erroDe("g0")).toMatchObject({ ao: "guardar_termo", mensagem: "Falta o id do pedido de explicação." });
+		expect(((await lerModulo(dados, materia, CURSO, "m1")) as ModuloGerado).explicacoes).toBeUndefined();
+	});
+
+	it("o fim da sessão cancela sem gravar; o pedido que ficou sem explicação sai no próximo pedido", async () => {
+		const adiado = adiada();
+		respostas.push(adiado.resposta);
+		const chamadasAntes = chamadas.length;
+		explicar("x1");
+		await respondeu("x1");
+		const velho = pedidosDe(moduloComPedido("x1"))[0]!.id;
+		await esperar(() => chamadas.length > chamadasAntes);
+		const antes = mostrados.length;
+		tratadores.session_shutdown?.({}, ctx);
+		await new Promise((resolver) => setTimeout(resolver, 30));
+		expect(mostrados).toHaveLength(antes);
+		expect(await doAprendiz("pediu_explicacao")).toHaveLength(0);
+		expect(((await lerModulo(dados, materia, CURSO, "m1")) as ModuloGerado).explicacoes!.map((item) => item.id)).toEqual([velho]);
+
+		ligar();
+		respostas.push(EXPLICACAO_COM_TERMO);
+		explicar("x2");
+		await respondeu("x2");
+		expect(pedidosDe(moduloComPedido("x2")).map((item) => item.id)).not.toContain(velho);
+		await esperar(() => pedidosDe(ultimaModulo())[0]?.explicacao !== undefined);
+		expect(((await lerModulo(dados, materia, CURSO, "m1")) as ModuloGerado).explicacoes).toHaveLength(1);
 	});
 });

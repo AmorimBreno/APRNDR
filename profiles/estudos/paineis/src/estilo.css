@@ -1611,3 +1611,233 @@ button.relatorio__evidencia:focus-visible { outline: none; box-shadow: var(--foc
 	.agenda__barra { padding: var(--space-3) var(--space-4); }
 	.agenda__filtro .ap-select { min-width: 0; }
 }
+
+/* ── Calendário em tela cheia (CalendarioCheio.tsx) ── */
+/* Duas colunas: a lateral (minimês, lista do dia, atrasadas e sem data) e o painel da grade com o cabeçalho. A altura é a da tela; abaixo de 600px ela rola no corpo da agenda. */
+.cal-cheio { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: var(--space-4); height: 100%; min-height: 600px; }
+.cal-cheio__lateral { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; min-height: 0; padding: var(--space-4); overflow-y: auto; border-radius: var(--radius-lg); background: var(--surface-panel); scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+.cal-cheio__principal { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: var(--space-3); min-width: 0; min-height: 0; padding: var(--space-4); border-radius: var(--radius-lg); background: var(--surface-panel); }
+.cal-cheio__topo { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); min-width: 0; }
+.cal-cheio__navega { flex: none; display: flex; align-items: center; gap: var(--space-1); }
+.cal-cheio__titulo { margin: 0; min-width: 0; }
+.cal-cheio__espaco { flex: 1; }
+.cal-cheio__painel { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+
+/* O minimês: seis semanas sempre, para a altura não mudar de um mês para o outro. */
+.cal-cheio__mini { display: flex; flex-direction: column; gap: var(--space-2); }
+.cal-cheio__mini-topo { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.cal-cheio__mini-titulo { margin: 0; min-width: 0; }
+.cal-cheio__mini-setas { flex: none; display: flex; align-items: center; gap: var(--space-1); }
+.cal-cheio__mini-grade { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.cal-cheio__mini-cabeca { padding: 0 0 var(--space-1); color: var(--ink-subtle); font-weight: 500; text-align: center; }
+.cal-cheio__mini-celula { padding: 0; text-align: center; }
+.cal-cheio__mini-dia { position: relative; display: grid; place-items: center; width: 100%; height: 38px; padding: 0 0 6px; border: 0; background: none; color: var(--ink); cursor: pointer; }
+.cal-cheio__mini-numero { display: grid; place-items: center; width: 28px; height: 28px; border: var(--border-strong) solid transparent; border-radius: var(--radius-full); transition: background-color .12s ease-out, border-color .12s ease-out; }
+.cal-cheio__mini-dia:hover .cal-cheio__mini-numero { background: var(--surface-hover); }
+.cal-cheio__mini-dia--fora { color: var(--ink-subtle); }
+.cal-cheio__mini-dia--hoje .cal-cheio__mini-numero { background: var(--amber); color: var(--on-amber); }
+.cal-cheio__mini-dia--hoje:hover .cal-cheio__mini-numero { background: var(--amber); filter: brightness(1.08); }
+.cal-cheio__mini-dia--escolhido .cal-cheio__mini-numero { border-color: var(--ink); }
+.cal-cheio__mini-dia:focus-visible { outline: none; }
+.cal-cheio__mini-dia:focus-visible .cal-cheio__mini-numero { box-shadow: var(--focus-ring); }
+.cal-cheio__mini-pontos { position: absolute; left: 0; right: 0; bottom: 2px; display: flex; justify-content: center; gap: 3px; height: 6px; }
+
+/* A lista do dia escolhido: as provas, as tarefas com hora e as sem hora (reaproveita as classes cal-item do calendário compacto). */
+.cal-cheio__lista-dia { display: flex; flex-direction: column; gap: var(--space-2); padding-top: var(--space-3); border-top: var(--border-hair) solid var(--line); }
+.cal-cheio__lista-topo { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.cal-cheio__lista-titulo { margin: 0; min-width: 0; }
+.cal-cheio__vazio { margin: 0; color: var(--ink-muted); }
+.cal-cheio__itens { display: flex; flex-direction: column; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.cal-cheio__bolinha { flex: none; width: 10px; height: 10px; border-radius: var(--radius-full); background: var(--tom, var(--line-strong)); }
+.cal-cheio__bolinha.agenda-tom--neutro { background: transparent; box-shadow: inset 0 0 0 var(--border-control) var(--ink-muted); }
+.cal-cheio__texto { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.cal-cheio__materia { color: var(--ink-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-cheio__curta { display: flex; flex-direction: column; gap: var(--space-1); padding-top: var(--space-3); border-top: var(--border-hair) solid var(--line); }
+.cal-cheio__curta-titulo { margin: 0; color: var(--ink-muted); }
+.cal-cheio__curta-conta { margin-left: var(--space-1); color: var(--ink-subtle); }
+.cal-cheio__curta-lista { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.cal-cheio__curta-item { display: flex; align-items: center; gap: var(--space-2); width: 100%; min-height: var(--control-sm); padding: 0 var(--space-2); border: 0; border-radius: var(--radius-sm); background: none; color: var(--ink); text-align: left; cursor: pointer; }
+.cal-cheio__curta-item:hover { background: var(--surface-hover); }
+.cal-cheio__curta-item:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+/* A grade: o fio entre as células é o próprio fundo aparecendo no vão de 1px. As semanas dividem a altura do painel. */
+.cal-cheio__grade { flex: 1; display: grid; gap: var(--border-hair); min-width: 0; min-height: 0; overflow: hidden; border: var(--border-hair) solid var(--line); border-radius: var(--radius-md); background: var(--line); }
+.cal-cheio__grade--mes { grid-template-rows: auto repeat(var(--semanas), minmax(0, 1fr)); }
+.cal-cheio__grade--semana { grid-template-rows: minmax(0, 1fr); }
+.cal-cheio__cabecas, .cal-cheio__semana { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--border-hair); min-height: 0; }
+.cal-cheio__cabeca-coluna { padding: var(--space-1) var(--space-2); background: var(--surface-panel); color: var(--ink-subtle); text-align: center; }
+/* A célula: a cabeça (28px) e as etiquetas (22px, vão de 2px); calendario-cheio.ts (MEDIDAS_DA_CELULA) conta com estes tamanhos. */
+.cal-cheio__celula { position: relative; display: flex; flex-direction: column; gap: 2px; min-width: 0; min-height: 0; padding: var(--space-1); overflow: hidden; background: var(--surface-panel); cursor: pointer; transition: background-color .12s ease-out; }
+.cal-cheio__celula:hover { background: var(--surface-raised); }
+.cal-cheio__celula--fora { background: var(--surface-ground); color: var(--ink-subtle); }
+.cal-cheio__celula--fora:hover { background: var(--surface-panel); }
+.cal-cheio__celula--escolhida { box-shadow: inset 0 0 0 var(--border-strong) var(--ink); }
+.cal-cheio__cabeca { flex: none; display: flex; align-items: flex-start; justify-content: space-between; height: 28px; margin-bottom: 2px; }
+.cal-cheio__dia { display: flex; align-items: center; gap: var(--space-2); height: 28px; padding: 0; border: 0; background: none; color: inherit; cursor: pointer; }
+.cal-cheio__dia-nome { color: var(--ink-muted); }
+.cal-cheio__numero { display: grid; place-items: center; min-width: 28px; height: 28px; border-radius: var(--radius-full); }
+.cal-cheio__celula--hoje .cal-cheio__numero { background: var(--amber); color: var(--on-amber); }
+.cal-cheio__dia:focus-visible { outline: none; }
+.cal-cheio__dia:focus-visible .cal-cheio__numero { box-shadow: var(--focus-ring); }
+/* O "+" só aparece com o mouse em cima (ou o foco dentro do dia). */
+.cal-cheio__novo { display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: var(--radius-xs); background: none; color: var(--ink-muted); cursor: pointer; opacity: 0; transition: opacity .12s ease-out; }
+.cal-cheio__celula:hover .cal-cheio__novo, .cal-cheio__celula:focus-within .cal-cheio__novo, .cal-cheio__novo:focus-visible { opacity: 1; }
+.cal-cheio__novo:hover { background: var(--surface-hover); color: var(--ink); }
+.cal-cheio__novo:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.cal-cheio__etiquetas { display: flex; flex-direction: column; gap: 2px; min-width: 0; min-height: 0; margin: 0; padding: 0; list-style: none; }
+.cal-cheio__grade--semana .cal-cheio__etiquetas { overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+.cal-cheio__etiquetas > li { min-width: 0; }
+/* A etiqueta é a cor da matéria (--tom e --tom-tinta, classeDoTom); sem matéria, só o contorno. */
+.cal-etq { display: flex; align-items: center; gap: var(--space-1); box-sizing: border-box; width: 100%; height: 22px; padding: 0 6px; overflow: hidden; border: 0; border-radius: var(--radius-xs); background: var(--tom, var(--line-strong)); color: var(--tom-tinta, var(--ink)); text-align: left; cursor: pointer; }
+.cal-etq.agenda-tom--neutro { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 var(--border-control) var(--line-strong); }
+button.cal-etq:hover { filter: brightness(1.1); }
+button.cal-etq:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.cal-etq--prova { cursor: default; font-weight: 600; }
+.cal-etq .ap-icon { flex: none; }
+.cal-etq__hora { flex: none; font-weight: 600; font-variant-numeric: tabular-nums; }
+.cal-etq__titulo { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-etq--feita { opacity: .6; }
+.cal-etq--feita .cal-etq__titulo { text-decoration: line-through; }
+.cal-cheio__mais { box-sizing: border-box; width: 100%; height: 22px; padding: 0 6px; border: 0; border-radius: var(--radius-xs); background: none; color: var(--ink-muted); text-align: left; cursor: pointer; }
+.cal-cheio__mais:hover { background: var(--surface-hover); color: var(--ink); }
+.cal-cheio__mais:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+/* Os pontinhos de cada dia só aparecem na tela estreita (as etiquetas somem). */
+.cal-cheio__pontos { display: none; justify-content: center; gap: 3px; height: 6px; }
+@media (max-width: 760px) {
+	.cal-cheio { grid-template-columns: minmax(0, 1fr); height: auto; min-height: 0; }
+	.cal-cheio__lateral { overflow-y: visible; }
+	.cal-cheio__mini { display: none; }
+	.cal-cheio__lista-dia { padding-top: 0; border-top: 0; }
+	.cal-cheio__principal { grid-template-rows: auto auto; }
+	.cal-cheio__grade--mes { grid-template-rows: auto repeat(var(--semanas), 56px); }
+	.cal-cheio__grade--mes .cal-cheio__etiquetas, .cal-cheio__grade--mes .cal-cheio__novo { display: none; }
+	.cal-cheio__grade--mes .cal-cheio__pontos { display: flex; }
+	.cal-cheio__grade--semana { grid-template-rows: none; }
+	.cal-cheio__grade--semana .cal-cheio__semana { grid-template-columns: minmax(0, 1fr); }
+	.cal-cheio__grade--semana .cal-cheio__celula { min-height: 56px; }
+	.cal-cheio__grade--semana .cal-cheio__novo { opacity: 1; }
+}
+@media (hover: none) {
+	.cal-cheio__novo { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+	.cal-cheio__mini-numero, .cal-cheio__celula, .cal-cheio__novo { transition: none; }
+}
+
+/* Conserto da casca (TelaAgenda.tsx): o grid de três linhas do .agenda põe a aba na linha "auto" quando não há aviso de erro, e a aba não ocupava a altura da tela. Em coluna, a aba sempre ocupa o que sobra. */
+.agenda { display: flex; flex-direction: column; }
+.agenda > :not(.agenda__corpo) { flex: none; }
+.agenda__corpo { flex: 1; }
+
+/* ── Lista de tarefas e quadro (ListaTarefas.tsx, QuadroTarefas.tsx) ── */
+.campo-rapido { min-width: 0; }
+
+/* A lista: o campo de adicionar e os filtros no topo, depois os grupos de prazo. */
+.lista-tarefas { display: flex; flex-direction: column; gap: var(--space-6); max-width: 920px; margin: 0 auto; padding-bottom: var(--space-8); }
+.lista-tarefas__topo { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-3) var(--space-5); }
+.lista-tarefas__novo { flex: 1 1 320px; }
+.lista-tarefas__filtros { flex: none; display: flex; align-items: center; gap: var(--space-5); min-height: var(--control-md); }
+.lista-tarefas__filtros .ap-select { min-width: 170px; }
+.lista-tarefas__grupos { display: flex; flex-direction: column; gap: var(--space-5); }
+.lista-tarefas__total { margin: 0; color: var(--ink-subtle); }
+.lista-grupo__titulo { display: flex; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-2); color: var(--ink-muted); font-weight: 500; }
+.lista-grupo__contagem { color: var(--ink-subtle); }
+.lista-grupo__alerta { flex: none; color: var(--amber); }
+.lista-grupo__alternar { display: inline-flex; align-items: center; gap: var(--space-2); min-height: 32px; margin-left: calc(var(--space-1) * -1); padding: 0 var(--space-1); border: 0; border-radius: var(--radius-xs); background: none; color: inherit; font-weight: inherit; cursor: pointer; }
+.lista-grupo__alternar:hover { color: var(--ink); }
+.lista-grupo__alternar:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.lista-grupo__seta { flex: none; transition: transform .12s ease-out; }
+.lista-grupo__alternar[aria-expanded="true"] .lista-grupo__seta { transform: rotate(90deg); }
+.lista-grupo__linhas { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: var(--space-1); list-style: none; border-radius: var(--radius-md); background: var(--surface-panel); }
+.lista-linha { display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-1) 0 var(--space-2); border-radius: var(--radius-sm); }
+.lista-linha__caixa { flex: none; align-items: center; }
+.lista-linha__caixa .ap-check__box { margin-top: 0; }
+.lista-linha__abrir { flex: 1; display: flex; align-items: center; gap: var(--space-4); min-width: 0; min-height: 48px; padding: 0 var(--space-2); border: 0; border-radius: var(--radius-sm); background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; transition: background-color .12s ease-out; }
+.lista-linha__abrir:hover { background: var(--surface-hover); }
+.lista-linha__abrir:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.lista-linha__titulo { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lista-linha--feita .lista-linha__titulo { color: var(--ink-muted); text-decoration: line-through; }
+.lista-linha__meta { flex: none; display: flex; align-items: center; justify-content: flex-end; gap: var(--space-4); }
+.lista-linha__data { display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; min-width: 104px; color: var(--ink-muted); white-space: nowrap; }
+.lista-linha__data--atrasada { color: var(--amber); }
+.lista-linha__materia { display: block; min-width: 110px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-muted); }
+.lista-linha__coluna { flex: none; }
+/* A bolinha da cor da matéria (a classe agenda-tom-* do elemento define --tom); sem matéria nem cor, só o contorno. */
+.lista-ponto { display: inline-block; flex: none; width: 10px; height: 10px; margin-right: 6px; border-radius: var(--radius-full); background: var(--tom, var(--line-strong)); }
+.agenda-tom--neutro .lista-ponto { background: transparent; box-shadow: inset 0 0 0 1.5px var(--ink-muted); }
+
+/* O quadro: as colunas lado a lado num painel que rola na horizontal (e na vertical, se uma coluna crescer). */
+.quadro-tela { display: flex; flex-direction: column; gap: var(--space-3); height: 100%; min-height: 0; }
+.quadro-tela > .agenda__erro { flex: none; }
+.quadro { flex: 1; min-height: 0; overflow: auto; padding-bottom: var(--space-3); scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+.quadro__colunas { display: flex; align-items: stretch; gap: var(--space-4); width: max-content; min-width: 100%; min-height: 100%; }
+.quadro--arrastando, .quadro--arrastando * { cursor: grabbing !important; }
+.quadro-coluna { flex: none; display: flex; flex-direction: column; gap: var(--space-2); width: min(296px, 85vw); padding: var(--space-3); border-radius: var(--radius-lg); background: var(--surface-panel); box-shadow: inset 0 0 0 var(--border-hair) var(--line); }
+.quadro-coluna--alvo { box-shadow: inset 0 0 0 var(--border-control) var(--amber); }
+.quadro-coluna__cabeca { display: flex; align-items: center; gap: var(--space-2); min-height: 36px; padding: 0 0 0 var(--space-1); }
+.quadro-coluna__titulo { flex: 1; display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.quadro-coluna__nome { margin: 0; min-width: 0; overflow: hidden; font-size: 17px; line-height: 24px; text-overflow: ellipsis; white-space: nowrap; }
+.quadro-coluna__feito { flex: none; display: inline-grid; place-items: center; color: var(--sage-text); }
+.quadro-coluna__contagem { flex: none; color: var(--ink-muted); }
+.quadro-coluna__renomear { flex: 1; min-width: 0; }
+.quadro-coluna__campo { box-sizing: border-box; width: 100%; min-width: 0; height: 32px; margin: 0; padding: 0 var(--space-2); border: var(--border-control) solid var(--focus); border-radius: var(--radius-sm); background: var(--surface-raised); color: var(--ink); font-size: 16px; outline: none; }
+.quadro-coluna__campo[aria-invalid="true"] { border-color: var(--brick-text); }
+.quadro-coluna__campo:focus-visible { box-shadow: 0 0 0 1px var(--focus); }
+.quadro-coluna__erro { display: flex; align-items: flex-start; gap: 6px; margin: var(--space-1) 0 0; color: var(--brick-text); }
+.quadro-coluna__erro .ap-icon { flex: none; margin-top: 2px; }
+.quadro-coluna__menu-botao, .quadro-item__mover-botao { display: inline-grid; place-items: center; border: 0; background: none; color: var(--ink-muted); cursor: pointer; transition: background-color .12s ease-out, color .12s ease-out; }
+.quadro-coluna__menu-botao { width: 32px; height: 32px; border-radius: var(--radius-sm); }
+.quadro-coluna__menu-botao:hover, .quadro-item__mover-botao:hover { background: var(--surface-hover); color: var(--ink); }
+.quadro-coluna__menu-botao:focus-visible, .quadro-item__mover-botao:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.quadro-coluna__menu-botao > .ap-icon, .quadro-item__mover-botao > .ap-icon:last-child { display: none; }
+/* Os três pontinhos do menu da coluna. */
+.quadro-coluna__pontos { display: block; width: 18px; height: 4px; background: radial-gradient(circle, currentColor 1.7px, transparent 1.9px) 0 0 / 6px 4px repeat-x; }
+/* Os menus ficam presos à direita do botão: o da última coluna não passa da borda do quadro. */
+.quadro-coluna__menu .menu-agente, .quadro-item__mover .menu-agente { left: auto; right: 0; min-width: 190px; }
+.quadro-coluna__lista { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: var(--space-1) 0; list-style: none; }
+.quadro-coluna__vazio { margin: 0; padding: var(--space-4) var(--space-2); border: var(--border-control) dashed var(--line-strong); border-radius: var(--radius-md); color: var(--ink-subtle); text-align: center; }
+.quadro-coluna__vazio--alvo { border-color: var(--amber); color: var(--ink); }
+.quadro-coluna__pe { padding-top: var(--space-1); }
+.quadro-item { position: relative; }
+.quadro-item--arrastando { opacity: .4; }
+/* A linha do lugar de soltar, no vão entre os cartões (não muda a altura de nada, para o alvo não tremer). */
+.quadro-item--antes::before, .quadro-item--depois::after { content: ""; position: absolute; z-index: 2; left: 0; right: 0; height: 3px; border-radius: var(--radius-full); background: var(--amber); pointer-events: none; }
+.quadro-item--antes::before { top: -6px; }
+.quadro-item--depois::after { bottom: -6px; }
+.quadro-cartao { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; padding: var(--space-3) calc(var(--space-8) + var(--space-1)) var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--surface-raised); box-shadow: inset 4px 0 0 var(--tom, var(--line-strong)); color: var(--ink); cursor: grab; user-select: none; transition: background-color .12s ease-out; }
+.quadro-cartao:hover { background: var(--surface-hover); }
+.quadro-cartao:focus-visible { outline: none; box-shadow: inset 4px 0 0 var(--tom, var(--line-strong)), var(--focus-ring); }
+.quadro-cartao__titulo { display: -webkit-box; overflow: hidden; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.quadro-cartao__titulo--feita { color: var(--ink-muted); text-decoration: line-through; }
+.quadro-cartao__meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); color: var(--ink-muted); }
+.quadro-cartao__data { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.quadro-cartao__data--atrasada { color: var(--amber); }
+.quadro-cartao__prazo::before { content: "·"; margin-right: 6px; }
+.quadro-cartao__data--atrasada .quadro-cartao__prazo { padding: 1px var(--space-2); border-radius: var(--radius-full); background: var(--amber-tint); color: var(--ink); }
+.quadro-cartao__data--atrasada .quadro-cartao__prazo::before { content: none; }
+.quadro-cartao__materia { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quadro-cartao__nota { overflow: hidden; color: var(--ink-muted); text-overflow: ellipsis; white-space: nowrap; }
+/* O cartão que segue o ponteiro durante o arrasto. */
+.quadro-cartao--fantasma { position: fixed; z-index: 1000; box-sizing: border-box; background: var(--surface-hover); box-shadow: inset 4px 0 0 var(--tom, var(--line-strong)), 0 0 0 2px var(--amber); cursor: grabbing; opacity: .95; pointer-events: none; transform: rotate(1.5deg); }
+/* O botão "Mover para…" do cartão aparece com o mouse em cima, o foco dentro ou o menu aberto. */
+.quadro-item__mover { position: absolute; top: 6px; right: 6px; opacity: 0; }
+.quadro-item:hover .quadro-item__mover, .quadro-item:focus-within .quadro-item__mover, .quadro-item__mover:has([aria-expanded="true"]) { opacity: 1; }
+.quadro--arrastando .quadro-item__mover { visibility: hidden; }
+.quadro-item__mover-botao { width: 28px; height: 28px; border-radius: var(--radius-xs); background: var(--surface-well); }
+.quadro-nova { flex: none; align-self: flex-start; width: min(296px, 85vw); }
+.quadro-nova__botao { min-height: 56px; border: var(--border-control) dashed var(--line-strong); }
+.quadro-apagar { display: flex; flex-direction: column; gap: var(--space-4); }
+.quadro-apagar p { margin: 0; }
+.quadro-apagar__nota { color: var(--ink-muted); }
+.quadro-apagar__erro { color: var(--brick-text); }
+@media (max-width: 720px) {
+	.lista-linha__abrir { flex-wrap: wrap; gap: 0 var(--space-4); padding-block: var(--space-2); }
+	.lista-linha__titulo { flex-basis: 100%; }
+	.lista-linha__meta { flex-wrap: wrap; justify-content: flex-start; gap: var(--space-1) var(--space-3); }
+	.lista-linha__data { justify-content: flex-start; min-width: 0; }
+	.lista-linha__materia { min-width: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+	.lista-grupo__seta, .lista-linha__abrir, .quadro-cartao, .quadro-coluna__menu-botao, .quadro-item__mover-botao { transition: none; }
+	.quadro-cartao--fantasma { transform: none; }
+}

@@ -1,10 +1,10 @@
 // @vitest-environment happy-dom
 // As partes puras da faixa da linha do tempo (LinhaDoTempo.tsx): os eventos
-// mais recentes e a marcação do dia só no primeiro marco de cada dia.
+// mais recentes, a marcação do dia só no primeiro marco de cada dia e o rótulo acessível de cada marca.
 
 import { describe, expect, it } from "vitest";
 import type { Evento } from "../../lib/eventos.ts";
-import { eventosRecentes, marcosDaFaixa, porDia } from "./LinhaDoTempo.tsx";
+import { eventosRecentes, marcosDaFaixa, porDia, rotuloDoMarco } from "./LinhaDoTempo.tsx";
 
 // Horários perto do meio do dia em UTC e com poucos minutos de diferença entre os do mesmo dia,
 // para a divisão por dia não mudar com o fuso do computador que roda o teste.
@@ -27,11 +27,12 @@ describe("eventosRecentes", () => {
 		expect(eventosRecentes([a, b, c, d, e], 3).map((item) => item.id)).toEqual(["e", "d", "c"]);
 	});
 
-	it("o limite padrão é 12", () => {
-		const muitos = Array.from({ length: 20 }, (_, indice) => evento(`x${indice}`, `2026-10-${String(indice + 1).padStart(2, "0")}T10:00:00.000Z`));
+	it("o limite padrão é 40", () => {
+		const muitos = Array.from({ length: 60 }, (_, indice) => evento(`x${indice}`, new Date(Date.UTC(2026, 0, indice + 1, 10)).toISOString()));
 		const recentes = eventosRecentes(muitos);
-		expect(recentes).toHaveLength(12);
-		expect(recentes[0]?.id).toBe("x19");
+		expect(recentes).toHaveLength(40);
+		expect(recentes[0]?.id).toBe("x59");
+		expect(marcosDaFaixa(muitos)).toHaveLength(40);
 	});
 
 	it("aceita lista vazia e limite zero, e não altera a lista de entrada", () => {
@@ -65,5 +66,19 @@ describe("marcosDaFaixa", () => {
 
 	it("sem eventos, nenhum marco", () => {
 		expect(marcosDaFaixa([])).toEqual([]);
+	});
+});
+
+describe("rotuloDoMarco", () => {
+	it("junta o dia, a hora, a frase e o detalhe, para o leitor de tela não depender do balão", () => {
+		const material: Evento = { id: "m", ts: "2026-11-03T10:00:00.000Z", verbo: "adicionou_material", objeto: { materia: "calculo", arquivo: "aula.pdf" }, resultado: { tipo: "pdf", trechos: 4 } };
+		const rotulo = rotuloDoMarco(material);
+		expect(rotulo).toContain("Material adicionado: aula.pdf");
+		expect(rotulo).toContain("PDF · 4 trechos");
+		expect(rotulo).toMatch(/\d{2}:\d{2}/);
+	});
+
+	it("sem detalhe, termina na frase", () => {
+		expect(rotuloDoMarco(a).endsWith("Nota criada: a")).toBe(true);
 	});
 });

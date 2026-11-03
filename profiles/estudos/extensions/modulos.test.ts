@@ -18,7 +18,7 @@ import { gravarGlossario, lerGlossario } from "../lib/termos.ts";
 import { acrescentarEvento, criarEvento, lerEventos } from "../lib/eventos.ts";
 import { type Conceito, gravarMapa, lerMapa, mapaVazio, pastaExtraidoArquivo } from "../lib/mapa.ts";
 import { criarMateria, eventosAprendiz, eventosMateria } from "../lib/materias.ts";
-import { caminhoDosAjustes, FRASE_DOS_AJUSTES, gravarAjustes } from "../lib/metodo-ciclo.ts";
+import { caminhoDoRelatorio, caminhoDosAjustes, FRASE_DOS_AJUSTES, gravarAjustes, lerRelatorio, type RelatorioMetodo } from "../lib/metodo-ciclo.ts";
 import { ARQUIVOS_METODO, caminhoDoModulo, type EstadoModuloNaTela, lerModulo, MINIMO_CARACTERES_EXEMPLO, type ModuloGerado } from "../lib/modulos.ts";
 import { hashDoPrompt, lerMetodo, PASTA_METODO } from "./cursos.ts";
 import type { RespostaModulo } from "../lib/modulo-respostas.ts";
@@ -27,6 +27,7 @@ import modulos, {
 	CAMINHO_PROMPT_EXPLICAR,
 	CAMINHO_PROMPT_LICAO,
 	CAMINHO_PROMPT_PLANO,
+	CAMINHO_PROMPT_RELATORIO,
 	CAMINHO_PROMPT_TERMOS,
 	CAMINHO_PROMPT_VERIFICACAO,
 	type MensagemEstado,
@@ -50,6 +51,7 @@ const PROMPT_VERIFICACAO = "---\nmodel: teste/modelo-x\n---\nConfira a pergunta.
 const PROMPT_CORRETOR = "---\nmodel: teste/modelo-x\n---\nCorrija pela rubrica.\n";
 const PROMPT_TERMOS = "---\nmodel: teste/modelo-x\n---\nMarque os termos.\n";
 const PROMPT_EXPLICAR = "---\nmodel: teste/modelo-x\n---\nExplique o trecho.\n";
+const PROMPT_RELATORIO = "---\nmodel: teste/modelo-x\n---\nEscreva o relatório do método.\n";
 /** Os arquivos da metodologia de mentira, em <dados>/metodo. */
 const METODO: Record<string, string> = Object.fromEntries(ARQUIVOS_METODO.map((arquivo) => [arquivo, `Como escrever (${arquivo}).\n`]));
 /** O system prompt com a metodologia de mentira, como instrucoesComMetodo o monta. */
@@ -128,6 +130,7 @@ const opcoesDeTeste = (extra: OpcoesModulos = {}): OpcoesModulos => ({
 	caminhoPromptCorretor: join(dados, "corretor.md"),
 	caminhoPromptTermos: join(dados, "modulo-termos.md"),
 	caminhoPromptExplicar: join(dados, "explicar-trecho.md"),
+	caminhoPromptRelatorio: join(dados, "relatorio-metodo.md"),
 	pastaMetodo: join(dados, "metodo"),
 	...extra,
 });
@@ -197,6 +200,7 @@ beforeEach(async () => {
 	await writeFile(join(dados, "corretor.md"), PROMPT_CORRETOR, "utf8");
 	await writeFile(join(dados, "modulo-termos.md"), PROMPT_TERMOS, "utf8");
 	await writeFile(join(dados, "explicar-trecho.md"), PROMPT_EXPLICAR, "utf8");
+	await writeFile(join(dados, "relatorio-metodo.md"), PROMPT_RELATORIO, "utf8");
 	await mkdir(join(dados, "metodo"), { recursive: true });
 	for (const [arquivo, conteudo] of Object.entries(METODO)) await writeFile(join(dados, "metodo", arquivo), conteudo, "utf8");
 	await gravarMapa(dados, materia, {
@@ -2118,5 +2122,560 @@ describe("os ajustes do Breno nas gerações dos módulos", () => {
 		expect(erroDe("g1")).toMatchObject({ ao: "gerar", modulo: "m1", mensagem: expect.stringMatching(/^Não consegui ler os ajustes do método .*estrutura-da-licao\.md: a linha 1 não está no formato/) });
 		expect(chamadas).toHaveLength(0);
 		expect(await readFile(caminhoDosAjustes(dados, "estrutura-da-licao.md"), "utf8")).toBe("## sem formato\n");
+	});
+});
+
+// --- O ciclo do método: o relatório e as decisões (docs/metodo-ciclo.md) -------------------------
+
+type MensagemModuloComRelatorio = MensagemModuloDoTeste & { relatorio: RelatorioMetodo | null; relatorioGerando: boolean; relatorioErro?: string };
+const moduloComRelatorio = (pedido?: string) => (pedido ? moduloDoPedido(pedido) : recebidas("modulo").at(-1)?.dados) as unknown as MensagemModuloComRelatorio;
+const relatorioNoEstado = () => doModulo(ultimo(), "m1")?.relatorio;
+const esperarRelatorio = (situacao: string) => esperar(() => relatorioNoEstado()?.situacao === situacao);
+const esperarPendentes = (quantas: number) => esperar(() => relatorioNoEstado()?.pendentes === quantas);
+const esperarEventosDoRelatorio = (quantos: number) => esperar(async () => (await doVerbo("gerou_relatorio_metodo")).length >= quantos);
+const dormir = (ms: number) => new Promise((resolver) => setTimeout(resolver, ms));
+/** Uma ação do painel modulos sem matéria nem curso (ligar_ajuste e listar_ajustes). */
+const acaoAjustes = (nome: string, dadosAcao: Record<string, unknown> = {}) => barramento.emit("interface:acao", { painel: "modulos", acao: nome, dados: dadosAcao });
+const ajustesDoPedido = (pedido: string) => comPedido(pedido).find((mensagem) => mensagem.acao === "ajustes")?.dados as unknown as { arquivos: Array<Record<string, unknown>>; pedido?: string } | undefined;
+const erroSemPedido = (ao: string) => recebidas("erro").find((mensagem) => mensagem.dados.ao === ao && mensagem.dados.pedido === undefined)?.dados;
+const decidirProposta = (pedido: string, proposta: string, decisao: string, extra: Record<string, unknown> = {}) => acao("decidir_proposta", { modulo: "m1", pedido, proposta, decisao, ...extra });
+const ajusteDaDecisao = (decisao: { tipo: string; ajuste?: string } | undefined) => (decisao?.tipo === "aprovada" ? (decisao.ajuste ?? "") : "");
+
+const TEXTO_P1 = "Antes do código de um exemplo, diga em uma frase o que ele vai mostrar.";
+const TEXTO_P2 = "Abra cada conceito pelo caso concreto.";
+
+/** O que o modelo do relatório devolve: um item em cada lista e duas propostas (exemplos.md e conceito.md). Com `extra`, troca campos. */
+function relatorioDoModelo(ids: string[], extra: Record<string, unknown> = {}): string {
+	return JSON.stringify({
+		resumo: "Os blocos curtos funcionaram; o bloco 2 ficou abstrato.",
+		funcionou: [{ texto: "Os blocos curtos foram bem avaliados.", evidencias: [ids[0]] }],
+		problemas: [{ texto: "O bloco 2 ficou abstrato.", evidencias: [ids[1]] }],
+		propostas: [
+			{ arquivo: "exemplos.md", ajuste: TEXTO_P1, porque: "Dois blocos foram mal avaliados.", evidencias: [ids[0], ids[1]] },
+			{ arquivo: "conceito.md", ajuste: TEXTO_P2, porque: "O Breno pediu explicação.", evidencias: [ids[0], ids[2] ?? ids[1]] },
+		],
+		...extra,
+	});
+}
+
+/** Notas rápidas em blocos de l1 (bom, ruim, ótimo): os eventos de retorno que o relatório conta. Devolve os ids deles, na ordem. */
+async function darRetorno(quantos: number): Promise<string[]> {
+	const notas: Array<[string, string]> = [
+		["l1-b1", "bom"],
+		["l1-b2", "ruim"],
+		["l1-b4", "otimo"],
+	];
+	for (const [indice, [bloco, nota]] of notas.slice(0, quantos).entries()) {
+		avaliar(`nota-${indice}`, bloco, nota);
+		await respondeu(`nota-${indice}`);
+	}
+	return (await doAprendiz("avaliou_bloco")).map((evento) => evento.id);
+}
+
+const concluirM1 = async (pedido = "c1") => {
+	acao("concluir", { modulo: "m1", pedido });
+	await respondeu(pedido);
+};
+
+/** Um módulo concluído com 3 retornos e o relatório pronto (duas propostas sem decisão). Devolve os ids dos retornos. */
+async function relatorioPronto(): Promise<string[]> {
+	const ids = await darRetorno(3);
+	respostas.push(relatorioDoModelo(ids));
+	await concluirM1();
+	await esperarRelatorio("pronto");
+	return ids;
+}
+
+describe("o relatório do método (concluir e gerar_relatorio)", () => {
+	beforeEach(async () => {
+		ligar();
+		geracaoQueDaCerto();
+		await gerarM1();
+	});
+
+	it("o prompt do perfil pede o modelo da decisão do Breno", async () => {
+		const prompt = lerPromptMapeador(await readFile(CAMINHO_PROMPT_RELATORIO, "utf8"));
+		expect(prompt.modelo).toBe("openrouter/openai/gpt-6.1-sol");
+		expect(prompt.instrucoes.length).toBeGreaterThan(200);
+	});
+
+	it("concluir responde sem esperar o modelo e dispara o relatório: a mensagem, o relatório gravado, o evento, o módulo e o estado", async () => {
+		const ids = await darRetorno(3);
+		const adiado = adiada();
+		respostas.push(adiado.resposta);
+		const antes = chamadas.length;
+		await concluirM1("c1");
+		expect(erroDe("c1")).toBeUndefined();
+		const aceito = comPedido("c1")[0]!.dados as unknown as MensagemEstado;
+		expect(doModulo(aceito, "m1")).toMatchObject({ situacao: "gerado", concluido: true, relatorio: { situacao: "gerando", pendentes: 0 } });
+		expect(moduloComRelatorio()).toMatchObject({ relatorio: null, relatorioGerando: true });
+		expect(moduloComRelatorio().relatorioErro).toBeUndefined();
+
+		// Enquanto o modelo pensa, nem decidir nem gerar de novo.
+		await esperar(() => chamadas.length > antes);
+		decidirProposta("d0", "p1", "aprovar");
+		await respondeu("d0");
+		expect(erroDe("d0")).toMatchObject({ ao: "decidir_proposta", proposta: "p1", mensagem: expect.stringContaining("está sendo gerado de novo") });
+		acao("gerar_relatorio", { modulo: "m1", pedido: "g0" });
+		await respondeu("g0");
+		expect(erroDe("g0")).toMatchObject({ ao: "gerar_relatorio", modulo: "m1", mensagem: expect.stringContaining("já está sendo gerado") });
+		expect(chamadas).toHaveLength(antes + 1);
+
+		const chamada = chamadas.at(-1)!;
+		expect(chamada.contexto.systemPrompt).toBe("Escreva o relatório do método.");
+		expect(chamada.opcoes.maxTokens).toBe(16_000);
+		const mensagem = textoDaChamada(chamada);
+		expect(mensagem).toContain("Lições do módulo (2):");
+		expect(mensagem).toContain('1. l1, "Contando termos": Calcular o TF.');
+		expect(mensagem).toContain("Eventos do módulo (3 lidos, 3 de retorno)");
+		expect(mensagem).toContain(`- ${ids[0]}: l1-b1 · `);
+		expect(mensagem).toMatch(new RegExp(`- ${ids[1]}: l1-b2 · .*Feedback Ruim`));
+		expect(mensagem).toMatch(new RegExp(`- ${ids[2]}: l1-b4 · .*Feedback Ótimo`));
+		expect(mensagem).toContain('<bloco id="l1-b2" licao="l1"');
+		expect(mensagem).toContain('<metodologia arquivo="exemplos.md">\nComo escrever (exemplos.md).\n</metodologia>');
+
+		adiado.soltar(relatorioDoModelo(ids));
+		await esperarRelatorio("pronto");
+		expect(relatorioNoEstado()).toEqual({ situacao: "pronto", pendentes: 2 });
+		const gravado = (await lerRelatorio(dados, materia, CURSO, "m1"))!;
+		expect(gravado).toMatchObject({
+			versao: 1,
+			modulo: "m1",
+			situacao: "pronto",
+			modelo: "teste/modelo-x",
+			custo: 0.01,
+			prompt: { nome: "relatorio-metodo.md", hash: hashDoPrompt(PROMPT_RELATORIO) },
+			eventosLidos: 3,
+			retornos: 3,
+			resumo: "Os blocos curtos funcionaram; o bloco 2 ficou abstrato.",
+			funcionou: [{ texto: "Os blocos curtos foram bem avaliados.", evidencias: [ids[0]] }],
+			problemas: [{ texto: "O bloco 2 ficou abstrato.", evidencias: [ids[1]] }],
+			propostas: [
+				{ id: "p1", arquivo: "exemplos.md", ajuste: TEXTO_P1, porque: "Dois blocos foram mal avaliados.", evidencias: [ids[0], ids[1]] },
+				{ id: "p2", arquivo: "conceito.md", ajuste: TEXTO_P2, porque: "O Breno pediu explicação.", evidencias: [ids[0], ids[2]] },
+			],
+		});
+		expect(gravado.propostas.every((proposta) => proposta.decisao === undefined)).toBe(true);
+		expect(gravado.evidencias).toEqual([
+			{ id: ids[0], linha: expect.stringContaining("l1-b1 · "), licao: "l1", bloco: "l1-b1" },
+			{ id: ids[1], linha: expect.stringContaining("Feedback Ruim"), licao: "l1", bloco: "l1-b2" },
+			{ id: ids[2], linha: expect.stringContaining("Feedback Ótimo"), licao: "l1", bloco: "l1-b4" },
+		]);
+		const final = moduloComRelatorio();
+		expect(final.relatorioGerando).toBe(false);
+		expect(final.relatorioErro).toBeUndefined();
+		expect(final.relatorio).toEqual(gravado);
+		expect(final.pedido).toBeUndefined();
+
+		const eventos = await doVerbo("gerou_relatorio_metodo");
+		expect(eventos).toHaveLength(1);
+		expect(eventos[0]).toMatchObject({
+			sessao: "sessao-1",
+			objeto: { materia, curso: CURSO, modulo: "m1" },
+			resultado: { situacao: "pronto", propostas: 2, custo: 0.01 },
+			contexto: { modelo: "teste/modelo-x", prompt: { nome: "relatorio-metodo.md", hash: hashDoPrompt(PROMPT_RELATORIO) } },
+		});
+		expect(await doVerbo("concluiu_modulo")).toHaveLength(1);
+	});
+
+	it("com menos de 3 retornos grava pouco_retorno sem chamar o modelo; gerar de novo só chama com forcar", async () => {
+		const ids = await darRetorno(2);
+		const antes = chamadas.length;
+		await concluirM1();
+		await esperarRelatorio("pouco_retorno");
+		await esperarEventosDoRelatorio(1);
+		expect(chamadas).toHaveLength(antes);
+		const gravado = (await lerRelatorio(dados, materia, CURSO, "m1"))!;
+		expect(gravado).toMatchObject({ situacao: "pouco_retorno", custo: 0, eventosLidos: 2, retornos: 2, resumo: "", funcionou: [], problemas: [], propostas: [], evidencias: [] });
+		expect(gravado.modelo).toBeUndefined();
+		expect(gravado.prompt).toBeUndefined();
+		expect(relatorioNoEstado()).toEqual({ situacao: "pouco_retorno", pendentes: 0 });
+		expect(moduloComRelatorio()).toMatchObject({ relatorioGerando: false, relatorio: { situacao: "pouco_retorno" } });
+		const [evento] = await doVerbo("gerou_relatorio_metodo");
+		expect(evento).toMatchObject({ objeto: { materia, curso: CURSO, modulo: "m1" }, resultado: { situacao: "pouco_retorno", propostas: 0, custo: 0 } });
+		expect(evento!.contexto).toBeUndefined();
+
+		// Decidir num relatório sem propostas é erro.
+		decidirProposta("d1", "p1", "aprovar");
+		await respondeu("d1");
+		expect(erroDe("d1")).toMatchObject({ ao: "decidir_proposta", mensagem: "O relatório deste módulo não tem propostas." });
+
+		// Sem forcar, de novo pouco_retorno (substitui o arquivo, com outro evento).
+		acao("gerar_relatorio", { modulo: "m1", pedido: "g1" });
+		await respondeu("g1");
+		await esperarEventosDoRelatorio(2);
+		await esperar(() => !moduloComRelatorio().relatorioGerando);
+		expect(chamadas).toHaveLength(antes);
+
+		// "Gerar mesmo assim": chama o modelo.
+		respostas.push(relatorioDoModelo(ids));
+		acao("gerar_relatorio", { modulo: "m1", pedido: "g2", forcar: true });
+		await respondeu("g2");
+		expect(moduloComRelatorio("g2")).toMatchObject({ relatorioGerando: true });
+		expect(comPedido("g2").map((mensagem) => mensagem.acao)).toEqual(["modulo"]);
+		await esperarRelatorio("pronto");
+		expect(chamadas).toHaveLength(antes + 1);
+		expect(await lerRelatorio(dados, materia, CURSO, "m1")).toMatchObject({ situacao: "pronto", eventosLidos: 2, retornos: 2, propostas: [{ id: "p1" }, { id: "p2" }] });
+		expect(await doVerbo("gerou_relatorio_metodo")).toHaveLength(3);
+	});
+
+	it("gerar_relatorio de um módulo que não está concluído, ou que não foi gerado, é erro", async () => {
+		const antes = chamadas.length;
+		acao("gerar_relatorio", { modulo: "m1", pedido: "g1" });
+		await respondeu("g1");
+		expect(erroDe("g1")).toMatchObject({ ao: "gerar_relatorio", modulo: "m1", mensagem: expect.stringContaining("não está concluído") });
+		acao("gerar_relatorio", { modulo: "m2", pedido: "g2" });
+		await respondeu("g2");
+		expect(erroDe("g2")).toMatchObject({ ao: "gerar_relatorio", modulo: "m2", mensagem: expect.stringContaining("ainda não foi gerado") });
+		expect(chamadas).toHaveLength(antes);
+		expect(await doVerbo("gerou_relatorio_metodo")).toHaveLength(0);
+	});
+
+	it("JSON inválido ou fora do esquema: uma nova tentativa com a frase do problema", async () => {
+		const ids = await darRetorno(3);
+		const antes = chamadas.length;
+		respostas.push("isso não é um JSON", relatorioDoModelo(ids));
+		await concluirM1("c1");
+		await esperarRelatorio("pronto");
+		expect(chamadas).toHaveLength(antes + 2);
+		expect(textoDaChamada(chamadas.at(-1)!)).toContain("A sua resposta não veio como o pedido");
+		const feito = (await lerRelatorio(dados, materia, CURSO, "m1"))!;
+		expect(feito.custo).toBeCloseTo(0.02, 5);
+		expect((await doVerbo("gerou_relatorio_metodo"))[0]!.resultado!.custo).toBeCloseTo(0.02, 5);
+
+		// Fora do esquema (sem o resumo): a frase do conferidor vai na nova tentativa.
+		respostas.push('{"funcionou": [], "problemas": [], "propostas": []}', relatorioDoModelo(ids, { resumo: "Outro resumo." }));
+		acao("gerar_relatorio", { modulo: "m1", pedido: "g1" });
+		await respondeu("g1");
+		await esperar(async () => (await lerRelatorio(dados, materia, CURSO, "m1"))?.resumo === "Outro resumo.");
+		expect(textoDaChamada(chamadas.at(-1)!)).toContain('Falta o "resumo"');
+	});
+
+	it("duas respostas ruins: o erro sai sem pedido, não deixa arquivo nem evento; o estado fica em erro até Tentar de novo", async () => {
+		const ids = await darRetorno(3);
+		respostas.push("ruim", "ainda ruim");
+		await concluirM1("c1");
+		await esperar(() => erroSemPedido("gerar_relatorio") !== undefined);
+		expect(erroSemPedido("gerar_relatorio")).toMatchObject({
+			ao: "gerar_relatorio",
+			materia,
+			curso: CURSO,
+			modulo: "m1",
+			mensagem: expect.stringContaining("O modelo não devolveu o relatório do método, nem na segunda tentativa"),
+		});
+		await esperarRelatorio("erro");
+		expect(relatorioNoEstado()).toMatchObject({ situacao: "erro", pendentes: 0, mensagem: expect.stringContaining("nem na segunda tentativa") });
+		await esperar(() => moduloComRelatorio().relatorioErro !== undefined);
+		expect(moduloComRelatorio()).toMatchObject({ relatorio: null, relatorioGerando: false, relatorioErro: expect.stringContaining("nem na segunda tentativa") });
+		expect(await lerRelatorio(dados, materia, CURSO, "m1")).toBeNull();
+		expect(await doVerbo("gerou_relatorio_metodo")).toHaveLength(0);
+
+		respostas.push(relatorioDoModelo(ids));
+		acao("gerar_relatorio", { modulo: "m1", pedido: "g1" });
+		await respondeu("g1");
+		expect(moduloComRelatorio("g1")).toMatchObject({ relatorioGerando: true });
+		expect(moduloComRelatorio("g1").relatorioErro).toBeUndefined();
+		await esperarRelatorio("pronto");
+		expect(moduloComRelatorio()).toMatchObject({ relatorioGerando: false, relatorio: { situacao: "pronto" } });
+		expect(moduloComRelatorio().relatorioErro).toBeUndefined();
+	});
+
+	it("a evidência é só do módulo: o evento de outro módulo não vai ao modelo, e citá-lo tira o item e a proposta", async () => {
+		const ids = await darRetorno(3);
+		const doOutroModulo = criarEvento({ sessao: "sessao-1", verbo: "avaliou_bloco", objeto: { materia, curso: CURSO, modulo: "m2", licao: "l1", bloco: "l1-b1" }, resultado: { avaliacao: "ruim", motivos: [], texto: "" } });
+		const doOutroCurso = criarEvento({ sessao: "sessao-1", verbo: "avaliou_bloco", objeto: { materia, curso: "outro-curso", modulo: "m1", licao: "l1", bloco: "l1-b1" }, resultado: { avaliacao: "ruim", motivos: [], texto: "" } });
+		await acrescentarEvento(eventosAprendiz(dados), doOutroModulo);
+		await acrescentarEvento(eventosAprendiz(dados), doOutroCurso);
+		respostas.push(
+			relatorioDoModelo(ids, {
+				funcionou: [{ texto: "Só do outro módulo.", evidencias: [doOutroModulo.id] }],
+				propostas: [
+					{ arquivo: "exemplos.md", ajuste: TEXTO_P1, porque: "Um evento do módulo e um de outro.", evidencias: [ids[0], doOutroModulo.id] },
+					{ arquivo: "conceito.md", ajuste: TEXTO_P2, porque: "Dois do módulo e um inventado.", evidencias: [ids[0], ids[1], doOutroCurso.id, "ev-que-nao-existe"] },
+				],
+			}),
+		);
+		await concluirM1();
+		await esperarRelatorio("pronto");
+		const mensagem = textoDaChamada(chamadas.at(-1)!);
+		expect(mensagem).toContain("Eventos do módulo (3 lidos, 3 de retorno)");
+		expect(mensagem).not.toContain(doOutroModulo.id);
+		expect(mensagem).not.toContain(doOutroCurso.id);
+		const gravado = (await lerRelatorio(dados, materia, CURSO, "m1"))!;
+		expect(gravado).toMatchObject({ eventosLidos: 3, retornos: 3, funcionou: [], problemas: [{ evidencias: [ids[1]] }] });
+		expect(gravado.propostas).toEqual([{ id: "p1", arquivo: "conceito.md", ajuste: TEXTO_P2, porque: "Dois do módulo e um inventado.", evidencias: [ids[0], ids[1]] }]);
+		expect(gravado.evidencias.map((item) => item.id)).toEqual([ids[0], ids[1]]);
+	});
+
+	it("o fim da sessão cancela a chamada sem gravar nem mostrar; na sessão nova o relatório é 'nenhum' e dá para gerar", async () => {
+		const ids = await darRetorno(3);
+		const adiado = adiada();
+		respostas.push(adiado.resposta);
+		const antes = chamadas.length;
+		await concluirM1();
+		await esperar(() => chamadas.length > antes);
+		const sinal = chamadas.at(-1)!.opcoes.signal!;
+		expect(sinal.aborted).toBe(false);
+		const mostradosAntes = mostrados.length;
+		tratadores.session_shutdown?.({}, ctx);
+		await dormir(40);
+		expect(sinal.aborted).toBe(true);
+		expect(mostrados).toHaveLength(mostradosAntes);
+		expect(await lerRelatorio(dados, materia, CURSO, "m1")).toBeNull();
+		expect(await doVerbo("gerou_relatorio_metodo")).toHaveLength(0);
+
+		ligar();
+		acao("listar", { pedido: "l1" });
+		await respondeu("l1");
+		expect(doModulo(ultimo(), "m1")).toMatchObject({ concluido: true, relatorio: { situacao: "nenhum", pendentes: 0 } });
+		decidirProposta("d1", "p1", "aprovar");
+		await respondeu("d1");
+		expect(erroDe("d1")).toMatchObject({ ao: "decidir_proposta", mensagem: "O módulo m1 ainda não tem relatório do método." });
+		respostas.push(relatorioDoModelo(ids));
+		acao("gerar_relatorio", { modulo: "m1", pedido: "g1" });
+		await respondeu("g1");
+		await esperarRelatorio("pronto");
+		expect(await doVerbo("gerou_relatorio_metodo")).toHaveLength(1);
+	});
+
+	it("um relatório gravado que não se lê não é sobrescrito: gerar_relatorio é erro antes de chamar o modelo, e o estado diz erro", async () => {
+		await relatorioPronto();
+		const caminho = caminhoDoRelatorio(dados, materia, CURSO, "m1");
+		await writeFile(caminho, "{ isto não é JSON", "utf8");
+		const antes = chamadas.length;
+		acao("gerar_relatorio", { modulo: "m1", pedido: "g1" });
+		await respondeu("g1");
+		expect(erroDe("g1")).toMatchObject({ ao: "gerar_relatorio", mensagem: expect.stringMatching(/^Não consegui ler o relatório do método .*m1\.json/) });
+		expect(chamadas).toHaveLength(antes);
+		expect(await readFile(caminho, "utf8")).toBe("{ isto não é JSON");
+		acao("listar", { pedido: "l1" });
+		await respondeu("l1");
+		expect(doModulo(ultimo(), "m1")?.relatorio).toMatchObject({ situacao: "erro", mensagem: expect.stringContaining("Não consegui ler o relatório do método") });
+		decidirProposta("d1", "p1", "aprovar");
+		await respondeu("d1");
+		expect(erroDe("d1")).toMatchObject({ ao: "decidir_proposta", mensagem: expect.stringContaining("Não consegui ler o relatório do método") });
+		expect(await readFile(caminho, "utf8")).toBe("{ isto não é JSON");
+	});
+});
+
+describe("as decisões sobre as propostas e os ajustes do método (decidir_proposta, ligar_ajuste e listar_ajustes)", () => {
+	let ids: string[];
+	beforeEach(async () => {
+		ligar();
+		geracaoQueDaCerto();
+		await gerarM1();
+		ids = await relatorioPronto();
+	});
+
+	it("aprovar com o texto editado grava o ajuste no arquivo, o aprovou_ajuste_metodo e a decisão; sem editar, o texto da proposta; o ajuste entra nas gerações seguintes", async () => {
+		const editado = "Antes do código, diga em uma frase o que ele mostra.";
+		decidirProposta("d1", "p1", "aprovar", { texto: `  ${editado}  ` });
+		await respondeu("d1");
+		expect(erroDe("d1")).toBeUndefined();
+		expect(comPedido("d1").map((mensagem) => mensagem.acao)).toEqual(["modulo"]);
+		const decisao = moduloComRelatorio("d1").relatorio!.propostas[0]!.decisao;
+		expect(decisao).toMatchObject({ tipo: "aprovada", texto: editado, ajuste: expect.stringMatching(/^a-\d{8}-1$/), em: expect.any(String), evento: expect.any(String) });
+		await esperarPendentes(1);
+		expect(relatorioNoEstado()).toEqual({ situacao: "pronto", pendentes: 1 });
+		const ajusteId = ajusteDaDecisao(decisao);
+		const [evento] = await doAprendiz("aprovou_ajuste_metodo");
+		expect(evento).toMatchObject({
+			sessao: "sessao-1",
+			objeto: { arquivo: "exemplos.md", ajuste: ajusteId, materia, curso: CURSO, modulo: "m1", proposta: "p1" },
+			resultado: { texto: editado, editado: true, evidencias: [ids[0], ids[1]] },
+		});
+		expect(decisao!.evento).toBe(evento!.id);
+		const arquivo = await readFile(caminhoDosAjustes(dados, "exemplos.md"), "utf8");
+		expect(arquivo).toContain(`## ${ajusteId} · ativo\n${editado}\n<!-- proposta: ${materia}/${CURSO}/m1/p1 · evidências: ${ids[0]}, ${ids[1]} · aprovado em `);
+		expect((await lerRelatorio(dados, materia, CURSO, "m1"))!.propostas[0]!.decisao).toEqual(decisao);
+
+		// Sem editar: o texto da proposta.
+		decidirProposta("d2", "p2", "aprovar");
+		await respondeu("d2");
+		expect(moduloComRelatorio("d2").relatorio!.propostas[1]!.decisao).toMatchObject({ tipo: "aprovada", texto: TEXTO_P2 });
+		const aprovados = await doAprendiz("aprovou_ajuste_metodo");
+		expect(aprovados).toHaveLength(2);
+		expect(aprovados[1]).toMatchObject({ objeto: { arquivo: "conceito.md", proposta: "p2" }, resultado: { texto: TEXTO_P2, editado: false } });
+		await esperarPendentes(0);
+		expect(relatorioNoEstado()).toEqual({ situacao: "pronto", pendentes: 0 });
+
+		// Os ajustes valem nas gerações seguintes: vão depois da base, e uma proposta igual a um ajuste ativo (sem acento, caixa nem espaços) sai.
+		respostas.push(
+			relatorioDoModelo(ids, {
+				propostas: [
+					{ arquivo: "exemplos.md", ajuste: "ANTES do codigo,  diga em uma frase o que ele mostra.", porque: "Repete o ajuste ativo.", evidencias: [ids[0], ids[1]] },
+					{ arquivo: "quiz.md", ajuste: "Troque a alternativa óbvia por uma plausível.", porque: "Um quiz foi fácil.", evidencias: [ids[0], ids[1]] },
+				],
+			}),
+		);
+		acao("gerar_relatorio", { modulo: "m1", pedido: "g1" });
+		await respondeu("g1");
+		await esperar(() => relatorioNoEstado()?.situacao === "pronto" && moduloComRelatorio().relatorio?.propostas[0]?.arquivo === "quiz.md");
+		const mensagem = textoDaChamada(chamadas.at(-1)!);
+		expect(mensagem).toContain(`<metodologia arquivo="exemplos.md">\nComo escrever (exemplos.md).\n</metodologia>\n\n<ajustes-do-breno arquivo="exemplos.md">\n${FRASE_DOS_AJUSTES}\n\n- ${editado}\n</ajustes-do-breno>`);
+		const novo = (await lerRelatorio(dados, materia, CURSO, "m1"))!;
+		expect(novo.propostas).toEqual([{ id: "p1", arquivo: "quiz.md", ajuste: "Troque a alternativa óbvia por uma plausível.", porque: "Um quiz foi fácil.", evidencias: [ids[0], ids[1]] }]);
+		await esperarPendentes(1);
+		expect(relatorioNoEstado()).toEqual({ situacao: "pronto", pendentes: 1 });
+		// As decisões do relatório substituído ficam nos eventos.
+		expect(await doAprendiz("aprovou_ajuste_metodo")).toHaveLength(2);
+	});
+
+	it("rejeitar grava o rejeitou_ajuste_metodo e a decisão, com o motivo aparado (ou sem ele), e não toca nos arquivos de ajustes", async () => {
+		decidirProposta("d1", "p2", "rejeitar", { motivo: "  Já faço isso.  ", texto: "ignorado" });
+		await respondeu("d1");
+		expect(erroDe("d1")).toBeUndefined();
+		const decisao = moduloComRelatorio("d1").relatorio!.propostas[1]!.decisao;
+		expect(decisao).toMatchObject({ tipo: "rejeitada", motivo: "Já faço isso.", em: expect.any(String), evento: expect.any(String) });
+		const [evento] = await doAprendiz("rejeitou_ajuste_metodo");
+		expect(evento).toMatchObject({
+			sessao: "sessao-1",
+			objeto: { arquivo: "conceito.md", materia, curso: CURSO, modulo: "m1", proposta: "p2" },
+			resultado: { texto: TEXTO_P2, evidencias: [ids[0], ids[2]], motivo: "Já faço isso." },
+		});
+		expect(decisao!.evento).toBe(evento!.id);
+		await esperarPendentes(1);
+		expect(relatorioNoEstado()).toEqual({ situacao: "pronto", pendentes: 1 });
+
+		decidirProposta("d2", "p1", "rejeitar");
+		await respondeu("d2");
+		const sem = moduloComRelatorio("d2").relatorio!.propostas[0]!.decisao!;
+		expect(sem.tipo).toBe("rejeitada");
+		expect("motivo" in sem).toBe(false);
+		expect((await doAprendiz("rejeitou_ajuste_metodo"))[1]).toMatchObject({ resultado: { motivo: "" } });
+		await esperarPendentes(0);
+		expect(relatorioNoEstado()).toEqual({ situacao: "pronto", pendentes: 0 });
+		await expect(readFile(caminhoDosAjustes(dados, "conceito.md"), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+		await expect(readFile(caminhoDosAjustes(dados, "exemplos.md"), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+		expect(await doAprendiz("aprovou_ajuste_metodo")).toHaveLength(0);
+	});
+
+	it("uma proposta já decidida dá erro (com a proposta e o pedido) e não grava de novo; pedidos fora do formato também", async () => {
+		decidirProposta("d1", "p1", "aprovar");
+		await respondeu("d1");
+		for (const [pedido, decisao] of [
+			["d2", "aprovar"],
+			["d3", "rejeitar"],
+		] as const) {
+			decidirProposta(pedido, "p1", decisao);
+			await respondeu(pedido);
+			expect(erroDe(pedido)).toMatchObject({ ao: "decidir_proposta", materia, curso: CURSO, modulo: "m1", proposta: "p1", mensagem: "A proposta p1 já foi aprovada." });
+		}
+		decidirProposta("d4", "p2", "rejeitar");
+		await respondeu("d4");
+		decidirProposta("d5", "p2", "aprovar");
+		await respondeu("d5");
+		expect(erroDe("d5")).toMatchObject({ proposta: "p2", mensagem: "A proposta p2 já foi rejeitada." });
+
+		const casos: Array<[Record<string, unknown>, string]> = [
+			[{ proposta: "p9", decisao: "aprovar" }, 'Não achei a proposta "p9"'],
+			[{ proposta: "p1", decisao: "talvez" }, "A decisão não é válida"],
+			[{ proposta: "", decisao: "aprovar" }, "Falta o id da proposta."],
+			[{ proposta: "p1", decisao: "aprovar", texto: "x".repeat(401) }, "o máximo é 400"],
+			[{ proposta: "p1", decisao: "rejeitar", motivo: "x".repeat(301) }, "o máximo é 300"],
+		];
+		for (const [indice, [extra, frase]] of casos.entries()) {
+			acao("decidir_proposta", { modulo: "m1", pedido: `e${indice}`, ...extra });
+			await respondeu(`e${indice}`);
+			expect(erroDe(`e${indice}`)).toMatchObject({ ao: "decidir_proposta", mensagem: expect.stringContaining(frase) });
+		}
+		expect(await doAprendiz("aprovou_ajuste_metodo")).toHaveLength(1);
+		expect(await doAprendiz("rejeitou_ajuste_metodo")).toHaveLength(1);
+	});
+
+	it("ligar e desligar um ajuste: o arquivo, o alterou_ajuste_metodo (só quando muda), a mensagem ajustes com o pedido; o desligado não vai às gerações", async () => {
+		decidirProposta("d1", "p1", "aprovar");
+		await respondeu("d1");
+		const ajuste = ajusteDaDecisao(moduloComRelatorio("d1").relatorio!.propostas[0]!.decisao);
+
+		acaoAjustes("listar_ajustes", { pedido: "la" });
+		await respondeu("la");
+		expect(ajustesDoPedido("la")!.arquivos).toEqual([
+			{
+				arquivo: "exemplos.md",
+				ajustes: [{ id: ajuste, texto: TEXTO_P1, ativo: true, origem: { materia, curso: CURSO, modulo: "m1", proposta: "p1", evidencias: [ids[0], ids[1]], aprovadoEm: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) } }],
+			},
+		]);
+
+		acaoAjustes("ligar_ajuste", { pedido: "l1", arquivo: "exemplos.md", ajuste, ativo: false });
+		await respondeu("l1");
+		expect(ajustesDoPedido("l1")!.arquivos[0]).toMatchObject({ arquivo: "exemplos.md", ajustes: [{ id: ajuste, ativo: false }] });
+		expect(await readFile(caminhoDosAjustes(dados, "exemplos.md"), "utf8")).toContain(`## ${ajuste} · desligado\n${TEXTO_P1}\n<!-- proposta:`);
+		const [alterou] = await doAprendiz("alterou_ajuste_metodo");
+		expect(alterou).toMatchObject({ sessao: "sessao-1", objeto: { arquivo: "exemplos.md", ajuste }, resultado: { ativo: false, texto: TEXTO_P1 } });
+
+		// Desligar de novo: nada muda, nenhum evento.
+		acaoAjustes("ligar_ajuste", { pedido: "l2", arquivo: "exemplos.md", ajuste, ativo: false });
+		await respondeu("l2");
+		expect(ajustesDoPedido("l2")!.arquivos[0]).toMatchObject({ ajustes: [{ id: ajuste, ativo: false }] });
+		expect(await doAprendiz("alterou_ajuste_metodo")).toHaveLength(1);
+
+		// Desligado, não vai à geração.
+		respostas.push(relatorioDoModelo(ids));
+		acao("gerar_relatorio", { modulo: "m1", pedido: "g1" });
+		await respondeu("g1");
+		await esperar(() => !moduloComRelatorio().relatorioGerando);
+		expect(textoDaChamada(chamadas.at(-1)!)).not.toContain("<ajustes-do-breno");
+
+		acaoAjustes("ligar_ajuste", { pedido: "l3", arquivo: "exemplos.md", ajuste, ativo: true });
+		await respondeu("l3");
+		expect(ajustesDoPedido("l3")!.arquivos[0]).toMatchObject({ ajustes: [{ id: ajuste, ativo: true }] });
+		expect(await doAprendiz("alterou_ajuste_metodo")).toHaveLength(2);
+		expect(await readFile(caminhoDosAjustes(dados, "exemplos.md"), "utf8")).toContain(`## ${ajuste} · ativo`);
+
+		const casos: Array<[Record<string, unknown>, string]> = [
+			[{ arquivo: "exemplos.md", ajuste: "a-9", ativo: true }, 'Não achei o ajuste "a-9" em exemplos.md.'],
+			[{ arquivo: "outro.md", ajuste, ativo: true }, '"outro.md" não é um arquivo de metodologia'],
+			[{ arquivo: "exemplos.md", ajuste, ativo: "sim" }, "não é true nem false"],
+			[{ ajuste, ativo: true }, "Falta o arquivo de metodologia"],
+		];
+		for (const [indice, [extra, frase]] of casos.entries()) {
+			acaoAjustes("ligar_ajuste", { pedido: `e${indice}`, ...extra });
+			await respondeu(`e${indice}`);
+			expect(erroDe(`e${indice}`)).toMatchObject({ ao: "ligar_ajuste", mensagem: expect.stringContaining(frase) });
+		}
+		expect(erroDe("e0")).toMatchObject({ arquivo: "exemplos.md", ajuste: "a-9" });
+		expect(await doAprendiz("alterou_ajuste_metodo")).toHaveLength(2);
+	});
+
+	it("um arquivo de ajustes ilegível não é sobrescrito: aprovar, ligar e gerar dão erro, e o listar_ajustes diz qual", async () => {
+		const ilegivel = caminhoDosAjustes(dados, "conceito.md");
+		await mkdir(join(dados, "aprendiz", "metodo"), { recursive: true });
+		await writeFile(ilegivel, "## sem formato\n", "utf8");
+
+		decidirProposta("d1", "p2", "aprovar");
+		await respondeu("d1");
+		expect(erroDe("d1")).toMatchObject({ ao: "decidir_proposta", proposta: "p2", mensagem: expect.stringMatching(/^Não consegui ler os ajustes do método .*conceito\.md: a linha 1 não está no formato/) });
+		expect(await readFile(ilegivel, "utf8")).toBe("## sem formato\n");
+		expect((await lerRelatorio(dados, materia, CURSO, "m1"))!.propostas[1]!.decisao).toBeUndefined();
+		expect(await doAprendiz("aprovou_ajuste_metodo")).toHaveLength(0);
+
+		acaoAjustes("ligar_ajuste", { pedido: "l1", arquivo: "conceito.md", ajuste: "a-1", ativo: false });
+		await respondeu("l1");
+		expect(erroDe("l1")).toMatchObject({ ao: "ligar_ajuste", arquivo: "conceito.md", ajuste: "a-1", mensagem: expect.stringContaining("Não consegui ler os ajustes do método") });
+		expect(await readFile(ilegivel, "utf8")).toBe("## sem formato\n");
+
+		acaoAjustes("listar_ajustes", { pedido: "la" });
+		await respondeu("la");
+		expect(ajustesDoPedido("la")!.arquivos).toEqual([{ arquivo: "conceito.md", ajustes: [], erro: expect.stringContaining("Não consegui ler os ajustes do método") }]);
+
+		const antes = chamadas.length;
+		acao("gerar_relatorio", { modulo: "m1", pedido: "g1" });
+		await respondeu("g1");
+		await esperar(() => erroSemPedido("gerar_relatorio") !== undefined);
+		expect(erroSemPedido("gerar_relatorio")).toMatchObject({ ao: "gerar_relatorio", mensagem: expect.stringContaining("Não consegui ler os ajustes do método") });
+		expect(chamadas).toHaveLength(antes);
+
+		// Os outros arquivos continuam funcionando.
+		decidirProposta("d2", "p1", "aprovar");
+		await respondeu("d2");
+		expect(erroDe("d2")).toBeUndefined();
+		expect(await readFile(ilegivel, "utf8")).toBe("## sem formato\n");
+	});
+
+	it("listar_ajustes sem nenhum ajuste devolve a lista vazia, com o pedido", async () => {
+		acaoAjustes("listar_ajustes", { pedido: "la" });
+		await respondeu("la");
+		expect(ajustesDoPedido("la")).toEqual({ arquivos: [], pedido: "la" });
 	});
 });

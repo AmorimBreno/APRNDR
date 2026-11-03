@@ -82,13 +82,15 @@ export interface QuizQuestionProps extends Omit<React.HTMLAttributes<HTMLElement
   /** Quando definido, revela o gabarito: a certa fica sálvia, a escolhida errada fica tijolo. Sem ele, serve para enquetes (ex.: perfil de aprendizado). */
   correctId?: string;
   disabled?: boolean;
+  /** [estudos-ia] Conteúdo com links ou botões: o radio fica ao lado do rótulo, nunca em volta dele. */
+  interactiveLabels?: boolean;
 }
 
 /**
  * Questão de alternativas. Cada alternativa é uma tecla com a letra (A, B, C…) — o teclado também responde:
  * a letra escolhe, setas navegam. Com correctId, mostra certo/errado com ícone e palavra, nunca só cor.
  */
-export function QuizQuestion({ number, total, kicker, prompt, options, value, onChange, correctId, disabled, className, children, ...rest }: QuizQuestionProps) {
+export function QuizQuestion({ number, total, kicker, prompt, options, value, onChange, correctId, disabled, interactiveLabels = false, className, children, ...rest }: QuizQuestionProps) {
   const promptId = React.useId();
   const revealed = correctId != null;
   const locked = revealed || !!disabled;
@@ -101,6 +103,8 @@ export function QuizQuestion({ number, total, kicker, prompt, options, value, on
     onChange?.(options[i].id);
   };
   const onKeyDown = (e: React.KeyboardEvent) => {
+    // [estudos-ia] Um controle do conteúdo não deve escolher uma alternativa pelas teclas dele.
+    if (interactiveLabels && !refs.current.includes(e.target as HTMLButtonElement)) return;
     const k = e.key;
     const current = refs.current.findIndex((el) => el === document.activeElement);
     if (/^[a-zA-Z]$/.test(k) && !e.metaKey && !e.ctrlKey && !e.altKey) {
@@ -148,6 +152,36 @@ export function QuizQuestion({ number, total, kicker, prompt, options, value, on
             : chosen
               ? 'selected'
               : 'idle';
+          // [estudos-ia] O conteúdo interativo é irmão do radio: sem botões aninhados.
+          if (interactiveLabels) {
+            const labelId = `${promptId}-opcao-${i}`;
+            return (
+              <div key={o.id} className={cx('ap-opt', 'ap-opt--interactive', `ap-opt--${state}`)} onClick={() => {
+                const selection = window.getSelection();
+                if (!selection || selection.isCollapsed) choose(i);
+              }}>
+                <button
+                  ref={(el) => { refs.current[i] = el; }}
+                  type="button"
+                  role="radio"
+                  aria-checked={chosen}
+                  aria-disabled={locked || undefined}
+                  aria-labelledby={labelId}
+                  tabIndex={i === focusIndex ? 0 : -1}
+                  className="ap-key data ap-opt__radio-control"
+                  onClick={(event) => { event.stopPropagation(); choose(i); }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') event.stopPropagation();
+                  }}
+                >
+                  <span aria-hidden="true">{state === 'correct' ? <Icon name="check" size={16} strokeWidth={3} /> : state === 'incorrect' ? <Icon name="close" size={16} strokeWidth={3} /> : letter(i)}</span>
+                </button>
+                <span id={labelId} className="ap-opt__label body">{o.label}</span>
+                {state === 'correct' && <Tag tone="sage" size="sm" icon="check" className="ap-opt__tag">Correta</Tag>}
+                {state === 'incorrect' && <Tag tone="brick" size="sm" icon="close" className="ap-opt__tag">Sua resposta</Tag>}
+              </div>
+            );
+          }
           return (
             <button
               key={o.id}

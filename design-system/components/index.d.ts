@@ -563,6 +563,8 @@ export interface QuizQuestionProps extends Omit<React.HTMLAttributes<HTMLElement
     /** Quando definido, revela o gabarito: a certa fica sálvia, a escolhida errada fica tijolo. Sem ele, serve para enquetes (ex.: perfil de aprendizado). */
     correctId?: string;
     disabled?: boolean;
+    /** [estudos-ia] O radio fica ao lado do rótulo que contém controles. */
+    interactiveLabels?: boolean;
 }
 /**
  * Questão de alternativas. Cada alternativa é uma tecla com a letra (A, B, C…) — o teclado também responde:

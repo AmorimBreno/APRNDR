@@ -12,6 +12,8 @@ Mudanças no código (o TypeScript do projeto é estrito e usa verbatimModuleSyn
 - components/src/util.ts: `cx` aceita também `0n`, porque o `error` dos campos é ReactNode e `error && ...` pode dar bigint. Linha marcada com [estudos-ia].
 - components/src/nav.tsx e components/index.d.ts: a SubjectWheel ganhou `createKicker`, a linha pequena acima do rótulo da linha de criar (o padrão continua "Criar com o tutor"). Na tela de cadernos a matéria nova é criada num modal, não com o tutor. Linhas marcadas com [estudos-ia]. O components/bundle.js não foi refeito: o app usa o src.
 
+- components/src/quiz.tsx e components/index.d.ts: `QuizQuestion` ganhou `interactiveLabels` (padrão false). Com ele, o radio é um botão ao lado do rótulo, em vez de envolver o texto: links e botões no rótulo não ficam aninhados em outro botão. As teclas de controles internos não escolhem uma alternativa; selecionar o texto também não escolhe. As classes `ap-opt__radio-control` e `ap-opt--interactive` ficam em components/bundle.css. Linhas marcadas com [estudos-ia]; bundle.js não foi refeito (o app usa src).
+
 Fora do pacote, também do estudos-ia: pnpm-workspace.yaml lista design-system.
 
 ## Regras do app que mudam o manual

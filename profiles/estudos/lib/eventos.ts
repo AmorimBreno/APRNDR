@@ -64,6 +64,12 @@ export type VerboEvento =
 	| "marcou_termos"
 	| "pediu_explicacao"
 	| "guardou_termo"
+	// O ciclo do método: docs/metodo-ciclo.md. gerou_relatorio_metodo vai para o eventos.jsonl
+	// da matéria; os outros três, para o aprendiz/eventos.jsonl.
+	| "gerou_relatorio_metodo"
+	| "aprovou_ajuste_metodo"
+	| "rejeitou_ajuste_metodo"
+	| "alterou_ajuste_metodo"
 	// Aprendizagem (seção 9.2), usados a partir dos itens 7 e 8:
 	| "pediu_reexplicacao"
 	| "pediu_outro_jeito"

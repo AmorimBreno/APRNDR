@@ -71,7 +71,7 @@ Na tela: no índice da visão do módulo, "Marcar os termos" (com o custo aproxi
 - A marca aparece em **negrito**, sublinhada, na cor âmbar do design system (a do post-it do quiz, legível no fundo escuro).
 - Passar o mouse (ou focar pelo teclado) abre um cartão acima do termo, misturando as referências do Breno (o tooltip escuro com cabeçalho e o cartão "Polyglot"):
   - cabeçalho: um ícone e "Conceito-chave", com o lugar à direita: "Módulo 01 · Lição 1" ou "Não explicado no curso";
-  - corpo: o termo grande (a forma do glossário), a definição embaixo;
+  - corpo: preenchido de âmbar (como o cartão "Polyglot" da referência), com o termo grande em tinta escura (a forma do glossário) e a definição embaixo;
   - uma setinha apontando para o termo.
 - Clicar no termo leva ao bloco onde ele foi explicado: abre o módulo e a lição (se for outra) e rola até o bloco, com um destaque rápido nele. Termo sem `explicado`: o clique fixa o cartão aberto (não navega). No próprio bloco que o explica, o clique não faz nada.
 - O cartão cabe na tela (vira para baixo quando não há espaço em cima) e funciona em 375 px.

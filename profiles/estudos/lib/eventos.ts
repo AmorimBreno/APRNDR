@@ -70,6 +70,12 @@ export type VerboEvento =
 	| "aprovou_ajuste_metodo"
 	| "rejeitou_ajuste_metodo"
 	| "alterou_ajuste_metodo"
+	// Os experimentos do método: docs/metodo-experimentos.md. A análise de cada módulo concluído os grava,
+	// todos no aprendiz/eventos.jsonl; os três de cima (aprovou, rejeitou e alterou) ficam como histórico.
+	| "iniciou_experimento_metodo"
+	| "decidiu_experimento_metodo"
+	| "registrou_aprendizado_metodo"
+	| "reviu_aprendizado_metodo"
 	// Aprendizagem (seção 9.2), usados a partir dos itens 7 e 8:
 	| "pediu_reexplicacao"
 	| "pediu_outro_jeito"

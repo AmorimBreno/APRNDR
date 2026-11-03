@@ -1,23 +1,25 @@
-// Testes das partes puras do ciclo do método (docs/metodo-ciclo.md): a linha
-// legível de cada verbo, a contagem de retorno e o limite de 3, a evidência
-// com os limites, a conferência do que o modelo devolve (consertos), a
-// igualdade com um ajuste ativo, as decisões e o formato markdown dos
-// ajustes (ler e escrever, com o texto editado à mão preservado e o arquivo
-// que não se lê dando erro).
+// Testes das partes puras do ciclo do método (docs/metodo-ciclo.md e
+// docs/metodo-experimentos.md): a linha legível de cada verbo, a contagem de
+// retorno e o limite de 3, a evidência com os limites, a igualdade com um
+// ajuste que vale, a leitura do relatório da versão 1 e o formato markdown dos
+// ajustes (os estados em teste, mantido e descartado, o formato antigo
+// ativo e desligado, o texto editado à mão preservado e o arquivo que não se
+// lê dando erro).
 
 import { describe, expect, it } from "vitest";
 import type { Evento } from "./eventos.ts";
 import {
 	acrescentarAjuste,
-	ajusteAtivoIgual,
-	ajustesAtivos,
+	ajusteQueValeIgual,
+	ajustesComEstado,
 	ajustesNaTela,
+	ajustesQueValem,
+	ajustesUsadosDe,
 	ajustesVazios,
-	aplicarDecisao,
 	blocoDeAjustes,
 	comentarioDaOrigem,
+	comentarioSubstituido,
 	contarRetornos,
-	type DecisaoAprovada,
 	ErroMetodo,
 	escolherLinhas,
 	escreverAjustesMarkdown,
@@ -28,25 +30,21 @@ import {
 	FRASE_DOS_AJUSTES,
 	formaDoAjuste,
 	lerAjustesMarkdown,
-	ligarAjuste,
+	lerReferenciaDeAjuste,
 	linhaDoEvento,
 	linhaParaOModelo,
 	MINIMO_RETORNOS,
 	mesmoAjuste,
 	montarEvidencia,
+	mudarEstadoDoAjuste,
 	novoIdAjuste,
-	novoRelatorio,
 	origemDoAjuste,
-	propostaPendente,
-	propostasPendentes,
-	type RelatorioMetodo,
-	relatorioLido,
-	relatorioNaOrdem,
+	referenciaDoAjuste,
+	relatorioV1Lido,
+	relatorioV1NaOrdem,
 	resumoDoEvento,
 	temRetornoSuficiente,
 	textoCurto,
-	validarDecisao,
-	validarRelatorioDoModelo,
 	validarTextoAjuste,
 } from "./metodo-ciclo-tipos.ts";
 import type { Bloco, ModuloGerado } from "./modulo-tipos.ts";
@@ -233,260 +231,239 @@ describe("a evidência com os limites", () => {
 	});
 });
 
-describe("o que o modelo devolve (validarRelatorioDoModelo)", () => {
-	const ids = ["ev-a", "ev-b", "ev-c"];
-	const proposta = (extra: Record<string, unknown> = {}) => ({ arquivo: "exemplos.md", ajuste: "Diga antes o que o exemplo vai mostrar.", porque: "Ele se perdeu.", evidencias: ["ev-a", "ev-b"], ...extra });
-
-	it("fora do formato é ErroMetodo (a extensão tenta de novo)", () => {
-		expect(() => validarRelatorioDoModelo([], { evidencias: ids })).toThrow(ErroMetodo);
-		expect(() => validarRelatorioDoModelo({ resumo: " ", funcionou: [], problemas: [], propostas: [] }, { evidencias: ids })).toThrow(/resumo/);
-		expect(() => validarRelatorioDoModelo({ resumo: "R", problemas: [], propostas: [] }, { evidencias: ids })).toThrow(/funcionou/);
-		expect(() => validarRelatorioDoModelo({ resumo: "R", funcionou: [], problemas: [], propostas: {} }, { evidencias: ids })).toThrow(/propostas/);
-	});
-
-	it("o que fica, com os ids p1, p2…; os consertos dizem o que saiu", () => {
-		const { relatorio, consertos } = validarRelatorioDoModelo(
-			{
-				resumo: "  O módulo foi bem.  ",
-				funcionou: [{ texto: "Os exemplos.", evidencias: ["ev-a", "ev-x"] }, { texto: "Sem evidência.", evidencias: ["ev-y"] }, { texto: "" }, "texto solto"],
-				problemas: [{ texto: "Os conceitos longos.", evidencias: ["ev-b", "ev-b"] }],
-				propostas: [
-					proposta(),
-					proposta({ arquivo: "metodo/Conceito", ajuste: "Divida o conceito em partes curtas." }),
-					proposta({ arquivo: "outro.md" }),
-					proposta({ ajuste: "" }),
-					proposta({ ajuste: "x".repeat(401) }),
-					proposta({ porque: "" }),
-					proposta({ evidencias: ["ev-a", "ev-z"] }),
-					proposta({ ajuste: "diga ANTES o que o exemplo vai mostrar." }),
-					proposta({ arquivo: "quiz.md", ajuste: "Use alternativas plausíveis.", porque: "p".repeat(400) }),
-					proposta({ arquivo: "pergunta.md", ajuste: "Pergunte o porquê." }),
-					7,
-				],
-			},
-			{ evidencias: ids },
-		);
-		expect(relatorio.resumo).toBe("O módulo foi bem.");
-		expect(relatorio.funcionou).toEqual([{ texto: "Os exemplos.", evidencias: ["ev-a"] }]);
-		expect(relatorio.problemas).toEqual([{ texto: "Os conceitos longos.", evidencias: ["ev-b"] }]);
-		expect(relatorio.propostas.map((item) => [item.id, item.arquivo, item.ajuste])).toEqual([
-			["p1", "exemplos.md", "Diga antes o que o exemplo vai mostrar."],
-			["p2", "conceito.md", "Divida o conceito em partes curtas."],
-			["p3", "quiz.md", "Use alternativas plausíveis."],
-			["p4", "pergunta.md", "Pergunte o porquê."],
-		]);
-		expect(relatorio.propostas[2]!.porque).toHaveLength(300);
-		expect(relatorio.propostas[2]!.porque.endsWith("…")).toBe(true);
-		expect(consertos).toEqual(
-			expect.arrayContaining([
-				expect.stringMatching(/^O que funcionou, item 1: o id "ev-x", que não está na evidência, saiu\.$/),
-				expect.stringMatching(/^O que funcionou, item 2: sem nenhum evento/),
-				expect.stringMatching(/^O que funcionou, item 3: sem texto/),
-				expect.stringMatching(/^Proposta 3: o arquivo "outro.md"/),
-				expect.stringMatching(/^Proposta 4: sem o ajuste/),
-				expect.stringMatching(/^Proposta 5: o ajuste tem 401 caracteres/),
-				expect.stringMatching(/^Proposta 6: sem o porquê/),
-				expect.stringMatching(/^Proposta 7: cita 1 evento da evidência \(o mínimo é 2\)/),
-				expect.stringMatching(/^Proposta 8: igual a uma proposta anterior para exemplos.md/),
-				expect.stringMatching(/^Proposta 9: o porquê passava de 300/),
-				expect.stringMatching(/^Proposta 11: não é um objeto/),
-			]),
-		);
-	});
-
-	it("uma proposta igual a um ajuste ativo do mesmo arquivo sai; de outro arquivo, fica; o resumo longo é cortado; no máximo 5", () => {
-		const muitas = ["a", "b", "c", "d", "e", "f"].map((letra) => proposta({ arquivo: "quiz.md", ajuste: `Regra ${letra}.` }));
-		const { relatorio, consertos } = validarRelatorioDoModelo(
-			{ resumo: "r".repeat(1600), funcionou: [], problemas: [], propostas: [proposta({ ajuste: "Diga  antes o que o exemplo vai mostrar" }), proposta({ arquivo: "conceito.md" }), ...muitas] },
-			{ evidencias: ids, ativos: { "exemplos.md": ["diga antes o que o exemplo vai mostrar"] } },
-		);
-		expect(relatorio.resumo).toHaveLength(1500);
-		expect(relatorio.propostas.map((item) => item.arquivo)).toEqual(["conceito.md", "quiz.md", "quiz.md", "quiz.md", "quiz.md"]);
-		expect(consertos).toEqual(expect.arrayContaining([expect.stringMatching(/^Proposta 1: igual a um ajuste ativo de exemplos.md/), expect.stringMatching(/passa de 5 propostas/), expect.stringMatching(/resumo passava/)]));
-	});
-});
-
-describe("a igualdade com um ajuste ativo", () => {
-	it("sem acento, sem caixa e sem espaços", () => {
+describe("a igualdade com um ajuste que vale", () => {
+	it("sem acento, sem caixa e sem espaços; só os que valem (em teste e mantido)", () => {
 		expect(formaDoAjuste("  Ação  É\tBoa ")).toBe("acaoeboa");
 		expect(mesmoAjuste("Diga o porquê.", "diga o porque .")).toBe(true);
 		expect(mesmoAjuste("Diga o porquê.", "Diga o porquê!")).toBe(false);
-		const conteudo = { ajustes: [{ id: "a", ativo: false, texto: "Use exemplos.", comentario: null }, { id: "b", ativo: true, texto: "Use tabelas.", comentario: null }] };
-		expect(ajusteAtivoIgual(conteudo, "use EXEMPLOS.")).toBeUndefined();
-		expect(ajusteAtivoIgual(conteudo, "use  tabelas.")?.id).toBe("b");
+		const conteudo = {
+			ajustes: [
+				{ id: "a", estado: "descartado" as const, texto: "Use exemplos.", comentario: null },
+				{ id: "b", estado: "em teste" as const, texto: "Use tabelas.", comentario: null },
+				{ id: "c", estado: "mantido" as const, texto: "Use listas.", comentario: null },
+			],
+		};
+		expect(ajusteQueValeIgual(conteudo, "use EXEMPLOS.")).toBeUndefined();
+		expect(ajusteQueValeIgual(conteudo, "use  tabelas.")?.id).toBe("b");
+		expect(ajusteQueValeIgual(conteudo, "Use listas")).toBeUndefined();
+		expect(ajusteQueValeIgual(conteudo, "Use  listas.")?.id).toBe("c");
 	});
 });
 
-describe("o relatório, as propostas e as decisões", () => {
-	const todas = [
-		{ id: "ev-a", linha: "linha a", licao: "l1", bloco: "l1-b2" },
-		{ id: "ev-b", linha: "linha b", licao: "l1", bloco: "l1-b3" },
-		{ id: "ev-c", linha: "linha c", licao: "l2", bloco: null },
-	];
-	const pronto = (): RelatorioMetodo =>
-		novoRelatorio({
-			modulo: "m1",
-			geradoEm: "2026-11-03T10:00:00.000Z",
-			eventosLidos: 3,
-			retornos: 3,
-			doModelo: {
-				relatorio: {
-					resumo: "Resumo.",
-					funcionou: [{ texto: "Bom.", evidencias: ["ev-a"] }],
-					problemas: [],
-					propostas: [
-						{ id: "p1", arquivo: "exemplos.md", ajuste: "Ajuste 1.", porque: "Porque 1.", evidencias: ["ev-b", "ev-a"] },
-						{ id: "p2", arquivo: "quiz.md", ajuste: "Ajuste 2.", porque: "Porque 2.", evidencias: ["ev-a", "ev-b"] },
-					],
-				},
-				modelo: "teste/x",
-				custo: 0.06,
-				prompt: { nome: "relatorio-metodo.md", hash: "abc" },
-				todas,
-			},
-		});
+describe("o relatório da versão 1 continua sendo lido", () => {
+	const v1 = {
+		versao: 1,
+		modulo: "m1",
+		situacao: "pronto",
+		geradoEm: "2026-11-03T10:00:00.000Z",
+		modelo: "teste/x",
+		custo: 0.06,
+		prompt: { nome: "relatorio-metodo.md", hash: "abc" },
+		eventosLidos: 3,
+		retornos: 3,
+		resumo: "Resumo.",
+		funcionou: [{ texto: "Bom.", evidencias: ["ev-a"] }],
+		problemas: [],
+		propostas: [
+			{ id: "p1", arquivo: "exemplos.md", ajuste: "Ajuste 1.", porque: "Porque 1.", evidencias: ["ev-b", "ev-a"], decisao: { tipo: "aprovada", texto: "Ajuste 1.", em: "2026-11-03T11:00:00.000Z", evento: "ev-d", ajuste: "a-20261103-1" } },
+			{ id: "p2", arquivo: "quiz.md", ajuste: "Ajuste 2.", porque: "Porque 2.", evidencias: ["ev-a", "ev-b"], decisao: { tipo: "rejeitada", motivo: "Não serve.", em: "2026-11-03T11:00:00.000Z", evento: "ev-e" } },
+			{ id: "p3", arquivo: "conceito.md", ajuste: "Ajuste 3.", porque: "Porque 3.", evidencias: ["ev-a", "ev-b"] },
+		],
+		evidencias: [
+			{ id: "ev-a", linha: "linha a", licao: "l1", bloco: "l1-b2" },
+			{ id: "ev-b", linha: "linha b", licao: "l1", bloco: null },
+		],
+	};
 
-	it("o relatório pronto guarda as evidências citadas, na ordem; o pouco_retorno vem vazio", () => {
-		const relatorio = pronto();
-		expect(relatorio).toMatchObject({ versao: 1, modulo: "m1", situacao: "pronto", modelo: "teste/x", custo: 0.06, eventosLidos: 3, retornos: 3 });
-		expect(relatorio.evidencias.map((item) => item.id)).toEqual(["ev-a", "ev-b"]);
-		expect(evidenciasDe(relatorio, ["ev-b", "ev-x", "ev-a"]).map((item) => item.linha)).toEqual(["linha b", "linha a"]);
-		const pouco = novoRelatorio({ modulo: "m1", geradoEm: "2026-11-03T10:00:00.000Z", eventosLidos: 2, retornos: 1 });
-		expect(pouco).toEqual({ versao: 1, modulo: "m1", situacao: "pouco_retorno", geradoEm: "2026-11-03T10:00:00.000Z", custo: 0, eventosLidos: 2, retornos: 1, resumo: "", funcionou: [], problemas: [], propostas: [], evidencias: [] });
-		expect(relatorioLido(JSON.parse(JSON.stringify(relatorio)), "m1")).toEqual(relatorio);
-		expect(relatorioLido(JSON.parse(JSON.stringify(pouco)), "m1")).toEqual(pouco);
+	it("lido de volta igual, com a decisão de cada proposta; evidenciasDe pega as linhas pelos ids", () => {
+		const lido = relatorioV1Lido(JSON.parse(JSON.stringify(v1)), "m1");
+		expect(lido).toEqual(v1);
+		expect(relatorioV1NaOrdem(lido)).toEqual(lido);
+		expect(evidenciasDe(lido, ["ev-b", "ev-x", "ev-a"]).map((item) => item.linha)).toEqual(["linha b", "linha a"]);
+		expect(estadoDoRelatorio(lido)).toEqual({ situacao: "pronto" });
 	});
 
-	it("relatorioLido recusa o que não está no formato", () => {
-		const bom = JSON.parse(JSON.stringify(pronto())) as Record<string, unknown>;
-		expect(() => relatorioLido({ ...bom, versao: 2 }, "m1")).toThrow(/versão 1/);
-		expect(() => relatorioLido(bom, "m2")).toThrow(/não é o nome do arquivo/);
-		expect(() => relatorioLido({ ...bom, situacao: "gerando" }, "m1")).toThrow(/situação/);
-		expect(() => relatorioLido({ ...bom, propostas: [{ ...(bom.propostas as object[])[0], arquivo: "x.md" }] }, "m1")).toThrow(/arquivo/);
-		expect(() => relatorioLido({ ...bom, propostas: [{ ...(bom.propostas as object[])[0], decisao: { tipo: "talvez", em: "x", evento: "y" } }] }, "m1")).toThrow(/aprovada nem rejeitada/);
+	it("recusa o que não está no formato", () => {
+		const bom = JSON.parse(JSON.stringify(v1)) as Record<string, unknown>;
+		expect(() => relatorioV1Lido({ ...bom, versao: 2 }, "m1")).toThrow(/versão 1/);
+		expect(() => relatorioV1Lido(bom, "m2")).toThrow(/não é o nome do arquivo/);
+		expect(() => relatorioV1Lido({ ...bom, situacao: "gerando" }, "m1")).toThrow(/situação/);
+		expect(() => relatorioV1Lido({ ...bom, propostas: [{ ...(bom.propostas as object[])[0], arquivo: "x.md" }] }, "m1")).toThrow(/arquivo/);
+		expect(() => relatorioV1Lido({ ...bom, propostas: [{ ...(bom.propostas as object[])[0], decisao: { tipo: "talvez", em: "x", evento: "y" } }] }, "m1")).toThrow(/aprovada nem rejeitada/);
 	});
 
-	it("as decisões: validar, aplicar uma vez, pendentes e o estado", () => {
-		expect(validarDecisao({ proposta: " p1 ", decisao: "aprovar", texto: "  Texto novo. ", motivo: "ignorado" })).toEqual({ proposta: "p1", decisao: "aprovar", texto: "Texto novo." });
-		expect(validarDecisao({ proposta: "p1", decisao: "aprovar", texto: "  " })).toEqual({ proposta: "p1", decisao: "aprovar" });
-		expect(validarDecisao({ proposta: "p1", decisao: "rejeitar", texto: "ignorado", motivo: " Não serve. " })).toEqual({ proposta: "p1", decisao: "rejeitar", motivo: "Não serve." });
-		expect(() => validarDecisao({ decisao: "aprovar" })).toThrow(/proposta/);
-		expect(() => validarDecisao({ proposta: "p1", decisao: "talvez" })).toThrow(/aprovar ou rejeitar/);
-		expect(() => validarDecisao({ proposta: "p1", decisao: "rejeitar", motivo: "m".repeat(301) })).toThrow(/301/);
-		expect(() => validarDecisao({ proposta: "p1", decisao: "aprovar", texto: "x".repeat(401) })).toThrow(/401/);
-
-		const relatorio = pronto();
-		expect(propostasPendentes(relatorio)).toBe(2);
-		expect(estadoDoRelatorio(relatorio)).toEqual({ situacao: "pronto", pendentes: 2 });
-		const decisao: DecisaoAprovada = { tipo: "aprovada", texto: "Ajuste 1.", em: "2026-11-03T11:00:00.000Z", evento: "ev-d", ajuste: "a-20261103-1" };
-		const decidido = aplicarDecisao(relatorio, "p1", decisao);
-		expect(relatorio.propostas[0]!.decisao).toBeUndefined();
-		expect(decidido.propostas[0]!.decisao).toEqual(decisao);
-		expect(propostasPendentes(decidido)).toBe(1);
-		expect(() => aplicarDecisao(decidido, "p1", decisao)).toThrow("A proposta p1 já foi aprovada.");
-		expect(() => propostaPendente(decidido, "p9")).toThrow(/Não achei a proposta "p9"/);
-		const pouco = novoRelatorio({ modulo: "m1", geradoEm: "x", eventosLidos: 0, retornos: 0 });
-		expect(() => propostaPendente(pouco, "p1")).toThrow(/não tem propostas/);
-		expect(estadoDoRelatorio(pouco)).toEqual({ situacao: "pouco_retorno", pendentes: 0 });
-		expect(estadoDoRelatorio(decidido, { gerando: true })).toEqual({ situacao: "gerando", pendentes: 1 });
-		expect(estadoDoRelatorio(null, { erro: "Falhou." })).toEqual({ situacao: "erro", pendentes: 0, mensagem: "Falhou." });
-		expect(estadoDoRelatorio(null)).toEqual({ situacao: "nenhum", pendentes: 0 });
-		expect(relatorioNaOrdem(decidido)).toEqual(decidido);
+	it("o estado do relatório: gerando, erro, o gravado ou nenhum", () => {
+		const lido = relatorioV1Lido(JSON.parse(JSON.stringify(v1)), "m1");
+		expect(estadoDoRelatorio(lido, { gerando: true })).toEqual({ situacao: "gerando" });
+		expect(estadoDoRelatorio(null, { erro: "Falhou." })).toEqual({ situacao: "erro", mensagem: "Falhou." });
+		expect(estadoDoRelatorio(null)).toEqual({ situacao: "nenhum" });
+		expect(estadoDoRelatorio({ situacao: "pouco_retorno" })).toEqual({ situacao: "pouco_retorno" });
 	});
 });
 
-describe("os ajustes em markdown", () => {
+describe("os ajustes em markdown (os estados dos experimentos)", () => {
 	const CANONICO = [
 		"# Ajustes do Breno para exemplos.md",
 		"",
-		"## a-20261103-1 · ativo",
+		"## a-20261103-1 · em teste",
 		"Antes do código de um exemplo, diga em uma frase o que ele vai mostrar.",
-		"<!-- proposta: mat/curso-a/m1/p1 · evidências: ev-1, ev-2 · aprovado em 2026-11-03 -->",
+		"<!-- origem: mat/curso-a/m1/p1 · evidências: ev-1, ev-2 · começou em 2026-11-03 -->",
 		"",
-		"## a-20261103-2 · desligado",
+		"## a-20261103-2 · mantido",
 		"Use números pequenos.",
 		"",
 		"- E uma lista.",
-		"<!-- proposta: m1/p2 · evidências: ev-3, ev-4 · aprovado em 2026-11-03 -->",
+		"<!-- origem: mat/curso-a/m2/p2 · evidências: ev-3, ev-4 · começou em 2026-11-03 -->",
+		"",
+		"## a-20261103-3 · descartado",
+		"Um que não funcionou.",
+		"<!-- origem: mat/curso-a/m2 · reescrita de exemplos.md#a-20261103-1 · evidências: ev-5 · começou em 2026-11-03 · substituído por a-20261103-4 -->",
 		"",
 	].join("\n");
 
 	it("lê e escreve o formato do contrato, ida e volta", () => {
 		const lido = lerAjustesMarkdown(CANONICO, "exemplos.md");
-		expect(lido).toEqual({
-			arquivo: "exemplos.md",
-			titulo: "Ajustes do Breno para exemplos.md",
-			ajustes: [
-				{ id: "a-20261103-1", ativo: true, texto: "Antes do código de um exemplo, diga em uma frase o que ele vai mostrar.", comentario: "proposta: mat/curso-a/m1/p1 · evidências: ev-1, ev-2 · aprovado em 2026-11-03" },
-				{ id: "a-20261103-2", ativo: false, texto: "Use números pequenos.\n\n- E uma lista.", comentario: "proposta: m1/p2 · evidências: ev-3, ev-4 · aprovado em 2026-11-03" },
-			],
-		});
+		expect(lido.ajustes.map((item) => [item.id, item.estado])).toEqual([
+			["a-20261103-1", "em teste"],
+			["a-20261103-2", "mantido"],
+			["a-20261103-3", "descartado"],
+		]);
+		expect(lido.ajustes[1]).toEqual({ id: "a-20261103-2", estado: "mantido", texto: "Use números pequenos.\n\n- E uma lista.", comentario: "origem: mat/curso-a/m2/p2 · evidências: ev-3, ev-4 · começou em 2026-11-03" });
 		expect(escreverAjustesMarkdown(lido)).toBe(CANONICO);
 		expect(lerAjustesMarkdown(escreverAjustesMarkdown(lido), "exemplos.md")).toEqual(lido);
 		expect(escreverAjustesMarkdown(ajustesVazios("quiz.md"))).toBe("# Ajustes do Breno para quiz.md\n");
 		expect(lerAjustesMarkdown("", "quiz.md")).toEqual(ajustesVazios("quiz.md"));
 	});
 
+	it("lê o formato antigo (ativo vale em teste, desligado vale descartado) e grava sempre os estados novos", () => {
+		const antigo = [
+			"# Ajustes do Breno para exemplos.md",
+			"",
+			"## a-20261103-1 · ativo",
+			"Antes do código de um exemplo, diga em uma frase o que ele vai mostrar.",
+			"<!-- proposta: mat/curso-a/m1/p1 · evidências: ev-1, ev-2 · aprovado em 2026-11-03 -->",
+			"",
+			"## a-20261103-2 · desligado",
+			"Use números pequenos.",
+			"<!-- proposta: m1/p2 · evidências: ev-3, ev-4 · aprovado em 2026-11-03 -->",
+			"",
+		].join("\n");
+		const lido = lerAjustesMarkdown(antigo, "exemplos.md");
+		expect(lido.ajustes.map((item) => item.estado)).toEqual(["em teste", "descartado"]);
+		expect(ajustesQueValem(lido).map((item) => item.id)).toEqual(["a-20261103-1"]);
+		expect(origemDoAjuste(lido.ajustes[0]!)).toEqual({ materia: "mat", curso: "curso-a", modulo: "m1", proposta: "p1", evidencias: ["ev-1", "ev-2"], em: "2026-11-03", reescritaDe: null, substituidoPor: null });
+		expect(origemDoAjuste(lido.ajustes[1]!)).toMatchObject({ materia: null, modulo: "m1", proposta: "p2", em: "2026-11-03" });
+		const escrito = escreverAjustesMarkdown(lido);
+		expect(escrito).toContain("## a-20261103-1 · em teste\n");
+		expect(escrito).toContain("## a-20261103-2 · descartado\n");
+		expect(escrito).not.toContain("ativo");
+		expect(escrito).not.toContain("desligado");
+		// O comentário antigo fica como está (o Breno pode ter editado).
+		expect(escrito).toContain("<!-- proposta: m1/p2 · evidências: ev-3, ev-4 · aprovado em 2026-11-03 -->");
+	});
+
 	it("o texto editado à mão pelo Breno é preservado (CRLF, linhas em branco, sem comentário, título trocado, separador e caixa)", () => {
-		const aMao = "﻿# Meus ajustes\r\n\r\n## a-1 - Ativo\r\nTexto   com   espaços\r\n### e um subtítulo\r\n\r\n\r\n## meu-ajuste | desligado\r\nEscrito à mão, sem comentário.\r\n";
+		const aMao = "﻿# Meus ajustes\r\n\r\n## a-1 - Em   Teste\r\nTexto   com   espaços\r\n### e um subtítulo\r\n\r\n\r\n## meu-ajuste | Descartado\r\nEscrito à mão, sem comentário.\r\n";
 		const lido = lerAjustesMarkdown(aMao, "conceito.md");
 		expect(lido.titulo).toBe("Meus ajustes");
 		expect(lido.ajustes).toEqual([
-			{ id: "a-1", ativo: true, texto: "Texto   com   espaços\n### e um subtítulo", comentario: null },
-			{ id: "meu-ajuste", ativo: false, texto: "Escrito à mão, sem comentário.", comentario: null },
+			{ id: "a-1", estado: "em teste", texto: "Texto   com   espaços\n### e um subtítulo", comentario: null },
+			{ id: "meu-ajuste", estado: "descartado", texto: "Escrito à mão, sem comentário.", comentario: null },
 		]);
-		const ligado = ligarAjuste(lido, "meu-ajuste", true);
-		const escrito = escreverAjustesMarkdown(ligado.conteudo);
-		expect(escrito).toBe("# Meus ajustes\n\n## a-1 · ativo\nTexto   com   espaços\n### e um subtítulo\n\n## meu-ajuste · ativo\nEscrito à mão, sem comentário.\n");
+		const mantido = mudarEstadoDoAjuste(lido, "meu-ajuste", "mantido");
+		const escrito = escreverAjustesMarkdown(mantido.conteudo);
+		expect(escrito).toBe("# Meus ajustes\n\n## a-1 · em teste\nTexto   com   espaços\n### e um subtítulo\n\n## meu-ajuste · mantido\nEscrito à mão, sem comentário.\n");
 		expect(lerAjustesMarkdown(escrito, "conceito.md").ajustes.map((item) => item.texto)).toEqual(lido.ajustes.map((item) => item.texto));
 	});
 
 	it("um arquivo que não se lê dá erro com a linha", () => {
 		const casos: Array<[string, RegExp]> = [
-			["Uma nota solta.\n## a-1 · ativo\nTexto.", /linha 1 tem texto fora de um ajuste/],
+			["Uma nota solta.\n## a-1 · em teste\nTexto.", /linha 1 tem texto fora de um ajuste/],
 			["# T\n# Outro título\n", /linha 2 tem texto fora/],
-			["## a-1 · ligado\nTexto.", /linha 1 não está no formato/],
-			["## a-1 · ativo\nTexto.\n## a-1 · ativo\nOutro.", /"a-1" se repete/],
-			["## a-1 · ativo\n\n<!-- x -->", /a-1 \(linha 1\) está sem texto/],
-			["## a-1 · ativo\nTexto.\n<!-- x -->\nDepois.", /linha 4 tem texto depois do comentário/],
-			["## a-1 · ativo\nTexto.\n<!-- sem fim", /não fecha na mesma linha/],
-			["## !a · ativo\nTexto.", /não é válido/],
+			["## a-1 · ligado\nTexto.", /linha 1 não está no formato "## <id> · em teste" \(ou "· mantido" ou "· descartado"\)/],
+			["## a-1\nTexto.", /linha 1 não está no formato/],
+			["## a-1 · em teste\nTexto.\n## a-1 · mantido\nOutro.", /"a-1" se repete/],
+			["## a-1 · em teste\n\n<!-- x -->", /o ajuste a-1 \(linha 1\) está sem texto/],
+			["## a-1 · em teste\nTexto.\n<!-- x -->\nDepois.", /linha 4 tem texto depois do comentário/],
+			["## a-1 · em teste\nTexto.\n<!-- sem fim", /não fecha na mesma linha/],
+			["## !a · em teste\nTexto.", /não é válido/],
 		];
 		for (const [texto, erro] of casos) expect(() => lerAjustesMarkdown(texto, "quiz.md")).toThrow(erro);
 	});
 
-	it("o id novo, acrescentar, ligar e desligar, os ativos e a origem", () => {
+	it("o id novo, acrescentar em teste, mudar o estado, os que valem e a origem", () => {
 		const agora = new Date(2026, 10, 3, 15, 0, 0);
 		expect(novoIdAjuste([], agora)).toBe("a-20261103-1");
 		expect(novoIdAjuste(["a-20261103-1", "a-20261103-7", "a-20261102-9", "outro"], agora)).toBe("a-20261103-8");
-		const comentario = comentarioDaOrigem({ materia: "mat", curso: "curso-a", modulo: "m1", proposta: "p1", evidencias: ["ev-1", "ev-2"], aprovadoEm: "2026-11-03" });
-		expect(comentario).toBe("proposta: mat/curso-a/m1/p1 · evidências: ev-1, ev-2 · aprovado em 2026-11-03");
+		const comentario = comentarioDaOrigem({ materia: "mat", curso: "curso-a", modulo: "m1", proposta: "p1", evidencias: ["ev-1", "ev-2"], em: "2026-11-03" });
+		expect(comentario).toBe("origem: mat/curso-a/m1/p1 · evidências: ev-1, ev-2 · começou em 2026-11-03");
+		expect(comentarioDaOrigem({ materia: "mat", curso: "curso-a", modulo: "m2", evidencias: [], em: "2026-11-04", reescritaDe: "quiz.md#a-1" })).toBe("origem: mat/curso-a/m2 · reescrita de quiz.md#a-1 · começou em 2026-11-04");
+		expect(comentarioSubstituido("origem: x/y/m1", "a-9")).toBe("origem: x/y/m1 · substituído por a-9");
+		expect(comentarioSubstituido(null, "a-9")).toBe("substituído por a-9");
 		const inicio = ajustesVazios("exemplos.md");
 		const { conteudo, ajuste } = acrescentarAjuste(inicio, { texto: "  Diga o que o exemplo mostra.  ", comentario, agora });
 		expect(inicio.ajustes).toHaveLength(0);
-		expect(ajuste).toEqual({ id: "a-20261103-1", ativo: true, texto: "Diga o que o exemplo mostra.", comentario });
+		expect(ajuste).toEqual({ id: "a-20261103-1", estado: "em teste", texto: "Diga o que o exemplo mostra.", comentario });
 		const segundo = acrescentarAjuste(conteudo, { texto: "Outro.", comentario: null, agora });
 		expect(segundo.ajuste.id).toBe("a-20261103-2");
-		const desligado = ligarAjuste(segundo.conteudo, "a-20261103-1", false);
-		expect(desligado.mudou).toBe(true);
-		expect(ajustesAtivos(desligado.conteudo).map((item) => item.id)).toEqual(["a-20261103-2"]);
-		expect(ligarAjuste(desligado.conteudo, "a-20261103-1", false).mudou).toBe(false);
-		expect(() => ligarAjuste(desligado.conteudo, "a-9", true)).toThrow('Não achei o ajuste "a-9" em exemplos.md.');
+		const mantido = mudarEstadoDoAjuste(segundo.conteudo, "a-20261103-1", "mantido");
+		expect(mantido.mudou).toBe(true);
+		const descartado = mudarEstadoDoAjuste(mantido.conteudo, "a-20261103-2", "descartado", { comentario: comentarioSubstituido(null, "a-20261103-3") });
+		expect(descartado.ajuste).toMatchObject({ estado: "descartado", comentario: "substituído por a-20261103-3" });
+		expect(ajustesQueValem(descartado.conteudo).map((item) => item.id)).toEqual(["a-20261103-1"]);
+		expect(ajustesComEstado(descartado.conteudo, "descartado").map((item) => item.id)).toEqual(["a-20261103-2"]);
+		expect(mudarEstadoDoAjuste(descartado.conteudo, "a-20261103-1", "mantido").mudou).toBe(false);
+		expect(() => mudarEstadoDoAjuste(descartado.conteudo, "a-9", "mantido")).toThrow('Não achei o ajuste "a-9" em exemplos.md.');
 		expect(() => acrescentarAjuste(inicio, { texto: "## Cabeçalho", comentario: null, agora })).toThrow(ErroMetodo);
-		expect(ajustesNaTela(desligado.conteudo)).toEqual([
-			{ id: "a-20261103-1", texto: "Diga o que o exemplo mostra.", ativo: false, origem: { materia: "mat", curso: "curso-a", modulo: "m1", proposta: "p1", evidencias: ["ev-1", "ev-2"], aprovadoEm: "2026-11-03" } },
-			{ id: "a-20261103-2", texto: "Outro.", ativo: true, origem: null },
+		expect(ajustesNaTela(descartado.conteudo)).toEqual([
+			{ id: "a-20261103-1", texto: "Diga o que o exemplo mostra.", estado: "mantido", origem: { materia: "mat", curso: "curso-a", modulo: "m1", proposta: "p1", evidencias: ["ev-1", "ev-2"], em: "2026-11-03", reescritaDe: null, substituidoPor: null } },
+			{ id: "a-20261103-2", texto: "Outro.", estado: "descartado", origem: { materia: null, curso: null, modulo: null, proposta: null, evidencias: [], em: null, reescritaDe: null, substituidoPor: "a-20261103-3" } },
 		]);
-		expect(origemDoAjuste({ comentario: "proposta: m1/p2 · aprovado em 2026-11-04" })).toEqual({ materia: null, curso: null, modulo: "m1", proposta: "p2", evidencias: [], aprovadoEm: "2026-11-04" });
+		expect(origemDoAjuste({ comentario: "origem: mat/curso-a/m2 · reescrita de quiz.md#a-1 · evidências: e1 · começou em 2026-11-04" })).toEqual({
+			materia: "mat",
+			curso: "curso-a",
+			modulo: "m2",
+			proposta: null,
+			evidencias: ["e1"],
+			em: "2026-11-04",
+			reescritaDe: "quiz.md#a-1",
+			substituidoPor: null,
+		});
+		expect(origemDoAjuste({ comentario: "origem: mat/curso-a/m2 · evidências: e1 · registrado em 2026-11-04" })).toMatchObject({ proposta: null, em: "2026-11-04" });
 		expect(origemDoAjuste({ comentario: "uma nota qualquer" })).toBeNull();
 		expect(validarTextoAjuste("  Texto.  ")).toBe("Texto.");
 		expect(() => validarTextoAjuste("a <!-- b")).toThrow(/<!--/);
 	});
 
-	it("o bloco <ajustes-do-breno> que vai depois da base", () => {
+	it("a referência <arquivo>#<id> e os ajustes usados", () => {
+		expect(referenciaDoAjuste("quiz.md", "a-1")).toBe("quiz.md#a-1");
+		expect(lerReferenciaDeAjuste("quiz.md#a-1")).toEqual({ arquivo: "quiz.md", id: "a-1" });
+		expect(lerReferenciaDeAjuste(" metodo/Quiz#a-1 ")).toEqual({ arquivo: "quiz.md", id: "a-1" });
+		expect(lerReferenciaDeAjuste("a-1")).toBeUndefined();
+		expect(lerReferenciaDeAjuste("outro.md#a-1")).toBeUndefined();
+		expect(lerReferenciaDeAjuste(7)).toBeUndefined();
+		expect(
+			ajustesUsadosDe("quiz.md", [
+				{ id: "a-1", estado: "em teste" },
+				{ id: "a-2", estado: "descartado" },
+				{ id: "a-3", estado: "mantido" },
+			]),
+		).toEqual([
+			{ arquivo: "quiz.md", ajuste: "a-1", estado: "em teste" },
+			{ arquivo: "quiz.md", ajuste: "a-3", estado: "mantido" },
+		]);
+	});
+
+	it("o bloco <ajustes-do-breno> que vai depois da base, com o estado de cada ajuste", () => {
 		expect(blocoDeAjustes("exemplos.md", [])).toBe("");
-		expect(blocoDeAjustes("exemplos.md", [{ texto: "Primeiro." }, { texto: "Segundo,\nem duas linhas." }])).toBe(
-			`<ajustes-do-breno arquivo="exemplos.md">\n${FRASE_DOS_AJUSTES}\n\n- Primeiro.\n- Segundo,\n  em duas linhas.\n</ajustes-do-breno>`,
+		expect(
+			blocoDeAjustes("exemplos.md", [
+				{ texto: "Primeiro.", estado: "em teste" },
+				{ texto: "Segundo,\nem duas linhas.", estado: "mantido" },
+			]),
+		).toBe(`<ajustes-do-breno arquivo="exemplos.md">\n${FRASE_DOS_AJUSTES}\n\n- (em teste) Primeiro.\n- (mantido) Segundo,\n  em duas linhas.\n</ajustes-do-breno>`);
+		expect(FRASE_DOS_AJUSTES).toBe(
+			'Estes ajustes vieram do retorno do Breno. Os marcados "em teste" são experimentos: siga-os à risca, para que dê para medir o efeito deles. Todos valem acima do texto acima quando os dois conflitarem.',
 		);
 	});
 });

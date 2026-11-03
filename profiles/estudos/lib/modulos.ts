@@ -15,6 +15,7 @@ import { type ArquivoDoCurso, type ContextoCurso, type Curso, ehIdModulo, type E
 import { type PromptUsado, type TrechosDoConceito, trechosDosConceitos } from "./diagnostico.ts";
 import type { Modulo as ModuloDoEsqueleto, TipoModulo } from "./esqueleto-tipos.ts";
 import { acrescentarEvento, criarEvento } from "./eventos.ts";
+import type { AjusteUsado } from "./metodo-ciclo-tipos.ts";
 import { lerMapa, type Prioridade, type Referencia } from "./mapa.ts";
 import { eventosMateria } from "./materias.ts";
 import {
@@ -77,6 +78,8 @@ function moduloLido(valor: unknown, materia: string, curso: string, modulo: stri
 		if (!ehObjeto(aguardando) || typeof aguardando.desde !== "string" || !Array.isArray(aguardando.prontos)) throw new Error("falta o aguardando (desde e prontos)");
 	} else if (typeof valor.geradoEm !== "string" || typeof valor.modelo !== "string" || typeof valor.custo !== "number" || !Array.isArray(valor.materiaisUsados)) {
 		throw new Error("faltam geradoEm, modelo, custo ou materiaisUsados");
+	} else if (valor.ajustesUsados !== undefined && !(Array.isArray(valor.ajustesUsados) && (valor.ajustesUsados as unknown[]).every(ehObjeto))) {
+		throw new Error("os ajustesUsados não são uma lista de objetos");
 	} else if (valor.concluidoEm !== undefined && typeof valor.concluidoEm !== "string") {
 		throw new Error("o concluidoEm não é um texto");
 	} else if (valor.respostas !== undefined && !ehObjeto(valor.respostas)) {
@@ -108,6 +111,8 @@ function moduloNaOrdem(modulo: Modulo): Modulo {
 		modelo: modulo.modelo,
 		custo: modulo.custo,
 		materiaisUsados: modulo.materiaisUsados,
+		// Os ajustes do método que valeram na geração (metodo-ciclo-tipos.ts): a reescrita de um bloco e o concluir os mantêm.
+		...(modulo.ajustesUsados ? { ajustesUsados: modulo.ajustesUsados } : {}),
 		...(modulo.concluidoEm ? { concluidoEm: modulo.concluidoEm } : {}),
 		// As respostas das questões (modulo-respostas-tipos.ts) ficam: a reescrita de um bloco e o concluir gravam o módulo com elas.
 		...(modulo.respostas && Object.keys(modulo.respostas).length > 0 ? { respostas: modulo.respostas } : {}),
@@ -208,6 +213,8 @@ export interface GeracaoModulo {
 	modelo: string;
 	custo: number;
 	materiaisUsados: ArquivoDoCurso[];
+	/** Os ajustes do método (`em teste` e `mantido`) carregados na geração das lições; vão no módulo e no contexto do gerou_modulo. */
+	ajustesUsados?: AjusteUsado[];
 }
 
 /** O formulário limpo: textos aparados, vazios fora. */
@@ -253,6 +260,7 @@ export async function gravarModuloGerado(dados: string, materia: string, curso: 
 		modelo: geracao.modelo,
 		custo: geracao.custo,
 		materiaisUsados: structuredClone(geracao.materiaisUsados ?? []),
+		...(geracao.ajustesUsados ? { ajustesUsados: structuredClone(geracao.ajustesUsados) } : {}),
 	};
 	await gravarModulo(dados, modulo);
 	const resumo = resumoDoModulo(modulo);
@@ -264,7 +272,11 @@ export async function gravarModuloGerado(dados: string, materia: string, curso: 
 				verbo: "gerou_modulo",
 				objeto: { materia, curso: atual.id, modulo: modulo.id },
 				resultado: { licoes: resumo.licoes, blocos: resumo.blocos, questoes: resumo.questoes, custo: geracao.custo },
-				contexto: { modelo: contexto.modelo ?? geracao.modelo, prompts: (contexto.prompts ?? []).map((prompt) => ({ nome: prompt.nome, hash: prompt.hash })) },
+				contexto: {
+						modelo: contexto.modelo ?? geracao.modelo,
+						prompts: (contexto.prompts ?? []).map((prompt) => ({ nome: prompt.nome, hash: prompt.hash })),
+						...(geracao.ajustesUsados ? { ajustesUsados: structuredClone(geracao.ajustesUsados) } : {}),
+					},
 			},
 			agora,
 		),

@@ -29,6 +29,7 @@ import {
 	frasesDoTexto,
 	itemDoRoteiro,
 	type Licao,
+	type ModuloGerado,
 	lerModulo,
 	licoesPorHoras,
 	marcarAguardando,
@@ -830,6 +831,40 @@ describe("no disco", () => {
 			resultado: { licoes: 1, blocos: 6, questoes: 1, custo: 0.12 },
 			contexto: { modelo: MODELO, prompts: [{ nome: "modulo-plano.md", hash: "abc" }, { nome: "modulo-licao.md", hash: "def" }] },
 		});
+	});
+
+	it("os ajustes que valeram na geração (ajustesUsados) vão no módulo e no contexto do gerou_modulo; sem o campo, nada é gravado; ler e regravar os mantém", async () => {
+		const ajustesUsados = [
+			{ arquivo: "quiz.md" as const, ajuste: "a-20261103-1", estado: "em teste" as const },
+			{ arquivo: "exemplos.md" as const, ajuste: "a-20261001-2", estado: "mantido" as const },
+		];
+		const gravado = await gravarModuloGerado(dados, materia, CURSO, { ...geracao("m1"), ajustesUsados }, { agora: AGORA, prompts: [{ nome: "modulo-licao.md", hash: "def" }] });
+		expect(gravado.ajustesUsados).toEqual(ajustesUsados);
+		expect(Object.keys(JSON.parse(await readFile(caminhoDoModulo(dados, materia, CURSO, "m1"), "utf8")))).toEqual([
+			"versao",
+			"id",
+			"curso",
+			"materia",
+			"situacao",
+			"licoes",
+			"geradoEm",
+			"modelo",
+			"custo",
+			"materiaisUsados",
+			"ajustesUsados",
+		]);
+		const lido = (await lerModulo(dados, materia, CURSO, "m1")) as ModuloGerado;
+		expect(lido.ajustesUsados).toEqual(ajustesUsados);
+		expect((await daMateria()).at(-1)!.contexto).toEqual({ modelo: MODELO, prompts: [{ nome: "modulo-licao.md", hash: "def" }], ajustesUsados });
+		// Uma geração sem experimentos guarda a lista vazia; uma sem o campo, nada.
+		const vazio = await gravarModuloGerado(dados, materia, CURSO, { ...geracao("m2"), ajustesUsados: [] }, { agora: AGORA });
+		expect(vazio.ajustesUsados).toEqual([]);
+		const sem = await gravarModuloGerado(dados, materia, CURSO, geracao("m3"), { agora: AGORA });
+		expect(sem.ajustesUsados).toBeUndefined();
+		expect("ajustesUsados" in ((await daMateria()).at(-1)!.contexto ?? {})).toBe(false);
+		// A lista que não é de objetos faz o arquivo não se ler.
+		await writeFile(caminhoDoModulo(dados, materia, CURSO, "m3"), JSON.stringify({ ...sem, ajustesUsados: "x" }), "utf8");
+		await expect(lerModulo(dados, materia, CURSO, "m3")).rejects.toThrow(/ajustesUsados não são uma lista/);
 	});
 
 	it("qualquer um pode ser gerado, fora de ordem; o gerado pode ser gerado de novo (substitui)", async () => {

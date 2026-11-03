@@ -154,3 +154,14 @@ A mensagem `modulo` de um módulo concluído leva `relatorio` (o JSON gravado, o
 O `estado` leva, por módulo concluído, `relatorio: {situacao: "gerando" | "pronto" | "pouco_retorno" | "erro" | "nenhum", pendentes}`. `pendentes` conta as propostas sem decisão.
 
 O `erro` leva `ao` (`gerar_relatorio`, `decidir_proposta` ou `ligar_ajuste`).
+
+### Detalhes da ponte, como ficaram na extensão
+
+- `concluir` responde como hoje (o `estado` com o pedido, já com `relatorio: {situacao: "gerando"}` no módulo) e dispara o relatório sem esperar. O módulo concluído vai antes, em uma mensagem `modulo` sem pedido, com `relatorioGerando: true`.
+- `gerar_relatorio` responde com a mensagem `modulo` com o pedido (com `relatorioGerando: true`). O relatório pronto chega depois, em uma mensagem `modulo` sem pedido. Se falhar, chega um `erro` sem pedido, com `ao: "gerar_relatorio"`, `materia`, `curso` e `modulo`. Os erros de antes de começar (módulo não concluído, relatório que não se lê, relatório já sendo gerado) vão com o pedido.
+- A mensagem `modulo` leva também `relatorioErro` (a frase da última tentativa que falhou, ou do arquivo do relatório que não se lê), até a próxima tentativa. O `estado` mostra `relatorio.situacao: "erro"` com `mensagem` nesses dois casos.
+- Se gerar de novo falhar, o relatório anterior fica no disco; só um relatório novo que deu certo o substitui.
+- `decidir_proposta` responde com a mensagem `modulo` com o pedido, com a decisão no `relatorio`. O `estado` (com os `pendentes`) vai logo depois, sem pedido. Com o relatório sendo gerado de novo, é erro. O `erro` leva `proposta`.
+- `ligar_ajuste` e `listar_ajustes` não levam matéria nem curso, e respondem com `ajustes {arquivos, pedido}`: só os arquivos com algum ajuste ou que não se leem (estes com `erro`, a frase). O `erro` de `ligar_ajuste` leva `arquivo` e `ajuste`. `ligar_ajuste` num ajuste que já está no estado pedido não grava nada e não gera evento.
+- Aprovar um texto igual (sem acento, caixa e espaços) a um ajuste ativo do mesmo arquivo não acrescenta outro ajuste: a decisão aponta para o que já existe.
+- Os arquivos de ajustes têm uma trava só, que pode ser tomada dentro da trava de uma matéria, nunca o contrário.

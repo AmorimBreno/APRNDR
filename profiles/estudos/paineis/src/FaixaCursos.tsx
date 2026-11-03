@@ -1,11 +1,14 @@
-// A faixa dos cursos do painel do caderno: os cursos da matéria em cards
-// numerados lado a lado, mais um card tracejado "Novo curso" no fim. Um curso
-// pronto abre a visão do curso (TelaCurso.tsx) pelo card inteiro; um rascunho
-// volta ao guia de criação (TelaGuiaCurso.tsx) pelo card, e o "Descartar" fica
-// num botão ao lado do card, não dentro dele, porque botão não aninha botão. O
-// primeiro curso pronto (o que está em andamento) ganha a cor da matéria.
+// A faixa dos cursos do painel do caderno: os cursos da matéria em cards largos
+// e baixos, cada um num tom pastel chapado, lado a lado, mais um card tracejado
+// "Novo curso" no fim. Em cima, o chip redondo com o ícone, o rótulo ("Curso 01"
+// ou "Rascunho") e o selo (os módulos, ou a etapa em que o rascunho parou); no
+// meio, o nome; embaixo, o prazo ou a última edição. Um curso pronto abre a
+// visão do curso (TelaCurso.tsx) pelo card inteiro; um rascunho volta ao guia
+// de criação (TelaGuiaCurso.tsx) pelo card, e o "Descartar" fica num botão ao
+// lado do card, não dentro dele, porque botão não aninha botão. O primeiro
+// curso pronto (o que está em andamento) ganha o tom da matéria.
 
-import { Button, Callout, Icon, Tag, type Tone } from "@estudos/design-system";
+import { Button, Callout, Icon, type Tone } from "@estudos/design-system";
 import { motion } from "motion/react";
 import type { ResumoCurso } from "../../lib/curso-tipos.ts";
 import type { Materia } from "../../lib/materia-tipos.ts";
@@ -16,7 +19,7 @@ import { useDescartarCurso } from "./useDescartarCurso.tsx";
 export interface PropsFaixaCursos {
 	cursos: CursosDaMateria;
 	materia?: Materia;
-	/** Cor da matéria: o primeiro curso pronto (o que está em andamento) ganha esse fundo. */
+	/** Cor da matéria: o primeiro curso pronto (o que está em andamento) ganha o tom pastel dela. */
 	tom: Tone;
 	novoCurso(): void;
 	continuar(curso: ResumoCurso): void;
@@ -34,7 +37,7 @@ export function FaixaCursos(props: PropsFaixaCursos) {
 		</Callout>
 	) : null;
 
-	const cards = lista ? cardsDosCursos(lista, props.materia) : [];
+	const cards = lista ? cardsDosCursos(lista, props.materia, props.tom) : [];
 	const contagem = textoContagem(cards.length);
 
 	const cardNovo = (
@@ -48,7 +51,7 @@ export function FaixaCursos(props: PropsFaixaCursos) {
 		</li>
 	);
 
-	const cardDoCurso = ({ curso, numero, destaque, rotulo, prazo, descricao }: CardCurso, indice: number) => {
+	const cardDoCurso = ({ curso, tom, icone, categoria, selo, rodape, descricao }: CardCurso, indice: number) => {
 		const rascunho = curso.situacao === "rascunho";
 		return (
 			<motion.li
@@ -58,23 +61,22 @@ export function FaixaCursos(props: PropsFaixaCursos) {
 				animate={{ opacity: 1, y: 0 }}
 				transition={{ type: "spring", stiffness: 420, damping: 32, delay: Math.min(indice, 10) * 0.03 }}
 			>
-				<div className="faixa-cursos__item">
+				<div className={`faixa-cursos__item faixa-cursos__item--${tom}`}>
 					<button
 						type="button"
-						className={`faixa-cursos__card${destaque ? " faixa-cursos__card--destaque" : ""}`}
+						className="faixa-cursos__card"
 						aria-label={`${rascunho ? "Continuar" : "Abrir"} o curso ${descricao}`}
 						onClick={() => (rascunho ? props.continuar(curso) : props.abrir(curso))}
 					>
-						<span className="faixa-cursos__numero data">{numero}</span>
-						<span className="faixa-cursos__nome">{curso.nome}</span>
-						<span className="faixa-cursos__pe">
-							<span className="faixa-cursos__rotulo">
-								<Tag size="sm" tone={rotulo.tom} icon={rascunho ? "clock" : "check"}>
-									{rotulo.texto}
-								</Tag>
+						<span className="faixa-cursos__alto">
+							<span className="faixa-cursos__chip">
+								<Icon name={icone} size={16} />
 							</span>
-							<span className="faixa-cursos__prazo data">{prazo}</span>
+							<span className="faixa-cursos__categoria">{categoria}</span>
+							<span className="faixa-cursos__selo">{selo}</span>
 						</span>
+						<span className="faixa-cursos__nome">{curso.nome}</span>
+						<span className="faixa-cursos__rodape">{rodape}</span>
 					</button>
 					{rascunho ? (
 						<Button
@@ -93,7 +95,7 @@ export function FaixaCursos(props: PropsFaixaCursos) {
 	};
 
 	return (
-		<section className={`faixa-cursos faixa-cursos--${props.tom}`} aria-label="Cursos da matéria">
+		<section className="faixa-cursos" aria-label="Cursos da matéria">
 			{aviso}
 			<header className="faixa-cursos__topo">
 				<h2 className="overline faixa-cursos__titulo">Cursos</h2>

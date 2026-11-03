@@ -1,10 +1,10 @@
 // As partes puras da faixa de cursos do painel do caderno (faixa-cursos.ts):
-// o card em destaque, a numeração, a etiqueta e o prazo juntos, e a contagem
-// do cabeçalho.
+// o card em destaque, a numeração, o tom de cada card, o selo, o rótulo e o pé
+// (prazo ou última edição), e a contagem do cabeçalho.
 
 import { describe, expect, it } from "vitest";
 import type { ResumoCurso } from "../../lib/curso-tipos.ts";
-import { cardsDosCursos, indiceEmDestaque, textoContagem } from "./faixa-cursos.ts";
+import { cardsDosCursos, indiceEmDestaque, TONS_DOS_CARDS, textoContagem } from "./faixa-cursos.ts";
 
 const materia = { provas: [{ nome: "P1", data: "2026-11-20" }] };
 
@@ -39,22 +39,49 @@ describe("os cards", () => {
 		expect(numeros[9]).toBe("10");
 	});
 
-	it("juntam a etiqueta e o prazo: o rascunho diz onde parou, o pronto quantos módulos tem", () => {
+	it("o rascunho diz em que etapa parou e o pronto quantos módulos tem", () => {
 		const [rascunho, pronto] = cardsDosCursos(
 			[resumo("a", { etapa: "diagnostico", prazo: "2026-11-20" }), resumo("b", { situacao: "pronto", modulos: 6, prazo: "2026-11-25" })],
 			materia,
 		);
-		expect(rascunho?.rotulo).toEqual({ texto: "Rascunho · parou em Diagnóstico", tom: "amber" });
-		expect(rascunho?.prazo).toBe("P1 em 20/11");
+		expect(rascunho).toMatchObject({ icone: "file", categoria: "Rascunho", selo: "parou em Diagnóstico", prazo: "P1 em 20/11", rodape: "Prazo: P1 em 20/11" });
 		expect(rascunho?.descricao).toBe("01, Curso a. Rascunho · parou em Diagnóstico. P1 em 20/11.");
-		expect(pronto?.rotulo).toEqual({ texto: "Pronto · 6 módulos", tom: "sage" });
-		expect(pronto?.prazo).toBe("25/11");
+		expect(pronto).toMatchObject({ icone: "flag", categoria: "Curso 02", selo: "6 módulos", prazo: "25/11", rodape: "Prazo: 25/11" });
 	});
 
-	it("sem módulos conhecidos, o pronto é só Pronto; sem prazo, diz sem prazo", () => {
-		const [card] = cardsDosCursos([resumo("a", { situacao: "pronto" })], undefined);
-		expect(card?.rotulo.texto).toBe("Pronto");
+	it("um módulo só fica no singular; sem módulos conhecidos, o selo do pronto é só Pronto", () => {
+		const [um, semConta] = cardsDosCursos([resumo("a", { situacao: "pronto", modulos: 1 }), resumo("b", { situacao: "pronto" })], undefined);
+		expect(um?.selo).toBe("1 módulo");
+		expect(semConta?.selo).toBe("Pronto");
+	});
+
+	it("sem prazo, o pé diz quando o curso foi editado", () => {
+		const agora = new Date("2026-10-23T15:00:00.000Z");
+		const [card] = cardsDosCursos([resumo("a", { situacao: "pronto" })], undefined, "amber", agora);
 		expect(card?.prazo).toBe("sem prazo");
+		expect(card?.rodape).toBe("editado ontem");
+	});
+});
+
+describe("o tom de cada card", () => {
+	it("o destaque fica no tom da matéria e os outros alternam os tons sem repeti-lo", () => {
+		const lista = [resumo("a", { situacao: "pronto" }), ...Array.from({ length: 7 }, (_, i) => resumo(`r${i}`))];
+		const tons = cardsDosCursos(lista, materia, "sage").map((card) => card.tom);
+		expect(tons[0]).toBe("sage");
+		expect(tons.slice(1).includes("sage")).toBe(false);
+	});
+
+	it("dois vizinhos nunca têm o mesmo tom", () => {
+		const lista = Array.from({ length: 14 }, (_, i) => resumo(`c${i}`, i === 3 ? { situacao: "pronto" } : {}));
+		for (const tomDaMateria of TONS_DOS_CARDS) {
+			const tons = cardsDosCursos(lista, materia, tomDaMateria).map((card) => card.tom);
+			tons.slice(1).forEach((tom, i) => expect(tom).not.toBe(tons[i]));
+		}
+	});
+
+	it("sem destaque, a ordem dos tons começa em tijolo (rosa), areia e aço", () => {
+		const tons = cardsDosCursos([resumo("a"), resumo("b"), resumo("c")], materia, "amber").map((card) => card.tom);
+		expect(tons).toEqual(["brick", "cream", "steel"]);
 	});
 });
 

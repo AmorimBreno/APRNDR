@@ -25,7 +25,7 @@ import { AvatarAgente, type DadosAvatarAgente, type JanelaPerfilHook, type Props
 import { motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Evento } from "../../lib/eventos.ts";
-import { type Materia, pastaMateriaisRelativa } from "../../lib/materia-tipos.ts";
+import { type CorMateria, type Materia, pastaMateriaisRelativa } from "../../lib/materia-tipos.ts";
 import { contextoDaMateria, type DadosCaderno, dataCurta, lerAcoes, PAINEL_CADERNOS, prepararConversa, proximaProva, quando, rotuloCapa } from "./comum.ts";
 import { EditorNota } from "./EditorNota.tsx";
 import { ModalMateria } from "./ModalMateria.tsx";
@@ -388,6 +388,7 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 				{...(materia ? { materia } : {})}
 				{...(numero ? { numero } : {})}
 				voltar={voltar}
+				{...(lista ? { materias: lista.materias } : {})}
 				editar={() => setEditando(true)}
 				conversar={conversar}
 				abrindo={abrindoConversa}
@@ -563,24 +564,55 @@ interface PropsAbaCaderno {
 	abrindo?: boolean;
 	/** O professor, para a foto do botão da conversa. */
 	agente?: { nome: string; avatar?: DadosAvatarAgente };
+	/** As matérias do Breno, na ordem da roda: as três primeiras dão a cor e o ideograma das capas do leque. */
+	materias?: Materia[];
+}
+
+interface CapaLeque {
+	cor: CorMateria;
+	glifo: string;
+}
+
+/** Tons e ideogramas que completam o leque quando o Breno tem menos de três matérias (brick fica de fora: a aba já é tijolo). */
+const CAPAS_RESERVA: CapaLeque[] = [
+	{ cor: "moss", glifo: "学" },
+	{ cor: "amber", glifo: "習" },
+	{ cor: "steel", glifo: "知" },
+	{ cor: "sage", glifo: "読" },
+	{ cor: "cream", glifo: "書" },
+];
+
+/** As três capas do leque: as primeiras matérias e, se faltarem, tons diferentes entre si e das matérias que já entraram. */
+function capasDoLeque(materias: Materia[] | undefined): [CapaLeque, CapaLeque, CapaLeque] {
+	const capas: CapaLeque[] = (materias ?? []).slice(0, 3).map((item) => ({ cor: item.cor, glifo: item.glifo }));
+	for (const reserva of CAPAS_RESERVA) {
+		if (capas.length >= 3) break;
+		if (!capas.some((capa) => capa.cor === reserva.cor)) capas.push(reserva);
+	}
+	// As reservas são cinco tons diferentes, então sempre sobram três capas.
+	return capas as [CapaLeque, CapaLeque, CapaLeque];
 }
 
 /**
  * A aba tijolo do caderno, com as classes da CourseBar do design system (sem a trilha: o caderno não é um curso).
- * A capa é o botão de editar a matéria (inclina como a capa da linha do meio da roda) e a foto do
- * professor, que pula no hover, abre a conversa da matéria.
+ * O botão de voltar é um leque de três capas de caderno, empilhadas como um maço, que abre no hover e no foco
+ * (as cores são as das primeiras matérias). A capa é o botão de editar a matéria (inclina como a capa da
+ * linha do meio da roda) e a foto do professor, que pula no hover, abre a conversa da matéria.
  */
 function AbaCaderno(props: PropsAbaCaderno) {
 	const { materia } = props;
+	// A capa da frente é a da primeira matéria; as de trás ficam uma para cada lado.
+	const [frente, esquerda, direita] = capasDoLeque(props.materias);
 	const prova = materia ? proximaProva(materia, new Date()) : undefined;
 	const kicker = [props.numero ? `Caderno ${pad2(props.numero)}` : "Caderno", prova ? `${prova.nome} ${quando(prova.dias)}, ${dataCurta(prova.data)}` : ""]
 		.filter(Boolean)
 		.join(" · ");
 	return (
 		<header className="ap-cbar aba-caderno">
-			<button type="button" className="ap-cbar__back button" onClick={props.voltar}>
-				<Icon name="list" size={18} strokeWidth={2.5} />
-				Matérias
+			<button type="button" className="aba-caderno__leque" onClick={props.voltar} title="Matérias" aria-label="Voltar para as matérias">
+				<NotebookCover size="sm" tone={esquerda.cor} glyph={esquerda.glifo as OrnamentGlyph} className="aba-caderno__leque-capa aba-caderno__leque-capa--esquerda" />
+				<NotebookCover size="sm" tone={direita.cor} glyph={direita.glifo as OrnamentGlyph} className="aba-caderno__leque-capa aba-caderno__leque-capa--direita" />
+				<NotebookCover size="sm" tone={frente.cor} glyph={frente.glifo as OrnamentGlyph} className="aba-caderno__leque-capa aba-caderno__leque-capa--frente" />
 			</button>
 			<div className="ap-cbar__course aba-caderno__materia">
 				{materia ? (

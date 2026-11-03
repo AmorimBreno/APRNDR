@@ -10,6 +10,7 @@
 // (modulo-tela.test.ts) rodam no Node.
 
 import type { IconName, RulerItem, TrackStep } from "@estudos/design-system";
+import type { ExplicacaoPedida, TermoNaTela } from "../../lib/termos-tipos.ts";
 import { ehQuestao } from "../../lib/modulo-respostas-tipos.ts";
 import type { Bloco, EstadoModuloNaTela, FormatoExplicacao, Licao, Modulo } from "../../lib/modulo-tipos.ts";
 
@@ -45,6 +46,9 @@ export interface LidoModuloAberto {
 	modulo?: Modulo;
 	/** Os blocos cuja resposta está sendo conferida pelo modelo agora (o corrigindo do último "modulo"; vazio sem nenhum). */
 	corrigindo?: string[];
+	glossario?: TermoNaTela[];
+	explicando?: string[];
+	explicacoesFalhas?: ExplicacaoPedida[];
 	erro?: string;
 }
 
@@ -246,7 +250,7 @@ export function rotuloConcluido(modulo: Modulo): string {
 // --- O aviso de visualização ---------------------------------------------------------
 
 /** O texto do Callout do topo da lição. */
-export const TEXTO_AVISO = "Pedir outra explicação de um trecho chega com a aula (item 7). Por enquanto, use o Feedback de cada bloco.";
+export const TEXTO_AVISO = "Selecione um trecho para pedir uma explicação. Os termos destacados abrem a definição; o Feedback de cada bloco ajuda a melhorar as próximas lições.";
 
 /** A chave do localStorage que lembra que o aviso foi fechado. */
 export const CHAVE_AVISO = "estudos:modulo:aviso-fechado";

@@ -299,10 +299,10 @@ describe("a ponte: a resposta ao abrir", () => {
 			recebida("3", "erro", { mensagem: "Falhou o listar.", ao: "listar", materia: "materia", curso: "curso" }),
 			recebida("4", "modulo", { materia: "materia", curso: "curso", modulo }),
 		];
-		expect(lerModuloAberto(recebidas, "materia", "curso", "m2")).toEqual({ modulo, corrigindo: [] });
+		expect(lerModuloAberto(recebidas, "materia", "curso", "m2")).toEqual({ modulo, corrigindo: [], glossario: [], explicando: [], explicacoesFalhas: [] });
 		const comErro = [...recebidas, recebida("5", "erro", { mensagem: "O módulo m2 ainda não foi gerado.", ao: "abrir", materia: "materia", curso: "curso", modulo: "m2" })];
 		expect(lerModuloAberto(comErro, "materia", "curso", "m2")).toEqual({ erro: "O módulo m2 ainda não foi gerado." });
-		expect(lerModuloAberto([...comErro, recebida("6", "modulo", { materia: "materia", curso: "curso", modulo })], "materia", "curso", "m2")).toEqual({ modulo, corrigindo: [] });
+		expect(lerModuloAberto([...comErro, recebida("6", "modulo", { materia: "materia", curso: "curso", modulo })], "materia", "curso", "m2")).toEqual({ modulo, corrigindo: [], glossario: [], explicando: [], explicacoesFalhas: [] });
 	});
 
 	it("guarda o corrigindo do último módulo (só os ids em texto)", () => {
@@ -310,7 +310,7 @@ describe("a ponte: a resposta ao abrir", () => {
 			recebida("1", "modulo", { materia: "materia", curso: "curso", modulo, corrigindo: ["l1-b2"] }),
 			recebida("2", "modulo", { materia: "materia", curso: "curso", modulo: { ...modulo, id: "m3" }, corrigindo: [] }),
 		];
-		expect(lerModuloAberto(recebidas, "materia", "curso", "m2")).toEqual({ modulo, corrigindo: ["l1-b2"] });
+		expect(lerModuloAberto(recebidas, "materia", "curso", "m2")).toEqual({ modulo, corrigindo: ["l1-b2"], glossario: [], explicando: [], explicacoesFalhas: [] });
 		const depois = [...recebidas, recebida("3", "modulo", { materia: "materia", curso: "curso", modulo, corrigindo: ["l1-b2", 3, "", null] })];
 		expect(lerModuloAberto(depois, "materia", "curso", "m2").corrigindo).toEqual(["l1-b2"]);
 		const semCampo = [...depois, recebida("4", "modulo", { materia: "materia", curso: "curso", modulo })];

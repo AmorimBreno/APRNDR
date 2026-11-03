@@ -170,6 +170,7 @@ import { type AcoesQuestoes, QuestaoModulo, QuestaoParaLer } from "./QuestaoModu
 import { placarDoModulo, TEXTO_TODAS_FEITAS, textoDoProgresso, todasFeitas } from "./questao-modulo-tela.ts";
 import { EtiquetaReferencia } from "./SecaoMapa.tsx";
 import { Teclas } from "./Teclas.tsx";
+import { type AcoesTermos, apontarTermo, ExplicacoesDoBloco, MarcarTermos, ProvedorTermos, TextoComTermos, useDestinoTermo } from "./TermosModulo.tsx";
 
 const MOLA = { type: "spring", stiffness: 380, damping: 32 } as const;
 
@@ -265,31 +266,51 @@ export function TelaModulo(props: PropsTelaModulo) {
 		corrigir: (bloco) => modulos.corrigir(moduloId, bloco),
 		encerrar: (bloco) => modulos.encerrar(moduloId, bloco),
 	};
+	const [, atualizarDestino] = useState(0);
+	const chaveTermos = `${materiaId}/${cursoId}`;
+	const licaoAtual = aberto.modulo?.licoes[indiceDaLicao(aberto.modulo.licoes, props.licaoId)]?.id;
+	useDestinoTermo(chaveTermos, moduloId, licaoAtual, abertura.tipo === "pronto");
+	const termos: AcoesTermos = {
+		modulo: moduloId,
+		glossario: aberto.glossario ?? [],
+		explicando: aberto.explicando ?? [],
+		falhas: aberto.explicacoesFalhas ?? [],
+		erros: modulos.errosTermos(moduloId),
+		marcando: modulos.estado?.modulos.find((m) => m.id === moduloId)?.marcando,
+		marcar: () => modulos.marcarTermos(moduloId),
+		explicar: (licao, bloco, trecho, tipo) => modulos.explicarTrecho(moduloId, licao, bloco, trecho, tipo),
+		guardar: (explicacao) => modulos.guardarTermo(moduloId, explicacao),
+		ir: (lugar) => {
+			apontarTermo(chaveTermos, lugar);
+			props.navegar(caminhoDoModulo(materiaId, cursoId, lugar.modulo, lugar.licao));
+			atualizarDestino((vez) => vez + 1);
+		},
+	};
 	return (
-		<>
+		<ProvedorTermos acoes={termos}>
 			<VisaoModulo
-			{...(props.materia ? { materia: props.materia } : {})}
-			{...(props.numero ? { numero: props.numero } : {})}
-			tom={props.tom}
-			{...(curso?.nome ? { cursoNome: curso.nome } : {})}
-			modulosDoCurso={doCurso}
-			{...(modulos.estado ? { estados: modulos.estado.modulos } : {})}
-			moduloId={moduloId}
-			abertura={abertura}
-			{...(props.licaoId ? { licaoId: props.licaoId } : {})}
-			voltarAoCurso={() => props.navegar(`caderno/${materiaId}/cursos/${cursoId}`)}
-			abrirModulo={(id) => props.navegar(caminhoDoModulo(materiaId, cursoId, id))}
-			abrirLicao={(id) => props.navegar(caminhoDoModulo(materiaId, cursoId, moduloId, id))}
-			abrirMaterial={(arquivo) => props.navegar(`caderno/${materiaId}/materiais/${arquivo}`)}
-			tentarDeNovo={aberto.abrirDeNovo}
-			concluir={() => modulos.concluir(moduloId)}
-			retornos={retornos}
-			questoes={questoes}
-			questionario={questionario}
-			abrirEscrita={() => setVendoEscrita(true)}
+				{...(props.materia ? { materia: props.materia } : {})}
+				{...(props.numero ? { numero: props.numero } : {})}
+				tom={props.tom}
+				{...(curso?.nome ? { cursoNome: curso.nome } : {})}
+				modulosDoCurso={doCurso}
+				{...(modulos.estado ? { estados: modulos.estado.modulos } : {})}
+				moduloId={moduloId}
+				abertura={abertura}
+				{...(props.licaoId ? { licaoId: props.licaoId } : {})}
+				voltarAoCurso={() => props.navegar(`caderno/${materiaId}/cursos/${cursoId}`)}
+				abrirModulo={(id) => props.navegar(caminhoDoModulo(materiaId, cursoId, id))}
+				abrirLicao={(id) => props.navegar(caminhoDoModulo(materiaId, cursoId, moduloId, id))}
+				abrirMaterial={(arquivo) => props.navegar(`caderno/${materiaId}/materiais/${arquivo}`)}
+				tentarDeNovo={aberto.abrirDeNovo}
+				concluir={() => modulos.concluir(moduloId)}
+				retornos={retornos}
+				questoes={questoes}
+				questionario={questionario}
+				abrirEscrita={() => setVendoEscrita(true)}
 			/>
 			<ModalEscrita aberto={vendoEscrita} fechar={() => setVendoEscrita(false)} escrita={escrita} materias={materias} />
-		</>
+		</ProvedorTermos>
 	);
 }
 
@@ -559,6 +580,7 @@ function LicaoAberta(props: {
 						})}
 					</ol>
 					<p className="data modulo__resumo">{resumoDoIndice(modulo)}</p>
+					<MarcarTermos modulo={modulo} />
 					{props.abrirEscrita ? (
 						<button type="button" className="body-sm escrita__link" onClick={props.abrirEscrita}>
 							<Icon name="book" size={16} strokeWidth={2.25} />
@@ -606,6 +628,7 @@ function LicaoAberta(props: {
 								<BlocoDaLicao
 									key={bloco.id}
 									bloco={bloco}
+									modulo={modulo}
 									numero={posicao + 1}
 									licao={licao.id}
 									abrirMaterial={props.abrirMaterial}
@@ -712,6 +735,7 @@ function Dobra(props: { className: string; children: ReactNode }) {
  */
 export function BlocoDaLicao(props: {
 	bloco: Bloco;
+	modulo?: Modulo;
 	numero: number;
 	licao?: string;
 	abrirMaterial(arquivo: string): void;
@@ -927,14 +951,17 @@ export function BlocoDaLicao(props: {
 								) : null}
 							</header>
 						) : null}
-						{ehQuestao(bloco) ? (
-							<QuestaoModulo key={versao} bloco={bloco} resposta={props.resposta} {...(props.questoes ? { acoes: props.questoes } : {})} />
-						) : (
-							<ConteudoDoBloco bloco={bloco} />
-						)}
+						<TextoComTermos bloco={bloco.id} licao={licao}>
+							{ehQuestao(bloco) ? (
+								<QuestaoModulo key={versao} bloco={bloco} resposta={props.resposta} {...(props.questoes ? { acoes: props.questoes } : {})} />
+							) : (
+								<ConteudoDoBloco bloco={bloco} />
+							)}
+						</TextoComTermos>
 					</LessonBlock>
 				</motion.div>
 			</AnimatePresence>
+			{props.modulo ? <ExplicacoesDoBloco modulo={props.modulo} bloco={bloco.id} /> : null}
 			<AnimatePresence initial={false}>
 				{balao && retornos && !reescrevendo ? (
 					<Dobra key="balao" className="retorno__dobra">

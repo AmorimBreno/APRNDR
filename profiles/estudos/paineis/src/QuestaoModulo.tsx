@@ -259,6 +259,7 @@ function Quiz(props: { bloco: BlocoAlternativa; resposta: RespostaModulo | undef
 			) : null}
 			<div className={primeira && comum.confianca === undefined ? "diag__resposta--apagada modulo__alternativas" : "modulo__alternativas"}>
 				<QuizQuestion
+					interactiveLabels
 					prompt={<Markdown texto={partes.pergunta} emLinha />}
 					value={vista.valor}
 					onChange={(id) => {
@@ -543,6 +544,7 @@ export function QuestaoParaLer({ bloco }: { bloco: Omit<BlocoVerificacao, "anter
 		<div className="modulo__questao">
 			<Contexto texto={partes.contexto} />
 			<QuizQuestion
+				interactiveLabels
 				prompt={<Markdown texto={partes.pergunta} emLinha />}
 				value={null}
 				disabled

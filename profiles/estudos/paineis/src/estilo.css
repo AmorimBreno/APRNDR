@@ -1319,3 +1319,30 @@
 	.pergunta-slider__faisca { display: none; }
 }
 
+/* Termos-chave e explicações: flutuantes fora da rolagem, sem sombras de card. */
+.termo-chave { appearance: none; display: inline; padding: 0; border: 0; border-radius: var(--radius-xs); background: none; color: var(--amber); font: inherit; font-weight: 700; text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: .18em; cursor: pointer; }
+.termo-chave:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.termo-cartao { z-index: 160; width: 380px; border: var(--border-strong) solid var(--amber); border-radius: var(--radius-md); background: var(--surface-panel); color: var(--ink); overflow: visible; }
+.termo-cartao::after { content: ""; position: absolute; left: var(--termo-seta); bottom: -7px; width: 10px; height: 10px; background: var(--surface-panel); border-right: 2px solid var(--amber); border-bottom: 2px solid var(--amber); transform: translateX(-50%) rotate(45deg); }
+.termo-cartao--abaixo::after { top: -7px; bottom: auto; background: var(--surface-ground); transform: translateX(-50%) rotate(225deg); }
+.termo-cartao__cabeca { display: flex; flex-wrap: wrap; gap: var(--space-2); justify-content: space-between; padding: var(--space-3); border-bottom: var(--border-hair) solid var(--line-strong); border-radius: var(--radius-md) var(--radius-md) 0 0; background: var(--surface-ground); }
+.termo-cartao__cabeca span { display: inline-flex; align-items: center; gap: var(--space-1); }
+.termo-cartao__corpo { padding: var(--space-4); overflow-wrap: anywhere; overflow-y: auto; max-height: 60vh; }
+.termo-cartao__titulo { display: block; margin-bottom: var(--space-2); color: var(--amber); font-size: 28px; line-height: 1.25; text-transform: none; }
+.termo-cartao__corpo p { margin: 0; }
+.termos-selecao { z-index: 150; border: var(--border-control) solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-raised); color: var(--ink); padding: var(--space-1); }
+.termos-selecao > div { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.termos-explicacoes { margin: var(--space-5) 0; display: grid; gap: var(--space-3); }
+.termos-explicacao { border: var(--border-control) solid var(--steel); border-radius: var(--radius-md); background: var(--surface-panel); color: var(--ink); overflow-wrap: anywhere; }
+.termos-explicacao > summary { cursor: pointer; padding: var(--space-4); }
+.termos-explicacao > summary > span { display: block; }
+.termos-explicacao > summary .overline { color: var(--ink-muted); margin-bottom: var(--space-2); }
+.termos-explicacao__corpo { padding: 0 var(--space-4) var(--space-4); }
+.termos-explicacoes__antigas > summary { cursor: pointer; color: var(--ink-muted); margin-bottom: var(--space-3); }
+.termos-explicacoes__antigas .termos-explicacao { margin-top: var(--space-2); }
+.termos-marcar { margin: var(--space-4) 0; }
+.termos-marcar > p { color: var(--ink-muted); }
+.termos-destino { animation: termo-destino 2s ease-out; outline-offset: 6px; }
+@keyframes termo-destino { from { outline: 2px solid var(--amber); background-color: var(--amber-tint); } to { outline: 2px solid transparent; } }
+@media (prefers-reduced-motion: reduce) { .termos-destino { animation: none; outline: 2px solid var(--amber); } }
+

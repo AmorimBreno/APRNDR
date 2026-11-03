@@ -44,6 +44,7 @@ import { type AcoesModulos, type MensagemErroModulos, type MensagemEstadoModulos
 import { EsperaDePedidos, respostaQualquer } from "./escrita-ponte.ts";
 import { chaveDoBloco, type DadosDoRetorno } from "./escrita-tela.ts";
 import type { LidoModuloAberto } from "./modulo-tela.ts";
+import type { ExplicacaoPedida, TipoExplicacao } from "../../lib/termos-tipos.ts";
 import { type CamposPedido, estaGerando } from "./modulos-tela.ts";
 
 export { PAINEL_MODULOS };
@@ -73,7 +74,7 @@ const doCurso = (dados: { materia?: string; curso?: string } | undefined, materi
 	!!dados && (dados.materia === undefined || dados.materia === materia) && (dados.curso === undefined || dados.curso === curso);
 
 /** As ações cujos erros são da visão do módulo (lerModuloAberto, errosDaReescrita, errosDasQuestoes), não do card. */
-const AO_DA_VISAO = new Set(["abrir", "retorno", "reescrever_bloco", "responder", "corrigir", "encerrar", "avaliar_bloco", "avaliar_licao"]);
+const AO_DA_VISAO = new Set(["abrir", "retorno", "reescrever_bloco", "responder", "corrigir", "encerrar", "avaliar_bloco", "avaliar_licao", "marcar_termos", "explicar_trecho", "guardar_termo"]);
 
 /**
  * Lê, em ordem, o que chegou ao painel "modulos" para o curso. Um erro sem
@@ -120,18 +121,49 @@ const blocosCorrigindo = (corrigindo: unknown): string[] =>
  */
 export function lerModuloAberto(recebidas: readonly AcaoRecebida[], materia: string, curso: string, modulo: string): LidoModuloAberto {
 	let lido: LidoModuloAberto = {};
+	const vistos = new Map<string, ExplicacaoPedida>();
+	const falhas = new Map<string, ExplicacaoPedida>();
+	let geradoEm: string | undefined;
 	for (const recebida of recebidas) {
 		if (recebida.acao === "modulo") {
 			const dados = recebida.dados as MensagemModulo | undefined;
 			if (!dados || dados.materia !== materia || dados.curso !== curso || dados.modulo?.id !== modulo || !Array.isArray(dados.modulo.licoes)) continue;
-			lido = { modulo: dados.modulo, corrigindo: blocosCorrigindo(dados.corrigindo) };
+			const geracao = dados.modulo.situacao === "gerado" ? dados.modulo.geradoEm : undefined;
+			if (geradoEm !== geracao) { vistos.clear(); falhas.clear(); }
+			geradoEm = geracao;
+			if (dados.modulo.situacao === "gerado") for (const explicacao of dados.modulo.explicacoes ?? []) vistos.set(explicacao.id, explicacao);
+			lido = { modulo: dados.modulo, corrigindo: blocosCorrigindo(dados.corrigindo), glossario: dados.glossario ?? [], explicando: dados.explicando ?? [] };
 		} else if (recebida.acao === "erro") {
 			const dados = recebida.dados as MensagemErroModulos | undefined;
-			if (!dados || dados.ao !== "abrir" || dados.modulo !== modulo || !doCurso(dados, materia, curso)) continue;
-			lido = { erro: dados.mensagem || "Erro desconhecido." };
+			if (!dados || dados.modulo !== modulo || !doCurso(dados, materia, curso)) continue;
+			if (dados.ao === "explicar_trecho" && dados.explicacao) {
+				const visto = vistos.get(dados.explicacao);
+				if (visto) falhas.set(visto.id, visto);
+			}
+			if (dados.ao === "abrir") lido = { erro: dados.mensagem || "Erro desconhecido." };
 		}
 	}
-	return lido;
+	return { ...lido, ...(lido.modulo ? { explicacoesFalhas: [...falhas.values()] } : {}) };
+}
+
+/** Erros dos termos por id de explicação; a marcação usa a chave "marcar_termos". */
+export function errosDosTermos(recebidas: readonly AcaoRecebida[], alvo: { materia: string; curso: string; modulo: string }): Record<string, string> {
+	const erros: Record<string, string> = {};
+	for (const recebida of recebidas) {
+		const dados = recebida.dados as MensagemErroModulos | undefined;
+		if (!dados || !doCurso(dados, alvo.materia, alvo.curso)) continue;
+		if (recebida.acao === "erro" && dados.modulo === alvo.modulo && ["marcar_termos", "explicar_trecho", "guardar_termo"].includes(dados.ao ?? "")) {
+			erros[dados.explicacao ?? dados.bloco ?? "marcar_termos"] = dados.mensagem;
+		}
+		if (recebida.acao === "modulo" && (recebida.dados as MensagemModulo).modulo?.id === alvo.modulo) {
+			const mensagem = recebida.dados as MensagemModulo;
+			for (const item of mensagem.modulo.situacao === "gerado" ? mensagem.modulo.explicacoes ?? [] : []) {
+				if (item.guardado || mensagem.explicando?.includes(item.id)) delete erros[item.id];
+			}
+		}
+		if (recebida.acao === "estado" && (recebida.dados as MensagemEstadoModulos).modulos?.some((m) => m.id === alvo.modulo && m.marcando)) delete erros.marcar_termos;
+	}
+	return erros;
 }
 
 /**
@@ -376,10 +408,14 @@ export interface ModulosDoCurso {
 	errosFeedback(modulo: string): Record<string, ErroVistoModulo>;
 	/** O questionário do fim da lição; resolve com o "modulo" com ele. */
 	avaliarLicao(modulo: string, licao: string, questionario: { notas: NotasLicao; texto?: string }): Promise<void>;
+	marcarTermos(modulo: string): Promise<void>;
+	explicarTrecho(modulo: string, licao: string, bloco: string, trecho: string, tipo: TipoExplicacao): Promise<void>;
+	guardarTermo(modulo: string, explicacao: string): Promise<void>;
+	errosTermos(modulo: string): Record<string, string>;
 }
 
 /** As ações com pedido cuja resposta não tem nome fixo na ponte (respostaQualquer). */
-type AcoesComPedido = AcoesModulosEscrita & Pick<AcoesModulos, "responder" | "corrigir" | "encerrar" | "avaliar_bloco" | "avaliar_licao">;
+type AcoesComPedido = AcoesModulosEscrita & Pick<AcoesModulos, "responder" | "corrigir" | "encerrar" | "avaliar_bloco" | "avaliar_licao" | "marcar_termos" | "explicar_trecho" | "guardar_termo">;
 
 /**
  * Os módulos de um curso: pede "listar" ao montar, quando a sessão muda e
@@ -503,6 +539,10 @@ export function useModulos(janela: JanelaPerfilHook, materia: string, curso: str
 		avaliarLicao: async (modulo, licao, questionario) => {
 			await mandarComPedido("avaliar_licao", { materia, curso, modulo, licao, pedido: crypto.randomUUID(), ...questionario });
 		},
+		marcarTermos: async (modulo) => { await mandarComPedido("marcar_termos", { materia, curso, modulo, pedido: crypto.randomUUID() }); },
+		explicarTrecho: async (modulo, licao, bloco, trecho, tipo) => { await mandarComPedido("explicar_trecho", { materia, curso, modulo, licao, bloco, trecho, tipo, pedido: crypto.randomUUID() }); },
+		guardarTermo: async (modulo, explicacao) => { await mandarComPedido("guardar_termo", { materia, curso, modulo, explicacao, pedido: crypto.randomUUID() }); },
+		errosTermos: (modulo) => errosDosTermos(recebidas ?? [], { materia, curso, modulo }),
 		cancelar: async (modulo) => {
 			try {
 				await acoes.acaoDaInterface(PAINEL_MODULOS, "cancelar", { materia, curso, modulo } satisfies AcoesModulos["cancelar"]);

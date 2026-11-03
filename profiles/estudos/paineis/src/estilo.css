@@ -1352,16 +1352,16 @@
 @media (prefers-reduced-motion: reduce) { .termos-destino { animation: none; outline: 2px solid var(--amber); } }
 
 
-/* ── O relatório do método (RelatorioMetodo.tsx, docs/metodo-ciclo.md, "A tela"): um cartão como os da prática,
- * depois do questionário, no pé da última lição de um módulo concluído. Dentro, o resumo, o que funcionou e o que não
- * funcionou (cada item com as evidências embaixo) e as propostas, num cartão cada (como o balão de retorno). ── */
+/* ── O relatório do método (RelatorioMetodo.tsx, docs/metodo-experimentos.md, "A tela"): um cartão como os da prática,
+ * depois do questionário, no pé da última lição de um módulo concluído. Dentro, o resumo, o placar, os experimentos (um cartão
+ * cada, como o balão de retorno), o que facilita e o que funcionou ou não (cada item com as evidências embaixo). ── */
 .relatorio { display: flex; flex-direction: column; gap: var(--space-6); margin-top: calc(var(--space-12) + var(--space-6)); }
 .relatorio__cabeca { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-1) var(--space-4); }
 .relatorio__titulo { margin: 0; color: var(--ink); }
 .relatorio__contagem, .relatorio__dados { margin: 0; color: var(--ink-muted); }
 .relatorio__texto { margin: 0; color: var(--ink); max-width: var(--measure-read); }
 .relatorio__vazio { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-3); }
-.relatorio__acoes, .relatorio__botoes { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.relatorio__acoes { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .relatorio__erro .ap-callout p { margin: 0; }
 .relatorio__erro .relatorio__acoes { margin-top: var(--space-3); }
 .relatorio__gerando { display: flex; align-items: center; gap: var(--space-4); }
@@ -1390,26 +1390,47 @@ button.relatorio__evidencia:focus-visible { outline: none; box-shadow: var(--foc
 /* A proposta: o cartão do balão de retorno, com o ajuste em destaque (a faixa âmbar das regras). */
 .relatorio__propostas { gap: var(--space-4); }
 .relatorio__proposta { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-5); border: var(--border-hair) solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-panel); }
-.relatorio__proposta[aria-busy="true"] { cursor: progress; }
 .relatorio__proposta-cabeca { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .relatorio__ajuste { margin: 0; padding: 2px 2px 2px var(--space-4); border-left: var(--border-strong) solid var(--amber); color: var(--ink); overflow-wrap: anywhere; }
-.relatorio__proposta--aprovada .relatorio__ajuste { border-left-color: var(--sage); }
-.relatorio__proposta--rejeitada .relatorio__ajuste { border-left-color: var(--line-strong); color: var(--ink-muted); }
-.relatorio__porque, .relatorio__original, .relatorio__motivo { margin: 0; color: var(--ink-muted); overflow-wrap: anywhere; }
-.relatorio__porque .overline, .relatorio__original .overline, .relatorio__motivo .overline { margin-right: var(--space-1); }
-.relatorio__edicao { display: flex; flex-direction: column; gap: var(--space-3); }
-.relatorio__proposta-erro { margin: 0; }
+.relatorio__proposta--aprovada .relatorio__ajuste, .relatorio__proposta--manter .relatorio__ajuste, .relatorio__proposta--confirmado .relatorio__ajuste { border-left-color: var(--sage); }
+.relatorio__proposta--rejeitada .relatorio__ajuste, .relatorio__proposta--descartar .relatorio__ajuste, .relatorio__proposta--contradito .relatorio__ajuste { border-left-color: var(--line-strong); color: var(--ink-muted); }
+.relatorio__proposta--continuar .relatorio__ajuste, .relatorio__proposta--facilita .relatorio__ajuste { border-left-color: var(--steel); }
+.relatorio__proposta--reescrever .relatorio__ajuste { border-left-color: var(--line-strong); color: var(--ink-muted); }
+.relatorio__porque, .relatorio__original, .relatorio__motivo, .relatorio__testado, .relatorio__conserto, .relatorio__nota { margin: 0; color: var(--ink-muted); overflow-wrap: anywhere; }
+.relatorio__porque .overline, .relatorio__original .overline, .relatorio__motivo .overline, .relatorio__texto-novo .overline { margin-right: var(--space-1); }
+.relatorio__testado { font-family: var(--font-mono); letter-spacing: 0.02em; }
+.relatorio__conserto { color: var(--ink-subtle); font-style: italic; }
+.relatorio__texto-novo { margin: 0; padding: 2px 2px 2px var(--space-4); border-left: var(--border-strong) solid var(--amber); color: var(--ink); overflow-wrap: anywhere; }
+/* O que ficou para depois: só leitura, em tom apagado. */
+.relatorio__proposta--depois { border-style: dashed; background: transparent; }
+.relatorio__proposta--depois .relatorio__ajuste { border-left-color: var(--line-strong); color: var(--ink-muted); font-weight: 400; }
+/* O placar do módulo: uma tabela curta (métrica, este módulo, média dos anteriores); o n vai em texto pequeno. */
+.relatorio__placar { width: 100%; border-collapse: collapse; }
+.relatorio__placar th, .relatorio__placar td { padding: var(--space-2) var(--space-3) var(--space-2) 0; border-top: var(--border-hair) solid var(--line); text-align: left; vertical-align: baseline; }
+.relatorio__placar thead th { padding-top: 0; border-top: 0; color: var(--ink-muted); }
+.relatorio__placar-nome { font-weight: 400; color: var(--ink); overflow-wrap: anywhere; }
+.relatorio__placar-valor { color: var(--ink); }
+.relatorio__placar-n { margin-left: var(--space-2); color: var(--ink-subtle); }
 .mod__relatorio { padding-top: var(--space-1); }
 @media (max-width: 640px) {
 	.relatorio { margin-top: var(--space-12); }
 	.relatorio__proposta { padding: var(--space-4); }
+	/* A tabela quebra em linhas: o nome da métrica em cima e os valores embaixo, cada um com o rótulo da coluna. */
+	.relatorio__placar, .relatorio__placar tbody, .relatorio__placar tr, .relatorio__placar th, .relatorio__placar td { display: block; }
+	.relatorio__placar thead { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+	.relatorio__placar tr { padding: var(--space-3) 0; border-top: var(--border-hair) solid var(--line); }
+	.relatorio__placar tbody tr:first-child { border-top: 0; padding-top: 0; }
+	.relatorio__placar th, .relatorio__placar td { padding: 0; border: 0; }
+	.relatorio__placar td { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--space-2); padding-top: var(--space-1); }
+	.relatorio__placar td::before { content: attr(data-rotulo); flex: 0 0 9.5em; color: var(--ink-subtle); font-size: 13px; line-height: 20px; }
+	.relatorio__placar-n { margin-left: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
 	.relatorio__evidencia { transition: none; }
 }
 
-/* ── Os ajustes do método em "Como o professor escreve" (ModalEscrita.tsx, docs/metodo-ciclo.md): depois das regras, os
- * ajustes aprovados por arquivo de metodologia, cada um com o texto, a origem e a chave Ligado/Desligado. ── */
+/* ── Os experimentos do método em "Como o professor escreve" (ModalEscrita.tsx, docs/metodo-experimentos.md): depois das
+ * regras, só leitura: os grupos Em teste, Mantidos e Descartados (texto, etiqueta do arquivo e origem) e "O que facilita". ── */
 .ajustes { display: flex; flex-direction: column; gap: var(--space-4); padding-top: var(--space-5); border-top: var(--border-hair) solid var(--line); }
 .ajustes__cabeca { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-1) var(--space-4); }
 .ajustes__titulo { margin: 0; color: var(--ink); }
@@ -1421,14 +1442,9 @@ button.relatorio__evidencia:focus-visible { outline: none; box-shadow: var(--foc
 .ajustes__arquivo-id { margin-left: var(--space-2); color: var(--ink-subtle); text-transform: none; letter-spacing: 0; }
 .ajustes__lista { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
 .ajustes__item + .ajustes__item { border-top: var(--border-hair) solid var(--line); }
-.ajustes__ajuste { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3) 0; transition: opacity .16s ease-out; }
-.ajustes__ajuste[aria-busy="true"] { cursor: progress; }
+.ajustes__ajuste { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3) 0; }
 .ajustes__ajuste-texto { margin: 0; color: var(--ink); overflow-wrap: anywhere; }
-.ajustes__ajuste--desligado .ajustes__ajuste-texto { color: var(--ink-subtle); }
+.ajustes__ajuste--descartado .ajustes__ajuste-texto { color: var(--ink-subtle); }
 .ajustes__controles { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); }
-.ajustes__ligar { align-items: center; margin-left: auto; }
-.ajustes__ligar .ap-check__label { color: var(--ink-muted); }
+.ajustes__nota { color: var(--ink-subtle); }
 .ajustes__erro { margin: 0; }
-@media (prefers-reduced-motion: reduce) {
-	.ajustes__ajuste { transition: none; }
-}

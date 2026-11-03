@@ -981,6 +981,8 @@
 .modulo__questao .ap-quiz__options[aria-disabled="true"] .ap-opt, .modulo__questao .ap-quiz__options[aria-disabled="true"] .ap-opt:hover { cursor: default; }
 .modulo__questao .ap-quiz__options[aria-disabled="true"] .ap-opt--idle:hover { background: var(--surface-panel); }
 .modulo__questao .ap-opt__label { display: flex; flex-direction: column; gap: 2px; }
+/* O texto da alternativa fica num span só: o markdown em linha solta texto e termos como irmãos, e o rótulo em flex os empilharia. */
+.modulo__alt-texto { display: block; min-width: 0; }
 .modulo__confusao { color: var(--ink-muted); }
 .modulo__contexto { padding: var(--space-4) var(--space-5); border-radius: var(--radius-md); background: var(--surface-well); }
 .modulo__contexto > :last-child { margin-bottom: 0; }

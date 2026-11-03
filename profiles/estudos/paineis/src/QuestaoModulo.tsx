@@ -275,7 +275,9 @@ function Quiz(props: { bloco: BlocoAlternativa; resposta: RespostaModulo | undef
 							id: String(indice),
 							label: (
 								<>
-									<Markdown texto={alternativa.texto} emLinha />
+									<span className="modulo__alt-texto">
+										<Markdown texto={alternativa.texto} emLinha />
+									</span>
 									{confusao ? <span className="body-sm modulo__confusao">{confusao}</span> : null}
 									{errada ? (
 										<Tag className="modulo__alt-errada" tone="brick" size="sm" icon="close">
@@ -548,7 +550,11 @@ export function QuestaoParaLer({ bloco }: { bloco: Omit<BlocoVerificacao, "anter
 				prompt={<Markdown texto={partes.pergunta} emLinha />}
 				value={null}
 				disabled
-				options={bloco.alternativas.map((alternativa, indice) => ({ id: String(indice), label: <Markdown texto={alternativa.texto} emLinha /> }))}
+				options={bloco.alternativas.map((alternativa, indice) => ({ id: String(indice), label: (
+					<span className="modulo__alt-texto">
+						<Markdown texto={alternativa.texto} emLinha />
+					</span>
+				) }))}
 			/>
 		</div>
 	);

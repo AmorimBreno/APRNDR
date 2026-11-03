@@ -120,7 +120,7 @@ As ações:
 - `ligar_ajuste {pedido, arquivo, ajuste, ativo}` liga ou desliga um ajuste e grava o evento `alterou_ajuste_metodo`. Ajustes não são apagados.
 - `listar_ajustes {}` devolve a mensagem `ajustes {arquivos: [{arquivo, ajustes: [{id, texto, ativo, origem}]}]}`.
 
-Os ajustes valem nas gerações: toda chamada que carrega um arquivo de metodologia (`lerMetodo`, nas lições, na reescrita, na marcação de termos, na explicação de um trecho, no diagnóstico e no corretor) carrega também os ajustes ativos daquele arquivo. Eles vão logo depois da base, como `<ajustes-do-breno arquivo="exemplos.md">`, com a frase "Estes ajustes foram aprovados pelo Breno a partir do retorno dele e valem acima do texto acima quando os dois conflitarem.". O hash do prompt nos eventos passa a incluir os ajustes, porque uma mudança neles muda o hash. A parte 4 era esta: o ciclo fecha aqui.
+Os ajustes valem nas gerações: toda chamada que carrega um arquivo de metodologia (`lerMetodo`, nas lições, na reescrita, na marcação de termos, na explicação de um trecho, no diagnóstico e no corretor) carrega também os ajustes ativos daquele arquivo. Eles vão logo depois da base, como `<ajustes-do-breno arquivo="exemplos.md">`, com a frase "Estes ajustes foram aprovados pelo Breno a partir do retorno dele e valem acima do texto acima quando os dois conflitarem.". O hash do prompt nos eventos passa a incluir os ajustes, porque uma mudança neles muda o hash.
 
 ## A tela
 

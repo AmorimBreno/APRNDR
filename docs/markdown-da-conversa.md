@@ -13,6 +13,7 @@ HTML cru no texto não é interpretado: aparece como texto.
 - Listas com `-` ou `1.`, e listas de tarefa com `- [ ]` e `- [x]`.
 - Tabelas com `|`.
 - Links `[texto](https://...)`. Abrem fora do app.
+- Ligações próprias de um perfil: `Markdown` aceita `ligacoes?: Record<string, (alvo: string, filhos: ReactNode) => ReactNode>`, pelo esquema do link (`api:metodo`, por exemplo). `ProvedorLigacoesMarkdown` compartilha o registro com Markdowns aninhados; uma prop `ligacoes` local substitui o registro herdado (`{}` o desliga). O callback recebe só o alvo, sem o esquema. Esquemas sem função viram texto; registrar um esquema não o libera no `src` de imagens. O núcleo não interpreta o significado da ligação.
 
 
 ## Matemática (LaTeX)

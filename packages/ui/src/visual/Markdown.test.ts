@@ -3,10 +3,38 @@
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { Markdown } from "./Markdown.tsx";
+import { type LigacoesMarkdown, Markdown, ProvedorLigacoesMarkdown } from "./Markdown.tsx";
 
-const html = (texto: string, opcoes: { emLinha?: boolean; aparecendo?: boolean } = {}) => renderToString(createElement(Markdown, { texto, ...opcoes }));
+const html = (texto: string, opcoes: { emLinha?: boolean; aparecendo?: boolean; ligacoes?: LigacoesMarkdown } = {}) => renderToString(createElement(Markdown, { texto, ...opcoes }));
 const contar = (saida: string, trecho: string) => saida.split(trecho).length - 1;
+
+describe("ligações genéricas de um perfil", () => {
+	const ligacoes: LigacoesMarkdown = { api: (alvo, filhos) => createElement("button", { "data-alvo": alvo }, filhos) };
+	it("entrega o alvo sem o esquema e mantém os filhos formatados", () => {
+		expect(html("[**método**](api:classe.metodo)", { ligacoes })).toContain('<button data-alvo="classe.metodo"><strong>método</strong></button>');
+	});
+	it("esquemas desconhecidos e perigosos viram texto, não links externos", () => {
+		for (const esquema of ["termo", "javascript", "data", "constructor", "__proto__"]) {
+			const saida = html(`[conteúdo](${esquema}:algo)`, { ligacoes });
+			expect(saida).toBe("<p>conteúdo</p>");
+		}
+	});
+	it("não libera esquemas próprios em src de imagem", () => {
+		expect(html("![imagem](api:algo)", { ligacoes })).not.toContain('src="api:');
+	});
+	it("mantém links normais e não interpreta marcas dentro de código", () => {
+		expect(html("[site](https://example.com)", { ligacoes })).toContain('target="_blank" rel="noreferrer"');
+		expect(html("`[método](api:algo)`", { ligacoes })).not.toContain("<button");
+	});
+	it("o provedor atende Markdowns aninhados e a prop local pode desligá-lo", () => {
+		const saida = renderToString(createElement(ProvedorLigacoesMarkdown, { ligacoes, children: [
+			createElement(Markdown, { key: "herdado", texto: "[método](api:sim)" }),
+			createElement(Markdown, { key: "local", texto: "[método](api:nao)", ligacoes: {} }),
+		] }));
+		expect(saida).toContain('data-alvo="sim"');
+		expect(saida).not.toContain('data-alvo="nao"');
+	});
+});
 
 describe("bloco de código", () => {
 	it("com linguagem: destaque de sintaxe, barra com o nome e números de linha", () => {

@@ -27,8 +27,9 @@
 // diferentes), o bloco aparece como código comum (ler-estrutura.ts).
 
 import type { CSSProperties, ReactNode } from "react";
-import { useRef } from "react";
-import ReactMarkdown, { type Components } from "react-markdown";
+import { createContext, useContext, useMemo, useRef } from "react";
+import ReactMarkdown, { type Components, defaultUrlTransform } from "react-markdown";
+
 import bash from "highlight.js/lib/languages/bash";
 import c from "highlight.js/lib/languages/c";
 import cpp from "highlight.js/lib/languages/cpp";
@@ -51,6 +52,17 @@ import rehypeCodigo, { CLASSE_LINHA } from "./rehype-codigo.ts";
 import rehypePalavras from "./rehype-palavras.ts";
 import remarkDinheiro from "./remark-dinheiro.ts";
 import remarkEmbeds from "./remark-embeds.ts";
+
+/** Ligações próprias de um perfil, sem semântica específica no núcleo. */
+export type LigacoesMarkdown = Record<string, (alvo: string, filhos: ReactNode) => ReactNode>;
+const ContextoLigacoes = createContext<LigacoesMarkdown>({});
+/** Compartilha as ligações também com Markdowns aninhados (questões, código ao lado). */
+export function ProvedorLigacoesMarkdown({ ligacoes, children }: { ligacoes: LigacoesMarkdown; children: ReactNode }) {
+	return <ContextoLigacoes.Provider value={ligacoes}>{children}</ContextoLigacoes.Provider>;
+}
+const esquemaDe = (url: string) => /^([a-z][a-z0-9+.-]*):/i.exec(url)?.[1]?.toLowerCase();
+const EXTERNOS = new Set(["http", "https", "mailto", "tel", "irc", "ircs", "xmpp"]);
+const ligacaoPropria = (ligacoes: LigacoesMarkdown, esquema: string) => Object.hasOwn(ligacoes, esquema) ? ligacoes[esquema] : undefined;
 
 /** As linguagens com destaque (os apelidos de cada uma, como py, js, ts, sh, também valem). */
 export const LINGUAGENS = { python, javascript, typescript, sql, bash, json, r, java, c, cpp, plaintext };
@@ -134,9 +146,16 @@ function BlocoDeCodigo({ no, emLinha, children }: { no: NoHast | undefined; emLi
 }
 
 // Links abrem fora do app (o app roda no Edge em modo app, sem barra de endereço).
-function criarComponentes(emLinha: boolean): Components {
+function criarComponentes(emLinha: boolean, ligacoes: LigacoesMarkdown): Components {
 	return {
-		a: ({ node: _node, ...props }) => <a {...props} target="_blank" rel="noreferrer" />,
+		a: ({ node, children, ...props }) => {
+			const original = String(node?.properties?.href ?? props.href ?? "");
+			const esquema = esquemaDe(original);
+			const desenhar = esquema ? ligacaoPropria(ligacoes, esquema) : undefined;
+			if (desenhar) return <>{desenhar(original.slice(original.indexOf(":") + 1), children)}</>;
+			if ((esquema && !EXTERNOS.has(esquema)) || !props.href) return <>{children}</>;
+			return <a {...props} target="_blank" rel="noreferrer">{children}</a>;
+		},
 		img: ({ node, ...props }) => {
 			const caminho = node?.properties?.dataEmbed;
 			if (typeof caminho !== "string" || !caminho) return <img {...props} />;
@@ -153,15 +172,15 @@ function criarComponentes(emLinha: boolean): Components {
 	};
 }
 
-const componentes = criarComponentes(false);
-const componentesEmLinha = criarComponentes(true);
-
 /**
  * `emLinha`: sem os parágrafos, para caber num rótulo. `aparecendo`: o texto
  * está chegando (ou chegou nesta janela), e as palavras novas aparecem uma a
  * uma com fade. Fica ligado depois do fim, para as últimas terminarem de aparecer.
  */
-export function Markdown({ texto, emLinha = false, aparecendo = false }: { texto: string; emLinha?: boolean; aparecendo?: boolean }) {
+export function Markdown({ texto, emLinha = false, aparecendo = false, ligacoes }: { texto: string; emLinha?: boolean; aparecendo?: boolean; ligacoes?: LigacoesMarkdown }) {
+	const herdadas = useContext(ContextoLigacoes);
+	const registradas = ligacoes ?? herdadas;
+	const componentes = useMemo(() => criarComponentes(emLinha, registradas), [emLinha, registradas]);
 	const atrasoDe = useFilaDePalavras();
 	// Enquanto a resposta chega: cada palavra num span, e as novas aparecem uma a uma (rehype-palavras.ts).
 	const plugins: PluginsRehype = aparecendo ? [...pluginsRehype, [rehypePalavras, { atrasoDe }]] : pluginsRehype;
@@ -169,7 +188,12 @@ export function Markdown({ texto, emLinha = false, aparecendo = false }: { texto
 		<ReactMarkdown
 			remarkPlugins={pluginsRemark}
 			rehypePlugins={plugins}
-			components={emLinha ? componentesEmLinha : componentes}
+			components={componentes}
+			urlTransform={(url, chave) => {
+				const esquema = esquemaDe(url);
+				// Esquemas próprios só em links, nunca em src de imagens.
+				return chave === "href" && esquema && ligacaoPropria(registradas, esquema) ? url : defaultUrlTransform(url);
+			}}
 		>
 			{texto}
 		</ReactMarkdown>

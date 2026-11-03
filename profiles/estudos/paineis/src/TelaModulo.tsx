@@ -52,13 +52,14 @@
 // reescrito tem a etiqueta "Reescrito" e "Ver a versão anterior". No índice,
 // o link "Como o professor escreve" abre as regras de escrita (ModalEscrita).
 //
-// O relatório do método (docs/metodo-ciclo.md, "A tela"): num módulo concluído,
-// a seção "Relatório do método" (RelatorioMetodo.tsx) fica no pé da última lição,
-// onde ficava o "Concluir o módulo", e o índice tem um link que leva até ela
-// (abre a última lição, se preciso). O relatório vem na mensagem modulo
-// (relatorio, relatorioGerando e relatorioErro); gerar e decidir cada proposta
-// são ações da ponte (useModulos). O clique numa evidência leva ao bloco pela
-// navegação dos termos (apontarTermo e useDestinoTermo).
+// O relatório do método (docs/metodo-experimentos.md, "A tela"): num módulo
+// concluído, a seção "Relatório do método" (RelatorioMetodo.tsx) fica no pé da
+// última lição, onde ficava o "Concluir o módulo", e o índice tem um link que
+// leva até ela (abre a última lição, se preciso). O relatório vem na mensagem
+// modulo (relatorio, relatorioGerando e relatorioErro); gerar é uma ação da
+// ponte (useModulos), e não há botão de decisão: a análise já vem aplicada. O
+// clique numa evidência leva ao bloco pela navegação dos termos (apontarTermo
+// e useDestinoTermo).
 
 import {
 	Button,
@@ -311,9 +312,7 @@ export function TelaModulo(props: PropsTelaModulo) {
 		relatorio: aberto.relatorio ?? null,
 		gerando: aberto.relatorioGerando === true,
 		...(aberto.relatorioErro ? { erro: aberto.relatorioErro } : {}),
-		erros: modulos.errosPropostas(moduloId),
 		gerar: (forcar) => modulos.gerarRelatorio(moduloId, forcar),
-		decidir: (proposta, decisao) => modulos.decidirProposta(moduloId, proposta, decisao),
 		ir: irParaEvidencia,
 	};
 	return (

@@ -76,7 +76,7 @@ export function TelaCadernos(props: PropsTelaCadernos) {
 	const [vendoEscrita, setVendoEscrita] = useState(false);
 	// As regras de escrita: pedidas quando o modal abre.
 	const escrita = useEscrita(props.janela, vendoEscrita);
-	// Os ajustes do método (os aprovados nos relatórios dos módulos): pedidos junto das regras.
+	// Os experimentos do método e o que facilita (as análises dos módulos): pedidos junto das regras.
 	const ajustes = useAjustes(props.janela, vendoEscrita);
 
 	// A faixa entra como bandeira; para sair (para os perfis, a conversa ou um caderno), ela sobe antes.

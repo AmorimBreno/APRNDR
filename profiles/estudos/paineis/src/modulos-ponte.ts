@@ -46,7 +46,6 @@ import { chaveDoBloco, type DadosDoRetorno } from "./escrita-tela.ts";
 import type { LidoModuloAberto } from "./modulo-tela.ts";
 import type { ExplicacaoPedida, TipoExplicacao } from "../../lib/termos-tipos.ts";
 import { type CamposPedido, estaGerando } from "./modulos-tela.ts";
-import type { DadosDaDecisao } from "./relatorio-tela.ts";
 
 export { PAINEL_MODULOS };
 
@@ -76,7 +75,7 @@ const doCurso = (dados: { materia?: string; curso?: string } | undefined, materi
 
 /**
  * As ações cujos erros são da visão do módulo (lerModuloAberto, errosDaReescrita,
- * errosDasQuestoes, errosDasPropostas) ou do modal dos ajustes (ajustes-ponte.ts),
+ * errosDasQuestoes) ou do modal dos ajustes (ajustes-ponte.ts),
  * não do card.
  */
 const AO_DA_VISAO = new Set([
@@ -92,8 +91,6 @@ const AO_DA_VISAO = new Set([
 	"explicar_trecho",
 	"guardar_termo",
 	"gerar_relatorio",
-	"decidir_proposta",
-	"ligar_ajuste",
 	"listar_ajustes",
 ]);
 
@@ -332,38 +329,6 @@ export function errosDoFeedback(
 	return erros;
 }
 
-// --- O relatório do método (docs/metodo-ciclo.md) -----------------------------
-
-/**
- * Os erros de decidir_proposta de cada proposta do relatório do módulo (pelo
- * id da proposta), lidos em ordem: um "erro" com ao "decidir_proposta" e a
- * proposta, daquele módulo. Um "modulo" posterior com o pedido de uma decisão
- * desta tela (`pedidos`: pedido → proposta) apaga o erro dela, e uma proposta
- * que o relatório já traz decidida também.
- */
-export function errosDasPropostas(
-	recebidas: readonly AcaoRecebida[],
-	alvo: { materia: string; curso: string; modulo: string },
-	pedidos: Readonly<Record<string, string>> = {},
-): Record<string, ErroVistoModulo> {
-	const erros: Record<string, ErroVistoModulo> = {};
-	for (const recebida of recebidas) {
-		if (recebida.acao === "modulo") {
-			const dados = recebida.dados as MensagemModulo | undefined;
-			if (!dados || dados.materia !== alvo.materia || dados.curso !== alvo.curso || dados.modulo?.id !== alvo.modulo) continue;
-			const proposta = typeof dados.pedido === "string" ? pedidos[dados.pedido] : undefined;
-			if (proposta) delete erros[proposta];
-			for (const item of Array.isArray(dados.relatorio?.propostas) ? dados.relatorio.propostas : []) if (item.decisao) delete erros[item.id];
-		} else if (recebida.acao === "erro") {
-			const dados = recebida.dados as MensagemErroModulos | undefined;
-			if (!dados || dados.ao !== "decidir_proposta" || typeof dados.proposta !== "string" || !dados.proposta || !doCurso(dados, alvo.materia, alvo.curso)) continue;
-			if (dados.modulo !== undefined && dados.modulo !== alvo.modulo) continue;
-			erros[dados.proposta] = { chave: recebida.chave, mensagem: dados.mensagem || "Erro desconhecido.", ao: "decidir_proposta" };
-		}
-	}
-	return erros;
-}
-
 // --- A espera pelo pedido ----------------------------------------------------
 
 /** A resposta da extensão a gerar ou aguardar. */
@@ -476,15 +441,11 @@ export interface ModulosDoCurso {
 	errosTermos(modulo: string): Record<string, string>;
 	/** "Gerar o relatório do método", "Tentar de novo" e, com forcar, "Gerar mesmo assim"; resolve com o modulo com o pedido (o relatório pronto chega depois, num modulo sem pedido). */
 	gerarRelatorio(modulo: string, forcar?: boolean): Promise<void>;
-	/** Aprova (com o texto editado, quando vier) ou rejeita (com o motivo opcional) uma proposta do relatório; resolve com o modulo com a decisão. */
-	decidirProposta(modulo: string, proposta: string, decisao: DadosDaDecisao): Promise<void>;
-	/** Os erros de decidir cada proposta do relatório do módulo (pelo id da proposta). */
-	errosPropostas(modulo: string): Record<string, ErroVistoModulo>;
 }
 
 /** As ações com pedido cuja resposta não tem nome fixo na ponte (respostaQualquer). */
 type AcoesComPedido = AcoesModulosEscrita &
-	Pick<AcoesModulos, "responder" | "corrigir" | "encerrar" | "avaliar_bloco" | "avaliar_licao" | "marcar_termos" | "explicar_trecho" | "guardar_termo" | "gerar_relatorio" | "decidir_proposta">;
+	Pick<AcoesModulos, "responder" | "corrigir" | "encerrar" | "avaliar_bloco" | "avaliar_licao" | "marcar_termos" | "explicar_trecho" | "guardar_termo" | "gerar_relatorio">;
 
 /**
  * Os módulos de um curso: pede "listar" ao montar, quando a sessão muda e
@@ -550,8 +511,6 @@ export function useModulos(janela: JanelaPerfilHook, materia: string, curso: str
 	const [reescritas, setReescritas] = useState<{ pedidos: Record<string, { modulo: string; chave: string }>; ultimo: Record<string, string> }>({ pedidos: {}, ultimo: {} });
 	// Os pedidos de nota rápida desta tela (pedido → módulo e bloco), para apagar o erro de um bloco quando uma nota nova dele dá certo.
 	const [notas, setNotas] = useState<Record<string, { modulo: string; bloco: string }>>({});
-	// Os pedidos de decisão desta tela (pedido → módulo e proposta), para apagar o erro de uma proposta quando a decisão dela dá certo.
-	const [decisoes, setDecisoes] = useState<Record<string, { modulo: string; proposta: string }>>({});
 
 	return {
 		...(estado ? { estado } : {}),
@@ -617,17 +576,6 @@ export function useModulos(janela: JanelaPerfilHook, materia: string, curso: str
 		gerarRelatorio: async (modulo, forcar) => {
 			await mandarComPedido("gerar_relatorio", { materia, curso, modulo, pedido: crypto.randomUUID(), ...(forcar ? { forcar: true } : {}) });
 		},
-		decidirProposta: async (modulo, proposta, decisao) => {
-			const pedido = crypto.randomUUID();
-			setDecisoes((atuais) => ({ ...atuais, [pedido]: { modulo, proposta } }));
-			await mandarComPedido("decidir_proposta", { materia, curso, modulo, proposta, pedido, ...decisao });
-		},
-		errosPropostas: (modulo) =>
-			errosDasPropostas(
-				recebidas ?? [],
-				{ materia, curso, modulo },
-				Object.fromEntries(Object.entries(decisoes).filter(([, item]) => item.modulo === modulo).map(([pedido, item]) => [pedido, item.proposta])),
-			),
 		cancelar: async (modulo) => {
 			try {
 				await acoes.acaoDaInterface(PAINEL_MODULOS, "cancelar", { materia, curso, modulo } satisfies AcoesModulos["cancelar"]);

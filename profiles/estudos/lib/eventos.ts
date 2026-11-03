@@ -76,6 +76,16 @@ export type VerboEvento =
 	| "decidiu_experimento_metodo"
 	| "registrou_aprendizado_metodo"
 	| "reviu_aprendizado_metodo"
+	// A agenda (tarefas e quadro): docs/agenda.md, "Eventos". Os de uma tarefa com matéria vão para o
+	// eventos.jsonl da matéria; os de uma tarefa sem matéria e alterou_quadro, para agenda/eventos.jsonl.
+	// concluiu_tarefa e reabriu_tarefa entram no lugar de moveu_tarefa ao entrar na coluna de feito e ao sair dela.
+	| "criou_tarefa"
+	| "editou_tarefa"
+	| "moveu_tarefa"
+	| "concluiu_tarefa"
+	| "reabriu_tarefa"
+	| "apagou_tarefa"
+	| "alterou_quadro"
 	// Aprendizagem (seção 9.2), usados a partir dos itens 7 e 8:
 	| "pediu_reexplicacao"
 	| "pediu_outro_jeito"

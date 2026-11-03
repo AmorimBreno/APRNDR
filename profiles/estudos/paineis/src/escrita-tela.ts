@@ -18,7 +18,7 @@ import {
 	TEXTO_RETORNO_MAXIMO,
 	validarRetorno,
 } from "../../lib/escrita-tipos.ts";
-import { type ArquivoDeAjustesNaTela, NOMES_ARQUIVO_METODO, type OrigemDoAjuste } from "../../lib/metodo-ciclo-tipos.ts";
+import { type AjusteNaTela, type ArquivoDeAjustesNaTela, type EstadoAjuste, NOMES_ARQUIVO_METODO, type OrigemDoMetodo } from "../../lib/metodo-ciclo-tipos.ts";
 import { type Bloco, type BlocoAnterior, versaoDoBloco } from "../../lib/modulo-tipos.ts";
 import { diaEMes } from "./modulo-tela.ts";
 
@@ -48,40 +48,87 @@ export function contagemDasRegras(regras: ReadonlyArray<Pick<RegraEscrita, "ativ
 	return `${total} · ${ligadas} ${ligadas === 1 ? "ligada" : "ligadas"}`;
 }
 
-// --- Os ajustes do método (docs/metodo-ciclo.md, "A tela") ----------------------------
+// --- Os experimentos do método (docs/metodo-experimentos.md, "A tela") -------------------
 
-export const TITULO_AJUSTES = "Ajustes do método";
+export const TITULO_AJUSTES = "Experimentos do método";
 /** A frase embaixo do título da seção. */
-export const LINHA_AJUSTES = "Estes ajustes vieram dos relatórios dos módulos e entram em toda geração.";
-export const TEXTO_SEM_AJUSTES = "Nenhum ajuste aprovado ainda.";
+export const LINHA_AJUSTES = "A análise de cada módulo concluído decide sobre os experimentos e registra o que facilita para você.";
+export const TEXTO_SEM_AJUSTES = "Nenhum experimento ainda.";
+export const TITULO_FACILITA = "O que facilita";
+
+/** Os grupos dos experimentos, na ordem em que a seção os mostra. */
+export const GRUPOS_DOS_EXPERIMENTOS = [
+	{ estado: "em teste", titulo: "Em teste" },
+	{ estado: "mantido", titulo: "Mantidos" },
+	{ estado: "descartado", titulo: "Descartados" },
+] as const satisfies ReadonlyArray<{ estado: EstadoAjuste; titulo: string }>;
 
 /** O nome de um arquivo de ajustes na tela ("Exemplos"). */
 export const nomeDoArquivoDeAjustes = (arquivo: ArquivoDeAjustesNaTela["arquivo"]): string => NOMES_ARQUIVO_METODO[arquivo];
 
-/** "Ligado" ou "Desligado" (o rótulo da chave de um ajuste). */
-export const rotuloDoAjuste = (ativo: boolean): string => (ativo ? "Ligado" : "Desligado");
+/** Um experimento com o arquivo de metodologia dele (os arquivos vêm separados na mensagem ajustes). */
+export interface ExperimentoDoModal extends AjusteNaTela {
+	arquivo: ArquivoDeAjustesNaTela["arquivo"];
+}
 
-/** "do módulo 01" (m1 → 01); outro nome de módulo, como está; sem origem, "escrito à mão". */
-export function rotuloDaOrigemDoAjuste(origem: Pick<OrigemDoAjuste, "modulo"> | null): string {
+/** Um grupo de experimentos que a seção desenha. */
+export interface GrupoDeExperimentos {
+	estado: EstadoAjuste;
+	titulo: string;
+	itens: ExperimentoDoModal[];
+}
+
+/**
+ * Os experimentos agrupados por estado (Em teste, Mantidos, Descartados), só
+ * os grupos que têm algum. Em cada grupo, a ordem recebida: os arquivos na
+ * ordem da mensagem e, em cada um, os ajustes na ordem do arquivo.
+ */
+export function agruparExperimentos(arquivos: readonly Pick<ArquivoDeAjustesNaTela, "arquivo" | "ajustes">[]): GrupoDeExperimentos[] {
+	const todos = arquivos.flatMap((arquivo) => arquivo.ajustes.map((ajuste) => ({ ...ajuste, arquivo: arquivo.arquivo })));
+	return GRUPOS_DOS_EXPERIMENTOS.map((grupo) => ({ estado: grupo.estado, titulo: grupo.titulo, itens: todos.filter((ajuste) => ajuste.estado === grupo.estado) })).filter((grupo) => grupo.itens.length > 0);
+}
+
+/** "do módulo 01" (m1 → 01); outro nome de módulo, como está; sem módulo, "de um relatório". */
+const moduloDaOrigem = (modulo: string | null): string => {
+	if (!modulo) return "de um relatório";
+	const numero = /^m(\d+)$/i.exec(modulo);
+	return `do módulo ${numero ? numero[1]!.padStart(2, "0") : modulo}`;
+};
+
+/**
+ * De onde um experimento ou um aprendizado veio: "do módulo 01, curso X" (o
+ * curso, quando o comentário diz), "reescrita de exemplos.md#a-1" (a
+ * reescrita de outro experimento) ou, sem origem, "escrito à mão".
+ */
+export function rotuloDaOrigemDoAjuste(origem: Pick<OrigemDoMetodo, "modulo"> & Partial<Pick<OrigemDoMetodo, "curso" | "reescritaDe">> | null): string {
 	if (!origem) return "escrito à mão";
-	if (!origem.modulo) return "de um relatório";
-	const numero = /^m(\d+)$/i.exec(origem.modulo);
-	return `do módulo ${numero ? numero[1]!.padStart(2, "0") : origem.modulo}`;
+	if (origem.reescritaDe) return `reescrita de ${origem.reescritaDe}`;
+	return origem.curso ? `${moduloDaOrigem(origem.modulo)}, curso ${origem.curso}` : moduloDaOrigem(origem.modulo);
 }
 
-/** "3 ajustes · 2 ligados"; sem ajustes, "Nenhum ajuste". Só conta os arquivos que se leem. */
-export function contagemDosAjustes(arquivos: ReadonlyArray<Pick<ArquivoDeAjustesNaTela, "ajustes">>): string {
-	const todos = arquivos.flatMap((arquivo) => arquivo.ajustes);
-	if (todos.length === 0) return "Nenhum ajuste";
-	const ligados = todos.filter((ajuste) => ajuste.ativo).length;
-	const total = `${todos.length} ${todos.length === 1 ? "ajuste" : "ajustes"}`;
-	if (ligados === todos.length) return total;
-	return `${total} · ${ligados} ${ligados === 1 ? "ligado" : "ligados"}`;
+/** Num descartado que uma reescrita substituiu: "substituído por a-20261103-1"; senão, "". */
+export const notaDoSubstituido = (origem: Pick<OrigemDoMetodo, "substituidoPor"> | null): string => (origem?.substituidoPor ? `substituído por ${origem.substituidoPor}` : "");
+
+/**
+ * A contagem do cabeçalho: "2 em teste · 1 mantido · 3 descartados" (só os
+ * grupos que têm algum); sem experimentos, "Nenhum experimento". Só conta os
+ * arquivos que se leem.
+ */
+export function contagemDosAjustes(arquivos: ReadonlyArray<Pick<ArquivoDeAjustesNaTela, "arquivo" | "ajustes">>): string {
+	const grupos = agruparExperimentos(arquivos);
+	if (grupos.length === 0) return "Nenhum experimento";
+	return grupos
+		.map((grupo) => {
+			const quantos = grupo.itens.length;
+			if (grupo.estado === "em teste") return `${quantos} em teste`;
+			if (grupo.estado === "mantido") return `${quantos} ${quantos === 1 ? "mantido" : "mantidos"}`;
+			return `${quantos} ${quantos === 1 ? "descartado" : "descartados"}`;
+		})
+		.join(" · ");
 }
 
-/** Os arquivos que a seção desenha: os que têm ajuste ou erro (a mensagem já vem assim), na ordem recebida. */
-export const arquivosParaMostrar = (arquivos: readonly ArquivoDeAjustesNaTela[]): ArquivoDeAjustesNaTela[] =>
-	arquivos.filter((arquivo) => arquivo.ajustes.length > 0 || Boolean(arquivo.erro));
+/** Os arquivos com erro (o que não se lê e não é sobrescrito), na ordem recebida: a seção mostra o erro de cada um, como antes. */
+export const arquivosComErro = (arquivos: readonly ArquivoDeAjustesNaTela[]): ArquivoDeAjustesNaTela[] => arquivos.filter((arquivo) => Boolean(arquivo.erro));
 
 // --- A matéria de uma regra (o seletor) ----------------------------------------------
 

@@ -217,6 +217,7 @@ const mensagem = (modulos: EstadoModuloNaTela[], extra: Partial<MensagemEstadoMo
 	materia: "ciencia-de-dados",
 	curso: "c1",
 	modulos,
+	experimentosEmTeste: 0,
 	...extra,
 });
 

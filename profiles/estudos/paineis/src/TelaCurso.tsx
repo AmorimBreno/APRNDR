@@ -266,6 +266,7 @@ export function TelaCurso(props: PropsTelaCurso) {
 										parar={() => parar(modulo.id)}
 										gerarDeNovo={() => setPerguntarDeNovo(modulo.id)}
 										{...(erroModulo && card.tipo !== "erro" ? { erro: erroModulo } : {})}
+										{...(modulos.estado ? { experimentosEmTeste: modulos.estado.experimentosEmTeste } : {})}
 										{...(props.agente ? { agente: props.agente } : {})}
 									/>
 									<div className="curso__modulo-texto">
@@ -390,7 +391,8 @@ export function TelaCurso(props: PropsTelaCurso) {
  * etapa e "Parar" (o progresso é o enchimento do card); no gerado, "Gerado",
  * as lições e as questões, "Gerar de novo" e "3 de 12 questões feitas"; no aguardando material, a
  * etiqueta, a nota e o aviso de material novo; no erro, a mensagem; no
- * concluído, a linha do relatório do método (docs/metodo-ciclo.md; ou nada).
+ * concluído, a linha do relatório do método (docs/metodo-experimentos.md: "Gerando o relatório…"
+ * ou "Relatório pronto · 2 experimentos em teste"; ou nada).
  */
 function RodapeModulo(props: {
 	card: CardModulo;
@@ -399,6 +401,8 @@ function RodapeModulo(props: {
 	gerarDeNovo(): void;
 	/** O erro de parar (ou outro erro do módulo sem pedido). */
 	erro?: string;
+	/** Quantos experimentos do método estão em teste agora (o estado do curso). */
+	experimentosEmTeste?: number;
 	agente?: { nome: string; avatar?: DadosAvatarAgente };
 }) {
 	const { card } = props;
@@ -458,14 +462,13 @@ function RodapeModulo(props: {
 			</Callout>
 		);
 	} else if (card.tipo === "concluido") {
-		// O relatório do método: gerando, com propostas para decidir ou pronto (erro, pouco retorno e sem relatório, nada).
-		const linha = linhaDoRelatorioNoCard(estado?.relatorio);
+		// O relatório do método: gerando ou pronto, com os experimentos em teste (erro, pouco retorno e sem relatório, nada).
+		const linha = linhaDoRelatorioNoCard(estado?.relatorio, props.experimentosEmTeste);
 		if (linha) {
 			const gerando = estado?.relatorio?.situacao === "gerando";
-			const pendentes = (estado?.relatorio?.pendentes ?? 0) > 0;
 			conteudo = (
 				<div className="mod__linha mod__relatorio">
-					<Tag size="sm" tone={gerando ? "steel" : pendentes ? "amber" : "sage"} icon={gerando ? "clock" : pendentes ? "checklist" : "check"}>
+					<Tag size="sm" tone={gerando ? "steel" : "sage"} icon={gerando ? "clock" : "check"}>
 						{linha}
 					</Tag>
 				</div>

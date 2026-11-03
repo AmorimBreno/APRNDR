@@ -24,7 +24,7 @@ import {
 	textoPendentes,
 } from "./mapa-ponte.ts";
 import { formatarDolar } from "./ModalMateriais.tsx";
-import { descreverEvento } from "./TelaCaderno.tsx";
+import { descreverEvento } from "./LinhaDoTempo.tsx";
 
 function conceito(id: string, extra: Partial<Conceito> = {}): Conceito {
 	return {

@@ -148,6 +148,33 @@
 .tempo__detalhe, .tempo__aviso { color: var(--ink-muted); }
 .tempo__aviso { margin: 0; }
 
+/* ── Faixa da linha do tempo do painel do caderno (LinhaDoTempo.tsx) ──
+ * Uma linha fina e contínua atravessa a faixa; cada marco é uma coluna de largura fixa com o dia (só no primeiro
+ * do dia), a marca redonda sobre a linha (a mesma .tempo__marca), a hora, a frase e o detalhe. O mais novo fica à
+ * esquerda e a faixa rola na horizontal. A entrada dos marcos é do motion (e já vem parada com movimento reduzido,
+ * pelo semMovimento); aqui não há transição nem animação. */
+.faixa-tempo { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.faixa-tempo__cabeca { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.faixa-tempo__titulo { margin: 0; color: var(--ink-muted); }
+.faixa-tempo__vazio { margin: 0; color: var(--ink-muted); }
+.faixa-tempo__rolagem { overflow-x: auto; overflow-y: hidden; padding-bottom: var(--space-2); border-radius: var(--radius-sm); scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+.faixa-tempo__rolagem:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.faixa-tempo__trilho { display: flex; width: max-content; min-width: 100%; margin: 0; padding: 0; list-style: none; }
+.faixa-tempo__marco { --marca: 32px; --altura-dia: 32px; position: relative; display: flex; flex: none; flex-direction: column; align-items: flex-start; gap: 2px; box-sizing: border-box; width: 224px; padding-right: var(--space-4); }
+/* A linha: de ponta a ponta de cada coluna, à altura do centro das marcas, de modo que as colunas se emendam. */
+.faixa-tempo__marco::before { content: ""; position: absolute; left: 0; right: 0; top: calc(var(--altura-dia) + var(--space-2) + var(--marca) / 2); height: var(--border-control); transform: translateY(-50%); background: var(--line-strong); }
+/* O mais novo começa a linha no centro da marca; o mais antigo da faixa a deixa sumir (há mais no "Ver tudo"). */
+.faixa-tempo__marco:first-child::before { left: calc(var(--marca) / 2); }
+.faixa-tempo__marco:last-child::before { background: linear-gradient(90deg, var(--line-strong), transparent); }
+.faixa-tempo__marco:first-child .faixa-tempo__marca { background: var(--amber); color: var(--on-amber); box-shadow: var(--key-lip); }
+/* O dia ocupa sempre a mesma altura (até duas linhas, coladas embaixo), para as marcas ficarem alinhadas na linha. */
+.faixa-tempo__marco .faixa-tempo__dia { display: flex; align-items: flex-end; width: 100%; height: var(--altura-dia); margin-bottom: var(--space-2); line-height: 15px; color: var(--ink-muted); }
+.faixa-tempo__dia-texto { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+.faixa-tempo__hora { padding-top: var(--space-2); }
+.faixa-tempo__frase, .faixa-tempo__detalhe { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.faixa-tempo__frase { -webkit-line-clamp: 3; }
+.faixa-tempo__detalhe { -webkit-line-clamp: 2; }
+
 @media (max-width: 900px) {
 	.caderno { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
 	.caderno__indice { padding: var(--space-2); }

@@ -25,7 +25,7 @@ import {
 	textoDasFeitas,
 	tituloDoFormulario,
 } from "./modulos-tela.ts";
-import { descreverEvento } from "./TelaCaderno.tsx";
+import { descreverEvento } from "./LinhaDoTempo.tsx";
 
 const ORDEM = ["m1", "m2", "m3", "m4"];
 const estado = (...modulos: EstadoModuloNaTela[]) => ({ modulos });

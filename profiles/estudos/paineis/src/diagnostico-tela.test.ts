@@ -36,7 +36,7 @@ import {
 	pontosDasDissertativas,
 	textoPlacar,
 } from "./diagnostico-tela.ts";
-import { descreverEvento } from "./TelaCaderno.tsx";
+import { descreverEvento } from "./LinhaDoTempo.tsx";
 
 const questoes: DiagnosticoNaTela["questoes"] = [
 	{ id: "q1", tipo: "alternativa", conceitos: ["a"], enunciado: "?", alternativas: [{ texto: "x" }, { texto: "y" }, { texto: "z" }] },

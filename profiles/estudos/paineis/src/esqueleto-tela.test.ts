@@ -29,7 +29,7 @@ import {
 } from "./esqueleto-tela.ts";
 import { rotuloCurso } from "./guia-curso.ts";
 import { formatarDolar } from "./ModalMateriais.tsx";
-import { descreverEvento } from "./TelaCaderno.tsx";
+import { descreverEvento } from "./LinhaDoTempo.tsx";
 
 const HOJE = "2026-10-26";
 

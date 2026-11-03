@@ -1,0 +1,361 @@
+// A linha do tempo do caderno (ESPECIFICACAO 8.1, item 4.3): os eventos do
+// eventos.jsonl da matéria, do mais novo ao mais antigo (a timeline não é um
+// arquivo à parte, seção 7). Vive fora da TelaCaderno para o painel poder usar
+// os mesmos textos sem importar a tela (import circular). Três formas:
+// - descreverEvento: o ícone, a frase e o detalhe de cada evento;
+// - LinhaDoTempo: a lista vertical completa, agrupada por dia, que aparece no
+//   modal "Ver tudo" (ModalLinhaDoTempo);
+// - FaixaTempo: a faixa horizontal do painel, com os marcos dos eventos mais
+//   recentes numa linha contínua, o dia só no primeiro marco de cada dia.
+
+import { Button, Icon, type IconName, Modal } from "@estudos/design-system";
+import { semMovimento } from "@estudos/ui";
+import { motion } from "motion/react";
+import type { Evento } from "../../lib/eventos.ts";
+import { dataCurta } from "./comum.ts";
+import { numeroCurto } from "./diagnostico-tela.ts";
+import { dataNumerica } from "./guia-curso.ts";
+import { formatarDolar } from "./ModalMateriais.tsx";
+
+const diaLongo = new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "numeric", month: "long" });
+const hora = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
+export const NOMES_TIPO: Record<string, string> = { pdf: "PDF", python: "Python", notebook: "Notebook", texto: "Texto" };
+const NOMES_CAMPO: Record<string, string> = { nome: "nome", cor: "cor da capa", glifo: "ideograma", provas: "provas" };
+
+/** O nome do curso de um evento: o do resultado, se veio; senão o id do objeto. */
+function nomeDoCurso(evento: Evento): string {
+	const resultado = (evento.resultado ?? {}) as Record<string, unknown>;
+	return typeof resultado.nome === "string" ? resultado.nome : typeof evento.objeto.curso === "string" ? evento.objeto.curso : "um curso";
+}
+
+/** Uma linha da linha do tempo: o ícone, a frase e o detalhe. */
+export function descreverEvento(evento: Evento): { icone: IconName; texto: string; detalhe?: string } {
+	const resultado = (evento.resultado ?? {}) as Record<string, unknown>;
+	const arquivo = typeof evento.objeto.arquivo === "string" ? evento.objeto.arquivo : "um arquivo";
+	const nota = typeof evento.objeto.nota === "string" ? evento.objeto.nota : "uma nota";
+	switch (evento.verbo) {
+		case "criou_materia":
+			return { icone: "notebook", texto: "Caderno criado", ...(typeof resultado.nome === "string" ? { detalhe: resultado.nome } : {}) };
+		case "alterou_materia": {
+			const partes = Object.keys(resultado).map((campo) => {
+				if (campo === "nome") return `nome: ${String(resultado.nome)}`;
+				if (campo === "glifo") return `ideograma ${String(resultado.glifo)}`;
+				if (campo === "provas") {
+					const provas = resultado.provas as Array<{ nome: string; data: string }>;
+					return provas.length ? `provas: ${provas.map((prova) => `${prova.nome} em ${dataCurta(prova.data)}`).join(", ")}` : "sem prova marcada";
+				}
+				return NOMES_CAMPO[campo] ?? campo;
+			});
+			return { icone: "refresh", texto: "Matéria editada", ...(partes.length ? { detalhe: partes.join(" · ") } : {}) };
+		}
+		case "adicionou_material":
+		case "atualizou_material": {
+			const tipo = typeof resultado.tipo === "string" ? (NOMES_TIPO[resultado.tipo] ?? resultado.tipo) : undefined;
+			const trechos = typeof resultado.trechos === "number" ? `${resultado.trechos} ${resultado.trechos === 1 ? "trecho" : "trechos"}` : undefined;
+			const custo = typeof resultado.custo === "number" && resultado.custo > 0 ? `${formatarDolar(resultado.custo)} com a visão` : undefined;
+			const detalhe = [tipo, trechos, custo].filter(Boolean).join(" · ");
+			return {
+				icone: evento.verbo === "adicionou_material" ? "paperclip" : "refresh",
+				texto: `${evento.verbo === "adicionou_material" ? "Material adicionado" : "Material atualizado"}: ${arquivo}`,
+				...(detalhe ? { detalhe } : {}),
+			};
+		}
+		case "removeu_material":
+			return { icone: "close", texto: `Material removido: ${arquivo}` };
+		case "criou_nota":
+			return { icone: "file", texto: `Nota criada: ${nota}` };
+		case "editou_nota":
+			return { icone: "book", texto: `Nota editada: ${nota}` };
+		case "renomeou_nota":
+			return {
+				icone: "refresh",
+				texto: `Nota renomeada: ${nota}`,
+				...(typeof resultado.de === "string"
+					? {
+							detalhe: [
+								`antes: ${resultado.de}`,
+								Array.isArray(resultado.mencoesAtualizadas) && resultado.mencoesAtualizadas.length
+									? `menções atualizadas em ${(resultado.mencoesAtualizadas as string[]).join(", ")}`
+									: "",
+							]
+								.filter(Boolean)
+								.join(" · "),
+						}
+					: {}),
+			};
+		case "mapeou_material": {
+			const novos = typeof resultado.novos === "number" ? resultado.novos : 0;
+			const reforcados = typeof resultado.reforcados === "number" ? resultado.reforcados : 0;
+			const custo = typeof resultado.custo === "number" ? resultado.custo : 0;
+			const detalhe = [
+				novos > 0 ? `${novos} ${novos === 1 ? "conceito novo" : "conceitos novos"}` : "",
+				reforcados > 0 ? `${reforcados} ${reforcados === 1 ? "reforçado" : "reforçados"}` : "",
+				custo > 0 ? formatarDolar(custo) : "",
+			]
+				.filter(Boolean)
+				.join(" · ");
+			return { icone: "bulb", texto: `Mapa atualizado com ${arquivo}`, ...(detalhe ? { detalhe } : {}) };
+		}
+		case "atualizou_mapa": {
+			const semFonte = typeof resultado.semFonte === "number" ? resultado.semFonte : 0;
+			return {
+				icone: "bulb",
+				texto: `Mapa sem ${arquivo}`,
+				...(semFonte > 0 ? { detalhe: semFonte === 1 ? "1 conceito ficou sem fonte" : `${semFonte} conceitos ficaram sem fonte` } : {}),
+			};
+		}
+		case "revisou_mapa":
+			return { icone: "bulb", texto: "Mapa revisado" };
+		case "montou_mapa_do_tema": {
+			const tema = typeof resultado.tema === "string" ? resultado.tema : "do curso";
+			const novos = typeof resultado.novos === "number" ? resultado.novos : undefined;
+			const custo = typeof resultado.custo === "number" && resultado.custo > 0 ? formatarDolar(resultado.custo) : "";
+			const detalhe = [novos !== undefined ? `${novos} ${novos === 1 ? "conceito" : "conceitos"}` : "", custo].filter(Boolean).join(" · ");
+			return { icone: "bulb", texto: `Mapa montado a partir do tema ${tema}`, ...(detalhe ? { detalhe } : {}) };
+		}
+		case "comecou_curso":
+			return { icone: "flag", texto: `Curso começado: ${typeof resultado.nome === "string" ? resultado.nome : String(evento.objeto.curso ?? "um curso")}` };
+		case "descartou_curso":
+			return { icone: "close", texto: `Rascunho descartado: ${typeof resultado.nome === "string" ? resultado.nome : String(evento.objeto.curso ?? "um curso")}` };
+		case "gerou_diagnostico": {
+			const questoes = typeof resultado.questoes === "number" ? resultado.questoes : Array.isArray(resultado.questoes) ? resultado.questoes.length : undefined;
+			const custo = typeof resultado.custo === "number" && resultado.custo > 0 ? formatarDolar(resultado.custo) : "";
+			const detalhe = [questoes !== undefined ? `${questoes} ${questoes === 1 ? "questão" : "questões"}` : "", custo].filter(Boolean).join(" · ");
+			return { icone: "checklist", texto: `Diagnóstico preparado: ${nomeDoCurso(evento)}`, ...(detalhe ? { detalhe } : {}) };
+		}
+		case "gerou_modulo": {
+			const modulo = typeof evento.objeto.modulo === "string" ? evento.objeto.modulo : "um módulo";
+			const curso = typeof evento.objeto.curso === "string" ? evento.objeto.curso : "um curso";
+			const licoes = typeof resultado.licoes === "number" ? `${resultado.licoes} ${resultado.licoes === 1 ? "lição" : "lições"}` : "";
+			const questoes = typeof resultado.questoes === "number" ? `${resultado.questoes} ${resultado.questoes === 1 ? "questão" : "questões"}` : "";
+			const custo = typeof resultado.custo === "number" && resultado.custo > 0 ? formatarDolar(resultado.custo) : "";
+			const detalhe = [licoes, questoes, custo].filter(Boolean).join(" · ");
+			return { icone: "book", texto: `Módulo gerado: ${modulo} de ${curso}`, ...(detalhe ? { detalhe } : {}) };
+		}
+		case "concluiu_modulo": {
+			const modulo = typeof evento.objeto.modulo === "string" ? evento.objeto.modulo : "um módulo";
+			const curso = typeof evento.objeto.curso === "string" ? evento.objeto.curso : "um curso";
+			const licoes = typeof resultado.licoes === "number" ? `${resultado.licoes} ${resultado.licoes === 1 ? "lição" : "lições"}` : "";
+			const questoes = typeof resultado.questoes === "number" ? `${resultado.questoes} ${resultado.questoes === 1 ? "questão" : "questões"}` : "";
+			const detalhe = [licoes, questoes].filter(Boolean).join(" · ");
+			return { icone: "check", texto: `Módulo concluído: ${modulo} de ${curso}`, ...(detalhe ? { detalhe } : {}) };
+		}
+		case "marcou_aguardando_material": {
+			const modulo = typeof evento.objeto.modulo === "string" ? evento.objeto.modulo : "um módulo";
+			const aviso = typeof resultado.nota === "string" && resultado.nota.trim() ? resultado.nota.trim() : "";
+			return { icone: "clock", texto: `Módulo aguardando material: ${modulo}`, ...(aviso ? { detalhe: aviso } : {}) };
+		}
+		case "gerou_esqueleto": {
+			const modulos = typeof resultado.modulos === "number" ? resultado.modulos : Array.isArray(resultado.modulos) ? resultado.modulos.length : undefined;
+			const custo = typeof resultado.custo === "number" && resultado.custo > 0 ? formatarDolar(resultado.custo) : "";
+			const detalhe = [modulos !== undefined ? `${modulos} ${modulos === 1 ? "módulo" : "módulos"}` : "", custo].filter(Boolean).join(" · ");
+			return { icone: "list", texto: `Esqueleto proposto: ${nomeDoCurso(evento)}`, ...(detalhe ? { detalhe } : {}) };
+		}
+		case "criou_curso": {
+			const modulos = typeof resultado.modulos === "number" ? resultado.modulos : Array.isArray(resultado.modulos) ? resultado.modulos.length : undefined;
+			const geral = typeof resultado.avaliacaoGeral === "string" && /^\d{4}-\d{2}-\d{2}$/.test(resultado.avaliacaoGeral) ? dataNumerica(resultado.avaliacaoGeral) : "";
+			const detalhe = [modulos !== undefined ? `${modulos} ${modulos === 1 ? "módulo" : "módulos"}` : "", geral ? `avaliação geral em ${geral}` : ""].filter(Boolean).join(" · ");
+			return { icone: "flag", texto: `Curso criado: ${nomeDoCurso(evento)}`, ...(detalhe ? { detalhe } : {}) };
+		}
+		case "recalculou_calendario": {
+			const geral = typeof resultado.avaliacaoGeral === "string" && /^\d{4}-\d{2}-\d{2}$/.test(resultado.avaliacaoGeral) ? dataNumerica(resultado.avaliacaoGeral) : "";
+			return { icone: "refresh", texto: `Calendário recalculado: ${nomeDoCurso(evento)}`, ...(geral ? { detalhe: `avaliação geral em ${geral}` } : {}) };
+		}
+		case "concluiu_diagnostico": {
+			const { acertos, alternativas, dissertativas, nota } = resultado;
+			const detalhe = [
+				typeof acertos === "number" && typeof alternativas === "number" && alternativas > 0 ? `${acertos} de ${alternativas} ${alternativas === 1 ? "certa" : "certas"}` : "",
+				typeof nota === "number" && typeof dissertativas === "number" && dissertativas > 0
+					? `${dissertativas === 1 ? "dissertativa" : "dissertativas"} ${numeroCurto(nota * 10)}/10`
+					: "",
+			]
+				.filter(Boolean)
+				.join(" · ");
+			return { icone: "check", texto: `Diagnóstico concluído: ${nomeDoCurso(evento)}`, ...(detalhe ? { detalhe } : {}) };
+		}
+		case "aprovou_mapa": {
+			const conceitos = typeof resultado.conceitos === "number" ? resultado.conceitos : undefined;
+			return {
+				icone: "check",
+				texto: "Mapa aprovado",
+				...(conceitos !== undefined ? { detalhe: `${conceitos} ${conceitos === 1 ? "conceito" : "conceitos"}` } : {}),
+			};
+		}
+		default:
+			return { icone: "flag", texto: evento.verbo.replaceAll("_", " ") };
+	}
+}
+
+/** Os eventos do mais novo ao mais antigo, em grupos por dia (no fuso do computador). */
+export function porDia(eventos: readonly Evento[]): Array<{ dia: string; eventos: Evento[] }> {
+	const grupos: Array<{ dia: string; eventos: Evento[] }> = [];
+	for (const evento of [...eventos].sort((a, b) => b.ts.localeCompare(a.ts))) {
+		const dia = diaLongo.format(new Date(evento.ts));
+		const ultimo = grupos.at(-1);
+		if (ultimo?.dia === dia) ultimo.eventos.push(evento);
+		else grupos.push({ dia, eventos: [evento] });
+	}
+	return grupos;
+}
+
+/** Quantos marcos a faixa do painel mostra, no máximo (o resto fica no "Ver tudo"). */
+const MARCOS_NA_FAIXA = 12;
+
+/** Os `limite` eventos mais novos, do mais novo ao mais antigo (a lista de entrada não é alterada). */
+export function eventosRecentes(eventos: readonly Evento[], limite: number = MARCOS_NA_FAIXA): Evento[] {
+	return [...eventos].sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, Math.max(0, limite));
+}
+
+/** Um marco da faixa: o evento e, só no primeiro de cada dia, o dia por extenso. */
+export interface MarcoDaFaixa {
+	evento: Evento;
+	dia?: string;
+}
+
+/** Os eventos recentes já na ordem da faixa, com o rótulo do dia só no primeiro marco de cada dia (no fuso do computador). */
+export function marcosDaFaixa(eventos: readonly Evento[], limite: number = MARCOS_NA_FAIXA): MarcoDaFaixa[] {
+	let anterior: string | undefined;
+	return eventosRecentes(eventos, limite).map((evento) => {
+		const dia = diaLongo.format(new Date(evento.ts));
+		const novoDia = dia !== anterior;
+		anterior = dia;
+		return novoDia ? { evento, dia } : { evento };
+	});
+}
+
+/** O aviso das linhas do eventos.jsonl que não puderam ser lidas. */
+function avisoInvalidas(invalidas: number): string {
+	return `${invalidas === 1 ? "Uma linha" : `${invalidas} linhas`} do eventos.jsonl não ${invalidas === 1 ? "pôde" : "puderam"} ser lida${invalidas === 1 ? "" : "s"} (o arquivo não foi mexido).`;
+}
+
+/** A lista vertical completa, agrupada por dia. */
+export function LinhaDoTempo({ eventos, invalidas }: { eventos: Evento[]; invalidas: number }) {
+	const grupos = porDia(eventos);
+	if (grupos.length === 0) return <p className="body caderno__carregando">Nada aconteceu neste caderno ainda.</p>;
+	let ordem = 0;
+	return (
+		<div className="tempo">
+			{grupos.map((grupo) => (
+				<section key={grupo.dia} className="tempo__dia" aria-label={grupo.dia}>
+					<h3 className="overline tempo__data">{grupo.dia}</h3>
+					<ol className="tempo__lista">
+						{grupo.eventos.map((evento) => {
+							const { icone, texto, detalhe } = descreverEvento(evento);
+							const atraso = Math.min(ordem++, 12) * 0.035;
+							return (
+								<motion.li
+									key={evento.id}
+									className="tempo__evento"
+									initial={{ opacity: 0, x: -10 }}
+									animate={{ opacity: 1, x: 0 }}
+									transition={{ type: "spring", stiffness: 420, damping: 30, delay: atraso }}
+								>
+									<span className="tempo__marca" aria-hidden="true">
+										<Icon name={icone} size={16} strokeWidth={2.5} />
+									</span>
+									<span className="tempo__hora data">{hora.format(new Date(evento.ts))}</span>
+									<span className="tempo__texto">
+										<span className="body-strong">{texto}</span>
+										{detalhe ? <span className="body-sm tempo__detalhe">{detalhe}</span> : null}
+									</span>
+								</motion.li>
+							);
+						})}
+					</ol>
+				</section>
+			))}
+			{invalidas > 0 ? <p className="body-sm tempo__aviso">{avisoInvalidas(invalidas)}</p> : null}
+		</div>
+	);
+}
+
+interface PropsFaixaTempo {
+	eventos: Evento[];
+	/** Linhas do eventos.jsonl que não puderam ser lidas. */
+	invalidas: number;
+	/** O botão "Ver tudo": o painel abre o ModalLinhaDoTempo. */
+	verTudo(): void;
+	/** Quantos marcos mostrar, no máximo (12 por padrão). */
+	limite?: number;
+}
+
+/** A faixa horizontal do painel: o título e "Ver tudo" em cima e, embaixo, os marcos dos eventos mais recentes (o mais novo à esquerda). */
+export function FaixaTempo(props: PropsFaixaTempo) {
+	const marcos = marcosDaFaixa(props.eventos, props.limite);
+	// Com movimento reduzido, os marcos já aparecem no lugar, sem a mola.
+	const parado = semMovimento();
+	return (
+		<section className="faixa-tempo" aria-label="Linha do tempo">
+			<header className="faixa-tempo__cabeca">
+				<h3 className="overline faixa-tempo__titulo">Linha do tempo</h3>
+				{marcos.length > 0 ? (
+					<Button variant="ghost" size="sm" iconRight="arrow-right" onClick={props.verTudo}>
+						Ver tudo
+					</Button>
+				) : null}
+			</header>
+			{marcos.length === 0 ? (
+				<p className="body faixa-tempo__vazio">Nada aconteceu neste caderno ainda.</p>
+			) : (
+				// A faixa rola na horizontal e recebe o foco do teclado, para as setas rolarem sem o mouse.
+				<div className="faixa-tempo__rolagem" tabIndex={0} role="region" aria-label="Eventos mais recentes do caderno, do mais novo ao mais antigo">
+					<ol className="faixa-tempo__trilho">
+						{marcos.map(({ evento, dia }, indice) => {
+							const { icone, texto, detalhe } = descreverEvento(evento);
+							return (
+								<motion.li
+									key={evento.id}
+									className="faixa-tempo__marco"
+									initial={parado ? false : { opacity: 0, x: -10 }}
+									animate={{ opacity: 1, x: 0 }}
+									transition={{ type: "spring", stiffness: 420, damping: 30, delay: parado ? 0 : Math.min(indice, 12) * 0.035 }}
+								>
+									<span className="overline faixa-tempo__dia" title={dia}>
+										{dia ? <span className="faixa-tempo__dia-texto">{dia}</span> : null}
+									</span>
+									<span className="tempo__marca faixa-tempo__marca" aria-hidden="true">
+										<Icon name={icone} size={16} strokeWidth={2.5} />
+									</span>
+									<span className="tempo__hora data faixa-tempo__hora">{hora.format(new Date(evento.ts))}</span>
+									<span className="body-strong faixa-tempo__frase">{texto}</span>
+									{detalhe ? <span className="body-sm tempo__detalhe faixa-tempo__detalhe">{detalhe}</span> : null}
+								</motion.li>
+							);
+						})}
+					</ol>
+				</div>
+			)}
+			{props.invalidas > 0 ? <p className="body-sm tempo__aviso">{avisoInvalidas(props.invalidas)}</p> : null}
+		</section>
+	);
+}
+
+interface PropsModalLinhaDoTempo {
+	aberto: boolean;
+	fechar(): void;
+	eventos: Evento[];
+	invalidas: number;
+	/** O nome da matéria, no alto do modal. */
+	titulo?: string;
+}
+
+/** O "Ver tudo" da faixa: a lista vertical completa num modal (o corpo do Modal já rola). */
+export function ModalLinhaDoTempo(props: PropsModalLinhaDoTempo) {
+	return (
+		<Modal
+			open={props.aberto}
+			onClose={props.fechar}
+			title="Linha do tempo"
+			kicker={props.titulo}
+			size="md"
+			footer={
+				<Button variant="primary" onClick={props.fechar}>
+					Fechar
+				</Button>
+			}
+		>
+			<LinhaDoTempo eventos={props.eventos} invalidas={props.invalidas} />
+		</Modal>
+	);
+}

@@ -1,6 +1,7 @@
 // As partes puras do painel do caderno (TelaCaderno.tsx): as três tags da lista
 // de baixo (Notas, Materiais e Mapa de conteúdo), qual tag cada rota abre, a
-// rota de cada tag e para onde as setas do teclado levam no seletor.
+// rota de cada tag, para onde as setas do teclado levam no seletor e quanto da
+// janela do painel sobra para o bloco de baixo (tarefas e calendário).
 
 import type { IconName } from "@estudos/design-system";
 
@@ -62,3 +63,25 @@ export const tagVizinha = (atual: TagCaderno, tecla: string): TagCaderno | undef
 		atual,
 		tecla,
 	);
+
+/** As medidas que o bloco de baixo do painel precisa para saber quanto da janela do painel sobra para ele. */
+export interface MedidasDoPainel {
+	/** A altura visível do painel (clientHeight). */
+	alturaDoPainel: number;
+	/** A borda de cima do painel na janela (getBoundingClientRect().top). */
+	topoDoPainel: number;
+	/** A borda de cima do bloco de baixo na janela. */
+	topoDoBloco: number;
+	/** Quanto o painel já rolou (scrollTop). */
+	rolagem: number;
+}
+
+/**
+ * Quanto da janela do painel sobra para o bloco de baixo quando o painel está no topo: a altura visível menos o
+ * que vem acima do bloco (a faixa dos cursos e o espaço entre eles). É a altura dos cartões de tarefas e do
+ * calendário (BaixoDoCaderno.tsx); a rolagem entra na conta para o resultado não depender de onde o painel está.
+ */
+export function restoDoPainel(medidas: MedidasDoPainel): number {
+	const acima = medidas.topoDoBloco - medidas.topoDoPainel + medidas.rolagem;
+	return Math.max(Math.round(medidas.alturaDoPainel - acima), 0);
+}

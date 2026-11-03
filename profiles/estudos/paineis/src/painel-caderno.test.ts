@@ -2,7 +2,7 @@
 // abre, a rota de cada tag e as setas do seletor.
 
 import { describe, expect, it } from "vitest";
-import { abaVizinha, rotaDaTag, TAGS_DO_CADERNO, tagDaRota, tagVizinha } from "./painel-caderno.ts";
+import { abaVizinha, restoDoPainel, rotaDaTag, TAGS_DO_CADERNO, tagDaRota, tagVizinha } from "./painel-caderno.ts";
 
 describe("tagDaRota", () => {
 	it("sem seção abre Notas", () => {
@@ -80,5 +80,21 @@ describe("abaVizinha", () => {
 		expect(abaVizinha(abas, "tarefas", "Home")).toBe("calendario");
 		expect(abaVizinha(abas, "tarefas", "End")).toBe("quadro");
 		expect(abaVizinha(abas, "tarefas", "Enter")).toBeUndefined();
+	});
+});
+
+describe("restoDoPainel", () => {
+	it("é a altura visível menos o que fica acima do bloco, com o painel no topo", () => {
+		expect(restoDoPainel({ alturaDoPainel: 700, topoDoPainel: 100, topoDoBloco: 320, rolagem: 0 })).toBe(480);
+	});
+
+	it("dá o mesmo valor com o painel rolado (a rolagem volta para a conta)", () => {
+		// Rolado 150: o bloco subiu 150 na janela, e o resultado continua o do painel no topo.
+		expect(restoDoPainel({ alturaDoPainel: 700, topoDoPainel: 100, topoDoBloco: 170, rolagem: 150 })).toBe(480);
+	});
+
+	it("arredonda e nunca fica negativo", () => {
+		expect(restoDoPainel({ alturaDoPainel: 700, topoDoPainel: 100, topoDoBloco: 320.4, rolagem: 0 })).toBe(480);
+		expect(restoDoPainel({ alturaDoPainel: 200, topoDoPainel: 0, topoDoBloco: 500, rolagem: 0 })).toBe(0);
 	});
 });

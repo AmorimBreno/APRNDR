@@ -1,6 +1,6 @@
 # Teste da agenda
 
-Objetivo: confirmar a agenda do perfil de estudos: o calendário compacto do caderno, a tela da agenda com as três abas (Calendário em tela cheia, Tarefas e Quadro), as provas das matérias no calendário, a linha do tempo do caderno com as tarefas e o professor lendo a agenda pelo ler_agenda. Confirmar também que os arquivos da agenda ficam legíveis na pasta de dados.
+Objetivo: confirmar a agenda do perfil de estudos: as colunas de tarefas e de calendário do caderno, a tela da agenda com as três abas (Calendário em tela cheia, Tarefas e Quadro), as provas das matérias no calendário, a linha do tempo do caderno com as tarefas e o professor lendo a agenda pelo ler_agenda. Confirmar também que os arquivos da agenda ficam legíveis na pasta de dados.
 
 Tempo: uns 45 minutos. Custo: quase nenhum. Só o passo 28 manda uma mensagem ao professor (gasta uns tokens do modelo); o resto não usa modelo.
 
@@ -18,17 +18,17 @@ No fim, anote o resultado de cada passo e mande para o Claude Code.
 
 ## Teste
 
-1. Abra o app com o atalho "Estudos", clique no card Estudos e, com Ciência de Dados no meio da roda, clique em "Abrir". Por quê: é a entrada no caderno, onde fica o calendário compacto. O que você deve ver: à direita da lista com as tags Notas, Materiais e Mapa de conteúdo, um cartão com o rótulo "Agenda", o mês com o dia de hoje destacado e três botões no alto do cartão: Tarefas, Quadro e Tela cheia (são ícones; passe o mouse para ler o nome).
+1. Abra o app com o atalho "Estudos", clique no card Estudos e, com Ciência de Dados no meio da roda, clique em "Abrir". Por quê: é a entrada no caderno, onde ficam as tarefas e o calendário. O que você deve ver: embaixo, três colunas: a lista com as tags Notas, Materiais e Mapa de conteúdo (metade da largura), um cartão "Tarefas" (um quarto) e um cartão "Calendário" (um quarto), os dois até o fim da janela. No cartão Tarefas, o título com a contagem de abertas, dois botões de ícone (a lista e o quadro; passe o mouse para ler o nome), a lista de hoje com "Nova tarefa", as próximas por prazo e o campo "Adicionar tarefa…" no pé. No Calendário, o botão Tela cheia no alto, o mês com o dia de hoje destacado e as seis semanas em células grandes.
 
-2. No cartão, clique num dia do mês que não seja hoje. Por quê: o dia escolhido manda na lista embaixo do mês. O que você deve ver: o dia com um contorno, a lista do dia com "Nada marcado para este dia." e o botão "Nova tarefa".
+2. No cartão Calendário, clique num dia do mês que não seja hoje. Por quê: o dia escolhido manda na lista do dia, que fica no cartão Tarefas. O que você deve ver: o dia com um contorno no calendário e, no cartão Tarefas, o título do dia no lugar de "Hoje", a lista com "Nada marcado para este dia." e o botão "Nova tarefa".
 
 3. Com esse dia escolhido, clique em "Nova tarefa". Por quê: o modal já vem com a data do dia e a matéria do caderno. O que você deve ver: o modal "Nova tarefa" (com "Agenda" no alto), o campo Data com o dia escolhido e o campo Matéria com Ciência de Dados. Preencha o Título com "Teste: ler o capítulo 2", a Hora com 14:00 e clique em "Criar tarefa". Por quê da hora: confere que a hora aparece junto da data.
 
-4. Olhe o cartão depois de salvar. Por quê: a tarefa entra no calendário na hora. O que você deve ver: o modal fecha; o dia escolhido ganha um pontinho colorido embaixo do número, na cor da matéria; a lista do dia mostra a tarefa com a hora, o título e a caixinha de feita à esquerda.
+4. Olhe os dois cartões depois de salvar. Por quê: a tarefa entra no calendário e na lista na hora. O que você deve ver: o modal fecha; o dia escolhido ganha um pontinho colorido embaixo do número, na cor da matéria; a lista do dia, no cartão Tarefas, mostra a tarefa com a hora, o título e a caixinha de feita à esquerda; a contagem de abertas sobe e a tarefa aparece também em "Próximas", no grupo do prazo dela.
 
 5. Marque a caixinha da tarefa na lista do dia e, depois, desmarque. Por quê: a caixinha move a tarefa para a coluna de feito e a tira de volta. O que você deve ver: marcada, a tarefa aparece apagada na lista do dia; desmarcada, ela volta aberta e sem o apagado. A primeira coluna que não é a de feito é a que recebe a tarefa de volta.
 
-6. Clique em "Tela cheia" no cartão. Por quê: leva ao calendário grande, já filtrado pela matéria do caderno. O que você deve ver: a tela da agenda, com a barra no alto (o botão "Caderno" à esquerda, o nome da matéria em cima de "Agenda", as abas Calendário, Tarefas e Quadro e o botão "Nova tarefa"). Embaixo, o mês com a tarefa "Teste: ler o capítulo 2" no dia, como uma etiqueta colorida, e à direita o minimês com a lista do dia.
+6. Clique em "Tela cheia", no cartão Calendário. Por quê: leva ao calendário grande, já filtrado pela matéria do caderno. O que você deve ver: a tela da agenda, com a barra no alto (o botão "Caderno" à esquerda, o nome da matéria em cima de "Agenda", as abas Calendário, Tarefas e Quadro e o botão "Nova tarefa"). Embaixo, o mês com a tarefa "Teste: ler o capítulo 2" no dia, como uma etiqueta colorida, e à direita o minimês com a lista do dia.
 
 7. No cabeçalho do calendário, troque para "Semana" e depois para "Mês". Por quê: a Semana mostra os sete dias com a lista inteira de cada um. O que você deve ver: na Semana, os sete dias lado a lado com o título da semana, os com hora em ordem de hora e depois os sem hora. Volte para "Mês" e aperte F5. O que você deve ver: depois de recarregar, a visão que ficou escolhida continua, porque ela fica guardada no navegador.
 
@@ -46,9 +46,9 @@ No fim, anote o resultado de cada passo e mande para o Claude Code.
 
 14. Na tela da agenda, abra o filtro de matéria (no alto, à direita do título) e escolha outra matéria. Depois, volte para "Todas as matérias". Por quê: o filtro deixa só as tarefas e as provas da matéria escolhida, nas listas, no quadro e no calendário. Tarefas sem matéria somem com o filtro. O que você deve ver: com a matéria escolhida, o calendário mostra só os itens dela e a barra mostra a cor e o nome dela; com "Todas as matérias", volta tudo. O endereço muda com a matéria, e o F5 mantém a escolha.
 
-15. Clique em "Caderno", no canto esquerdo da barra. Por quê: volta ao caderno da matéria do filtro. O que você deve ver: o caderno da matéria escolhida, com o cartão do calendário. Se o filtro estivesse em "Todas as matérias", o botão diria "Matérias" e levaria à roda.
+15. Clique em "Caderno", no canto esquerdo da barra. Por quê: volta ao caderno da matéria do filtro. O que você deve ver: o caderno da matéria escolhida, com os cartões de tarefas e do calendário. Se o filtro estivesse em "Todas as matérias", o botão diria "Matérias" e levaria à roda.
 
-16. Volte à tela da agenda pelo botão "Tela cheia" do cartão e clique na aba "Tarefas", com "Todas as matérias" no filtro. Por quê: a lista de tarefas agrupa por prazo. O que você deve ver: grupos com os títulos Atrasadas, Hoje, Amanhã, Esta semana, Mais tarde e Sem data, cada um com as tarefas de teste no grupo do prazo delas (a "Teste: ler o capítulo 2" cai em Hoje ou no dia que você escolheu). Cada linha tem a caixinha, o título, a data e a hora, a matéria com a bolinha da cor e a coluna como etiqueta.
+16. Volte à tela da agenda pelo botão "Tela cheia" do cartão Calendário e clique na aba "Tarefas", com "Todas as matérias" no filtro. Por quê: a lista de tarefas agrupa por prazo. O que você deve ver: grupos com os títulos Atrasadas, Hoje, Amanhã, Esta semana, Mais tarde e Sem data, cada um com as tarefas de teste no grupo do prazo delas (a "Teste: ler o capítulo 2" cai em Hoje ou no dia que você escolheu). Cada linha tem a caixinha, o título, a data e a hora, a matéria com a bolinha da cor e a coluna como etiqueta.
 
 17. No campo "Adicionar tarefa…" no alto da lista, escreva "Teste: rápida" e aperte Enter. Depois, escreva "Teste: para apagar" e aperte Esc. Por quê: o Enter cria a tarefa só com o título, na primeira coluna que não é a de feito, com a matéria do filtro se houver; o Esc limpa o campo sem criar nada. O que você deve ver: a "Teste: rápida" aparece em Sem data (ela não tem data), o campo continua pronto para a próxima tarefa, e "Teste: para apagar" não aparece em lugar nenhum.
 
@@ -74,7 +74,7 @@ No fim, anote o resultado de cada passo e mande para o Claude Code.
 
 28. Abra a conversa da matéria pela foto do professor no caderno e escreva "o que eu tenho para fazer esta semana?". Por quê: o professor lê a agenda pela ferramenta ler_agenda, só de leitura. O que você deve ver: uma chamada ler_agenda no grupo de ferramentas da resposta, e a resposta com as seções "Atrasadas (abertas, com data antes de hoje)", "Abertas com data no intervalo", "Abertas sem data" e "Provas no intervalo", com as tarefas e a prova de teste. Depois, peça "crie uma tarefa para amanhã chamada Teste: pelo professor". Ele não tem ferramenta para criar: deve dizer que só consegue ler a agenda, e nenhuma tarefa nova aparece na tela da agenda.
 
-29. Diminua a janela até cerca de 375 px de largura e abra o caderno e a tela da agenda (Calendário e Quadro). Por quê: confere a tela estreita. O que você deve ver: no caderno, o cartão do calendário fica embaixo da lista de tags. No Calendário, o Mês mostra só os pontinhos coloridos, e a lista do dia fica acima da grade. A página não ganha rolagem para o lado: só o quadro rola para o lado, dentro dele. Volte à largura normal.
+29. Diminua a janela até cerca de 375 px de largura e abra o caderno e a tela da agenda (Calendário e Quadro). Por quê: confere a tela estreita. O que você deve ver: no caderno, abaixo de uns 1100 px as tarefas e o calendário ficam lado a lado embaixo da lista de tags, e abaixo de uns 700 px tudo fica numa coluna. No Calendário, o Mês mostra só os pontinhos coloridos, e a lista do dia fica acima da grade. A página não ganha rolagem para o lado: só o quadro rola para o lado, dentro dele. Volte à largura normal.
 
 30. Apague o que foi criado no teste. Na aba Tarefas, abra cada tarefa que começa com "Teste" e clique em "Apagar tarefa", confirmando no próprio modal. No Quadro, apague as colunas "Teste: coluna 2" e "Teste: vazia", se ainda existirem, pelo menu "…" de cada uma (antes, a coluna precisa estar sem tarefas ou com um destino). Confira que a coluna Feito continua marcada como feito. Por fim, abra "Editar matéria" da matéria de teste, apague a data da prova e clique em "Salvar". Por quê: a agenda e a matéria voltam ao que eram. Os eventos desses testes continuam nos eventos.jsonl, porque eles só crescem. O que você deve ver: a agenda com as colunas A fazer, Fazendo e Feito (esta marcada como feito) e as tarefas que você tinha antes, se houver; o caderno sem a prova de teste.
 
@@ -83,7 +83,7 @@ No fim, anote o resultado de cada passo e mande para o Claude Code.
 
 Para cada passo, escreva ok ou o que aconteceu de diferente:
 
-1. Cartão do calendário no caderno:
+1. Colunas de tarefas e de calendário no caderno:
 2. Escolher um dia:
 3. Nova tarefa com a data e a matéria:
 4. Pontinho e lista do dia:

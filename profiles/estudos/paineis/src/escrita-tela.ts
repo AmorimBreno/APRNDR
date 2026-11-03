@@ -18,6 +18,7 @@ import {
 	TEXTO_RETORNO_MAXIMO,
 	validarRetorno,
 } from "../../lib/escrita-tipos.ts";
+import { type ArquivoDeAjustesNaTela, NOMES_ARQUIVO_METODO, type OrigemDoAjuste } from "../../lib/metodo-ciclo-tipos.ts";
 import { type Bloco, type BlocoAnterior, versaoDoBloco } from "../../lib/modulo-tipos.ts";
 import { diaEMes } from "./modulo-tela.ts";
 
@@ -46,6 +47,41 @@ export function contagemDasRegras(regras: ReadonlyArray<Pick<RegraEscrita, "ativ
 	if (ligadas === regras.length) return total;
 	return `${total} · ${ligadas} ${ligadas === 1 ? "ligada" : "ligadas"}`;
 }
+
+// --- Os ajustes do método (docs/metodo-ciclo.md, "A tela") ----------------------------
+
+export const TITULO_AJUSTES = "Ajustes do método";
+/** A frase embaixo do título da seção. */
+export const LINHA_AJUSTES = "Estes ajustes vieram dos relatórios dos módulos e entram em toda geração.";
+export const TEXTO_SEM_AJUSTES = "Nenhum ajuste aprovado ainda.";
+
+/** O nome de um arquivo de ajustes na tela ("Exemplos"). */
+export const nomeDoArquivoDeAjustes = (arquivo: ArquivoDeAjustesNaTela["arquivo"]): string => NOMES_ARQUIVO_METODO[arquivo];
+
+/** "Ligado" ou "Desligado" (o rótulo da chave de um ajuste). */
+export const rotuloDoAjuste = (ativo: boolean): string => (ativo ? "Ligado" : "Desligado");
+
+/** "do módulo 01" (m1 → 01); outro nome de módulo, como está; sem origem, "escrito à mão". */
+export function rotuloDaOrigemDoAjuste(origem: Pick<OrigemDoAjuste, "modulo"> | null): string {
+	if (!origem) return "escrito à mão";
+	if (!origem.modulo) return "de um relatório";
+	const numero = /^m(\d+)$/i.exec(origem.modulo);
+	return `do módulo ${numero ? numero[1]!.padStart(2, "0") : origem.modulo}`;
+}
+
+/** "3 ajustes · 2 ligados"; sem ajustes, "Nenhum ajuste". Só conta os arquivos que se leem. */
+export function contagemDosAjustes(arquivos: ReadonlyArray<Pick<ArquivoDeAjustesNaTela, "ajustes">>): string {
+	const todos = arquivos.flatMap((arquivo) => arquivo.ajustes);
+	if (todos.length === 0) return "Nenhum ajuste";
+	const ligados = todos.filter((ajuste) => ajuste.ativo).length;
+	const total = `${todos.length} ${todos.length === 1 ? "ajuste" : "ajustes"}`;
+	if (ligados === todos.length) return total;
+	return `${total} · ${ligados} ${ligados === 1 ? "ligado" : "ligados"}`;
+}
+
+/** Os arquivos que a seção desenha: os que têm ajuste ou erro (a mensagem já vem assim), na ordem recebida. */
+export const arquivosParaMostrar = (arquivos: readonly ArquivoDeAjustesNaTela[]): ArquivoDeAjustesNaTela[] =>
+	arquivos.filter((arquivo) => arquivo.ajustes.length > 0 || Boolean(arquivo.erro));
 
 // --- A matéria de uma regra (o seletor) ----------------------------------------------
 

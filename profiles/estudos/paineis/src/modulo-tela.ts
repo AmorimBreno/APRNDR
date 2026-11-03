@@ -10,6 +10,7 @@
 // (modulo-tela.test.ts) rodam no Node.
 
 import type { IconName, RulerItem, TrackStep } from "@estudos/design-system";
+import type { RelatorioMetodo } from "../../lib/metodo-ciclo-tipos.ts";
 import type { ExplicacaoPedida, TermoNaTela } from "../../lib/termos-tipos.ts";
 import { ehQuestao } from "../../lib/modulo-respostas-tipos.ts";
 import type { Bloco, EstadoModuloNaTela, FormatoExplicacao, Licao, Modulo } from "../../lib/modulo-tipos.ts";
@@ -49,6 +50,12 @@ export interface LidoModuloAberto {
 	glossario?: TermoNaTela[];
 	explicando?: string[];
 	explicacoesFalhas?: ExplicacaoPedida[];
+	/** O relatório do método gravado do módulo concluído (docs/metodo-ciclo.md); ausente: não há (ou o módulo não está concluído). */
+	relatorio?: RelatorioMetodo;
+	/** O relatório está sendo gerado agora. */
+	relatorioGerando?: boolean;
+	/** A frase da última geração que falhou, ou do arquivo do relatório que não se lê. */
+	relatorioErro?: string;
 	erro?: string;
 }
 

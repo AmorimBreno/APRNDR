@@ -15,6 +15,7 @@ import {
 	termoPorId,
 	TIPOS_EXPLICACAO,
 	type ExplicacaoPedida,
+	type LugarDoTermo,
 	type LugarNaTela,
 	type TermoNaTela,
 	type TipoExplicacao,
@@ -456,8 +457,9 @@ export function MarcarTermos({ modulo }: { modulo: Modulo }) {
 
 // Destino passageiro por aba: sobrevive à remontagem do módulo na navegação,
 // mas nunca é gravado na pasta de dados nem compartilhado entre janelas.
-let destino: { chave: string; lugar: LugarNaTela } | undefined;
-export function apontarTermo(chave: string, lugar: LugarNaTela) {
+// Também serve ao relatório do método: o clique numa evidência leva ao bloco do mesmo jeito (só precisa do lugar).
+let destino: { chave: string; lugar: LugarDoTermo } | undefined;
+export function apontarTermo(chave: string, lugar: LugarDoTermo) {
 	destino = { chave, lugar };
 }
 export function useDestinoTermo(chave: string, modulo: string, licao: string | undefined, pronto: boolean) {

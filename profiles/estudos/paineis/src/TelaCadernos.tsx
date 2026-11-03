@@ -14,6 +14,7 @@ import { type ControleFaixaMarca, FaixaMarca, type JanelaPerfilHook, type PropsT
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { type Materia, pastaMateriaisRelativa } from "../../lib/materia-tipos.ts";
 import { dataCurta, lerAcoes, PAINEL_CADERNOS, prepararConversa, proximaProva, quando, rotuloCapa } from "./comum.ts";
+import { useAjustes } from "./ajustes-ponte.ts";
 import { useEscrita } from "./escrita-ponte.ts";
 import { TITULO_ESCRITA } from "./escrita-tela.ts";
 import { ModalEscrita } from "./ModalEscrita.tsx";
@@ -75,6 +76,8 @@ export function TelaCadernos(props: PropsTelaCadernos) {
 	const [vendoEscrita, setVendoEscrita] = useState(false);
 	// As regras de escrita: pedidas quando o modal abre.
 	const escrita = useEscrita(props.janela, vendoEscrita);
+	// Os ajustes do método (os aprovados nos relatórios dos módulos): pedidos junto das regras.
+	const ajustes = useAjustes(props.janela, vendoEscrita);
 
 	// A faixa entra como bandeira; para sair (para os perfis, a conversa ou um caderno), ela sobe antes.
 	const faixa = useRef<ControleFaixaMarca>(null);
@@ -210,7 +213,7 @@ export function TelaCadernos(props: PropsTelaCadernos) {
 				enviar={(arquivos) => (materiaAtual ? acoes.enviarMateriais(pastaMateriaisRelativa(materiaAtual.id), arquivos) : Promise.resolve([]))}
 				reprocessar={(caminho) => acoes.reprocessarMaterial(caminho)}
 			/>
-			<ModalEscrita aberto={vendoEscrita} fechar={() => setVendoEscrita(false)} escrita={escrita} materias={materias} />
+			<ModalEscrita aberto={vendoEscrita} fechar={() => setVendoEscrita(false)} escrita={escrita} ajustes={ajustes} materias={materias} />
 			<ModalMateria
 				aberto={criando}
 				fechar={() => setCriando(false)}

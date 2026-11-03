@@ -19,7 +19,8 @@
 // módulo gerado, TelaModulo.tsx) e, embaixo, "Gerado" com as lições e as
 // questões, "Gerar de novo" (com confirmação) e "3 de 12 questões feitas"
 // (o progresso do estado); o concluído é o holográfico,
-// com "Rever"; o aguardando material é preto, com a etiqueta, a nota e "Gerar
+// com "Rever" e, embaixo, a linha do relatório do método ("Gerando o relatório…",
+// "Relatório: 2 propostas para decidir" ou "Relatório pronto"; docs/metodo-ciclo.md); o aguardando material é preto, com a etiqueta, a nota e "Gerar
 // agora"; o erro, a mensagem e "Tentar de novo". Só o recomendado leva a
 // etiqueta "Próximo". Nenhum card fica bloqueado.
 
@@ -50,6 +51,7 @@ import {
 	textoDasFeitas,
 	textoDaEtapa,
 } from "./modulos-tela.ts";
+import { linhaDoRelatorioNoCard } from "./relatorio-tela.ts";
 
 const MOLA = { type: "spring", stiffness: 380, damping: 32 } as const;
 
@@ -388,7 +390,7 @@ export function TelaCurso(props: PropsTelaCurso) {
  * etapa e "Parar" (o progresso é o enchimento do card); no gerado, "Gerado",
  * as lições e as questões, "Gerar de novo" e "3 de 12 questões feitas"; no aguardando material, a
  * etiqueta, a nota e o aviso de material novo; no erro, a mensagem; no
- * concluído, nada.
+ * concluído, a linha do relatório do método (docs/metodo-ciclo.md; ou nada).
  */
 function RodapeModulo(props: {
 	card: CardModulo;
@@ -455,6 +457,20 @@ function RodapeModulo(props: {
 				<p>{estado?.mensagem || "A geração falhou."}</p>
 			</Callout>
 		);
+	} else if (card.tipo === "concluido") {
+		// O relatório do método: gerando, com propostas para decidir ou pronto (erro, pouco retorno e sem relatório, nada).
+		const linha = linhaDoRelatorioNoCard(estado?.relatorio);
+		if (linha) {
+			const gerando = estado?.relatorio?.situacao === "gerando";
+			const pendentes = (estado?.relatorio?.pendentes ?? 0) > 0;
+			conteudo = (
+				<div className="mod__linha mod__relatorio">
+					<Tag size="sm" tone={gerando ? "steel" : pendentes ? "amber" : "sage"} icon={gerando ? "clock" : pendentes ? "checklist" : "check"}>
+						{linha}
+					</Tag>
+				</div>
+			);
+		}
 	}
 	if (!conteudo && !props.erro) return null;
 	return (

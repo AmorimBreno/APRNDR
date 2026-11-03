@@ -12,22 +12,39 @@
 //
 // As regras vêm da ponte "escrita" (useEscrita, escrita-ponte.ts): salvar e
 // apagar esperam a resposta, sem mudança otimista.
+//
+// Depois das regras, a seção "Ajustes do método" (docs/metodo-ciclo.md, "A
+// tela"): os ajustes aprovados nos relatórios dos módulos, por arquivo de
+// metodologia, cada um com o texto, a origem ("do módulo 01") e a chave
+// Ligado/Desligado (ligar_ajuste, vale na hora). Vêm da ponte "modulos"
+// (useAjustes, ajustes-ponte.ts), que o modal pede ao abrir. Um arquivo que não
+// se lê mostra o erro; sem ajustes, "Nenhum ajuste aprovado ainda.".
 
 import { Button, Callout, EmptyState, Icon, Modal, Switch, Tag } from "@estudos/design-system";
 import { MenuSuspenso, semMovimento } from "@estudos/ui";
 import { AnimatePresence, motion } from "motion/react";
-import { type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
 import { type EntradaRegra, type RegraEscrita, TEXTO_REGRA_MAXIMO } from "../../lib/escrita-tipos.ts";
+import type { ArquivoDeAjustesNaTela } from "../../lib/metodo-ciclo-tipos.ts";
+import { type AjustesDoMetodo, chaveDoAjuste } from "./ajustes-ponte.ts";
 import type { EscritaDoProfessor } from "./escrita-ponte.ts";
 import {
+	arquivosParaMostrar,
 	contagemDasRegras,
+	contagemDosAjustes,
 	EXEMPLO_REGRA,
+	LINHA_AJUSTES,
 	LINHA_CONTRATO,
 	materiaDaOpcao,
 	nomeDaMateria,
+	nomeDoArquivoDeAjustes,
 	opcaoDaMateria,
 	opcoesDaRegra,
 	rotuloDaOrigem,
+	rotuloDaOrigemDoAjuste,
+	rotuloDoAjuste,
+	TEXTO_SEM_AJUSTES,
+	TITULO_AJUSTES,
 	TITULO_ESCRITA,
 	TITULO_SEM_REGRAS,
 } from "./escrita-tela.ts";
@@ -42,6 +59,8 @@ export interface PropsModalEscrita {
 	aberto: boolean;
 	fechar(): void;
 	escrita: EscritaDoProfessor;
+	/** Os ajustes aprovados nos relatórios dos módulos (a ponte "modulos"). */
+	ajustes: AjustesDoMetodo;
 	materias: MateriasDoSeletor;
 }
 
@@ -61,13 +80,13 @@ export function ModalEscrita(props: PropsModalEscrita) {
 				</Button>
 			}
 		>
-			<ConteudoEscrita escrita={props.escrita} materias={props.materias} />
+			<ConteudoEscrita escrita={props.escrita} ajustes={props.ajustes} materias={props.materias} />
 		</Modal>
 	);
 }
 
-/** A linha do contrato, o erro, a lista das regras (ou o vazio) e "Regra nova". */
-export function ConteudoEscrita(props: { escrita: EscritaDoProfessor; materias: MateriasDoSeletor }) {
+/** A linha do contrato, o erro, a lista das regras (ou o vazio), "Regra nova" e os ajustes do método. */
+export function ConteudoEscrita(props: { escrita: EscritaDoProfessor; ajustes: AjustesDoMetodo; materias: MateriasDoSeletor }) {
 	const { escrita, materias } = props;
 	const regras = escrita.regras;
 	const [erro, setErro] = useState<string | undefined>(undefined);
@@ -168,6 +187,7 @@ export function ConteudoEscrita(props: { escrita: EscritaDoProfessor; materias: 
 				</div>
 			) : null}
 			{lista}
+			<SecaoAjustes ajustes={props.ajustes} />
 		</div>
 	);
 }
@@ -326,5 +346,119 @@ function RegraNova(props: { aberta: boolean; abrir(): void; fechar(): void; salv
 			</div>
 			<Button variant="ghost" size="sm" iconOnly icon="close" aria-label="Fechar a regra nova" onClick={fechar} />
 		</motion.div>
+	);
+}
+
+/** "Ajustes do método": os ajustes aprovados, por arquivo de metodologia, cada um com a chave Ligado/Desligado. */
+export function SecaoAjustes({ ajustes }: { ajustes: AjustesDoMetodo }) {
+	const titulo = useId();
+	const arquivos = ajustes.arquivos;
+	const aMostrar = arquivos ? arquivosParaMostrar(arquivos) : [];
+	// O erro do listar que o Breno já fechou (pela chave da ação recebida).
+	const [dispensado, setDispensado] = useState<string | undefined>(undefined);
+	const erroLista = ajustes.erro && ajustes.erro.chave !== dispensado ? ajustes.erro : undefined;
+
+	let conteudo;
+	if (!arquivos) {
+		conteudo = erroLista ? null : <p className="body ajustes__texto">Abrindo os ajustes…</p>;
+	} else if (aMostrar.length === 0) {
+		conteudo = <p className="body ajustes__texto">{TEXTO_SEM_AJUSTES}</p>;
+	} else {
+		conteudo = (
+			<div className="ajustes__arquivos">
+				{aMostrar.map((arquivo) => (
+					<ArquivoDeAjustes key={arquivo.arquivo} arquivo={arquivo} ajustes={ajustes} />
+				))}
+			</div>
+		);
+	}
+
+	return (
+		<section className="ajustes" aria-labelledby={titulo}>
+			<header className="ajustes__cabeca">
+				<h3 id={titulo} className="heading ajustes__titulo">
+					{TITULO_AJUSTES}
+				</h3>
+				{aMostrar.some((arquivo) => arquivo.ajustes.length > 0) ? (
+					<span className="data ajustes__contagem">{contagemDosAjustes(aMostrar)}</span>
+				) : null}
+			</header>
+			<p className="body ajustes__contrato">{LINHA_AJUSTES}</p>
+			{erroLista ? (
+				<div className="escrita__erro">
+					<Callout tone="amber" label="Não deu certo" icon="alert" quote={false}>
+						<p>{erroLista.mensagem}</p>
+						<div className="escrita__erro-botoes">
+							<Button
+								variant="secondary"
+								size="sm"
+								icon="refresh"
+								onClick={() => {
+									setDispensado(erroLista.chave);
+									ajustes.listar();
+								}}
+							>
+								Tentar de novo
+							</Button>
+						</div>
+					</Callout>
+				</div>
+			) : null}
+			{conteudo}
+		</section>
+	);
+}
+
+/** Os ajustes de um arquivo de metodologia; um arquivo que não se lê mostra o erro (e o arquivo não é sobrescrito). */
+function ArquivoDeAjustes({ arquivo, ajustes }: { arquivo: ArquivoDeAjustesNaTela; ajustes: AjustesDoMetodo }) {
+	return (
+		<div className="ajustes__arquivo">
+			<h4 className="overline ajustes__arquivo-nome">
+				{nomeDoArquivoDeAjustes(arquivo.arquivo)} <span className="ajustes__arquivo-id">{arquivo.arquivo}</span>
+			</h4>
+			{arquivo.erro ? <p className="body-sm cursos__erro ajustes__erro">{arquivo.erro}</p> : null}
+			{arquivo.ajustes.length > 0 ? (
+				<ul className="ajustes__lista" aria-label={`Ajustes de ${nomeDoArquivoDeAjustes(arquivo.arquivo)}`}>
+					{arquivo.ajustes.map((ajuste) => (
+						<li key={ajuste.id} className="ajustes__item">
+							<LinhaAjuste arquivo={arquivo.arquivo} ajuste={ajuste} ajustes={ajustes} />
+						</li>
+					))}
+				</ul>
+			) : null}
+		</div>
+	);
+}
+
+/** Um ajuste: o texto, a origem e a chave Ligado/Desligado (vale na hora, depois da resposta). */
+function LinhaAjuste(props: { arquivo: ArquivoDeAjustesNaTela["arquivo"]; ajuste: ArquivoDeAjustesNaTela["ajustes"][number]; ajustes: AjustesDoMetodo }) {
+	const { arquivo, ajuste, ajustes } = props;
+	const [ocupado, setOcupado] = useState(false);
+	const erro = ajustes.erros[chaveDoAjuste(arquivo, ajuste.id)];
+	const ligar = (ativo: boolean) => {
+		if (ocupado) return;
+		setOcupado(true);
+		ajustes
+			.ligar(arquivo, ajuste.id, ativo)
+			.catch(() => undefined)
+			.finally(() => setOcupado(false));
+	};
+	return (
+		<div className={`ajustes__ajuste${ajuste.ativo ? "" : " ajustes__ajuste--desligado"}`} aria-busy={ocupado || undefined}>
+			<p className="body ajustes__ajuste-texto">{ajuste.texto}</p>
+			<div className="ajustes__controles">
+				<Tag size="sm" tone="neutral" icon="flag" className="ajustes__origem" title="De onde o ajuste veio.">
+					{rotuloDaOrigemDoAjuste(ajuste.origem)}
+				</Tag>
+				<Switch
+					className="ajustes__ligar"
+					label={rotuloDoAjuste(ajuste.ativo)}
+					checked={ajuste.ativo}
+					disabled={ocupado}
+					onChange={(evento) => ligar(evento.target.checked)}
+				/>
+			</div>
+			{erro && !ocupado ? <p className="body-sm cursos__erro ajustes__erro">{erro}</p> : null}
+		</div>
 	);
 }

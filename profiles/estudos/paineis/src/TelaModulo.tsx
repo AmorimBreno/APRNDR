@@ -51,6 +51,14 @@
 // o Parar (cancelar); o bloco novo entra com uma transição curta. Um bloco
 // reescrito tem a etiqueta "Reescrito" e "Ver a versão anterior". No índice,
 // o link "Como o professor escreve" abre as regras de escrita (ModalEscrita).
+//
+// O relatório do método (docs/metodo-ciclo.md, "A tela"): num módulo concluído,
+// a seção "Relatório do método" (RelatorioMetodo.tsx) fica no pé da última lição,
+// onde ficava o "Concluir o módulo", e o índice tem um link que leva até ela
+// (abre a última lição, se preciso). O relatório vem na mensagem modulo
+// (relatorio, relatorioGerando e relatorioErro); gerar e decidir cada proposta
+// são ações da ponte (useModulos). O clique numa evidência leva ao bloco pela
+// navegação dos termos (apontarTermo e useDestinoTermo).
 
 import {
 	Button,
@@ -88,6 +96,7 @@ import {
 } from "../../lib/modulo-feedback-tipos.ts";
 import { ehQuestao, progressoDoModulo, respostaDoBloco, type RespostaModulo } from "../../lib/modulo-respostas-tipos.ts";
 import { type Bloco, type BlocoAnterior, type EstadoModuloNaTela, type Licao, type Modulo, versaoDoBloco } from "../../lib/modulo-tipos.ts";
+import { useAjustes } from "./ajustes-ponte.ts";
 import { ExplicacaoComCodigo } from "./CodigoCitado.tsx";
 import { rotuloCapa } from "./comum.ts";
 import { useCurso } from "./cursos-ponte.ts";
@@ -168,6 +177,8 @@ import { type ErroVistoModulo, reescrevendoNoModulo, useModuloAberto, useModulos
 import { PerguntaSlider } from "./PerguntaSlider.tsx";
 import { type AcoesQuestoes, QuestaoModulo, QuestaoParaLer } from "./QuestaoModulo.tsx";
 import { placarDoModulo, TEXTO_TODAS_FEITAS, textoDoProgresso, todasFeitas } from "./questao-modulo-tela.ts";
+import { type AcoesRelatorio, RelatorioMetodo } from "./RelatorioMetodo.tsx";
+import { type DestinoDaEvidencia, ID_RELATORIO, TITULO_RELATORIO } from "./relatorio-tela.ts";
 import { EtiquetaReferencia } from "./SecaoMapa.tsx";
 import { Teclas } from "./Teclas.tsx";
 import { type AcoesTermos, apontarTermo, ExplicacoesDoBloco, MarcarTermos, ProvedorTermos, TextoComTermos, useDestinoTermo } from "./TermosModulo.tsx";
@@ -234,6 +245,7 @@ export function TelaModulo(props: PropsTelaModulo) {
 	// "Como o professor escreve": as regras são pedidas quando o modal abre.
 	const [vendoEscrita, setVendoEscrita] = useState(false);
 	const escrita = useEscrita(props.janela, vendoEscrita);
+	const ajustes = useAjustes(props.janela, vendoEscrita);
 	const materias = props.materias ?? (props.materia ? [props.materia] : []);
 
 	// A reescrita de um bloco: quando ela acaba (o estado não traz mais o bloco), o módulo é aberto de novo (o "modulo" novo também chega sozinho).
@@ -286,6 +298,24 @@ export function TelaModulo(props: PropsTelaModulo) {
 			atualizarDestino((vez) => vez + 1);
 		},
 	};
+	// O relatório do método (a seção só aparece num módulo concluído): o que a mensagem modulo trouxe e as ações da ponte.
+	const irParaEvidencia = (destino: DestinoDaEvidencia) => {
+		if (destino.tipo === "bloco") {
+			apontarTermo(chaveTermos, { modulo: destino.modulo, licao: destino.licao, bloco: destino.bloco });
+			atualizarDestino((vez) => vez + 1);
+		}
+		props.navegar(caminhoDoModulo(materiaId, cursoId, destino.modulo, destino.licao));
+	};
+	const relatorio: AcoesRelatorio = {
+		modulo: moduloId,
+		relatorio: aberto.relatorio ?? null,
+		gerando: aberto.relatorioGerando === true,
+		...(aberto.relatorioErro ? { erro: aberto.relatorioErro } : {}),
+		erros: modulos.errosPropostas(moduloId),
+		gerar: (forcar) => modulos.gerarRelatorio(moduloId, forcar),
+		decidir: (proposta, decisao) => modulos.decidirProposta(moduloId, proposta, decisao),
+		ir: irParaEvidencia,
+	};
 	return (
 		<ProvedorTermos acoes={termos}>
 			<VisaoModulo
@@ -307,9 +337,10 @@ export function TelaModulo(props: PropsTelaModulo) {
 				retornos={retornos}
 				questoes={questoes}
 				questionario={questionario}
+				relatorio={relatorio}
 				abrirEscrita={() => setVendoEscrita(true)}
 			/>
-			<ModalEscrita aberto={vendoEscrita} fechar={() => setVendoEscrita(false)} escrita={escrita} materias={materias} />
+			<ModalEscrita aberto={vendoEscrita} fechar={() => setVendoEscrita(false)} escrita={escrita} ajustes={ajustes} materias={materias} />
 		</ProvedorTermos>
 	);
 }
@@ -339,6 +370,8 @@ export interface PropsVisaoModulo {
 	questoes?: AcoesQuestoes;
 	/** O questionário do fim da lição; sem ele, a lição não tem o cartão. */
 	questionario?: AcoesQuestionario;
+	/** O relatório do método; sem ele (ou num módulo não concluído), a última lição não tem a seção nem o índice tem o link. */
+	relatorio?: AcoesRelatorio;
 	/** Abre "Como o professor escreve"; sem ele, o índice não tem o link. */
 	abrirEscrita?(): void;
 }
@@ -404,6 +437,7 @@ export function VisaoModulo(props: PropsVisaoModulo) {
 				{...(props.retornos ? { retornos: props.retornos } : {})}
 				{...(props.questoes ? { questoes: props.questoes } : {})}
 				{...(props.questionario ? { questionario: props.questionario } : {})}
+				{...(props.relatorio ? { relatorio: props.relatorio } : {})}
 				{...(props.abrirEscrita ? { abrirEscrita: props.abrirEscrita } : {})}
 			/>
 		);
@@ -446,7 +480,7 @@ export function VisaoModulo(props: PropsVisaoModulo) {
 	);
 }
 
-/** O índice das lições e a lição aberta, com a régua dos blocos e o pé (na última lição, "Concluir o módulo"). */
+/** O índice das lições e a lição aberta, com a régua dos blocos e o pé (na última lição, "Concluir o módulo" ou, num módulo concluído, o relatório do método). */
 function LicaoAberta(props: {
 	modulo: Modulo;
 	licao: Licao;
@@ -461,6 +495,7 @@ function LicaoAberta(props: {
 	retornos?: AcoesRetorno;
 	questoes?: AcoesQuestoes;
 	questionario?: AcoesQuestionario;
+	relatorio?: AcoesRelatorio;
 	abrirEscrita?(): void;
 }) {
 	const { modulo, licao, indice } = props;
@@ -523,6 +558,21 @@ function LicaoAberta(props: {
 	const mostraConcluir = ultima && podeConcluir(modulo) && props.concluir !== undefined;
 	const pergunta = perguntaConcluir(props.numero ?? 0);
 	const concluido = rotuloConcluido(modulo);
+	const temRelatorio = Boolean(concluido) && props.relatorio !== undefined;
+	// O link do índice: a seção fica na última lição, então, de outra, abre ela e rola quando chega.
+	const [irAoRelatorio, setIrAoRelatorio] = useState(false);
+	useEffect(() => {
+		if (!irAoRelatorio || !ultima) return;
+		const quadro = requestAnimationFrame(() => {
+			document.getElementById(ID_RELATORIO)?.scrollIntoView({ block: "start", behavior: semMovimento() ? "auto" : "smooth" });
+			setIrAoRelatorio(false);
+		});
+		return () => cancelAnimationFrame(quadro);
+	}, [irAoRelatorio, ultima, licao.id]);
+	const abrirRelatorio = () => {
+		setIrAoRelatorio(true);
+		if (!ultima) props.abrirLicao(modulo.licoes[total - 1]!.id);
+	};
 	const fecharConcluir = () => {
 		if (concluindo) return;
 		setPerguntarConcluir(false);
@@ -581,6 +631,12 @@ function LicaoAberta(props: {
 					</ol>
 					<p className="data modulo__resumo">{resumoDoIndice(modulo)}</p>
 					<MarcarTermos modulo={modulo} />
+					{temRelatorio ? (
+						<button type="button" className="body-sm escrita__link" onClick={abrirRelatorio}>
+							<Icon name="checklist" size={16} strokeWidth={2.25} />
+							{TITULO_RELATORIO}
+						</button>
+					) : null}
 					{props.abrirEscrita ? (
 						<button type="button" className="body-sm escrita__link" onClick={props.abrirEscrita}>
 							<Icon name="book" size={16} strokeWidth={2.25} />
@@ -645,6 +701,7 @@ function LicaoAberta(props: {
 								enviar={(dados) => props.questionario!.enviar(licao.id, dados)}
 							/>
 						) : null}
+						{ultima && temRelatorio && props.relatorio ? <RelatorioMetodo acoes={props.relatorio} /> : null}
 						<footer className="modulo__pe">
 							<Button
 								variant="ghost"

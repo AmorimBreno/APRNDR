@@ -2,19 +2,19 @@
 // da pasta da matéria. Em cima, a aba tijolo (as classes da CourseBar do
 // design system): Matérias, a capa, a prova, o nome, Editar e Conversar. A
 // aba é a linha tijolo da roda que subiu (o mesmo view-transition-name).
+// À direita da aba, antes da foto do professor, o botão da linha do tempo abre
+// a lista completa dos eventos do eventos.jsonl da matéria, por dia, num modal
+// (ModalLinhaDoTempo; a timeline não é um arquivo à parte, seção 7).
 // Embaixo, na largura toda, o painel (como um dashboard), que rola na vertical
-// como um todo com a aba fixa em cima. São três faixas de cima para baixo:
+// como um todo com a aba fixa em cima. São duas faixas de cima para baixo:
 // - Cursos: os cursos da matéria em cards lado a lado e "Novo curso"
 //   (FaixaCursos, item 5), que rolam para o lado;
-// - Linha do tempo: os marcos dos eventos mais recentes do eventos.jsonl da
-//   matéria (FaixaTempo), que também rolam para o lado, e "Ver tudo", que abre
-//   a lista completa por dia num modal (a timeline não é um arquivo à parte,
-//   seção 7);
 // - a lista com o seletor de tags em cima: Notas (SecaoNotas), Materiais (a
 //   área de soltar e a lista do serviço de materiais) e Mapa de conteúdo, os
 //   conceitos dos materiais para revisar e aprovar (SecaoMapa, item 4.4). A
 //   tag escolhida vem da rota; trocar de tag navega (para o F5 e o histórico
-//   dizerem a mesma coisa) e a lista entra com uma mola curta.
+//   dizerem a mesma coisa) e a lista entra com uma mola curta. À direita do
+//   seletor ficam as ações da tag aberta: na Notas, o botão "Nova nota".
 // Caminho: caderno/<matéria>[/<tag>] com a tag notas, materiais ou mapa (sem
 // tag, e nas rotas antigas linha-do-tempo e cursos, vale Notas; ver
 // painel-caderno.ts); caderno/<matéria>/notas/<título> abre uma nota, com o
@@ -27,7 +27,7 @@
 // mesmo jeito; caderno/<matéria>/cursos/<curso>/modulos/<módulo>[/<lição>]
 // abre a visão do módulo gerado (TelaModulo), com a CourseBar no lugar da aba.
 
-import { Button, EmptyState, NotebookCover, type OrnamentGlyph, pad2 } from "@estudos/design-system";
+import { Button, EmptyState, Icon, NotebookCover, type OrnamentGlyph, pad2 } from "@estudos/design-system";
 import { AvatarAgente, type DadosAvatarAgente, type JanelaPerfilHook, type PropsTelaInicial, semEsperar, semMovimento } from "@estudos/ui";
 import { motion } from "motion/react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
@@ -42,7 +42,7 @@ import { SecaoMapa } from "./SecaoMapa.tsx";
 import { SecaoNotas, useListaNotas } from "./SecaoNotas.tsx";
 import { useCursos } from "./cursos-ponte.ts";
 import { FaixaCursos } from "./FaixaCursos.tsx";
-import { FaixaTempo, ModalLinhaDoTempo, NOMES_TIPO } from "./LinhaDoTempo.tsx";
+import { ModalLinhaDoTempo, NOMES_TIPO } from "./LinhaDoTempo.tsx";
 import { rotaDaTag, type TagCaderno, tagDaRota } from "./painel-caderno.ts";
 import { idDaAba, idDoPainel, SeletorTags } from "./SeletorTags.tsx";
 import { TelaCurso } from "./TelaCurso.tsx";
@@ -79,8 +79,10 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 	const erro = errosAbrir[props.materiaId];
 	const [editando, setEditando] = useState(false);
 	const [abrindoConversa, setAbrindoConversa] = useState(false);
-	// O "Ver tudo" da faixa da linha do tempo: a lista completa por dia num modal.
+	// O botão da linha do tempo, na aba: a lista completa por dia num modal.
 	const [verTudo, setVerTudo] = useState(false);
+	// O formulário da nota nova (SecaoNotas), aberto pelo botão "Nova nota" da linha das tags.
+	const [criandoNota, setCriandoNota] = useState(false);
 	// A tag da lista de baixo vem da rota (tagDaRota); a base dos ids liga as abas à lista (aria-controls e aria-labelledby).
 	const tag = tagDaRota(props.secao);
 	const baseIds = useId();
@@ -96,13 +98,15 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 	// A matéria e os eventos dela; de novo quando muda quantos materiais estão
 	// prontos (cada material pronto ou removido vira um evento da linha do tempo).
 	const prontos = (estado.materiais ?? []).filter((material) => material.pasta === pastaMateriaisRelativa(materiaId) && material.estado === "pronto").length;
-	// E de novo ao trocar de tag e ao abrir ou fechar uma nota: as notas também viram eventos, e a linha do tempo
-	// agora fica sempre à vista, então os novos precisam aparecer logo ao voltar da nota ou de outra tag.
+	// E de novo ao trocar de tag e ao abrir ou fechar uma nota: as notas também viram eventos, e os novos
+	// precisam estar na linha do tempo logo ao voltar da nota ou de outra tag (o botão da aba também pede de novo ao abrir).
 	const notaAberta = tag === "notas" ? props.nota : undefined;
 	const comNotaAberta = notaAberta !== undefined;
 	useEffect(() => {
 		if (sessaoId) semEsperar(acoes.acaoDaInterface(PAINEL_CADERNOS, "abrir", { id: materiaId }));
 	}, [prontos, sessaoId, acoes, materiaId, tag, comNotaAberta]);
+	// O formulário da nota nova fecha ao trocar de tag, de matéria ou de nota (ele é desta lista).
+	useEffect(() => setCriandoNota(false), [tag, materiaId, notaAberta]);
 	const notas = useListaNotas(props.janela, materiaId, `${tag}/${props.nota ?? ""}`);
 	// O mapa de conteúdo (a contagem da tag e a lista).
 	const mapa = useMapa(props.janela, materiaId);
@@ -144,6 +148,11 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 		if (nova !== tag) props.navegar(rotaDaTag(materiaId, nova));
 	};
 	const abrirNota = (titulo: string) => props.navegar(`caderno/${materiaId}/notas/${titulo}`);
+	// Abre a linha do tempo pedindo os eventos de novo: o botão vive na aba, em qualquer tela do caderno.
+	const abrirLinhaDoTempo = () => {
+		if (sessaoId) semEsperar(acoes.acaoDaInterface(PAINEL_CADERNOS, "abrir", { id: materiaId }));
+		setVerTudo(true);
+	};
 	const tom = materia?.cor === "ink" || !materia ? "brick" : materia.cor;
 	// O agente da sessão (ou o padrão do perfil), para a foto no guia de curso.
 	const nomeAgente = estado.sessao?.agente ?? props.perfil?.agentePadrao;
@@ -185,6 +194,7 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 				voltar={voltar}
 				{...(lista ? { materias: lista.materias } : {})}
 				editar={() => setEditando(true)}
+				{...(caderno ? { linhaDoTempo: abrirLinhaDoTempo } : {})}
 				conversar={conversar}
 				abrindo={abrindoConversa}
 				{...(nomeAgente ? { agente: { nome: nomeAgente, ...(avatarAgente ? { avatar: avatarAgente } : {}) } } : {})}
@@ -266,17 +276,17 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 								abrir={(curso) => props.navegar(`caderno/${materiaId}/cursos/${curso.id}`)}
 							/>
 						</div>
-						<div className="painel-caderno__bloco">
-							{caderno ? (
-								<FaixaTempo eventos={caderno.eventos} invalidas={caderno.invalidas} verTudo={() => setVerTudo(true)} />
-							) : (
-								<p className="body caderno__carregando">Abrindo o caderno…</p>
-							)}
-						</div>
 						<section className="painel-caderno__bloco painel-caderno__lista" aria-label="Notas, materiais e mapa de conteúdo">
 							<header className="painel-caderno__seletor">
 								<SeletorTags base={baseIds} atual={tag} contagem={contagem} escolher={escolherTag} />
 								{meta ? <span className="data painel-caderno__meta">{meta}</span> : null}
+								{tag === "notas" && notas ? (
+									<div className="painel-caderno__acoes">
+										<Button variant="primary" icon="plus" disabled={criandoNota} onClick={() => setCriandoNota(true)}>
+											Nova nota
+										</Button>
+									</div>
+								) : null}
 							</header>
 							<motion.div
 								key={tag}
@@ -289,7 +299,15 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 								transition={{ type: "spring", stiffness: 380, damping: 32 }}
 							>
 								{tag === "notas" ? (
-									<SecaoNotas janela={props.janela} materiaId={materiaId} {...(notas ? { lista: notas } : {})} tom={tom} abrirNota={abrirNota} />
+									<SecaoNotas
+											janela={props.janela}
+											materiaId={materiaId}
+											{...(notas ? { lista: notas } : {})}
+											tom={tom}
+											abrirNota={abrirNota}
+											criando={criandoNota}
+											definirCriando={setCriandoNota}
+										/>
 								) : tag === "mapa" ? (
 									<SecaoMapa
 										mapa={mapa}
@@ -308,13 +326,13 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 								)}
 							</motion.div>
 						</section>
-						{caderno ? (
-							<ModalLinhaDoTempo aberto={verTudo} fechar={() => setVerTudo(false)} eventos={caderno.eventos} invalidas={caderno.invalidas} titulo={caderno.materia.nome} />
-						) : null}
 					</motion.div>
 				)}
 			</>
 			)}
+			{caderno ? (
+				<ModalLinhaDoTempo aberto={verTudo} fechar={() => setVerTudo(false)} eventos={caderno.eventos} invalidas={caderno.invalidas} titulo={caderno.materia.nome} />
+			) : null}
 			{materia ? (
 				<ModalMateria
 					aberto={editando}
@@ -335,6 +353,8 @@ interface PropsAbaCaderno {
 	numero?: number;
 	voltar(): void;
 	editar(): void;
+	/** Abre a linha do tempo (o modal); sem ela (o caderno ainda não chegou), o botão fica desligado. */
+	linhaDoTempo?(): void;
 	conversar(): void;
 	/** A conversa da matéria está sendo aberta (a sessão troca no servidor). */
 	abrindo?: boolean;
@@ -373,7 +393,8 @@ function capasDoLeque(materias: Materia[] | undefined): [CapaLeque, CapaLeque, C
  * A aba tijolo do caderno, com as classes da CourseBar do design system (sem a trilha: o caderno não é um curso).
  * O botão de voltar é um leque de três capas de caderno, empilhadas como um maço, que abre no hover e no foco
  * (as cores são as das primeiras matérias). A capa é o botão de editar a matéria (inclina como a capa da
- * linha do meio da roda) e a foto do professor, que pula no hover, abre a conversa da matéria.
+ * linha do meio da roda), o botão redondo da linha do tempo e a foto do professor, que pula no hover, abre a
+ * conversa da matéria.
  */
 function AbaCaderno(props: PropsAbaCaderno) {
 	const { materia } = props;
@@ -402,6 +423,16 @@ function AbaCaderno(props: PropsAbaCaderno) {
 				</div>
 			</div>
 			<span className="aba-caderno__espaco" />
+			<button
+				type="button"
+				className="aba-caderno__tempo"
+				onClick={props.linhaDoTempo}
+				disabled={!props.linhaDoTempo}
+				title="Linha do tempo"
+				aria-label="Abrir a linha do tempo"
+			>
+				<Icon name="clock" size={22} strokeWidth={2.25} />
+			</button>
 			<button
 				type="button"
 				className={`aba-caderno__professor${props.abrindo ? " aba-caderno__professor--abrindo" : ""}`}

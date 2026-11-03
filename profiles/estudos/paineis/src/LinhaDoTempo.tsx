@@ -1,26 +1,18 @@
 // A linha do tempo do caderno (ESPECIFICACAO 8.1, item 4.3): os eventos do
 // eventos.jsonl da matéria, do mais novo ao mais antigo (a timeline não é um
 // arquivo à parte, seção 7). Vive fora da TelaCaderno para o painel poder usar
-// os mesmos textos sem importar a tela (import circular). Três formas:
+// os mesmos textos sem importar a tela (import circular). Três partes:
 // - descreverEvento: o ícone, a frase e o detalhe de cada evento;
-// - LinhaDoTempo: a lista vertical completa, agrupada por dia, que aparece no
-//   modal "Ver tudo" (ModalLinhaDoTempo);
-// - FaixaTempo: a faixa horizontal do painel, só com as marcas redondas (o
-//   ícone) dos eventos mais recentes sobre uma linha contínua; o dia, a hora e a
-//   frase aparecem num balão ao lado do mouse (ou ancorado na marca, com o foco).
+// - LinhaDoTempo: a lista vertical completa, agrupada por dia;
+// - ModalLinhaDoTempo: o modal que a mostra, aberto pelo botão da aba do caderno.
 
 import { Button, Icon, type IconName, Modal } from "@estudos/design-system";
-import { semMovimento } from "@estudos/ui";
 import { motion } from "motion/react";
-import { type Dispatch, memo, type PointerEvent as EventoPonteiro, type SetStateAction, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import type { Evento } from "../../lib/eventos.ts";
-import { type Ponto, posicaoAncorada, posicaoDoBalao } from "./balao-posicao.ts";
 import { dataCurta } from "./comum.ts";
 import { numeroCurto } from "./diagnostico-tela.ts";
 import { dataNumerica } from "./guia-curso.ts";
 import { formatarDolar } from "./ModalMateriais.tsx";
-import type { Retangulo } from "./termos-tela.ts";
 
 const diaLongo = new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "numeric", month: "long" });
 const hora = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -204,31 +196,6 @@ export function porDia(eventos: readonly Evento[]): Array<{ dia: string; eventos
 	return grupos;
 }
 
-/** Quantos marcos a faixa do painel mostra, no máximo (o resto fica no "Ver tudo"). Só com os ícones, cabem muitos. */
-const MARCOS_NA_FAIXA = 40;
-
-/** Os `limite` eventos mais novos, do mais novo ao mais antigo (a lista de entrada não é alterada). */
-export function eventosRecentes(eventos: readonly Evento[], limite: number = MARCOS_NA_FAIXA): Evento[] {
-	return [...eventos].sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, Math.max(0, limite));
-}
-
-/** Um marco da faixa: o evento e, só no primeiro de cada dia, o dia por extenso (a faixa usa isso para abrir espaço na troca de dia). */
-export interface MarcoDaFaixa {
-	evento: Evento;
-	dia?: string;
-}
-
-/** Os eventos recentes já na ordem da faixa, com o rótulo do dia só no primeiro marco de cada dia (no fuso do computador). */
-export function marcosDaFaixa(eventos: readonly Evento[], limite: number = MARCOS_NA_FAIXA): MarcoDaFaixa[] {
-	let anterior: string | undefined;
-	return eventosRecentes(eventos, limite).map((evento) => {
-		const dia = diaLongo.format(new Date(evento.ts));
-		const novoDia = dia !== anterior;
-		anterior = dia;
-		return novoDia ? { evento, dia } : { evento };
-	});
-}
-
 /** O aviso das linhas do eventos.jsonl que não puderam ser lidas. */
 function avisoInvalidas(invalidas: number): string {
 	return `${invalidas === 1 ? "Uma linha" : `${invalidas} linhas`} do eventos.jsonl não ${invalidas === 1 ? "pôde" : "puderam"} ser lida${invalidas === 1 ? "" : "s"} (o arquivo não foi mexido).`;
@@ -275,181 +242,6 @@ export function LinhaDoTempo({ eventos, invalidas }: { eventos: Evento[]; invali
 	);
 }
 
-/** O texto de uma marca para o leitor de tela, que não depende do balão: o dia, a hora, a frase e o detalhe. */
-export function rotuloDoMarco(evento: Evento): string {
-	const { texto, detalhe } = descreverEvento(evento);
-	const quando = new Date(evento.ts);
-	return [`${diaLongo.format(quando)}, ${hora.format(quando)}`, texto, detalhe].filter(Boolean).join(". ");
-}
-
-/** De onde vem o balão: acompanha o cursor (mouse) ou fica embaixo da marca (foco do teclado ou toque). */
-type AlvoDoBalao = { evento: Evento; modo: "mouse"; ponto: Ponto } | { evento: Evento; modo: "ancorado"; elemento: HTMLElement; alvo: Retangulo };
-
-/** O foco veio do teclado? Num clique de mouse o balão já é o do cursor; se o navegador não conhece o seletor, vale como teclado. */
-function focoDoTeclado(elemento: HTMLElement): boolean {
-	try {
-		return elemento.matches(":focus-visible");
-	} catch {
-		return true;
-	}
-}
-
-function ancorarEm(evento: Evento, elemento: HTMLElement): AlvoDoBalao {
-	const { left, right, top, bottom } = elemento.getBoundingClientRect();
-	return { evento, modo: "ancorado", elemento, alvo: { left, right, top, bottom } };
-}
-
-interface PropsMarca {
-	evento: Evento;
-	definir: Dispatch<SetStateAction<AlvoDoBalao | null>>;
-}
-
-/** A marca redonda de um evento: só o ícone. O balão com as informações vem do mouse, do foco ou do toque. */
-const MarcaDoEvento = memo(function MarcaDoEvento({ evento, definir }: PropsMarca) {
-	const { icone } = descreverEvento(evento);
-	const noCursor = (e: EventoPonteiro<HTMLButtonElement>) => {
-		if (e.pointerType === "mouse") definir({ evento, modo: "mouse", ponto: { x: e.clientX, y: e.clientY } });
-	};
-	return (
-		<button
-			type="button"
-			className="tempo__marca faixa-tempo__marca"
-			aria-label={rotuloDoMarco(evento)}
-			onPointerEnter={noCursor}
-			onPointerMove={noCursor}
-			// Ao sair, o balão some; se a marca tem o foco do teclado, ele volta a ficar embaixo dela.
-			onPointerLeave={(e) => {
-				if (e.pointerType !== "mouse") return;
-				const elemento = e.currentTarget;
-				definir(document.activeElement === elemento && focoDoTeclado(elemento) ? ancorarEm(evento, elemento) : null);
-			}}
-			// Sem mouse, tocar na marca mostra o balão ancorado nela (tocar fora o fecha).
-			onPointerUp={(e) => {
-				if (e.pointerType !== "mouse") definir(ancorarEm(evento, e.currentTarget));
-			}}
-			onFocus={(e) => {
-				if (focoDoTeclado(e.currentTarget)) definir(ancorarEm(evento, e.currentTarget));
-			}}
-			onBlur={() => definir((atual) => (atual?.evento.id === evento.id && atual.modo === "ancorado" ? null : atual))}
-		>
-			<Icon name={icone} size={18} strokeWidth={2.5} />
-		</button>
-	);
-});
-
-/** O balão com as informações do evento, num portal no body (a rolagem da faixa o cortaria), sempre dentro da janela. */
-function BalaoDaFaixa({ alvo, parado }: { alvo: AlvoDoBalao; parado: boolean }) {
-	const ref = useRef<HTMLDivElement>(null);
-	const { texto, detalhe } = descreverEvento(alvo.evento);
-	const quando = new Date(alvo.evento.ts);
-	// Mede e posiciona antes de pintar, a cada renderização (o cursor anda, o evento troca). Escreve direto no
-	// elemento, sem estado, para o balão não ficar um quadro atrás do cursor. As coordenadas são físicas;
-	// o zoom do body entra na divisão, como nos flutuantes dos termos.
-	useLayoutEffect(() => {
-		const elemento = ref.current;
-		if (!elemento) return;
-		const zoom = Number.parseFloat(getComputedStyle(document.body).zoom) || 1;
-		const caixa = elemento.getBoundingClientRect();
-		const tamanho = { largura: caixa.width, altura: caixa.height };
-		const tela = { largura: window.innerWidth, altura: window.innerHeight };
-		const { left, top } = alvo.modo === "mouse" ? posicaoDoBalao(alvo.ponto, tamanho, tela) : posicaoAncorada(alvo.alvo, tamanho, tela);
-		elemento.style.left = `${left / zoom}px`;
-		elemento.style.top = `${top / zoom}px`;
-	});
-	return createPortal(
-		<div ref={ref} className="faixa-tempo__balao" aria-hidden="true">
-			<motion.div
-				className="faixa-tempo__balao-cartao"
-				initial={parado ? false : { opacity: 0 }}
-				animate={{ opacity: 1 }}
-				transition={{ duration: 0.12, ease: "easeOut" }}
-			>
-				<span className="overline faixa-tempo__balao-dia">{diaLongo.format(quando)}</span>
-				<span className="data faixa-tempo__balao-hora">{hora.format(quando)}</span>
-				<span className="body-strong">{texto}</span>
-				{detalhe ? <span className="body-sm faixa-tempo__balao-detalhe">{detalhe}</span> : null}
-			</motion.div>
-		</div>,
-		document.body,
-	);
-}
-
-interface PropsFaixaTempo {
-	eventos: Evento[];
-	/** Linhas do eventos.jsonl que não puderam ser lidas. */
-	invalidas: number;
-	/** O botão "Ver tudo": o painel abre o ModalLinhaDoTempo. */
-	verTudo(): void;
-	/** Quantos marcos mostrar, no máximo (40 por padrão). */
-	limite?: number;
-}
-
-/** A faixa horizontal do painel: o título e "Ver tudo" em cima e, embaixo, só as marcas dos eventos mais recentes (a mais nova à esquerda). */
-export function FaixaTempo(props: PropsFaixaTempo) {
-	const marcos = marcosDaFaixa(props.eventos, props.limite);
-	// Com movimento reduzido, os marcos já aparecem no lugar, sem a mola, e o balão sem o fade.
-	const parado = semMovimento();
-	const [balao, setBalao] = useState<AlvoDoBalao | null>(null);
-	const aberto = balao !== null;
-	// Com o balão aberto, Esc o fecha, e tocar (ou clicar) fora das marcas também.
-	useEffect(() => {
-		if (!aberto) return;
-		const tecla = (e: KeyboardEvent) => {
-			if (e.key === "Escape") setBalao(null);
-		};
-		const fora = (e: PointerEvent) => {
-			if (!(e.target instanceof Element) || !e.target.closest(".faixa-tempo__marca")) setBalao(null);
-		};
-		document.addEventListener("keydown", tecla);
-		document.addEventListener("pointerdown", fora);
-		return () => {
-			document.removeEventListener("keydown", tecla);
-			document.removeEventListener("pointerdown", fora);
-		};
-	}, [aberto]);
-	return (
-		<section className="faixa-tempo" aria-label="Linha do tempo">
-			<header className="faixa-tempo__cabeca">
-				<h3 className="overline faixa-tempo__titulo">Linha do tempo</h3>
-				{marcos.length > 0 ? (
-					<Button variant="ghost" size="sm" iconRight="arrow-right" onClick={props.verTudo}>
-						Ver tudo
-					</Button>
-				) : null}
-			</header>
-			{marcos.length === 0 ? (
-				<p className="body faixa-tempo__vazio">Nada aconteceu neste caderno ainda.</p>
-			) : (
-				// A faixa rola na horizontal; as marcas são focáveis, então o teclado percorre e rola a faixa sozinho.
-				// Ao rolar, o balão ancorado acompanha a marca.
-				<div
-					className="faixa-tempo__rolagem"
-					role="region"
-					aria-label="Eventos mais recentes do caderno, do mais novo ao mais antigo"
-					onScroll={() => setBalao((atual) => (atual?.modo === "ancorado" ? ancorarEm(atual.evento, atual.elemento) : atual))}
-				>
-					<ol className="faixa-tempo__trilho">
-						{marcos.map(({ evento, dia }, indice) => (
-							<motion.li
-								key={evento.id}
-								// Na troca de dia, um espaço maior e um tracinho na linha (o primeiro marco não precisa).
-								className={`faixa-tempo__marco${dia && indice > 0 ? " faixa-tempo__marco--novo-dia" : ""}`}
-								initial={parado ? false : { opacity: 0, x: -10 }}
-								animate={{ opacity: 1, x: 0 }}
-								transition={{ type: "spring", stiffness: 420, damping: 30, delay: parado ? 0 : Math.min(indice, 12) * 0.035 }}
-							>
-								<MarcaDoEvento evento={evento} definir={setBalao} />
-							</motion.li>
-						))}
-					</ol>
-				</div>
-			)}
-			{balao ? <BalaoDaFaixa alvo={balao} parado={parado} /> : null}
-			{props.invalidas > 0 ? <p className="body-sm tempo__aviso">{avisoInvalidas(props.invalidas)}</p> : null}
-		</section>
-	);
-}
-
 interface PropsModalLinhaDoTempo {
 	aberto: boolean;
 	fechar(): void;
@@ -459,7 +251,7 @@ interface PropsModalLinhaDoTempo {
 	titulo?: string;
 }
 
-/** O "Ver tudo" da faixa: a lista vertical completa num modal (o corpo do Modal já rola). */
+/** A lista vertical completa num modal (o corpo do Modal já rola). */
 export function ModalLinhaDoTempo(props: PropsModalLinhaDoTempo) {
 	return (
 		<Modal

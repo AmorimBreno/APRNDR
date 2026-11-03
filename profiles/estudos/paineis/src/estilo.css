@@ -74,7 +74,7 @@
 .material__avisos ul { margin: var(--space-1) 0 0; padding-left: var(--space-5); }
 .cadernos__corpo { overflow: hidden; }
 
-/* ── Caderno da matéria (TelaCaderno.tsx): a aba tijolo e, embaixo, o painel de três faixas (cursos, linha do tempo e a lista com as tags) ── */
+/* ── Caderno da matéria (TelaCaderno.tsx): a aba tijolo e, embaixo, o painel de duas faixas (cursos e a lista com as tags) ── */
 .tela-caderno { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: var(--space-4); height: 100%; padding: var(--space-4); box-sizing: border-box; }
 .aba-caderno { overflow: hidden; border-radius: var(--radius-lg); }
 .aba-caderno .ap-cbar__course { max-width: 560px; }
@@ -93,6 +93,11 @@
 .aba-caderno__leque .aba-caderno__leque-capa--direita { transform: translate(5px, -2px) rotate(3deg); }
 .aba-caderno__leque:hover .aba-caderno__leque-capa--esquerda, .aba-caderno__leque:focus-visible .aba-caderno__leque-capa--esquerda { transform: translate(-8px, -1px) rotate(-12deg); }
 .aba-caderno__leque:hover .aba-caderno__leque-capa--direita, .aba-caderno__leque:focus-visible .aba-caderno__leque-capa--direita { transform: translate(8px, -1px) rotate(12deg); }
+/* O botão da linha do tempo, antes da foto do professor: redondo e discreto (fundo transparente, contorno --on-brick); no hover e
+ * no foco ganha só um véu de --on-brick, sem se mexer. Abre o ModalLinhaDoTempo. */
+.aba-caderno__tempo { flex: none; display: grid; place-items: center; box-sizing: border-box; width: 44px; height: 44px; margin-right: var(--space-4); padding: 0; border: var(--border-control) solid var(--on-brick); border-radius: var(--radius-full); background: transparent; color: var(--on-brick); cursor: pointer; transition: background-color .16s ease-out; }
+.aba-caderno__tempo:hover { background: color-mix(in srgb, var(--on-brick) 16%, transparent); }
+.aba-caderno__tempo:focus-visible { outline: var(--border-strong) solid var(--on-brick); outline-offset: 4px; }
 /* A foto do professor abre a conversa da matéria: pula uma vez no hover e fica pulando enquanto a conversa abre. */
 .aba-caderno__professor { flex: none; display: grid; place-items: center; margin-right: var(--space-6); padding: 0; border: 0; border-radius: var(--radius-full); background: none; cursor: pointer; }
 .aba-caderno__professor .avatar { box-shadow: 0 0 0 3px var(--on-brick), var(--sticker-shadow); transform-origin: 50% 100%; }
@@ -113,8 +118,8 @@
 .caderno__carregando { margin: 0; color: var(--ink-muted); }
 
 /* O painel: abaixo da aba, na largura toda, e rola na vertical como um todo (é o motion.div com layoutScroll, para o arrasto
- * do mapa medir certo). Cada faixa é um bloco no fundo do painel; as faixas dos cursos e da linha do tempo rolam para o lado
- * dentro delas. A nota aberta ocupa a mesma área, no lugar do painel. */
+ * do mapa medir certo). Cada faixa é um bloco no fundo do painel; a faixa dos cursos rola para o lado
+ * dentro dela. A nota aberta ocupa a mesma área, no lugar do painel. */
 .painel-caderno { display: flex; flex-direction: column; gap: var(--space-4); min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
 .painel-caderno__bloco { flex: none; min-width: 0; padding: var(--space-5) var(--space-6); border-radius: var(--radius-lg); background: var(--surface-panel); }
 .painel-caderno__nota { display: flex; flex-direction: column; min-height: 0; overflow: hidden; border-radius: var(--radius-lg); background: var(--surface-panel); }
@@ -122,6 +127,8 @@
 .painel-caderno__lista { display: flex; flex-direction: column; gap: var(--space-5); }
 .painel-caderno__seletor { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-4); min-width: 0; }
 .painel-caderno__meta { flex: none; color: var(--ink-muted); }
+/* As ações da tag aberta, à direita do seletor (hoje o botão Nova nota, na tag Notas). */
+.painel-caderno__acoes { flex: none; display: flex; align-items: center; gap: var(--space-2); }
 .painel-caderno__corpo { min-width: 0; }
 .painel-caderno__corpo .ap-empty { max-width: 760px; background: var(--surface-raised); }
 .painel-caderno__corpo .materiais { max-width: 880px; }
@@ -149,46 +156,16 @@
 .tempo__detalhe, .tempo__aviso { color: var(--ink-muted); }
 .tempo__aviso { margin: 0; }
 
-/* ── Faixa da linha do tempo do painel do caderno (LinhaDoTempo.tsx) ──
- * Uma linha fina e contínua atravessa a faixa e cada evento é só a marca redonda com o ícone (a mesma .tempo__marca,
- * agora um botão focável), uma ao lado da outra. A mais nova fica à esquerda e a faixa rola na horizontal. Na troca
- * de dia há um espaço maior e um tracinho vertical na linha. O dia, a hora e a frase ficam no balão (.faixa-tempo__balao),
- * que vai num portal no body, ao lado do cursor ou embaixo da marca com o foco. A entrada das marcas é do motion e o
- * fade do balão também (os dois já vêm parados com movimento reduzido, pelo semMovimento); aqui não há transição. */
-.faixa-tempo { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
-.faixa-tempo__cabeca { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
-.faixa-tempo__titulo { margin: 0; color: var(--ink-muted); }
-.faixa-tempo__vazio { margin: 0; color: var(--ink-muted); }
-/* O respiro em volta das marcas deixa o anel de foco e a sombra da primeira aparecerem dentro da rolagem. */
-.faixa-tempo__rolagem { overflow-x: auto; overflow-y: hidden; padding: var(--space-1) var(--space-1) var(--space-2); border-radius: var(--radius-sm); scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
-.faixa-tempo__trilho { display: flex; align-items: center; width: max-content; min-width: 100%; margin: 0; padding: 0; list-style: none; }
-.faixa-tempo__marco { --marca: 36px; position: relative; display: flex; flex: none; align-items: center; box-sizing: border-box; padding-right: var(--space-4); }
-/* A linha: de ponta a ponta de cada marco, à altura do centro da marca, de modo que os marcos se emendam. */
-.faixa-tempo__marco::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: var(--border-control); transform: translateY(-50%); background: var(--line-strong); }
-/* A mais nova começa a linha no centro da marca; a mais antiga da faixa a deixa sumir (há mais no "Ver tudo"). */
-.faixa-tempo__marco:first-child::before { left: calc(var(--marca) / 2); }
-.faixa-tempo__marco:last-child::before { background: linear-gradient(90deg, var(--line-strong), transparent); }
-/* A troca de dia: o dobro do espaço e um tracinho vertical no meio dele (o espaço de antes é o padding-right do marco anterior). */
-.faixa-tempo__marco--novo-dia { padding-left: var(--space-8); }
-.faixa-tempo__marco--novo-dia::after { content: ""; position: absolute; left: calc((var(--space-8) - var(--space-4)) / 2); top: 50%; width: var(--border-control); height: var(--space-5); transform: translate(-50%, -50%); background: var(--line-strong); }
-.faixa-tempo__marca { box-sizing: border-box; width: var(--marca, 36px); height: var(--marca, 36px); padding: 0; border: 0; font: inherit; cursor: default; }
-.faixa-tempo__marca:hover { box-shadow: inset 0 0 0 var(--border-control) var(--amber); }
-.faixa-tempo__marca:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-.faixa-tempo__marco:first-child .faixa-tempo__marca { background: var(--amber); color: var(--on-amber); box-shadow: var(--key-lip); }
-.faixa-tempo__marco:first-child .faixa-tempo__marca:focus-visible { box-shadow: var(--key-lip), var(--focus-ring); }
-/* O balão: um cartão flutuante neutro (superfície elevada, contorno, sombra de adesivo). A posição (left e top) vem do código. */
-.faixa-tempo__balao { position: fixed; left: 0; top: 0; z-index: 160; max-width: 280px; pointer-events: none; }
-.faixa-tempo__balao-cartao { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-3) var(--space-4); border: var(--border-hair) solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-raised); color: var(--ink); box-shadow: var(--sticker-shadow); overflow-wrap: anywhere; }
-.faixa-tempo__balao-dia, .faixa-tempo__balao-hora, .faixa-tempo__balao-detalhe { color: var(--ink-muted); }
-
 @media (max-width: 900px) {
 	.painel-caderno__bloco { padding: var(--space-4); }
-	/* O seletor e a meta numa coluna só: o seletor rola para o lado se as três tags não couberem. */
+	/* O seletor e a meta (ou as ações) numa coluna só: o seletor rola para o lado se as três tags não couberem; as ações vão para baixo, à direita. */
 	.painel-caderno__seletor { flex-direction: column; align-items: stretch; }
+	.painel-caderno__acoes { justify-content: flex-end; }
+	.aba-caderno__tempo { margin-right: var(--space-3); }
 	.aba-caderno__professor { margin-right: var(--space-4); }
 }
 @media (prefers-reduced-motion: reduce) {
-	.painel-caderno__tag, .aba-caderno__capa .ap-nb, .aba-caderno__leque .aba-caderno__leque-capa { transition: none; }
+	.painel-caderno__tag, .aba-caderno__tempo, .aba-caderno__capa .ap-nb, .aba-caderno__leque .aba-caderno__leque-capa { transition: none; }
 	.painel-caderno__tag:active { transform: none; }
 	.aba-caderno__professor .avatar, .aba-caderno__professor--abrindo .avatar { animation: none; }
 }
@@ -206,7 +183,6 @@
 
 /* ── Notas do caderno (SecaoNotas.tsx e EditorNota.tsx, item 4.3, parte B) ── */
 .notas { display: flex; flex-direction: column; gap: var(--space-5); max-width: 880px; }
-.notas__topo { display: flex; justify-content: flex-end; }
 .notas__nova { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-5); border-radius: var(--radius-lg); background: var(--surface-raised); box-shadow: inset 0 0 0 var(--border-hair) var(--line); }
 .notas__nova-botoes { display: flex; justify-content: flex-end; gap: var(--space-2); }
 .notas__lista { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }

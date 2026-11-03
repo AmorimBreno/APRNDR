@@ -1,7 +1,9 @@
 // A seção Notas do caderno (item 4.3, parte B): as notas da matéria, da mexida
-// mais recente para a mais antiga, e "Nova nota", que pede o título, cria a
-// nota pela extensão de notas e abre o editor nela. Clicar numa nota abre o
-// editor (EditorNota) no caminho caderno/<matéria>/notas/<título>.
+// mais recente para a mais antiga, e o formulário da nota nova, que pede o
+// título, cria a nota pela extensão de notas e abre o editor nela. O botão
+// "Nova nota" fica na linha do seletor de tags (TelaCaderno), que guarda se o
+// formulário está aberto e o passa aqui. Clicar numa nota abre o editor
+// (EditorNota) no caminho caderno/<matéria>/notas/<título>.
 
 import { Button, EmptyState, Icon, type Tone, TextField } from "@estudos/design-system";
 import { type JanelaPerfilHook, semEsperar } from "@estudos/ui";
@@ -44,11 +46,14 @@ export interface PropsSecaoNotas {
 	/** Cor da capa, para o bloco do ideograma do caderno vazio. */
 	tom: Tone;
 	abrirNota(titulo: string): void;
+	/** O formulário da nota nova está aberto? Quem abre é o botão "Nova nota" da linha das tags (TelaCaderno). */
+	criando: boolean;
+	/** Abre ou fecha o formulário da nota nova. */
+	definirCriando(criando: boolean): void;
 }
 
 export function SecaoNotas(props: PropsSecaoNotas) {
-	const { janela, materiaId, lista } = props;
-	const [criando, setCriando] = useState(false);
+	const { janela, materiaId, lista, criando, definirCriando } = props;
 	const [titulo, setTitulo] = useState("");
 	const [erro, setErro] = useState<string | undefined>(undefined);
 	/** O título mandado para criar, esperando a resposta. */
@@ -96,7 +101,7 @@ export function SecaoNotas(props: PropsSecaoNotas) {
 					type="button"
 					variant="ghost"
 					onClick={() => {
-						setCriando(false);
+						definirCriando(false);
 						setTitulo("");
 						setErro(undefined);
 					}}
@@ -115,31 +120,16 @@ export function SecaoNotas(props: PropsSecaoNotas) {
 
 	if (lista.notas.length === 0 && !criando) {
 		return (
-			<EmptyState
-				glyph="書"
-				tone={props.tom}
-				title="Nenhuma nota ainda"
-				action={
-					<Button variant="primary" icon="plus" onClick={() => setCriando(true)}>
-						Nova nota
-					</Button>
-				}
-			>
+			<EmptyState glyph="書" tone={props.tom} title="Nenhuma nota ainda">
 				Suas anotações em markdown: títulos, listas, tarefas, citações e código. Cada nota é um arquivo em notas/ que abre fora do app. Só você escreve nelas;
-				o professor pode lê-las na conversa do caderno.
+				o professor pode lê-las na conversa do caderno. O botão Nova nota, ao lado das tags, cria a primeira.
 			</EmptyState>
 		);
 	}
 
 	return (
 		<div className="notas">
-			{formulario ?? (
-				<div className="notas__topo">
-					<Button variant="primary" icon="plus" onClick={() => setCriando(true)}>
-						Nova nota
-					</Button>
-				</div>
-			)}
+			{formulario}
 			<ul className="notas__lista">
 				{lista.notas.map((nota, indice) => (
 					<motion.li

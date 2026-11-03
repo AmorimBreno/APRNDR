@@ -17,7 +17,8 @@
 //   ../prompts/diagnostico.md e a correção da dissertativa, do de
 //   ../prompts/corretor.md (frontmatter "model: provedor/id"), com a
 //   metodologia de ../metodo/ no system prompt (as questões, quiz.md e
-//   dissertativa.md; o corretor, dissertativa.md), pelo
+//   dissertativa.md; o corretor, dissertativa.md), cada arquivo seguido dos
+//   ajustes ativos do Breno (aprendiz/metodo/, docs/metodo-ciclo.md), pelo
 //   ctx.modelRegistry do pi, como o mapeador (extensions/mapa.ts): a chamada
 //   vai fora da trava, com uma nova tentativa se a resposta não vier no
 //   formato, e o resultado é gravado dentro dela. Toda mensagem "curso" passa
@@ -110,6 +111,7 @@ import { lerEscrita, regrasQueValem, secaoDasRegras } from "../lib/escrita.ts";
 import { objetoJsonDoModelo } from "../lib/json-do-modelo.ts";
 import { ErroMapa, lerMapa, type MapaConteudo } from "../lib/mapa.ts";
 import { arquivoMateria, ErroMaterias } from "../lib/materias.ts";
+import { type AjusteMetodo, ajustesAtivosDe, blocoDeAjustes, ehArquivoMetodo } from "../lib/metodo-ciclo.ts";
 import { lerPromptMapeador } from "./mapa.ts";
 import { materiaDaConversa } from "./notas.ts";
 
@@ -235,11 +237,13 @@ async function lerPrompt(caminho: string): Promise<PromptLido> {
 }
 
 /**
- * O nome e o hash do prompt com os da metodologia (usadoComMetodo), para os
- * eventos que não chamam o modelo; sem o prompt, nada, e sem a metodologia, só
- * o prompt (não impede gravar).
+ * O nome e o hash do prompt com os da metodologia e dos ajustes do Breno
+ * (usadoComMetodo; com `dados`, os ajustes ativos de aprendiz/metodo/), para
+ * os eventos que não chamam o modelo; sem o prompt, nada, e sem a
+ * metodologia (ou com um arquivo de ajustes ilegível), só o prompt (não
+ * impede gravar).
  */
-async function promptSeHouver(caminho: string, pastaMetodo: string, arquivos: readonly string[]): Promise<{ prompt?: PromptUsado }> {
+async function promptSeHouver(caminho: string, pastaMetodo: string, arquivos: readonly string[], dados?: string): Promise<{ prompt?: PromptUsado }> {
 	let usado: PromptUsado;
 	try {
 		usado = (await lerPrompt(caminho)).usado;
@@ -247,7 +251,7 @@ async function promptSeHouver(caminho: string, pastaMetodo: string, arquivos: re
 		return {};
 	}
 	try {
-		return { prompt: usadoComMetodo(usado, await lerMetodo(pastaMetodo, arquivos)) };
+		return { prompt: usadoComMetodo(usado, await lerMetodo(pastaMetodo, arquivos, dados)) };
 	} catch {
 		return { prompt: usado };
 	}
@@ -262,15 +266,29 @@ export const PASTA_METODO = join(dirname(fileURLToPath(import.meta.url)), "..", 
 export const METODO_DIAGNOSTICO = ["quiz.md", "dissertativa.md"] as const;
 export const METODO_CORRETOR = ["dissertativa.md"] as const;
 
-/** Um arquivo da metodologia lido: o nome, o conteúdo e o nome (metodo/<arquivo>) com o hash do conteúdo, como os prompts. */
+/**
+ * Um arquivo da metodologia lido: o nome, o conteúdo e o nome
+ * (metodo/<arquivo>) com o hash do conteúdo, como os prompts; e, quando o
+ * Breno tem ajustes ativos para ele (docs/metodo-ciclo.md, "Os ajustes
+ * aprovados"), os ajustes e o nome (aprendiz/metodo/<arquivo>) com o hash do
+ * bloco <ajustes-do-breno> que vai ao modelo (uma mudança nos ajustes muda o
+ * hash).
+ */
 export interface MetodoLido {
 	arquivo: string;
 	conteudo: string;
 	usado: PromptUsado;
+	ajustes?: { ativos: AjusteMetodo[]; usado: PromptUsado };
 }
 
-/** Lê os arquivos da metodologia, na ordem dada. Um que não dá para ler é ErroCurso (a chamada não sai sem a metodologia). */
-export async function lerMetodo(pasta: string, arquivos: readonly string[]): Promise<MetodoLido[]> {
+/**
+ * Lê os arquivos da metodologia, na ordem dada. Um que não dá para ler é
+ * ErroCurso (a chamada não sai sem a metodologia). Com `dados` (a pasta de
+ * dados), cada arquivo vem com os ajustes ativos do Breno
+ * (aprendiz/metodo/<arquivo>.md); um arquivo de ajustes ilegível é
+ * ErroMetodo (um ErroCurso): a chamada também não sai sem os ajustes dele.
+ */
+export async function lerMetodo(pasta: string, arquivos: readonly string[], dados?: string): Promise<MetodoLido[]> {
 	const lidos: MetodoLido[] = [];
 	for (const arquivo of arquivos) {
 		let conteudo: string;
@@ -279,27 +297,49 @@ export async function lerMetodo(pasta: string, arquivos: readonly string[]): Pro
 		} catch (erro) {
 			throw new ErroCurso(`Não consegui ler o arquivo da metodologia ${join(pasta, arquivo)}: ${(erro as Error).message}`);
 		}
-		lidos.push({ arquivo, conteudo, usado: { nome: `metodo/${arquivo}`, hash: hashDoPrompt(conteudo) } });
+		const lido: MetodoLido = { arquivo, conteudo, usado: { nome: `metodo/${arquivo}`, hash: hashDoPrompt(conteudo) } };
+		if (dados !== undefined && ehArquivoMetodo(arquivo)) {
+			const ativos = await ajustesAtivosDe(dados, arquivo);
+			if (ativos.length > 0) lido.ajustes = { ativos, usado: { nome: `aprendiz/metodo/${arquivo}`, hash: hashDoPrompt(blocoDeAjustes(arquivo, ativos)) } };
+		}
+		lidos.push(lido);
 	}
 	return lidos;
 }
 
-/** O system prompt: as instruções do prompt e, depois, cada arquivo da metodologia entre <metodologia arquivo="…"> e </metodologia>. Sem metodologia, as instruções como estão. */
+/**
+ * O system prompt: as instruções do prompt e, depois, cada arquivo da
+ * metodologia entre <metodologia arquivo="…"> e </metodologia>, cada um
+ * seguido, quando há, do bloco dos ajustes ativos do Breno
+ * (<ajustes-do-breno arquivo="…">, blocoDeAjustes). Sem metodologia, as
+ * instruções como estão.
+ */
 export function instrucoesComMetodo(instrucoes: string, metodo: readonly MetodoLido[]): string {
 	if (metodo.length === 0) return instrucoes;
-	return [instrucoes.trimEnd(), ...metodo.map((item) => `<metodologia arquivo=${JSON.stringify(item.arquivo)}>\n${item.conteudo.trim()}\n</metodologia>`)].join("\n\n");
+	return [
+		instrucoes.trimEnd(),
+		...metodo.flatMap((item) => [
+			`<metodologia arquivo=${JSON.stringify(item.arquivo)}>\n${item.conteudo.trim()}\n</metodologia>`,
+			...(item.ajustes ? [blocoDeAjustes(item.arquivo, item.ajustes.ativos)] : []),
+		]),
+	].join("\n\n");
 }
+
+/** O nome e o hash de um arquivo da metodologia e, quando há, os dos ajustes dele, na ordem em que vão ao modelo. */
+export const usadosDoMetodo = (item: MetodoLido): PromptUsado[] => [item.usado, ...(item.ajustes ? [item.ajustes.usado] : [])];
 
 /**
  * O prompt usado com a metodologia, para os eventos que guardam um prompt só
  * (o contexto.prompt do diagnóstico, do corretor e do reescreveu_bloco): os
  * nomes e os hashes juntos, na mesma ordem, separados por " + "
- * ("diagnostico.md + metodo/quiz.md", "a1b2… + c3d4…"). Sem metodologia, o
- * prompt como está.
+ * ("diagnostico.md + metodo/quiz.md", "a1b2… + c3d4…"); os ajustes do Breno
+ * vão logo depois do arquivo deles ("metodo/quiz.md +
+ * aprendiz/metodo/quiz.md"). Sem metodologia, o prompt como está.
  */
 export function usadoComMetodo(prompt: PromptUsado, metodo: readonly MetodoLido[]): PromptUsado {
 	if (metodo.length === 0) return prompt;
-	return { nome: [prompt.nome, ...metodo.map((item) => item.usado.nome)].join(" + "), hash: [prompt.hash, ...metodo.map((item) => item.usado.hash)].join(" + ") };
+	const usados = metodo.flatMap(usadosDoMetodo);
+	return { nome: [prompt.nome, ...usados.map((item) => item.nome)].join(" + "), hash: [prompt.hash, ...usados.map((item) => item.hash)].join(" + ") };
 }
 
 /** "provedor/id" (o id pode ter barras) no registro do pi, com credencial. */
@@ -503,7 +543,8 @@ export function mensagemDoCorretor(questao: Pick<QuestaoDissertativa, "contexto"
 
 /**
  * Corrige uma dissertativa pela rubrica: o prompt do corretor
- * (prompts/corretor.md) com a metodologia METODO_CORRETOR, temperatura 0,
+ * (prompts/corretor.md) com a metodologia METODO_CORRETOR (com `dados`, e os
+ * ajustes ativos do Breno), temperatura 0,
  * a mensagem do corretor (mensagemDoCorretor) e validarCorrecao na leitura,
  * com a nova tentativa do pedirJson. A mesma correção serve ao diagnóstico e
  * às dissertativas das lições do módulo (extensions/modulos.ts). Devolve a
@@ -513,14 +554,14 @@ export function mensagemDoCorretor(questao: Pick<QuestaoDissertativa, "contexto"
  */
 export async function corrigirPelaRubrica(
 	registro: RegistroCursos | undefined,
-	arquivos: { caminhoPrompt: string; pastaMetodo: string },
+	arquivos: { caminhoPrompt: string; pastaMetodo: string; dados?: string },
 	questao: QuestaoDissertativa,
 	texto: string,
 	sinal: AbortSignal,
 	depois: string,
 ): Promise<{ correcao: Correcao; prompt: PromptUsado }> {
 	const prompt = await lerPrompt(arquivos.caminhoPrompt);
-	const metodo = await lerMetodo(arquivos.pastaMetodo, METODO_CORRETOR);
+	const metodo = await lerMetodo(arquivos.pastaMetodo, METODO_CORRETOR, arquivos.dados);
 	if (!registro) throw new ErroDiagnostico("A sessão não tem o registro de modelos do pi; não dá para chamar o modelo do corretor.");
 	const modelo = resolverModelo(registro, prompt.modelo, "do corretor");
 	const corrigida = await pedirJson(
@@ -940,7 +981,7 @@ export default function cursos(pi: ExtensionAPI, opcoes: OpcoesCursos = {}) {
 				return { atual: lido, mapa: mapaLido };
 			});
 			const prompt = await lerPrompt(caminhoDiagnostico);
-			const metodo = await lerMetodo(pastaMetodo, METODO_DIAGNOSTICO);
+			const metodo = await lerMetodo(pastaMetodo, METODO_DIAGNOSTICO, dados);
 			if (!registro) throw new ErroDiagnostico("A sessão não tem o registro de modelos do pi; não dá para chamar o modelo do diagnóstico.");
 			const modelo = resolverModelo(registro, prompt.modelo, "do diagnóstico");
 			const objetivo = atual.objetivo!;
@@ -1015,7 +1056,7 @@ export default function cursos(pi: ExtensionAPI, opcoes: OpcoesCursos = {}) {
 			// Fora da trava: a chamada pode levar minutos.
 			const { correcao, prompt } = await corrigirPelaRubrica(
 				registro,
-				{ caminhoPrompt: caminhoCorretor, pastaMetodo },
+				{ caminhoPrompt: caminhoCorretor, pastaMetodo, dados },
 				questao,
 				resposta.texto,
 				sinal,
@@ -1189,7 +1230,7 @@ export default function cursos(pi: ExtensionAPI, opcoes: OpcoesCursos = {}) {
 						await mostrarLista(dados, materia);
 					});
 				} else if (ao === "autoavaliar") {
-					const contexto = { ...daSessao(), ...(await promptSeHouver(caminhoDiagnostico, pastaMetodo, METODO_DIAGNOSTICO)) };
+					const contexto = { ...daSessao(), ...(await promptSeHouver(caminhoDiagnostico, pastaMetodo, METODO_DIAGNOSTICO, dados)) };
 					await naTrava(materia, async () => {
 						const novo = await salvarAutoavaliacao(dados, materia, curso, dadosAcao.niveis, contexto);
 						await mostrarCurso(dados, materia, novo, comPedido);
@@ -1202,7 +1243,7 @@ export default function cursos(pi: ExtensionAPI, opcoes: OpcoesCursos = {}) {
 						mostrar("erro", { mensagem: "Falta a questão da resposta.", ao, materia, curso, ...comPedido });
 						return;
 					}
-					const contexto = { ...daSessao(), ...(await promptSeHouver(caminhoDiagnostico, pastaMetodo, METODO_DIAGNOSTICO)) };
+					const contexto = { ...daSessao(), ...(await promptSeHouver(caminhoDiagnostico, pastaMetodo, METODO_DIAGNOSTICO, dados)) };
 					const entrada = { confianca: dadosAcao.confianca, escolha: dadosAcao.escolha, texto: dadosAcao.texto, tempoMs: dadosAcao.tempoMs };
 					const chave = chaveDo(materia, curso);
 					const aCorrigir = await naTrava(materia, async () => {
@@ -1239,7 +1280,7 @@ export default function cursos(pi: ExtensionAPI, opcoes: OpcoesCursos = {}) {
 					});
 					await corrigirDissertativa(dados, materia, curso, aCorrigir.alvo, aCorrigir.controle, pedido);
 				} else if (ao === "concluir_diagnostico") {
-					const contexto = { ...daSessao(), ...(await promptSeHouver(caminhoDiagnostico, pastaMetodo, METODO_DIAGNOSTICO)) };
+					const contexto = { ...daSessao(), ...(await promptSeHouver(caminhoDiagnostico, pastaMetodo, METODO_DIAGNOSTICO, dados)) };
 					await naTrava(materia, async () => {
 						const resultado = await concluirDiagnostico(dados, materia, curso, contexto);
 						await mostrarCurso(dados, materia, resultado.curso, { invalidadas: resultado.invalidadas, ...comPedido });

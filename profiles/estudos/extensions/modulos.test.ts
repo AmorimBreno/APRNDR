@@ -18,6 +18,7 @@ import { gravarGlossario, lerGlossario } from "../lib/termos.ts";
 import { acrescentarEvento, criarEvento, lerEventos } from "../lib/eventos.ts";
 import { type Conceito, gravarMapa, lerMapa, mapaVazio, pastaExtraidoArquivo } from "../lib/mapa.ts";
 import { criarMateria, eventosAprendiz, eventosMateria } from "../lib/materias.ts";
+import { caminhoDosAjustes, FRASE_DOS_AJUSTES, gravarAjustes } from "../lib/metodo-ciclo.ts";
 import { ARQUIVOS_METODO, caminhoDoModulo, type EstadoModuloNaTela, lerModulo, MINIMO_CARACTERES_EXEMPLO, type ModuloGerado } from "../lib/modulos.ts";
 import { hashDoPrompt, lerMetodo, PASTA_METODO } from "./cursos.ts";
 import type { RespostaModulo } from "../lib/modulo-respostas.ts";
@@ -2023,5 +2024,99 @@ describe("os pedidos de explicação (explicar_trecho e guardar_termo)", () => {
 		expect(pedidosDe(moduloComPedido("x2")).map((item) => item.id)).not.toContain(velho);
 		await esperar(() => pedidosDe(ultimaModulo())[0]?.explicacao !== undefined);
 		expect(((await lerModulo(dados, materia, CURSO, "m1")) as ModuloGerado).explicacoes).toHaveLength(1);
+	});
+});
+
+// --- Os ajustes do Breno nas gerações (docs/metodo-ciclo.md, "Os ajustes aprovados") ------------
+
+describe("os ajustes do Breno nas gerações dos módulos", () => {
+	const ajusteDe = (arquivo: string) => `Ajuste de ${arquivo}.`;
+	const blocoDe = (arquivo: string) => `<ajustes-do-breno arquivo="${arquivo}">\n${FRASE_DOS_AJUSTES}\n\n- ${ajusteDe(arquivo)}\n</ajustes-do-breno>`;
+	/** O system prompt com a metodologia de mentira e, depois de cada arquivo, os ajustes dele. */
+	const comAjustes = (instrucoes: string, arquivos: string[]) =>
+		[instrucoes, ...arquivos.flatMap((arquivo) => [`<metodologia arquivo="${arquivo}">\n${METODO[arquivo]!.trim()}\n</metodologia>`, blocoDe(arquivo)])].join("\n\n");
+	const ajustesUsado = (arquivo: string) => ({ nome: `aprendiz/metodo/${arquivo}`, hash: hashDoPrompt(blocoDe(arquivo)) });
+	/** O prompt com a metodologia e os ajustes, como os eventos que guardam um prompt só o guardam. */
+	const comAjustesUsado = (nome: string, conteudo: string, arquivos: string[]) => {
+		const usados = [{ nome, hash: hashDoPrompt(conteudo) }, ...arquivos.flatMap((arquivo) => [metodoUsado(arquivo), ajustesUsado(arquivo)])];
+		return { nome: usados.map((item) => item.nome).join(" + "), hash: usados.map((item) => item.hash).join(" + ") };
+	};
+
+	beforeEach(async () => {
+		for (const arquivo of ARQUIVOS_METODO) {
+			await gravarAjustes(dados, {
+				arquivo,
+				titulo: `Ajustes do Breno para ${arquivo}`,
+				ajustes: [
+					{ id: "a-1", ativo: true, texto: ajusteDe(arquivo), comentario: null },
+					{ id: "a-2", ativo: false, texto: "Um ajuste desligado.", comentario: null },
+				],
+			});
+		}
+		ligar();
+	});
+
+	it("o plano, as lições, a reescrita, a pergunta, a dissertativa, a explicação e os termos levam os ajustes; os eventos, o hash deles", async () => {
+		geracaoQueDaCerto();
+		await gerarM1();
+		expect(chamadas[0]!.contexto.systemPrompt).toBe(comAjustes("Planeje as lições.", ["estrutura-da-licao.md"]));
+		expect(chamadas[1]!.contexto.systemPrompt).toBe(
+			comAjustes("Escreva a lição.", ["estrutura-da-licao.md", "introducao.md", "conceito.md", "exemplos.md", "pergunta.md", "ideia-central.md", "quiz.md", "termos.md"]),
+		);
+		for (const chamada of chamadas) expect(chamada.contexto.systemPrompt).not.toContain("Um ajuste desligado.");
+		const [gerou] = await doVerbo("gerou_modulo");
+		expect(gerou!.contexto!.prompts).toEqual([
+			{ nome: "modulo-plano.md", hash: hashDoPrompt(PROMPT_PLANO) },
+			{ nome: "modulo-licao.md", hash: hashDoPrompt(PROMPT_LICAO) },
+			...ARQUIVOS_METODO.flatMap((arquivo) => [metodoUsado(arquivo), ajustesUsado(arquivo)]),
+		]);
+
+		// A reescrita de um bloco.
+		const id = await retornoNoB1();
+		respostas.push(EXPLICACAO_NOVA);
+		reescrever("w1", id);
+		await respondeu("w1");
+		await reescritoNa("l1-b1");
+		expect(chamadas.at(-1)!.contexto.systemPrompt).toBe(comAjustes("Reescreva o bloco.", ["introducao.md", "termos.md"]));
+		const [reescreveu] = await doAprendiz("reescreveu_bloco");
+		expect(reescreveu!.contexto!.prompt).toEqual(comAjustesUsado("modulo-bloco.md", PROMPT_BLOCO, ["introducao.md", "termos.md"]));
+
+		// A conferência da pergunta e a correção da dissertativa.
+		respostas.push(CONFERENCIA_PARCIAL);
+		await responder("v1", { bloco: "l1-b3", confianca: 3, texto: "As ocorrências.", tempoMs: 1 });
+		await esperar(async () => (await doAprendiz("respondeu_verificacao")).length === 1);
+		expect(chamadas.at(-1)!.contexto.systemPrompt).toBe(comAjustes("Confira a pergunta.", ["pergunta.md"]));
+		const [verificacao] = await doAprendiz("respondeu_verificacao");
+		expect((verificacao!.contexto!.corretor as { prompt: unknown }).prompt).toEqual(comAjustesUsado("verificacao.md", PROMPT_VERIFICACAO, ["pergunta.md"]));
+		respostas.push(CORRECAO_M1);
+		await responder("d1", { bloco: "l2-b5", confianca: 2, texto: "Poucos documentos.", tempoMs: 1 });
+		await esperar(async () => (await doAprendiz("respondeu_dissertativa")).length === 1);
+		expect(chamadas.at(-1)!.contexto.systemPrompt).toBe(comAjustes("Corrija pela rubrica.", ["dissertativa.md"]));
+		const [dissertativa] = await doAprendiz("respondeu_dissertativa");
+		expect((dissertativa!.contexto!.corretor as { prompt: unknown }).prompt).toEqual(comAjustesUsado("corretor.md", PROMPT_CORRETOR, ["dissertativa.md"]));
+
+		// A explicação de um trecho e "Marcar os termos".
+		respostas.push(EXPLICACAO_COM_TERMO);
+		explicar("x1");
+		await respondeu("x1");
+		await esperar(async () => (await doAprendiz("pediu_explicacao")).length === 1);
+		expect(chamadas.at(-1)!.contexto.systemPrompt).toBe(comAjustes("Explique o trecho.", ["conceito.md", "termos.md"]));
+		const [explicou] = await doAprendiz("pediu_explicacao");
+		expect((explicou!.contexto!.explicador as { prompt: unknown }).prompt).toEqual(comAjustesUsado("explicar-trecho.md", PROMPT_EXPLICAR, ["conceito.md", "termos.md"]));
+		respostas.push(TERMOS_L1, TERMOS_L2);
+		acao("marcar_termos", { modulo: "m1", pedido: "t1" });
+		await respondeu("t1");
+		await esperar(async () => (await doVerbo("marcou_termos")).length === 1);
+		expect(chamadas.at(-1)!.contexto.systemPrompt).toBe(comAjustes("Marque os termos.", ["termos.md"]));
+	});
+
+	it("um arquivo de ajustes ilegível impede a geração antes de chamar o modelo, e não é sobrescrito", async () => {
+		await writeFile(caminhoDosAjustes(dados, "estrutura-da-licao.md"), "## sem formato\n", "utf8");
+		geracaoQueDaCerto();
+		acao("gerar", { modulo: "m1", pedido: "g1" });
+		await respondeu("g1");
+		expect(erroDe("g1")).toMatchObject({ ao: "gerar", modulo: "m1", mensagem: expect.stringMatching(/^Não consegui ler os ajustes do método .*estrutura-da-licao\.md: a linha 1 não está no formato/) });
+		expect(chamadas).toHaveLength(0);
+		expect(await readFile(caminhoDosAjustes(dados, "estrutura-da-licao.md"), "utf8")).toBe("## sem formato\n");
 	});
 });

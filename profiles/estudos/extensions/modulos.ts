@@ -12,7 +12,9 @@
 //   (../prompts/modulo-licao.md), em sequência, pelo ctx.modelRegistry do pi,
 //   como o diagnóstico e o esqueleto (extensions/cursos.ts). O system prompt
 //   de cada chamada é o prompt e, depois dele, os arquivos da metodologia
-//   (../metodo/, docs/modulos.md, "A metodologia em arquivos"): o plano leva a
+//   (../metodo/, docs/modulos.md, "A metodologia em arquivos"), cada um
+//   seguido dos ajustes ativos do Breno (aprendiz/metodo/, lerMetodo com a
+//   pasta de dados; docs/metodo-ciclo.md): o plano leva a
 //   estrutura da lição; cada lição, os de arquivosDeMetodo(roteiro); a
 //   reescrita, o do tipo do bloco. As chamadas vão fora da trava, com uma nova
 //   tentativa se a resposta não vier no formato, se o plano precisou de
@@ -191,6 +193,7 @@ import {
 	pedirJson,
 	type RegistroCursos,
 	usadoComMetodo,
+	usadosDoMetodo,
 } from "./cursos.ts";
 import { arquivoDoAviso, lerPromptMapeador } from "./mapa.ts";
 import { materiaDaConversa } from "./notas.ts";
@@ -749,10 +752,10 @@ export function mensagemDaExplicacao(entrada: EntradaExplicacao, regras = ""): s
 	].join("\n\n");
 }
 
-/** Os arquivos da metodologia usados, sem repetir, na ordem em que apareceram (para o contexto do gerou_modulo). */
+/** Os arquivos da metodologia usados e os ajustes do Breno de cada um (usadosDoMetodo), sem repetir, na ordem em que apareceram (para o contexto do gerou_modulo). */
 function metodoUsado(lidos: readonly MetodoLido[]) {
 	const vistos = new Set<string>();
-	return lidos.flatMap((item) => (vistos.has(item.usado.nome) ? [] : (vistos.add(item.usado.nome), [item.usado])));
+	return lidos.flatMap(usadosDoMetodo).filter((usado) => (vistos.has(usado.nome) ? false : (vistos.add(usado.nome), true)));
 }
 
 // --- Texto para o professor ----------------------------------------------------
@@ -1348,7 +1351,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 			const promptPlano = await lerPrompt(caminhoPlano);
 			const promptLicao = await lerPrompt(caminhoLicao);
 			// A estrutura da lição, que o plano carrega (os arquivos das lições são lidos depois do plano, pelos roteiros).
-			const metodoPlano = await lerMetodo(pastaMetodo, [ARQUIVO_ESTRUTURA_LICAO]);
+			const metodoPlano = await lerMetodo(pastaMetodo, [ARQUIVO_ESTRUTURA_LICAO], dados);
 			if (!registro) throw new ErroModulo("A sessão não tem o registro de modelos do pi; não dá para chamar o modelo dos módulos.");
 			const modeloPlano = resolverModelo(registro, promptPlano.modelo, "do plano do módulo");
 			const modeloLicao = resolverModelo(registro, promptLicao.modelo, "das lições do módulo");
@@ -1428,7 +1431,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 			const comLicoes = await entradaDoModelo(dados, materia, curso, modulo, { pedido: doPedido, plano: plano.resultado });
 			const entradas = comLicoes.licoes ?? [];
 			// Os arquivos da metodologia de todas as lições, lidos uma vez (cada lição leva os do roteiro dela).
-			const metodoLicoes = await lerMetodo(pastaMetodo, arquivosDeMetodo(entradas.flatMap((item) => item.licao.roteiro)));
+			const metodoLicoes = await lerMetodo(pastaMetodo, arquivosDeMetodo(entradas.flatMap((item) => item.licao.roteiro)), dados);
 			const metodoDe = (roteiro: readonly unknown[]) => {
 				const arquivos: readonly string[] = arquivosDeMetodo(roteiro);
 				return metodoLicoes.filter((item) => arquivos.includes(item.arquivo));
@@ -1692,7 +1695,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 			const conceitosDoBloco = alvo.bloco.conceitos.filter((id) => alvo.licao.conceitos.includes(id));
 			const naEntrada = { id: alvo.licao.id, titulo: alvo.licao.titulo, objetivo: alvo.licao.objetivo, conceitos: conceitosDoBloco, roteiro: roteiroDaLicao(alvo.licao) };
 			// O arquivo da metodologia do tipo do bloco (a explicação pelo formato) e o dos termos-chave.
-			const metodo = await lerMetodo(pastaMetodo, [arquivoDeMetodo(itemDoRoteiro(alvo.bloco)), ARQUIVO_TERMOS]);
+			const metodo = await lerMetodo(pastaMetodo, [arquivoDeMetodo(itemDoRoteiro(alvo.bloco)), ARQUIVO_TERMOS], dados);
 			const entrada = await entradaDoModelo(dados, materia, alvo.curso, modulo, { pedido: alvo.modulo.pedido, plano: [naEntrada] });
 			const doBloco = entrada.licoes?.[0];
 			if (!doBloco) throw new ErroModulo("Não consegui montar a entrada da reescrita do bloco.");
@@ -1792,12 +1795,12 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 			let conferencia: Conferencia;
 			let corretor: Corretor;
 			if (bloco.tipo === "dissertativa") {
-				const corrigida = await corrigirPelaRubrica(registro, { caminhoPrompt: caminhoCorretor, pastaMetodo }, bloco, alvo.alvo.texto, sinal, depois);
+				const corrigida = await corrigirPelaRubrica(registro, { caminhoPrompt: caminhoCorretor, pastaMetodo, dados }, bloco, alvo.alvo.texto, sinal, depois);
 				conferencia = { tipo: "dissertativa", correcao: corrigida.correcao };
 				corretor = { modelo: corrigida.correcao.modelo, prompt: corrigida.prompt, custo: corrigida.correcao.custo };
 			} else if (bloco.tipo === "verificacao") {
 				const prompt = await lerPrompt(caminhoVerificacao);
-				const metodo = await lerMetodo(pastaMetodo, METODO_VERIFICACAO);
+				const metodo = await lerMetodo(pastaMetodo, METODO_VERIFICACAO, dados);
 				if (!registro) throw new ErroModulo("A sessão não tem o registro de modelos do pi; não dá para chamar o modelo que confere a pergunta.");
 				const modelo = resolverModelo(registro, prompt.modelo, "da conferência da pergunta");
 				const mensagem = mensagemDaVerificacao({ pergunta: bloco.pergunta, respostaEsperada: bloco.respostaEsperada, explicacoes: explicacoesAntes(licao, bloco.id), texto: alvo.alvo.texto });
@@ -1914,7 +1917,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 		const chave = chaveDoModulo(materia, curso, modulo);
 		const doPedido = validarPedidoExplicacao(dadosAcao);
 		const prompt = await lerPrompt(caminhoExplicar);
-		const metodo = await lerMetodo(pastaMetodo, METODO_EXPLICAR);
+		const metodo = await lerMetodo(pastaMetodo, METODO_EXPLICAR, dados);
 		if (!registro) throw new ErroModulo("A sessão não tem o registro de modelos do pi; não dá para chamar o modelo que explica o trecho.");
 		const modelo = resolverModelo(registro, prompt.modelo, "da explicação do trecho");
 		const regras = await regrasDaMateria(dados, materia);
@@ -2027,7 +2030,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 		const comGasto = (mensagem: string) => (custo > 0 ? `${mensagem} Gasto das lições já marcadas: US$ ${custo.toFixed(4)}.` : mensagem);
 		try {
 			const prompt = await lerPrompt(caminhoTermos);
-			const metodo = await lerMetodo(pastaMetodo, METODO_TERMOS);
+			const metodo = await lerMetodo(pastaMetodo, METODO_TERMOS, dados);
 			if (!registro) throw new ErroModulo("A sessão não tem o registro de modelos do pi; não dá para chamar o modelo que marca os termos.");
 			const modelo = resolverModelo(registro, prompt.modelo, "de Marcar os termos");
 			const inicio = await naTrava(materia, async () => {

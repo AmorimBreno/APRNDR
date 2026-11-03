@@ -17,6 +17,7 @@ import { somarDias } from "../lib/esqueleto.ts";
 import { lerEventos } from "../lib/eventos.ts";
 import { gravarMapa, type MapaConteudo, mapaVazio, pastaExtraidoArquivo } from "../lib/mapa.ts";
 import { criarMateria, eventosAprendiz, eventosMateria } from "../lib/materias.ts";
+import { caminhoDosAjustes, FRASE_DOS_AJUSTES, gravarAjustes } from "../lib/metodo-ciclo.ts";
 import cursos, { CAMINHO_PROMPT_CORRETOR, CAMINHO_PROMPT_DIAGNOSTICO, CAMINHO_PROMPT_ESQUELETO, hashDoPrompt, linhaDoPrazo, pedidoDoLimite, textoDoCurso } from "./cursos.ts";
 import { lerPromptMapeador } from "./mapa.ts";
 
@@ -632,6 +633,43 @@ describe("diagnóstico", () => {
 		expect(String(erroDe("g2")!.mensagem)).toContain("Não consegui ler as regras de escrita");
 		expect(chamadas).toHaveLength(1);
 		expect(await readFile(arquivoEscrita(dados), "utf8")).toBe("{ quebrado");
+	});
+
+	it("os ajustes ativos do Breno vão logo depois do arquivo deles e entram no hash; um arquivo de ajustes ilegível impede gerar", async () => {
+		const id = await cursoNoDiagnostico();
+		await gravarAjustes(dados, {
+			arquivo: "quiz.md",
+			titulo: "Ajustes do Breno para quiz.md",
+			ajustes: [
+				{ id: "a-1", ativo: true, texto: "Alternativas erradas plausíveis.", comentario: null },
+				{ id: "a-2", ativo: false, texto: "Desligado.", comentario: null },
+			],
+		});
+		await gerar(id, "g1");
+		const ajustes = `<ajustes-do-breno arquivo="quiz.md">\n${FRASE_DOS_AJUSTES}\n\n- Alternativas erradas plausíveis.\n</ajustes-do-breno>`;
+		const [base, quiz, dissertativa] = comMetodo("Gere as questões.", ["quiz.md", "dissertativa.md"]).split("\n\n<metodologia");
+		expect(chamadas[0]!.contexto.systemPrompt).toBe(`${base}\n\n<metodologia${quiz}\n\n${ajustes}\n\n<metodologia${dissertativa}`);
+		expect(chamadas[0]!.contexto.systemPrompt).not.toContain("Desligado.");
+		const semAjustes = await promptComMetodo("diagnostico.md", ["quiz.md", "dissertativa.md"]);
+		const [prompt, ...hashes] = semAjustes.hash.split(" + ");
+		const [evento] = await doVerbo("gerou_diagnostico");
+		expect(evento!.contexto!.prompt).toEqual({
+			nome: "diagnostico.md + metodo/quiz.md + aprendiz/metodo/quiz.md + metodo/dissertativa.md",
+			hash: [prompt, hashes[0], hashDoPrompt(ajustes), hashes[1]].join(" + "),
+		});
+		// O autoavaliou_conceito (sem chamar o modelo) também leva os ajustes no prompt.
+		const [autoavaliou] = await doAprendiz("autoavaliou_conceito");
+		expect((autoavaliou!.contexto!.prompt as { nome: string }).nome).toContain("aprendiz/metodo/quiz.md");
+
+		const outro = await cursoNoDiagnostico();
+		await writeFile(caminhoDosAjustes(dados, "dissertativa.md"), "texto solto\n", "utf8");
+		acao("autoavaliar", { curso: outro, pedido: "a2", niveis: NIVEIS });
+		await respondeu("a2");
+		acao("gerar_diagnostico", { curso: outro, pedido: "g2" });
+		await respondeu("g2");
+		expect(String(erroDe("g2")!.mensagem)).toMatch(/^Não consegui ler os ajustes do método .*dissertativa\.md/);
+		expect(chamadas).toHaveLength(1);
+		expect(await readFile(caminhoDosAjustes(dados, "dissertativa.md"), "utf8")).toBe("texto solto\n");
 	});
 
 	it("gerar com outro em andamento no mesmo curso dá erro; no escopo livre não vão trechos", async () => {

@@ -33,9 +33,11 @@ export function rotaDaTag(materiaId: string, tag: TagCaderno): string {
 	return `caderno/${materiaId}/${tag}`;
 }
 
-/** Para onde a tecla leva no seletor de tags (setas, com volta ao redor, Home e End); undefined para as outras teclas. */
-export function tagVizinha(atual: TagCaderno, tecla: string): TagCaderno | undefined {
-	const ids = TAGS_DO_CADERNO.map((tag) => tag.id);
+/**
+ * Para onde a tecla leva numa lista de abas (setas, com volta ao redor, Home e End); undefined para as outras teclas.
+ * Serve ao seletor de tags e às abas da agenda (SeletorAbas em SeletorTags.tsx).
+ */
+export function abaVizinha<Id extends string>(ids: readonly Id[], atual: Id, tecla: string): Id | undefined {
 	const posicao = ids.indexOf(atual);
 	switch (tecla) {
 		case "ArrowRight":
@@ -52,3 +54,11 @@ export function tagVizinha(atual: TagCaderno, tecla: string): TagCaderno | undef
 			return undefined;
 	}
 }
+
+/** Para onde a tecla leva no seletor de tags (setas, com volta ao redor, Home e End); undefined para as outras teclas. */
+export const tagVizinha = (atual: TagCaderno, tecla: string): TagCaderno | undefined =>
+	abaVizinha(
+		TAGS_DO_CADERNO.map((tag) => tag.id),
+		atual,
+		tecla,
+	);

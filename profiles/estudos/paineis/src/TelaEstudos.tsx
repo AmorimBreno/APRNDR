@@ -8,11 +8,14 @@
 // = a visão do curso pronto, dentro do caderno;
 // "caderno/<matéria>/cursos/<curso>/modulos/<módulo>[/<lição>]" = a visão do
 // módulo gerado, com a CourseBar no lugar da aba do caderno.
+// "agenda/<aba>[/<matéria>]" = a tela da agenda (calendario, tarefas ou quadro), filtrada pela matéria.
 // Um caminho desconhecido cai nos cadernos.
 
 import { type PropsTelaInicial, useJanelaPerfil } from "@estudos/ui";
 import { useEffect, useState } from "react";
+import { abaDaRota } from "./agenda-tela.ts";
 import { rotaDoModulo } from "./modulo-tela.ts";
+import { TelaAgenda } from "./TelaAgenda.tsx";
 import { TelaCaderno } from "./TelaCaderno.tsx";
 import { TelaCadernos } from "./TelaCadernos.tsx";
 
@@ -40,6 +43,8 @@ export function TelaEstudos(props: PropsTelaInicial) {
 		if (noCaderno && materiaId) setEscolhida(materiaId);
 	}, [noCaderno, materiaId]);
 
+	// "agenda/<aba>[/<matéria>]": o segundo pedaço é a aba e o terceiro, a matéria do filtro.
+	if (tipo === "agenda") return <TelaAgenda {...props} janela={janela} aba={abaDaRota(materiaId)} {...(secao ? { materia: secao } : {})} />;
 	if (noCaderno && materiaId) return <TelaCaderno {...props} janela={janela} materiaId={materiaId} {...(secao ? { secao } : {})} {...(nota ? { nota } : {})} {...(material ? { material } : {})} {...(guia ? { guia } : {})} {...(cursoPronto ? { curso: cursoPronto } : {})} {...(modulo ? { modulo } : {})} />;
 	return <TelaCadernos {...props} janela={janela} {...(escolhida ? { escolhida } : {})} escolher={setEscolhida} />;
 }

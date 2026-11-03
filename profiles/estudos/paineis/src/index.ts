@@ -4,6 +4,7 @@
 
 import type { EntradaTelaInicial, RegistroPaineis } from "@estudos/ui";
 import { ehPergunta, PainelQuiz } from "./PainelQuiz.tsx";
+import { PAINEL_AGENDA } from "./agenda-ponte.ts";
 import { PAINEL_CADERNOS, usarAparenciaMaterias } from "./comum.ts";
 import { PAINEL_CURSOS } from "./cursos-ponte.ts";
 import { PAINEL_ESCRITA } from "./escrita-ponte.ts";
@@ -21,7 +22,7 @@ export { TelaEstudos } from "./TelaEstudos.tsx";
 export const telaInicialEstudos: EntradaTelaInicial = {
 	componente: TelaEstudos,
 	rotuloVoltar: "Cadernos",
-	rotuloDoCaminho: (caminho) => (caminho.startsWith("caderno/") ? "Caderno" : undefined),
+	rotuloDoCaminho: (caminho) => (caminho.startsWith("caderno/") ? "Caderno" : caminho.startsWith("agenda") ? "Agenda" : undefined),
 	// O nome e a cor de agora de cada matéria, para a pílula do histórico da conversa.
 	usarAparenciaContextos: usarAparenciaMaterias,
 };
@@ -40,6 +41,8 @@ export const paineisEstudos: RegistroPaineis = {
 	[PAINEL_MODULOS]: { componente: () => null, titulo: "Módulos", foraDaArea: true },
 	// A ponte de "Como o professor escreve" com a extensão dos módulos: as regras de escrita são do modal.
 	[PAINEL_ESCRITA]: { componente: () => null, titulo: "Regras de escrita", foraDaArea: true },
+	// A ponte da agenda com a extensão da agenda: as tarefas são do calendário e da tela da agenda.
+	[PAINEL_AGENDA]: { componente: () => null, titulo: "Agenda", foraDaArea: true },
 	// Só pedidos: cada questão é respondida no modal, pelo botão na conversa,
 	// e o modal continua aberto depois de conferir, com o retorno.
 	quiz: {

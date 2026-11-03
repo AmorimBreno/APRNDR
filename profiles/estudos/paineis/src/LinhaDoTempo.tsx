@@ -26,6 +26,90 @@ function nomeDoCurso(evento: Evento): string {
 	return typeof resultado.nome === "string" ? resultado.nome : typeof evento.objeto.curso === "string" ? evento.objeto.curso : "um curso";
 }
 
+const texto = (valor: unknown): string | undefined => (typeof valor === "string" && valor ? valor : undefined);
+const ehDataIso = (valor: unknown): valor is string => typeof valor === "string" && /^\d{4}-\d{2}-\d{2}$/.test(valor);
+
+/** "10/11 às 14:00" (ou só a data, ou nada) de um resultado com data e hora. */
+function dataEHora(data: unknown, hora: unknown): string {
+	if (!ehDataIso(data)) return "";
+	return `${dataNumerica(data)}${typeof hora === "string" && hora ? ` às ${hora}` : ""}`;
+}
+
+/** O valor de um campo da tarefa que mudou, para o detalhe: data e hora legíveis, null = sem valor. */
+function valorDoCampo(campo: string, valor: unknown): string {
+	if (valor === null || valor === undefined || valor === "") return campo === "nota" ? "sem nota" : campo === "data" ? "sem data" : campo === "hora" ? "sem hora" : campo === "materia" ? "sem matéria" : "vazio";
+	if (campo === "data" && ehDataIso(valor)) return dataNumerica(valor);
+	return String(valor);
+}
+
+const NOMES_CAMPO_TAREFA: Record<string, string> = { titulo: "título", nota: "nota", data: "data", hora: "hora", materia: "matéria" };
+
+/** As frases dos eventos de tarefa (docs/agenda.md, "Eventos"). */
+function descreverTarefa(evento: Evento): { icone: IconName; texto: string; detalhe?: string } {
+	const resultado = (evento.resultado ?? {}) as Record<string, unknown>;
+	const titulo = texto(evento.objeto.titulo) ?? "uma tarefa";
+	const trajeto = texto(resultado.deNome) && texto(resultado.paraNome) ? `${texto(resultado.deNome)} → ${texto(resultado.paraNome)}` : "";
+	const detalheDe = (...partes: string[]) => partes.filter(Boolean).join(" · ");
+	const comDetalhe = (icone: IconName, frase: string, detalhe: string) => ({ icone, texto: `${frase}: ${titulo}`, ...(detalhe ? { detalhe } : {}) });
+	switch (evento.verbo) {
+		case "criou_tarefa": {
+			const quando = dataEHora(resultado.data, resultado.hora);
+			return comDetalhe("plus", "Tarefa criada", detalheDe(quando ? `para ${quando}` : "", texto(resultado.colunaNome) ? `em ${texto(resultado.colunaNome)}` : ""));
+		}
+		case "editou_tarefa": {
+			const mudou = (resultado.mudou ?? {}) as Record<string, unknown>;
+			const antes = (resultado.antes ?? {}) as Record<string, unknown>;
+			const partes = Object.keys(mudou).map((campo) => {
+				const nome = NOMES_CAMPO_TAREFA[campo] ?? campo;
+				if (campo === "nota") return mudou.nota === null ? "nota apagada" : "nota alterada";
+				const antigo = antes[campo] === undefined ? "" : `${valorDoCampo(campo, antes[campo])} → `;
+				return `${nome}: ${antigo}${valorDoCampo(campo, mudou[campo])}`;
+			});
+			return comDetalhe("refresh", "Tarefa editada", detalheDe(...partes));
+		}
+		case "moveu_tarefa":
+			return comDetalhe("arrow-right", "Tarefa movida", trajeto);
+		case "concluiu_tarefa":
+			return comDetalhe("check", "Tarefa concluída", trajeto);
+		case "reabriu_tarefa":
+			return comDetalhe("refresh", "Tarefa reaberta", trajeto);
+		default: {
+			const quando = dataEHora(resultado.data, resultado.hora);
+			return comDetalhe(
+				"close",
+				"Tarefa apagada",
+				detalheDe(texto(resultado.colunaNome) ? `estava em ${texto(resultado.colunaNome)}` : "", resultado.concluida === true ? "já concluída" : "", quando ? `era para ${quando}` : ""),
+			);
+		}
+	}
+}
+
+/** As frases do alterou_quadro, uma por ação (docs/agenda.md, "Eventos"). */
+function descreverQuadro(evento: Evento): { icone: IconName; texto: string; detalhe?: string } {
+	const resultado = (evento.resultado ?? {}) as Record<string, unknown>;
+	const coluna = texto(evento.objeto.nome) ?? texto(evento.objeto.coluna) ?? "uma coluna";
+	const contagem = (quantos: unknown, um: string, varios: string) => (typeof quantos === "number" ? `${quantos} ${quantos === 1 ? um : varios}` : "");
+	switch (resultado.acao) {
+		case "criou_coluna":
+			return { icone: "plus", texto: `Coluna criada: ${coluna}`, ...(typeof resultado.posicao === "number" ? { detalhe: `posição ${resultado.posicao + 1}` } : {}) };
+		case "renomeou_coluna":
+			return { icone: "refresh", texto: `Coluna renomeada: ${texto(resultado.para) ?? coluna}`, ...(texto(resultado.de) ? { detalhe: `antes: ${texto(resultado.de)}` } : {}) };
+		case "reordenou_colunas":
+			return { icone: "list", texto: "Colunas reordenadas" };
+		case "marcou_feito": {
+			const detalhe = [contagem(resultado.concluidas, "tarefa concluída", "tarefas concluídas"), contagem(resultado.reabertas, "tarefa reaberta", "tarefas reabertas")].filter(Boolean).join(" · ");
+			return { icone: "check", texto: `Coluna de feito: ${coluna}`, ...(detalhe ? { detalhe } : {}) };
+		}
+		case "apagou_coluna": {
+			const movidas = Array.isArray(resultado.movidas) ? resultado.movidas.length : 0;
+			const detalhe = movidas > 0 ? `${contagem(movidas, "tarefa foi", "tarefas foram")} para ${texto(resultado.destinoNome) ?? "outra coluna"}` : "";
+			return { icone: "close", texto: `Coluna apagada: ${coluna}`, ...(detalhe ? { detalhe } : {}) };
+		}
+		default:
+			return { icone: "list", texto: "Quadro alterado" };
+	}
+}
+
 /** Uma linha da linha do tempo: o ícone, a frase e o detalhe. */
 export function descreverEvento(evento: Evento): { icone: IconName; texto: string; detalhe?: string } {
 	const resultado = (evento.resultado ?? {}) as Record<string, unknown>;
@@ -179,6 +263,15 @@ export function descreverEvento(evento: Evento): { icone: IconName; texto: strin
 				...(conceitos !== undefined ? { detalhe: `${conceitos} ${conceitos === 1 ? "conceito" : "conceitos"}` } : {}),
 			};
 		}
+		case "criou_tarefa":
+		case "editou_tarefa":
+		case "moveu_tarefa":
+		case "concluiu_tarefa":
+		case "reabriu_tarefa":
+		case "apagou_tarefa":
+			return descreverTarefa(evento);
+		case "alterou_quadro":
+			return descreverQuadro(evento);
 		default:
 			return { icone: "flag", texto: evento.verbo.replaceAll("_", " ") };
 	}

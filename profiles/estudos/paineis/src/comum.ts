@@ -96,6 +96,7 @@ export function contextoDaMateria(materia: Materia): ContextoSessao {
 			`Numa nota, [[materiais/<arquivo>]] menciona um material desta matéria: leia com ler_material no caminho materias/${materia.id}/materiais/<arquivo>.`,
 			"O mapa de conteúdo da matéria (os conceitos do material, em ordem e com prioridades) você lê com ler_mapa_conteudo.",
 			"Os cursos da matéria (os planos de estudo, inclusive os rascunhos do guia de criação, com prazo, objetivo e os conceitos do mapa de cada um) você lê com ler_curso.",
+			"A agenda do Breno (tarefas com data, o quadro de colunas e as provas das matérias) você lê com ler_agenda; ela é dele, então nunca crie nem mude tarefas.",
 		].join(" "),
 		escopoMateriais: `materias/${materia.id}`,
 	};

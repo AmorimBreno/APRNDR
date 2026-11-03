@@ -2,7 +2,7 @@
 // abre, a rota de cada tag e as setas do seletor.
 
 import { describe, expect, it } from "vitest";
-import { rotaDaTag, TAGS_DO_CADERNO, tagDaRota, tagVizinha } from "./painel-caderno.ts";
+import { abaVizinha, rotaDaTag, TAGS_DO_CADERNO, tagDaRota, tagVizinha } from "./painel-caderno.ts";
 
 describe("tagDaRota", () => {
 	it("sem seção abre Notas", () => {
@@ -67,5 +67,18 @@ describe("tagVizinha", () => {
 	it("as outras teclas não mexem", () => {
 		expect(tagVizinha("notas", "Enter")).toBeUndefined();
 		expect(tagVizinha("notas", "a")).toBeUndefined();
+	});
+});
+
+describe("abaVizinha", () => {
+	const abas = ["calendario", "tarefas", "quadro"] as const;
+
+	it("anda numa lista qualquer, com volta ao redor, Home e End", () => {
+		expect(abaVizinha(abas, "calendario", "ArrowRight")).toBe("tarefas");
+		expect(abaVizinha(abas, "quadro", "ArrowRight")).toBe("calendario");
+		expect(abaVizinha(abas, "calendario", "ArrowLeft")).toBe("quadro");
+		expect(abaVizinha(abas, "tarefas", "Home")).toBe("calendario");
+		expect(abaVizinha(abas, "tarefas", "End")).toBe("quadro");
+		expect(abaVizinha(abas, "tarefas", "Enter")).toBeUndefined();
 	});
 });

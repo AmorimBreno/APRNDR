@@ -6,7 +6,10 @@
 // a lista completa dos eventos do eventos.jsonl da matéria, por dia, num modal
 // (ModalLinhaDoTempo; a timeline não é um arquivo à parte, seção 7).
 // Embaixo, na largura toda, o painel (como um dashboard), que rola na vertical
-// como um todo com a aba fixa em cima. São duas faixas de cima para baixo:
+// como um todo com a aba fixa em cima. São duas faixas de cima para baixo (a
+// segunda em duas colunas: à direita, o calendário compacto da matéria,
+// CalendarioCompacto, fixo no topo enquanto o painel rola; na tela estreita ele
+// vai para baixo da lista):
 // - Cursos: os cursos da matéria em cards lado a lado e "Novo curso"
 //   (FaixaCursos, item 5), que rolam para o lado;
 // - a lista com o seletor de tags em cima: Notas (SecaoNotas), Materiais (a
@@ -41,6 +44,7 @@ import { ConteudoMateriais, custoDaVisao, formatarDolar } from "./ModalMateriais
 import { SecaoMapa } from "./SecaoMapa.tsx";
 import { SecaoNotas, useListaNotas } from "./SecaoNotas.tsx";
 import { useCursos } from "./cursos-ponte.ts";
+import { CalendarioCompacto } from "./CalendarioCompacto.tsx";
 import { FaixaCursos } from "./FaixaCursos.tsx";
 import { ModalLinhaDoTempo, NOMES_TIPO } from "./LinhaDoTempo.tsx";
 import { rotaDaTag, type TagCaderno, tagDaRota } from "./painel-caderno.ts";
@@ -276,6 +280,7 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 								abrir={(curso) => props.navegar(`caderno/${materiaId}/cursos/${curso.id}`)}
 							/>
 						</div>
+						<div className="painel-caderno__baixo">
 						<section className="painel-caderno__bloco painel-caderno__lista" aria-label="Notas, materiais e mapa de conteúdo">
 							<header className="painel-caderno__seletor">
 								<SeletorTags base={baseIds} atual={tag} contagem={contagem} escolher={escolherTag} />
@@ -326,6 +331,16 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 								)}
 							</motion.div>
 						</section>
+						<aside className="painel-caderno__agenda" aria-label="Agenda da matéria">
+							<CalendarioCompacto
+								janela={props.janela}
+								materiaId={materiaId}
+								{...(materia ? { materia } : {})}
+								navegar={props.navegar}
+								vez={`${tag}/${editando}`}
+							/>
+						</aside>
+						</div>
 					</motion.div>
 				)}
 			</>

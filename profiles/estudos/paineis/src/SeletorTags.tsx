@@ -5,15 +5,79 @@
 // Teclas são radios de formulário. As setas andam entre as tags e já escolhem
 // (como em abas com ativação automática), Home e End vão às pontas, e só a tag
 // escolhida entra na ordem do Tab (as outras ficam a uma seta de distância).
+// SeletorAbas é o mesmo seletor para qualquer lista de abas (a tela da agenda
+// usa); SeletorTags o aplica às tags do caderno.
 
-import { Icon, pad2 } from "@estudos/design-system";
+import { Icon, type IconName, pad2 } from "@estudos/design-system";
 import { type KeyboardEvent, useRef } from "react";
-import { TAGS_DO_CADERNO, type TagCaderno, tagVizinha } from "./painel-caderno.ts";
+import { abaVizinha, TAGS_DO_CADERNO, type TagCaderno } from "./painel-caderno.ts";
 
 /** O id da aba de uma tag; `base` vem de useId() na tela, para a lista de baixo apontar para a aba com aria-labelledby. */
-export const idDaAba = (base: string, tag: TagCaderno) => `${base}-aba-${tag}`;
+export const idDaAba = (base: string, tag: string) => `${base}-aba-${tag}`;
 /** O id da lista de baixo, que as abas controlam (aria-controls). */
 export const idDoPainel = (base: string) => `${base}-painel`;
+
+export interface AbaDoSeletor<Id extends string> {
+	id: Id;
+	nome: string;
+	icone: IconName;
+}
+
+export interface PropsSeletorAbas<Id extends string> {
+	/** O nome do grupo de abas, para o leitor de tela. */
+	rotulo: string;
+	abas: readonly AbaDoSeletor<Id>[];
+	base: string;
+	atual: Id;
+	/** Quantos itens cada aba tem (sem a chave, ou undefined = ainda não chegou, a contagem some). */
+	contagem?: Partial<Record<Id, number | undefined>>;
+	escolher(aba: Id): void;
+}
+
+/**
+ * As abas como teclas de papel, para qualquer lista de abas: o seletor de tags do caderno (SeletorTags) e as abas
+ * da tela da agenda (TelaAgenda.tsx) usam este. Mesmas classes, mesmo teclado.
+ */
+export function SeletorAbas<Id extends string>(props: PropsSeletorAbas<Id>) {
+	const botoes = useRef<Partial<Record<Id, HTMLButtonElement | null>>>({});
+	const ids = props.abas.map((aba) => aba.id);
+	const aoTeclar = (evento: KeyboardEvent<HTMLButtonElement>, aba: Id) => {
+		const vizinha = abaVizinha(ids, aba, evento.key);
+		if (!vizinha) return;
+		evento.preventDefault();
+		botoes.current[vizinha]?.focus();
+		props.escolher(vizinha);
+	};
+	return (
+		<div className="painel-caderno__tags" role="tablist" aria-label={props.rotulo}>
+			{props.abas.map((aba) => {
+				const escolhida = aba.id === props.atual;
+				const quantos = props.contagem?.[aba.id];
+				return (
+					<button
+						key={aba.id}
+						ref={(elemento) => {
+							botoes.current[aba.id] = elemento;
+						}}
+						type="button"
+						role="tab"
+						id={idDaAba(props.base, aba.id)}
+						aria-selected={escolhida}
+						aria-controls={idDoPainel(props.base)}
+						tabIndex={escolhida ? 0 : -1}
+						className={`painel-caderno__tag${escolhida ? " painel-caderno__tag--escolhida" : ""}`}
+						onClick={() => props.escolher(aba.id)}
+						onKeyDown={(evento) => aoTeclar(evento, aba.id)}
+					>
+						<Icon name={aba.icone} size={18} strokeWidth={2.25} />
+						<span className="body-sm painel-caderno__tag-nome">{aba.nome}</span>
+						{quantos === undefined ? null : <span className="data painel-caderno__tag-conta">{pad2(quantos)}</span>}
+					</button>
+				);
+			})}
+		</div>
+	);
+}
 
 export interface PropsSeletorTags {
 	base: string;
@@ -24,41 +88,5 @@ export interface PropsSeletorTags {
 }
 
 export function SeletorTags(props: PropsSeletorTags) {
-	const abas = useRef<Partial<Record<TagCaderno, HTMLButtonElement | null>>>({});
-	const aoTeclar = (evento: KeyboardEvent<HTMLButtonElement>, tag: TagCaderno) => {
-		const vizinha = tagVizinha(tag, evento.key);
-		if (!vizinha) return;
-		evento.preventDefault();
-		abas.current[vizinha]?.focus();
-		props.escolher(vizinha);
-	};
-	return (
-		<div className="painel-caderno__tags" role="tablist" aria-label="Conteúdo do caderno">
-			{TAGS_DO_CADERNO.map((tag) => {
-				const escolhida = tag.id === props.atual;
-				const quantos = props.contagem[tag.id];
-				return (
-					<button
-						key={tag.id}
-						ref={(elemento) => {
-							abas.current[tag.id] = elemento;
-						}}
-						type="button"
-						role="tab"
-						id={idDaAba(props.base, tag.id)}
-						aria-selected={escolhida}
-						aria-controls={idDoPainel(props.base)}
-						tabIndex={escolhida ? 0 : -1}
-						className={`painel-caderno__tag${escolhida ? " painel-caderno__tag--escolhida" : ""}`}
-						onClick={() => props.escolher(tag.id)}
-						onKeyDown={(evento) => aoTeclar(evento, tag.id)}
-					>
-						<Icon name={tag.icone} size={18} strokeWidth={2.25} />
-						<span className="body-sm painel-caderno__tag-nome">{tag.nome}</span>
-						{quantos === undefined ? null : <span className="data painel-caderno__tag-conta">{pad2(quantos)}</span>}
-					</button>
-				);
-			})}
-		</div>
-	);
+	return <SeletorAbas rotulo="Conteúdo do caderno" abas={TAGS_DO_CADERNO} base={props.base} atual={props.atual} contagem={props.contagem} escolher={props.escolher} />;
 }

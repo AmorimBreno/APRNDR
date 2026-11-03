@@ -22,6 +22,7 @@ import {
 } from "./diagnostico-tipos.ts";
 import type { Esqueleto, Modulo as ModuloDoEsqueleto } from "./esqueleto-tipos.ts";
 import type { Referencia } from "./mapa-tipos.ts";
+import type { ArquivoDeAjustesNaTela, Decisao, EstadoRelatorio, RelatorioMetodo } from "./metodo-ciclo-tipos.ts";
 import type { AvaliacaoNova, FeedbackModulo, NotasLicao, QuestionariosModulo } from "./modulo-feedback-tipos.ts";
 import type { Progresso, RespostasModulo } from "./modulo-respostas-tipos.ts";
 import {
@@ -351,6 +352,25 @@ export interface AcoesModulos {
 	explicar_trecho: { materia: string; curso: string; modulo: string; licao: string; bloco: string; pedido: string; trecho: string; tipo: TipoExplicacao };
 	/** "Guardar no glossário": o termo do pedido de explicação (o id em `explicacao`) entra no glossário e o trecho ganha a marca; responde com o modulo com o pedido. */
 	guardar_termo: { materia: string; curso: string; modulo: string; pedido: string; explicacao: string };
+	/**
+	 * O relatório do método de um módulo concluído (docs/metodo-ciclo.md):
+	 * "Gerar o relatório do método", "Tentar de novo" e, com forcar,
+	 * "Gerar mesmo assim" (chama o modelo mesmo com pouco retorno). Gerar de
+	 * novo substitui o relatório (as decisões ficam nos eventos). Responde com
+	 * o modulo com o pedido e relatorioGerando; o relatório chega depois num
+	 * modulo sem pedido (ou um erro sem pedido, ao gerar_relatorio).
+	 */
+	gerar_relatorio: { materia: string; curso: string; modulo: string; pedido: string; forcar?: boolean };
+	/**
+	 * Aprova (com o texto editado, quando vier) ou rejeita (com o motivo
+	 * opcional) uma proposta do relatório; responde com o modulo com o pedido,
+	 * com a decisão no relatório.
+	 */
+	decidir_proposta: { materia: string; curso: string; modulo: string; pedido: string; proposta: string; decisao: Decisao; texto?: string; motivo?: string };
+	/** Liga ou desliga um ajuste aprovado (nada é apagado); responde com a mensagem ajustes com o pedido. Sem matéria nem curso: os ajustes valem para todas. */
+	ligar_ajuste: { pedido: string; arquivo: ArquivoMetodo; ajuste: string; ativo: boolean };
+	/** Os ajustes aprovados de todos os arquivos de metodologia; responde com a mensagem ajustes (com o pedido, quando veio). Sem matéria nem curso. */
+	listar_ajustes: { pedido?: string };
 }
 
 export type AcaoModulos = keyof AcoesModulos;
@@ -389,6 +409,8 @@ export interface EstadoModuloNaTela {
 	progresso?: Progresso;
 	/** Em gerado, enquanto "Marcar os termos" roda (docs/termos.md): a lição sendo marcada, a partir de 1, e quantas o módulo tem. */
 	marcando?: { licao: number; licoes: number };
+	/** Em gerado e concluído (docs/metodo-ciclo.md): o relatório do método (gerando, pronto, pouco_retorno, erro com a mensagem, ou nenhum) e as propostas sem decisão. */
+	relatorio?: EstadoRelatorio;
 }
 
 /** A mensagem "estado" (interface:mostrar, gravar: false), mandada a cada mudança. */
@@ -419,14 +441,26 @@ export interface MensagemModulo {
 	glossario: TermoNaTela[];
 	/** Os ids dos pedidos de explicação do módulo que o modelo está explicando agora, na ordem de explicacoes (vazio sem nenhum). Vem em toda mensagem modulo. */
 	explicando: string[];
-	/** O da tela, quando a mensagem respondeu a responder, corrigir, encerrar, avaliar_bloco, avaliar_licao, explicar_trecho ou guardar_termo. */
+	/**
+	 * O relatório do método gravado (docs/metodo-ciclo.md), com as evidências
+	 * citadas ({id, linha, licao, bloco}, em relatorio.evidencias:
+	 * evidenciasDe), ou null: o módulo não está concluído, o relatório ainda
+	 * não foi gerado (ou falhou, ou está sendo gerado) ou o arquivo não se lê
+	 * (relatorioErro). Vem em toda mensagem modulo.
+	 */
+	relatorio: RelatorioMetodo | null;
+	/** O relatório do módulo está sendo gerado agora. Vem em toda mensagem modulo. */
+	relatorioGerando: boolean;
+	/** A frase do último relatório que falhou (até a próxima tentativa), ou do arquivo do relatório que não se lê. */
+	relatorioErro?: string;
+	/** O da tela, quando a mensagem respondeu a responder, corrigir, encerrar, avaliar_bloco, avaliar_licao, explicar_trecho, guardar_termo, gerar_relatorio ou decidir_proposta. */
 	pedido?: string;
 }
 
 /** A mensagem "erro". */
 export interface MensagemErroModulos {
 	mensagem: string;
-	/** A ação que falhou (listar, gerar, aguardar, concluir, responder, corrigir, encerrar, avaliar_bloco, avaliar_licao…). */
+	/** A ação que falhou (listar, gerar, aguardar, concluir, responder, corrigir, encerrar, avaliar_bloco, avaliar_licao, gerar_relatorio, decidir_proposta, ligar_ajuste, listar_ajustes…). */
 	ao?: string;
 	materia?: string;
 	curso?: string;
@@ -435,6 +469,17 @@ export interface MensagemErroModulos {
 	bloco?: string;
 	/** Em explicar_trecho (a explicação que falhou depois de aceita) e guardar_termo: o id do pedido de explicação. */
 	explicacao?: string;
+	/** Em decidir_proposta: o id da proposta. */
+	proposta?: string;
+	/** Em ligar_ajuste: o arquivo de metodologia e o id do ajuste. */
+	arquivo?: string;
+	ajuste?: string;
+	pedido?: string;
+}
+
+/** A mensagem "ajustes" (listar_ajustes, ligar_ajuste): os ajustes aprovados por arquivo de metodologia, na ordem de ARQUIVOS_METODO; só os arquivos com algum ajuste ou que não se leem (com erro). */
+export interface MensagemAjustes {
+	arquivos: ArquivoDeAjustesNaTela[];
 	pedido?: string;
 }
 
@@ -443,6 +488,7 @@ export interface MensagensModulos {
 	estado: MensagemEstadoModulos;
 	modulo: MensagemModulo;
 	erro: MensagemErroModulos;
+	ajustes: MensagemAjustes;
 }
 
 // --- O que os modelos devolvem ---------------------------------------------------

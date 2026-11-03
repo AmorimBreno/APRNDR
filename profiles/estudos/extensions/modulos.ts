@@ -64,7 +64,16 @@
 //   explicar_trecho (../prompts/explicar-trecho.md) e guardar_termo, com as
 //   chamadas fora da trava e canceladas no fim da sessão; toda mensagem
 //   "modulo" leva o glossário com o lugar de cada termo e o explicando
-//   (../lib/termos.ts).
+//   (../lib/termos.ts);
+// - o ciclo do método (docs/metodo-ciclo.md): concluir dispara, sem
+//   esperar, o relatório do método do módulo (../prompts/relatorio-metodo.md,
+//   fora da trava, com a nova tentativa e cancelado no fim da sessão; com
+//   pouco retorno, gravado sem chamar o modelo); gerar_relatorio (com
+//   forcar), decidir_proposta, ligar_ajuste e listar_ajustes. Toda mensagem
+//   "modulo" leva o relatorio, o relatorioGerando e o relatorioErro; o
+//   "estado" leva o relatorio de cada módulo concluído. Os arquivos de
+//   ajustes (aprendiz/metodo/) têm uma trava só, que pode ser tomada dentro
+//   da trava de uma matéria, nunca o contrário (../lib/metodo-ciclo.ts).
 import { readFile, stat } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -114,6 +123,25 @@ import { objetoJsonDoModelo } from "../lib/json-do-modelo.ts";
 import { ErroMapa, lerMapa, PAINEL_MAPA } from "../lib/mapa.ts";
 import { arquivoMateria, ErroMaterias, eventosAprendiz, eventosMateria } from "../lib/materias.ts";
 import {
+	blocoDeAjustes,
+	decidirProposta,
+	ErroMetodo,
+	type EstadoRelatorio,
+	estadoDoRelatorio,
+	type EvidenciaMontada,
+	evidenciaDoModulo,
+	lerRelatorio,
+	ligarAjusteNoDisco,
+	linhaParaOModelo,
+	listarAjustes,
+	MINIMO_RETORNOS,
+	NOMES_ITEM_ROTEIRO,
+	novoRelatorio,
+	registrarRelatorio,
+	type RelatorioMetodo,
+	validarRelatorioDoModelo,
+} from "../lib/metodo-ciclo.ts";
+import {
 	type ExplicadoDeNovo,
 	explicacoesAteOBloco,
 	type Glossario,
@@ -146,6 +174,7 @@ import {
 	type AcoesModulos,
 	ARQUIVO_ESTRUTURA_LICAO,
 	ARQUIVO_TERMOS,
+	ARQUIVOS_METODO,
 	arquivoDeMetodo,
 	arquivosDeMetodo,
 	type Bloco,
@@ -219,6 +248,9 @@ export const CAMINHO_PROMPT_TERMOS = join(dirname(fileURLToPath(import.meta.url)
 /** O prompt da explicação de um trecho ("Não sei o que é isso", "Explique melhor"; mesmo formato). */
 export const CAMINHO_PROMPT_EXPLICAR = join(dirname(fileURLToPath(import.meta.url)), "..", "prompts", "explicar-trecho.md");
 
+/** O prompt do relatório do método de um módulo concluído (docs/metodo-ciclo.md; mesmo formato). */
+export const CAMINHO_PROMPT_RELATORIO = join(dirname(fileURLToPath(import.meta.url)), "..", "prompts", "relatorio-metodo.md");
+
 /** Os arquivos da metodologia de "Marcar os termos" e da explicação de um trecho. */
 export const METODO_TERMOS = [ARQUIVO_TERMOS] as const;
 export const METODO_EXPLICAR = ["conceito.md", ARQUIVO_TERMOS] as const;
@@ -236,6 +268,7 @@ const MAX_TOKENS_BLOCO = 16_000;
 const MAX_TOKENS_VERIFICACAO = 8_000;
 const MAX_TOKENS_TERMOS = 16_000;
 const MAX_TOKENS_EXPLICAR = 8_000;
+const MAX_TOKENS_RELATORIO = 16_000;
 
 /** Até quantos caracteres ler_modulo devolve de uma vez (as explicações vão inteiras). */
 const LIMITE_LEITURA = 100_000;
@@ -260,7 +293,12 @@ const ACOES: ReadonlyArray<AcaoDaTela> = [
 	"marcar_termos",
 	"explicar_trecho",
 	"guardar_termo",
+	"gerar_relatorio",
+	"decidir_proposta",
 ];
+
+/** As ações dos ajustes do método, sem matéria nem curso (os ajustes valem para todas): atendidas à parte. */
+const ACOES_AJUSTES: ReadonlyArray<AcaoDaTela> = ["ligar_ajuste", "listar_ajustes"];
 
 /** As ações que são de uma questão, a nota rápida de um bloco e o pedido de explicação: o erro leva o bloco. */
 const ACOES_DA_QUESTAO: ReadonlyArray<AcaoDaTela> = ["responder", "corrigir", "encerrar", "avaliar_bloco", "explicar_trecho"];
@@ -293,6 +331,13 @@ interface DadosAcao {
 	trecho?: unknown;
 	tipo?: unknown;
 	explicacao?: unknown;
+	forcar?: unknown;
+	proposta?: unknown;
+	decisao?: unknown;
+	motivo?: unknown;
+	arquivo?: unknown;
+	ajuste?: unknown;
+	ativo?: unknown;
 }
 
 const FRASES: Record<AcaoDaTela | "ler", string> = {
@@ -312,6 +357,10 @@ const FRASES: Record<AcaoDaTela | "ler", string> = {
 	marcar_termos: "marcar os termos do módulo",
 	explicar_trecho: "explicar o trecho",
 	guardar_termo: "guardar o termo no glossário",
+	gerar_relatorio: "gerar o relatório do método",
+	decidir_proposta: "gravar a decisão sobre a proposta",
+	ligar_ajuste: "ligar ou desligar o ajuste do método",
+	listar_ajustes: "ler os ajustes do método",
 	ler: "ler o módulo",
 };
 
@@ -752,6 +801,56 @@ export function mensagemDaExplicacao(entrada: EntradaExplicacao, regras = ""): s
 	].join("\n\n");
 }
 
+/** O que vai na mensagem do relatório do método. */
+export interface EntradaRelatorio {
+	curso: EntradaPlano["curso"];
+	modulo: EntradaPlano["modulo"];
+	/** As lições do módulo (o título e o objetivo de cada uma). */
+	licoes: readonly Pick<Licao, "id" | "titulo" | "objetivo">[];
+	/** A evidência montada (montarEvidencia): as linhas mandadas e os blocos com Ruim ou pedido de explicação. */
+	evidencia: EvidenciaMontada;
+	/** A metodologia inteira, com os ajustes ativos (lerMetodo com a pasta de dados). */
+	metodo: readonly MetodoLido[];
+}
+
+/**
+ * A mensagem do relatório do método (docs/metodo-ciclo.md, "A evidência"):
+ * o curso e o módulo; o título e o objetivo das lições; as linhas dos
+ * eventos ("- <id>: <linha>", linhaParaOModelo), com quantos foram lidos,
+ * quantos são de retorno e quantos ficaram de fora; o começo do texto dos
+ * blocos com Feedback Ruim ou pedido de explicação; a metodologia atual,
+ * cada arquivo seguido dos ajustes ativos (blocoDeAjustes); e, com `regras`,
+ * as regras de escrita do Breno.
+ */
+export function mensagemDoRelatorio(entrada: EntradaRelatorio, regras = ""): string {
+	const { evidencia } = entrada;
+	const licoes = entrada.licoes.map((licao, indice) => `${indice + 1}. ${licao.id}, ${JSON.stringify(licao.titulo)}: ${licao.objetivo || "(sem objetivo)"}`);
+	const deFora = evidencia.deFora > 0 ? `; ${evidencia.deFora} de fora por falta de espaço (os de retorno ficaram)` : "";
+	const blocos = evidencia.blocos.map(
+		(bloco) =>
+			`<bloco id=${JSON.stringify(bloco.bloco)} licao=${JSON.stringify(bloco.licao)} tipo=${JSON.stringify(NOMES_ITEM_ROTEIRO[bloco.item])} arquivo=${JSON.stringify(bloco.arquivo)}>\n${bloco.texto}${bloco.cortado ? "\n[… o bloco continua]" : ""}\n</bloco>`,
+	);
+	const metodo = entrada.metodo.flatMap((item) => [
+		`<metodologia arquivo=${JSON.stringify(item.arquivo)}>\n${item.conteudo.trim()}\n</metodologia>`,
+		...(item.ajustes ? [blocoDeAjustes(item.arquivo, item.ajustes.ativos)] : []),
+	]);
+	return [
+		...linhasDoCurso({ curso: entrada.curso, modulo: entrada.modulo, formulario: {} }),
+		`Lições do módulo (${licoes.length}):\n${licoes.join("\n")}`,
+		evidencia.mandadas.length > 0
+			? [
+					`Eventos do módulo (${evidencia.eventosLidos} lidos, ${evidencia.retornos} de retorno${deFora}), na ordem em que aconteceram:`,
+					...evidencia.mandadas.map(linhaParaOModelo),
+				].join("\n")
+			: "Eventos do módulo: nenhum.",
+		blocos.length > 0
+			? `O começo dos blocos com Feedback Ruim ou com pedido de explicação (${blocos.length}):\n\n${blocos.join("\n\n")}`
+			: "Blocos com Feedback Ruim ou com pedido de explicação: nenhum.",
+		`A metodologia atual (cada arquivo e, quando há, os ajustes já aprovados pelo Breno para ele):\n\n${metodo.join("\n\n")}`,
+		...comRegras(regras),
+	].join("\n\n");
+}
+
 /** Os arquivos da metodologia usados e os ajustes do Breno de cada um (usadosDoMetodo), sem repetir, na ordem em que apareceram (para o contexto do gerou_modulo). */
 function metodoUsado(lidos: readonly MetodoLido[]) {
 	const vistos = new Set<string>();
@@ -850,6 +949,8 @@ export interface OpcoesModulos {
 	caminhoPromptTermos?: string;
 	/** O explicar-trecho.md (nos testes, um prompt de mentira). */
 	caminhoPromptExplicar?: string;
+	/** O relatorio-metodo.md (nos testes, um prompt de mentira). */
+	caminhoPromptRelatorio?: string;
 	/** A pasta da metodologia (nos testes, arquivos de mentira). */
 	pastaMetodo?: string;
 	/** Quanto esperar os materiais do formulário (nos testes, pouco). */
@@ -954,6 +1055,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 	const caminhoCorretor = opcoes.caminhoPromptCorretor ?? CAMINHO_PROMPT_CORRETOR;
 	const caminhoTermos = opcoes.caminhoPromptTermos ?? CAMINHO_PROMPT_TERMOS;
 	const caminhoExplicar = opcoes.caminhoPromptExplicar ?? CAMINHO_PROMPT_EXPLICAR;
+	const caminhoRelatorio = opcoes.caminhoPromptRelatorio ?? CAMINHO_PROMPT_RELATORIO;
 	const pastaMetodo = opcoes.pastaMetodo ?? PASTA_METODO;
 	const tempoEspera = opcoes.tempoEsperaMateriaisMs ?? TEMPO_ESPERA_MATERIAIS_MS;
 	const intervalo = opcoes.intervaloVarreduraMs ?? INTERVALO_VARREDURA_MS;
@@ -982,6 +1084,12 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 	const marcacoes = new Map<string, MarcacaoEmAndamento>();
 	/** As explicações de um trecho em andamento, por "matéria/curso/módulo" e pelo id do pedido. */
 	const explicacoesEmAndamento = new Map<string, Map<string, AbortController>>();
+	/** Os relatórios do método sendo gerados, por "matéria/curso/módulo" (um por módulo). */
+	const relatorios = new Map<string, AbortController>();
+	/** A frase do último relatório que falhou, por "matéria/curso/módulo", até a próxima tentativa (um relatório que falhou não deixa arquivo). */
+	const errosDoRelatorio = new Map<string, string>();
+	/** A trava dos arquivos de ajustes (aprendiz/metodo/): todo ler-gravar deles espera o anterior. Pode ser tomada dentro da trava de uma matéria, nunca o contrário. */
+	let travaAjustes: Promise<unknown> = Promise.resolve();
 
 	const daSessao = () => (sessao ? { sessao } : {});
 	const chaveDo = (materia: string, curso: string) => `${materia}/${curso}`;
@@ -990,6 +1098,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 	function mostrar(acao: "estado", dados: MensagemEstado): void;
 	function mostrar(acao: "modulo", dados: MensagensModulos["modulo"]): void;
 	function mostrar(acao: "erro", dados: MensagensModulos["erro"]): void;
+	function mostrar(acao: "ajustes", dados: MensagensModulos["ajustes"]): void;
 	function mostrar(acao: keyof MensagensModulos, dados: unknown): void {
 		pi.events.emit("interface:mostrar", { painel: PAINEL_MODULOS, acao, dados, gravar: false });
 	}
@@ -1029,8 +1138,10 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 	 * pedidos de explicação em andamento e o glossário do curso
 	 * (glossarioParaATela: com o lugar de cada termo, pelo esqueleto e pelos
 	 * módulos do disco; um glossário ou curso ilegível vai vazio, e a marca
-	 * aparece como texto); com o pedido, quando responde a uma ação. Chamado
-	 * dentro da trava.
+	 * aparece como texto); num módulo concluído, o relatório do método gravado
+	 * (um arquivo ilegível vai como null, com a frase em relatorioErro), se ele
+	 * está sendo gerado e a frase da última tentativa que falhou; com o pedido,
+	 * quando responde a uma ação. Chamado dentro da trava.
 	 */
 	const mostrarModulo = async (materia: string, curso: string, modulo: Modulo, pedido?: string) => {
 		const dados = pastaDados;
@@ -1043,7 +1154,28 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 				glossario = [];
 			}
 		}
-		mostrar("modulo", { materia, curso, modulo, corrigindo: corrigindoNo(modulo), explicando: explicandoNo(modulo), glossario, ...(pedido ? { pedido } : {}) });
+		const chave = chaveDoModulo(materia, curso, modulo.id);
+		let relatorio: RelatorioMetodo | null = null;
+		let relatorioErro = errosDoRelatorio.get(chave);
+		if (dados && modulo.situacao === "gerado" && modulo.concluidoEm) {
+			try {
+				relatorio = await lerRelatorio(dados, materia, curso, modulo.id);
+			} catch (erro) {
+				relatorioErro ??= (erro as Error).message;
+			}
+		}
+		mostrar("modulo", {
+			materia,
+			curso,
+			modulo,
+			corrigindo: corrigindoNo(modulo),
+			explicando: explicandoNo(modulo),
+			glossario,
+			relatorio,
+			relatorioGerando: relatorios.has(chave),
+			...(relatorioErro ? { relatorioErro } : {}),
+			...(pedido ? { pedido } : {}),
+		});
 	};
 
 	const marcarConferindo = (chave: string, alvo: AlvoConferencia): AbortController => {
@@ -1149,8 +1281,10 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 	 * O estado de todos os módulos do curso, na ordem do esqueleto: a geração
 	 * em andamento, o erro da última geração (com os dados da versão gravada,
 	 * quando há), o arquivo ilegível (erro), o gravado (gerado, com concluido e
-	 * concluidoEm, ou aguardando, com materialNovo) ou a_gerar; e o
-	 * recomendado (proximo). Curso que não está pronto: nenhum módulo.
+	 * concluidoEm e, no concluído, o relatorio do método: estadoDoRelatorio, com
+	 * o relatório ilegível como erro; ou aguardando, com materialNovo) ou
+	 * a_gerar; e o recomendado (proximo). Curso que não está pronto: nenhum
+	 * módulo.
 	 */
 	const estadoDoCurso = async (dados: string, materia: string, curso: string): Promise<{ modulos: EstadoModulo[]; proximo: string | null }> => {
 		const atual = await lerCurso(dados, materia, curso);
@@ -1160,6 +1294,20 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 		const prontos = algumAguardando ? await materiaisProntos(dados, materia) : [];
 		const geracao = geracoes.get(chaveDo(materia, atual.id));
 		const reescrita = reescritas.get(chaveDo(materia, atual.id));
+		// O relatório do método de cada módulo concluído (docs/metodo-ciclo.md).
+		const relatoriosDoCurso = new Map<string, EstadoRelatorio>();
+		for (const [id, gravado] of Object.entries(lidos.modulos)) {
+			if (gravado.situacao !== "gerado" || !gravado.concluidoEm) continue;
+			const chave = chaveDoModulo(materia, atual.id, id);
+			let lido: RelatorioMetodo | null = null;
+			let ilegivel: string | undefined;
+			try {
+				lido = await lerRelatorio(dados, materia, atual.id, id);
+			} catch (erro) {
+				ilegivel = (erro as Error).message;
+			}
+			relatoriosDoCurso.set(id, estadoDoRelatorio(lido, { gerando: relatorios.has(chave), erro: errosDoRelatorio.get(chave) ?? ilegivel }));
+		}
 		const lista = atual.esqueleto.modulos.map(({ id }): EstadoModulo => {
 			if (geracao?.aceita && geracao.modulo === id) {
 				const esperando = geracao.esperando ?? [];
@@ -1192,6 +1340,7 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 					...(gravado.concluidoEm ? { concluidoEm: gravado.concluidoEm } : {}),
 					...(reescrita?.aceita && reescrita.modulo === id ? { reescrevendo: { licao: reescrita.licao, bloco: reescrita.bloco } } : {}),
 					...(marcacao?.aceita ? { marcando: { licao: marcacao.licao, licoes: marcacao.licoes } } : {}),
+					...(relatoriosDoCurso.has(id) ? { relatorio: relatoriosDoCurso.get(id)! } : {}),
 				};
 			} else if (gravado?.situacao === "aguardando_material") {
 				doGravado = { nota: gravado.aguardando.nota, materialNovo: materialNovo(gravado.aguardando, prontos) };
@@ -2104,6 +2253,151 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 		}
 	};
 
+	/** Roda `tarefa` na trava dos arquivos de ajustes (depois da anterior, mesmo que ela tenha falhado). */
+	const naTravaAjustes = <T>(tarefa: () => Promise<T>): Promise<T> => {
+		const resultado = travaAjustes.then(tarefa, tarefa);
+		travaAjustes = resultado.catch(() => undefined);
+		return resultado;
+	};
+
+	/**
+	 * Marca o relatório do método do módulo como sendo gerado
+	 * (relatorioGerando) e tira a frase da tentativa anterior. Um que já está
+	 * sendo gerado é ErroMetodo. Chamado na trava da matéria, antes de mandar o
+	 * módulo e o estado.
+	 */
+	const comecarRelatorio = (materia: string, curso: string, modulo: string): AbortController => {
+		const chave = chaveDoModulo(materia, curso, modulo);
+		if (relatorios.has(chave)) throw new ErroMetodo("O relatório do método deste módulo já está sendo gerado. Espere terminar.");
+		const controle = new AbortController();
+		relatorios.set(chave, controle);
+		errosDoRelatorio.delete(chave);
+		return controle;
+	};
+
+	/**
+	 * Gera o relatório do método de um módulo concluído (docs/metodo-ciclo.md),
+	 * já marcado em relatorios (comecarRelatorio). Fora da trava: lê o módulo e
+	 * monta a evidência (evidenciaDoModulo, do aprendiz/eventos.jsonl); com
+	 * menos de MINIMO_RETORNOS eventos de retorno e sem `forcar`, o relatório é
+	 * pouco_retorno, sem chamar o modelo; senão, lê o prompt
+	 * (relatorio-metodo.md), a metodologia inteira com os ajustes ativos e as
+	 * regras de escrita da matéria e chama o modelo (mensagemDoRelatorio;
+	 * validarRelatorioDoModelo, com a nova tentativa do pedirJson; os consertos
+	 * não pedem outra). Na trava, grava o relatório e o gerou_relatorio_metodo
+	 * (registrarRelatorio, que não sobrescreve um relatório ilegível) e manda o
+	 * módulo e o estado. Com erro, a frase fica em errosDoRelatorio (um
+	 * relatório que falhou não deixa arquivo) e vão o erro (sem pedido, ao
+	 * gerar_relatorio), o módulo e o estado. O fim da sessão cancela sem
+	 * gravar.
+	 */
+	const gerarRelatorio = async (dados: string, materia: string, curso: string, modulo: string, controle: AbortController, forcar: boolean) => {
+		const chave = chaveDoModulo(materia, curso, modulo);
+		const sinal = controle.signal;
+		const mandarDeNovo = async () => {
+			const atual = await lerModulo(dados, materia, curso, modulo);
+			if (atual) await mostrarModulo(materia, curso, atual);
+			await mostrarEstado(dados, materia, curso);
+		};
+		try {
+			const lido = await lerModulo(dados, materia, curso, modulo);
+			if (!lido || lido.situacao !== "gerado" || !lido.concluidoEm) throw new ErroMetodo(`O módulo ${modulo} não está concluído; o relatório do método é de um módulo concluído.`);
+			const evidencia = await evidenciaDoModulo(dados, lido);
+			const contagem = { modulo, eventosLidos: evidencia.eventosLidos, retornos: evidencia.retornos };
+			let relatorio: RelatorioMetodo;
+			if (!forcar && evidencia.retornos < MINIMO_RETORNOS) {
+				relatorio = novoRelatorio({ ...contagem, geradoEm: new Date().toISOString() });
+			} else {
+				const prompt = await lerPrompt(caminhoRelatorio);
+				if (!registro) throw new ErroModulo("A sessão não tem o registro de modelos do pi; não dá para chamar o modelo do relatório do método.");
+				const modelo = resolverModelo(registro, prompt.modelo, "do relatório do método");
+				const metodo = await lerMetodo(pastaMetodo, ARQUIVOS_METODO, dados);
+				const regras = await regrasDaMateria(dados, materia);
+				const entrada = await entradaDoModelo(dados, materia, curso, modulo);
+				const ativos = Object.fromEntries(metodo.map((item) => [item.arquivo, (item.ajustes?.ativos ?? []).map((ajuste) => ajuste.texto)]));
+				const mandadas = evidencia.mandadas.map((item) => item.id);
+				const resposta = await pedirJson(
+					registro,
+					modelo,
+					prompt.instrucoes,
+					mensagemDoRelatorio({ curso: entrada.plano.curso, modulo: entrada.plano.modulo, licoes: lido.licoes, evidencia, metodo }, regras),
+					(texto) => validarRelatorioDoModelo(objetoJsonDoModelo(texto), { evidencias: mandadas, ativos }).relatorio,
+					sinal,
+					{
+						maxTokens: MAX_TOKENS_RELATORIO,
+						formato: '{"resumo": "…", "funcionou": [...], "problemas": [...], "propostas": [...]}',
+						oQue: "o relatório do método",
+						depois: "Nenhum relatório foi gravado.",
+					},
+				);
+				relatorio = novoRelatorio({
+					...contagem,
+					geradoEm: new Date().toISOString(),
+					doModelo: { relatorio: resposta.resultado, modelo: prompt.modelo, custo: resposta.custo, prompt: prompt.usado, todas: evidencia.todas },
+				});
+			}
+			await naTrava(materia, async () => {
+				if (sinal.aborted) throw new Cancelado();
+				if (relatorios.get(chave) === controle) relatorios.delete(chave);
+				await registrarRelatorio(dados, materia, curso, relatorio, daSessao());
+				await mandarDeNovo();
+			});
+		} catch (erro) {
+			if (relatorios.get(chave) === controle) relatorios.delete(chave);
+			if (pastaDados !== dados || erro instanceof Cancelado || sinal.aborted) return;
+			const mensagem = mensagemDe(erro, "gerar_relatorio");
+			errosDoRelatorio.set(chave, mensagem);
+			mostrar("erro", { mensagem, ao: "gerar_relatorio", materia, curso, modulo });
+			await naTrava(materia, async () => {
+				if (pastaDados !== dados) return;
+				await mandarDeNovo();
+			}).catch(() => undefined);
+		} finally {
+			if (relatorios.get(chave) === controle) relatorios.delete(chave);
+		}
+	};
+
+	/**
+	 * "Gerar o relatório do método" (gerar_relatorio; também "Tentar de novo" e,
+	 * com forcar, "Gerar mesmo assim"): na trava, confere o módulo concluído, o
+	 * relatório anterior (ilegível é erro: não é sobrescrito) e que nenhum está
+	 * sendo gerado, marca o relatório e manda o módulo com o pedido (com
+	 * relatorioGerando) e o estado; depois, gerarRelatorio. Gerar de novo
+	 * substitui o relatório; as decisões tomadas ficam nos eventos.
+	 */
+	const pedirRelatorio = async (dados: string, materia: string, curso: string, modulo: string, dadosAcao: DadosAcao, pedido: string | undefined) => {
+		const controle = await naTrava(materia, async () => {
+			const lido = await lerModulo(dados, materia, curso, modulo);
+			if (!lido) throw new ErroModulo(`O módulo ${modulo} ainda não foi gerado.`);
+			if (lido.situacao !== "gerado" || !lido.concluidoEm) throw new ErroMetodo(`O módulo ${modulo} não está concluído; o relatório do método é de um módulo concluído.`);
+			await lerRelatorio(dados, materia, curso, modulo);
+			const marcado = comecarRelatorio(materia, curso, modulo);
+			await mostrarModulo(materia, curso, lido, pedido);
+			await mostrarEstado(dados, materia, curso);
+			return marcado;
+		});
+		await gerarRelatorio(dados, materia, curso, modulo, controle, dadosAcao.forcar === true);
+	};
+
+	/**
+	 * A decisão do Breno numa proposta do relatório (decidir_proposta;
+	 * decidirProposta, na trava da matéria e, dentro dela, na dos ajustes):
+	 * aprovar acrescenta o ajuste e grava o aprovou_ajuste_metodo; rejeitar
+	 * grava o rejeitou_ajuste_metodo; a decisão vai para o relatório. Responde
+	 * com o módulo com o pedido e manda o estado (as pendentes). Com o
+	 * relatório sendo gerado de novo, erro.
+	 */
+	const decidir = (dados: string, materia: string, curso: string, modulo: string, dadosAcao: DadosAcao, pedido: string | undefined) =>
+		naTrava(materia, async () => {
+			if (relatorios.has(chaveDoModulo(materia, curso, modulo))) throw new ErroMetodo("O relatório do método deste módulo está sendo gerado de novo. Espere terminar antes de decidir.");
+			const lido = await lerModulo(dados, materia, curso, modulo);
+			if (!lido) throw new ErroModulo(`O módulo ${modulo} ainda não foi gerado.`);
+			const entrada = { proposta: dadosAcao.proposta, decisao: dadosAcao.decisao, texto: dadosAcao.texto, motivo: dadosAcao.motivo };
+			await naTravaAjustes(() => decidirProposta(dados, materia, curso, modulo, entrada, daSessao()));
+			await mostrarModulo(materia, curso, lido, pedido);
+			await mostrarEstado(dados, materia, curso);
+		});
+
 	pi.on("session_start", (_evento, ctx) => {
 		pastaDados = ctx.cwd;
 		sessao = ctx.sessionManager.getSessionId();
@@ -2124,6 +2418,9 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 		marcacoes.clear();
 		for (const doModulo of explicacoesEmAndamento.values()) for (const controle of doModulo.values()) controle.abort();
 		explicacoesEmAndamento.clear();
+		for (const controle of relatorios.values()) controle.abort();
+		relatorios.clear();
+		errosDoRelatorio.clear();
 		retornos.clear();
 		erros.clear();
 		avisos.clear();
@@ -2237,6 +2534,10 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 					await explicarTrecho(dados, materia, curso, modulo, dadosAcao, pedido);
 				} else if (ao === "guardar_termo") {
 					await guardar(dados, materia, curso, modulo, dadosAcao, pedido);
+				} else if (ao === "gerar_relatorio") {
+					await pedirRelatorio(dados, materia, curso, modulo, dadosAcao, pedido);
+				} else if (ao === "decidir_proposta") {
+					await decidir(dados, materia, curso, modulo, dadosAcao, pedido);
 				} else if (ao === "cancelar") {
 					// Para a geração ou a reescrita de um bloco do módulo (o que estava gravado fica).
 					const chave = chaveDo(materia, curso);
@@ -2261,24 +2562,61 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 					});
 				} else if (ao === "concluir") {
 					// Na trava do curso (a da matéria): grava o concluidoEm e o
-					// concluiu_modulo, manda o módulo novo (para a visão dele) e o
-					// estado com o pedido (a resposta da tela).
-					await naTrava(materia, async () => {
+					// concluiu_modulo, marca o relatório do método como sendo gerado,
+					// manda o módulo novo (para a visão dele) e o estado com o pedido (a
+					// resposta da tela). Depois, sem esperar, o relatório do método
+					// (docs/metodo-ciclo.md, "Quando roda").
+					const controle = await naTrava(materia, async () => {
 						const emAndamento = geracoes.get(chaveDo(materia, curso));
 						if (emAndamento?.modulo === modulo) throw new ErroModulo("Este módulo está sendo gerado. Pare a geração antes de concluí-lo.");
 						const concluido = await concluirModulo(dados, materia, curso, modulo, daSessao());
 						erros.delete(chaveDoModulo(materia, curso, modulo));
 						avisos.delete(chaveDoModulo(materia, curso, modulo));
+						const marcado = comecarRelatorio(materia, curso, modulo);
 						await mostrarModulo(materia, curso, concluido);
 						await mostrarEstado(dados, materia, curso, pedido);
+						return marcado;
 					});
+					void gerarRelatorio(dados, materia, curso, modulo, controle, false);
 				}
 			} catch (erro) {
 				const comBloco = ACOES_DA_QUESTAO.includes(ao) && typeof dadosAcao.bloco === "string" && dadosAcao.bloco ? { bloco: dadosAcao.bloco } : {};
 				const comExplicacao = ao === "guardar_termo" && typeof dadosAcao.explicacao === "string" && dadosAcao.explicacao ? { explicacao: dadosAcao.explicacao } : {};
-				mostrar("erro", { mensagem: mensagemDe(erro, ao), ao, materia, curso, ...comModulo, ...comBloco, ...comExplicacao, ...comPedido });
+				const comProposta = ao === "decidir_proposta" && typeof dadosAcao.proposta === "string" && dadosAcao.proposta ? { proposta: dadosAcao.proposta } : {};
+				mostrar("erro", { mensagem: mensagemDe(erro, ao), ao, materia, curso, ...comModulo, ...comBloco, ...comExplicacao, ...comProposta, ...comPedido });
 			}
 		})();
+	});
+
+	// Os ajustes do método no painel modulos (docs/metodo-ciclo.md, "Ponte"):
+	// ligar_ajuste e listar_ajustes, sem matéria nem curso (os ajustes valem
+	// para todas), na trava dos ajustes; a resposta é "ajustes" (com o pedido)
+	// ou "erro" (ao, o arquivo e o ajuste em ligar_ajuste). Sem session_start,
+	// calada como o resto.
+	pi.events.on("interface:acao", (recebido) => {
+		const { painel, acao, dados: bruto } = (recebido ?? {}) as { painel?: string; acao?: string; dados?: unknown };
+		if (painel !== PAINEL_MODULOS || !ACOES_AJUSTES.includes(acao as AcaoDaTela)) return;
+		const dados = pastaDados;
+		if (!dados) return;
+		const ao = acao as "ligar_ajuste" | "listar_ajustes";
+		const dadosAcao = (typeof bruto === "object" && bruto !== null ? bruto : {}) as DadosAcao;
+		const pedido = typeof dadosAcao.pedido === "string" ? dadosAcao.pedido : undefined;
+		const comPedido = pedido ? { pedido } : {};
+		void naTravaAjustes(async () => {
+			if (pastaDados !== dados) return;
+			if (ao === "ligar_ajuste") await ligarAjusteNoDisco(dados, dadosAcao.arquivo, dadosAcao.ajuste, dadosAcao.ativo, daSessao());
+			mostrar("ajustes", { arquivos: await listarAjustes(dados), ...comPedido });
+		}).catch((erro: unknown) => {
+			if (pastaDados !== dados) return;
+			const doAjuste =
+				ao === "ligar_ajuste"
+					? {
+							...(typeof dadosAcao.arquivo === "string" && dadosAcao.arquivo ? { arquivo: dadosAcao.arquivo } : {}),
+							...(typeof dadosAcao.ajuste === "string" && dadosAcao.ajuste ? { ajuste: dadosAcao.ajuste } : {}),
+						}
+					: {};
+			mostrar("erro", { mensagem: mensagemDe(erro, ao), ao, ...doAjuste, ...comPedido });
+		});
 	});
 
 	// O painel escrita (docs/escrita.md, "Ponte"): listar, salvar e apagar as

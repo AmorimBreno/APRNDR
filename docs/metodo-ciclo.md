@@ -1,5 +1,7 @@
 # O ciclo do método: relatório e ajustes (parte 4 do plano de 2026-10-28)
 
+> Mudou em 2026-11-03: a aprovação e o liga e desliga saíram. Os ajustes agora são experimentos que a análise de cada módulo decide sozinha. Veja docs/metodo-experimentos.md, que vale acima deste documento onde os dois diferem.
+
 Pedido do Breno: o professor aprende a ensinar melhor com o retorno dele. Quando um módulo é concluído, o professor lê o que o Breno deixou nele e propõe ajustes à metodologia. Cada proposta cita eventos e o Breno aprova ou rejeita uma a uma.
 
 Decisões dele (2026-11-03):

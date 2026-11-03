@@ -14,7 +14,7 @@ Os dados de estudo ficam numa pasta fora do repositório, em markdown e JSON leg
 
 Os eventos de aprendizagem são só de acréscimo. Nunca edite ou apague eventos já gravados.
 
-Toda hipótese do perfil do aprendiz precisa citar ids de eventos. Nada no perfil é alterado sem aprovação do usuário.
+Toda hipótese do perfil do aprendiz precisa citar ids de eventos. Nada no perfil é alterado sem aprovação do usuário. A exceção são os ajustes do método, que entram sozinhos como experimentos (ESPECIFICACAO.md, 13.17).
 
 O app deve continuar abrindo pelo atalho único e recarregando ao vivo depois de qualquer mudança.
 

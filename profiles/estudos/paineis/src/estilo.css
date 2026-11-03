@@ -74,7 +74,7 @@
 .material__avisos ul { margin: var(--space-1) 0 0; padding-left: var(--space-5); }
 .cadernos__corpo { overflow: hidden; }
 
-/* ── Caderno da matéria (TelaCaderno.tsx): a aba tijolo, o índice das seções e a seção aberta ── */
+/* ── Caderno da matéria (TelaCaderno.tsx): a aba tijolo e, embaixo, o painel de três faixas (cursos, linha do tempo e a lista com as tags) ── */
 .tela-caderno { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: var(--space-4); height: 100%; padding: var(--space-4); box-sizing: border-box; }
 .aba-caderno { overflow: hidden; border-radius: var(--radius-lg); }
 .aba-caderno .ap-cbar__course { max-width: 560px; }
@@ -109,31 +109,32 @@
 	100% { transform: translateY(0) scale(1, 1); }
 }
 
-.caderno { display: grid; grid-template-columns: var(--menu-rail) minmax(0, 1fr); gap: var(--space-4); min-height: 0; }
 .caderno__erro { display: grid; place-items: center; }
-
-.caderno__indice { overflow-y: auto; padding: var(--space-5) var(--space-3); border-radius: var(--radius-lg); background: var(--surface-panel); scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
-.caderno__indice ul { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
-.caderno__indice-titulo { margin: 0 var(--space-3) var(--space-3); color: var(--ink-muted); }
-.caderno__item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); width: 100%; height: 48px; padding: 0 var(--space-3); border: var(--border-control) solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--ink); font: inherit; text-align: left; cursor: pointer; transition: background-color .16s ease-out, border-color .16s ease-out, transform .3s var(--mola); }
-.caderno__item:hover { background: var(--surface-hover); }
-.caderno__item:active { transform: translateY(1px); }
-.caderno__item:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-.caderno__item--atual, .caderno__item--atual:hover { border-color: var(--amber); background: var(--amber-tint); }
-.caderno__item--em-breve { color: var(--ink-muted); }
-.caderno__item-nome { overflow: hidden; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
-.caderno__item-conta { color: var(--ink-subtle); }
-.caderno__item--atual .ap-icon { color: var(--amber); }
-
-.caderno__secao { display: flex; flex-direction: column; min-height: 0; overflow: hidden; border-radius: var(--radius-lg); background: var(--surface-panel); }
-.caderno__secao-cabeca { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 4px var(--space-4); padding: var(--space-6) var(--space-8) var(--space-4); border-bottom: var(--border-hair) solid var(--line); }
-.caderno__secao-cabeca .overline { grid-column: 1; color: var(--ink-muted); }
-.caderno__secao-titulo { grid-column: 1; margin: 0; }
-.caderno__secao-meta { grid-column: 2; grid-row: 2; color: var(--ink-muted); }
-.caderno__secao-corpo { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-6) var(--space-8); scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
-.caderno__secao-corpo .ap-empty { max-width: 760px; background: var(--surface-raised); }
-.caderno__secao-corpo .materiais { max-width: 880px; }
 .caderno__carregando { margin: 0; color: var(--ink-muted); }
+
+/* O painel: abaixo da aba, na largura toda, e rola na vertical como um todo (é o motion.div com layoutScroll, para o arrasto
+ * do mapa medir certo). Cada faixa é um bloco no fundo do painel; as faixas dos cursos e da linha do tempo rolam para o lado
+ * dentro delas. A nota aberta ocupa a mesma área, no lugar do painel. */
+.painel-caderno { display: flex; flex-direction: column; gap: var(--space-4); min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+.painel-caderno__bloco { flex: none; min-width: 0; padding: var(--space-5) var(--space-6); border-radius: var(--radius-lg); background: var(--surface-panel); }
+.painel-caderno__nota { display: flex; flex-direction: column; min-height: 0; overflow: hidden; border-radius: var(--radius-lg); background: var(--surface-panel); }
+/* A lista de baixo: o seletor de tags (e a meta à direita) em cima, o conteúdo da tag escolhida embaixo. */
+.painel-caderno__lista { display: flex; flex-direction: column; gap: var(--space-5); }
+.painel-caderno__seletor { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-4); min-width: 0; }
+.painel-caderno__meta { flex: none; color: var(--ink-muted); }
+.painel-caderno__corpo { min-width: 0; }
+.painel-caderno__corpo .ap-empty { max-width: 760px; background: var(--surface-raised); }
+.painel-caderno__corpo .materiais { max-width: 880px; }
+/* As tags do seletor: teclas de papel como as do diagnóstico (.diag__tecla), mas com ícone e contagem; a escolhida fica âmbar.
+ * O respiro de baixo e o das laterais deixam a sombra da tecla e o anel de foco aparecerem dentro da rolagem para o lado. */
+.painel-caderno__tags { display: flex; align-items: center; gap: var(--space-2); min-width: 0; margin: calc(-1 * var(--space-1)); padding: var(--space-1) var(--space-1) 6px; overflow-x: auto; scrollbar-width: none; }
+.painel-caderno__tag { position: relative; flex: none; display: inline-flex; align-items: center; gap: var(--space-2); min-height: var(--control-md); padding: 0 var(--space-4) 2px; border: 0; border-radius: var(--radius-sm); background: var(--cream); color: var(--on-cream); box-shadow: var(--key-lip); font: inherit; white-space: nowrap; cursor: pointer; user-select: none; transition: filter .12s ease-out, transform .06s ease-out; }
+.painel-caderno__tag:hover { filter: brightness(1.06); }
+.painel-caderno__tag:active { transform: translateY(1px); box-shadow: var(--key-lip-pressed); }
+.painel-caderno__tag:focus-visible { outline: none; box-shadow: var(--key-lip), var(--focus-ring); }
+.painel-caderno__tag--escolhida { background: var(--amber); color: var(--on-amber); }
+.painel-caderno__tag-nome { font-weight: 600; }
+.painel-caderno__tag-conta { opacity: .78; }
 
 /* A linha do tempo: um fio tracejado com uma marca por evento, os dias como cabeçalhos. */
 .tempo { display: flex; flex-direction: column; gap: var(--space-8); max-width: var(--measure-read); }
@@ -176,19 +177,14 @@
 .faixa-tempo__detalhe { -webkit-line-clamp: 2; }
 
 @media (max-width: 900px) {
-	.caderno { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
-	.caderno__indice { padding: var(--space-2); }
-	.caderno__indice-titulo { display: none; }
-	.caderno__indice ul { flex-direction: row; overflow-x: auto; scrollbar-width: none; }
-	.caderno__indice li { flex: none; }
-	.caderno__item { grid-template-columns: auto auto; width: auto; }
-	.caderno__item-nome { overflow: visible; }
-	.caderno__item-conta { display: none; }
-	.caderno__secao-cabeca, .caderno__secao-corpo { padding-left: var(--space-5); padding-right: var(--space-5); }
+	.painel-caderno__bloco { padding: var(--space-4); }
+	/* O seletor e a meta numa coluna só: o seletor rola para o lado se as três tags não couberem. */
+	.painel-caderno__seletor { flex-direction: column; align-items: stretch; }
 	.aba-caderno__professor { margin-right: var(--space-4); }
 }
 @media (prefers-reduced-motion: reduce) {
-	.caderno__item, .aba-caderno__capa .ap-nb, .aba-caderno__leque .aba-caderno__leque-capa { transition: none; }
+	.painel-caderno__tag, .aba-caderno__capa .ap-nb, .aba-caderno__leque .aba-caderno__leque-capa { transition: none; }
+	.painel-caderno__tag:active { transform: none; }
 	.aba-caderno__professor .avatar, .aba-caderno__professor--abrindo .avatar { animation: none; }
 }
 
@@ -572,19 +568,7 @@
 	.faixa-cursos__celula:hover > .faixa-cursos__item { transform: none; }
 }
 
-/* ── Cursos do caderno (SecaoCursos.tsx, item 5): a lista no ritmo da lista de notas ── */
-.cursos { display: flex; flex-direction: column; gap: var(--space-5); max-width: 880px; }
-.cursos .ap-callout { margin: 0; }
-.cursos__topo { display: flex; justify-content: flex-end; }
-.cursos__lista { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
-.cursos__item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); padding: var(--space-4); border: var(--border-control) solid transparent; border-radius: var(--radius-md); background: var(--surface-raised); color: var(--ink); transition: border-color .16s ease-out; }
-.cursos__item:hover { border-color: var(--line-strong); }
-.cursos__item > .ap-icon { align-self: start; margin-top: 2px; color: var(--amber); }
-.cursos__texto { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
-.cursos__nome { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.cursos__meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
-.cursos__quando { color: var(--ink-subtle); }
-.cursos__acoes { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
+/* ── O erro dos cursos (useDescartarCurso.tsx, TelaCurso.tsx, TelaModulo.tsx, TermosModulo.tsx e os modais): a linha de erro em tijolo ── */
 .cursos__erro { margin: var(--space-3) 0 0; color: var(--brick-text); }
 
 /* ── O guia de criação de curso (TelaGuiaCurso.tsx, item 5): uma folha centrada no lugar do índice e
@@ -623,9 +607,6 @@
 	.guia__cabeca, .guia__trilho, .guia__corpo, .guia__rodape { padding-left: var(--space-5); padding-right: var(--space-5); }
 	.guia__trilho .ap-step__text { display: none; }
 	.guia__trilho .ap-step--current .ap-step__text { display: flex; }
-}
-@media (prefers-reduced-motion: reduce) {
-	.cursos__item { transition: none; }
 }
 
 /* ── A etapa Diagnóstico do guia (EtapaDiagnostico.tsx, item 5, parte B): as fases no topo, a
@@ -920,7 +901,6 @@
 .curso__objetivo { margin: 0; color: var(--ink); }
 .curso__datas { margin: 0; color: var(--ink-muted); }
 .curso__parte--calendario { max-width: var(--measure-read); }
-.cursos__item--abre { cursor: pointer; }
 
 /* ── O card de cada módulo (item 6, docs/modulos.md, "O card de cada módulo"): classes do perfil por cima do
  * ModuleCard no state next (o musgo do gerado). O não gerado é preto (o fundo do painel, borda cheia); durante a

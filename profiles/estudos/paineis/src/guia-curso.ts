@@ -1,5 +1,5 @@
-// As partes puras do guia de criação de curso (TelaGuiaCurso.tsx) e da seção
-// Cursos do caderno (SecaoCursos.tsx): o prazo pelas provas da matéria, os
+// As partes puras do guia de criação de curso (TelaGuiaCurso.tsx) e dos cursos
+// do caderno (FaixaCursos.tsx): o prazo pelas provas da matéria, os
 // rótulos da lista, a seleção da etapa Mapa guardada pelos desmarcados e o
 // texto do primário do Mapa.
 

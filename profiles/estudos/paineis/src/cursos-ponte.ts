@@ -1,6 +1,6 @@
 // O painel "cursos" da ponte, que a extensão dos cursos (docs/cursos.md,
-// "Ponte") atende, e a leitura do que ela mandou. A seção Cursos do caderno
-// (SecaoCursos.tsx) e o guia de criação (TelaGuiaCurso.tsx) usam daqui.
+// "Ponte") atende, e a leitura do que ela mandou. A faixa dos cursos do
+// painel do caderno (FaixaCursos.tsx) e o guia de criação (TelaGuiaCurso.tsx) usam daqui.
 //
 // Sem mudança otimista: cada ação que grava (comecar, confirmar, descartar)
 // leva um pedido e devolve uma promessa, resolvida quando chega o "curso" ou o

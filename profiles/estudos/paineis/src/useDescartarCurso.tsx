@@ -1,7 +1,7 @@
 // O descarte de um rascunho de curso, com a confirmação num Modal: a pasta do
-// curso é apagada, então nada some sem o Breno confirmar. Serve à lista da
-// seção Cursos (SecaoCursos.tsx) e à faixa do painel do caderno
-// (FaixaCursos.tsx), que só precisam pedir o descarte e pôr o modal na tela.
+// curso é apagada, então nada some sem o Breno confirmar. Serve à faixa dos
+// cursos do painel do caderno (FaixaCursos.tsx), que só precisa pedir o
+// descarte e pôr o modal na tela.
 
 import { Button, Modal } from "@estudos/design-system";
 import { type ReactNode, useState } from "react";

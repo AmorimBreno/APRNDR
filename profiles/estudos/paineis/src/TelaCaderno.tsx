@@ -2,28 +2,35 @@
 // da pasta da matéria. Em cima, a aba tijolo (as classes da CourseBar do
 // design system): Matérias, a capa, a prova, o nome, Editar e Conversar. A
 // aba é a linha tijolo da roda que subiu (o mesmo view-transition-name).
-// Embaixo, o índice das seções à esquerda e a seção aberta à direita:
-// - Linha do tempo: os eventos do eventos.jsonl da matéria, do mais novo ao mais
-//   antigo, por dia (a timeline não é um arquivo à parte, seção 7);
-// - Notas: a lista das notas pessoais (SecaoNotas) e, com um título no
-//   caminho, o editor da nota (EditorNota);
-// - Materiais: a área de soltar e a lista do serviço de materiais;
-// - Mapa de conteúdo: os conceitos dos materiais, para revisar e aprovar
-//   (SecaoMapa, item 4.4);
-// - Cursos: os cursos da matéria e "Novo curso" (SecaoCursos, item 5);
-// - Aulas, Resumos e Questionários: dizem o que vão ter e em que item chegam.
-// Caminho: caderno/<matéria>/<seção> (sem a seção, a linha do tempo);
-// caderno/<matéria>/notas/<título> abre uma nota; caderno/<matéria>/cursos/novo
-// e caderno/<matéria>/cursos/<curso>/guia[/<etapa>] abrem o guia de criação de
-// curso (TelaGuiaCurso) no lugar do índice e da seção, com a aba no topo;
+// Embaixo, na largura toda, o painel (como um dashboard), que rola na vertical
+// como um todo com a aba fixa em cima. São três faixas de cima para baixo:
+// - Cursos: os cursos da matéria em cards lado a lado e "Novo curso"
+//   (FaixaCursos, item 5), que rolam para o lado;
+// - Linha do tempo: os marcos dos eventos mais recentes do eventos.jsonl da
+//   matéria (FaixaTempo), que também rolam para o lado, e "Ver tudo", que abre
+//   a lista completa por dia num modal (a timeline não é um arquivo à parte,
+//   seção 7);
+// - a lista com o seletor de tags em cima: Notas (SecaoNotas), Materiais (a
+//   área de soltar e a lista do serviço de materiais) e Mapa de conteúdo, os
+//   conceitos dos materiais para revisar e aprovar (SecaoMapa, item 4.4). A
+//   tag escolhida vem da rota; trocar de tag navega (para o F5 e o histórico
+//   dizerem a mesma coisa) e a lista entra com uma mola curta.
+// Caminho: caderno/<matéria>[/<tag>] com a tag notas, materiais ou mapa (sem
+// tag, e nas rotas antigas linha-do-tempo e cursos, vale Notas; ver
+// painel-caderno.ts); caderno/<matéria>/notas/<título> abre uma nota, com o
+// editor (EditorNota) ocupando a área toda abaixo da aba no lugar do painel;
+// caderno/<matéria>/materiais/<arquivo> abre os Materiais com o arquivo em
+// destaque; caderno/<matéria>/cursos/novo e
+// caderno/<matéria>/cursos/<curso>/guia[/<etapa>] abrem o guia de criação de
+// curso (TelaGuiaCurso) no lugar do painel, com a aba no topo;
 // caderno/<matéria>/cursos/<curso> abre a visão do curso pronto (TelaCurso), do
 // mesmo jeito; caderno/<matéria>/cursos/<curso>/modulos/<módulo>[/<lição>]
 // abre a visão do módulo gerado (TelaModulo), com a CourseBar no lugar da aba.
 
-import { Button, EmptyState, Icon, type IconName, NotebookCover, type OrnamentGlyph, pad2 } from "@estudos/design-system";
-import { AvatarAgente, type DadosAvatarAgente, type JanelaPerfilHook, type PropsTelaInicial, semEsperar } from "@estudos/ui";
+import { Button, EmptyState, NotebookCover, type OrnamentGlyph, pad2 } from "@estudos/design-system";
+import { AvatarAgente, type DadosAvatarAgente, type JanelaPerfilHook, type PropsTelaInicial, semEsperar, semMovimento } from "@estudos/ui";
 import { motion } from "motion/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { type CorMateria, type Materia, pastaMateriaisRelativa } from "../../lib/materia-tipos.ts";
 import { contextoDaMateria, type DadosCaderno, dataCurta, lerAcoes, PAINEL_CADERNOS, prepararConversa, proximaProva, quando, rotuloCapa } from "./comum.ts";
 import { EditorNota } from "./EditorNota.tsx";
@@ -34,66 +41,22 @@ import { ConteudoMateriais, custoDaVisao, formatarDolar } from "./ModalMateriais
 import { SecaoMapa } from "./SecaoMapa.tsx";
 import { SecaoNotas, useListaNotas } from "./SecaoNotas.tsx";
 import { useCursos } from "./cursos-ponte.ts";
-import { SecaoCursos } from "./SecaoCursos.tsx";
-import { LinhaDoTempo, NOMES_TIPO } from "./LinhaDoTempo.tsx";
+import { FaixaCursos } from "./FaixaCursos.tsx";
+import { FaixaTempo, ModalLinhaDoTempo, NOMES_TIPO } from "./LinhaDoTempo.tsx";
+import { rotaDaTag, type TagCaderno, tagDaRota } from "./painel-caderno.ts";
+import { idDaAba, idDoPainel, SeletorTags } from "./SeletorTags.tsx";
 import { TelaCurso } from "./TelaCurso.tsx";
 import { TelaGuiaCurso } from "./TelaGuiaCurso.tsx";
 import { TelaModulo } from "./TelaModulo.tsx";
 
-interface Secao {
-	id: string;
-	nome: string;
-	icone: IconName;
-	/** Seções que ainda não existem: o ideograma, o título e o que vão ter. */
-	emBreve?: { glifo: OrnamentGlyph; titulo: string; texto: string };
-}
-
-export const SECOES: readonly Secao[] = [
-	{ id: "linha-do-tempo", nome: "Linha do tempo", icone: "clock" },
-	{ id: "notas", nome: "Notas", icone: "book" },
-	{ id: "materiais", nome: "Materiais", icone: "paperclip" },
-	{ id: "mapa", nome: "Mapa de conteúdo", icone: "bulb" },
-	{ id: "cursos", nome: "Cursos", icone: "flag" },
-	{
-		id: "aulas",
-		nome: "Aulas",
-		icone: "message",
-		emBreve: {
-			glifo: "学",
-			titulo: "Nenhuma aula ainda",
-			texto: "O registro de cada aula ao vivo, com as anotações que o professor escreve enquanto ela acontece. Chegam no item 4.7.",
-		},
-	},
-	{
-		id: "resumos",
-		nome: "Resumos",
-		icone: "list",
-		emBreve: {
-			glifo: "復習",
-			titulo: "Nenhum resumo ainda",
-			texto: "O professor escreve o resumo de cada aula quando ela acaba. Chegam com as aulas, no item 4.7.",
-		},
-	},
-	{
-		id: "questionarios",
-		nome: "Questionários",
-		icone: "checklist",
-		emBreve: {
-			glifo: "試験",
-			titulo: "Nenhum questionário ainda",
-			texto: "As questões dos cursos, as avaliações dos módulos e a revisão espaçada. Chegam no item 4.8.",
-		},
-	},
-];
-
 export interface PropsTelaCaderno extends PropsTelaInicial {
 	janela: JanelaPerfilHook;
 	materiaId: string;
-	/** Id da seção (SECOES); sem ela, a linha do tempo. */
+	/** Id da seção da rota (notas, materiais ou mapa); qualquer outra cai em Notas (tagDaRota). */
 	secao?: string;
-	/** Título da nota aberta (na seção Notas). */
+	/** Título da nota aberta (na tag Notas). */
 	nota?: string;
-	/** O arquivo em destaque na seção Materiais (vindo de uma menção numa nota). */
+	/** O arquivo em destaque na tag Materiais (vindo de uma menção numa nota). */
 	material?: string;
 	/** O guia de criação de curso: sem curso, o de um curso novo; a etapa vem da rota. */
 	guia?: { curso?: string; etapa?: string };
@@ -116,6 +79,11 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 	const erro = errosAbrir[props.materiaId];
 	const [editando, setEditando] = useState(false);
 	const [abrindoConversa, setAbrindoConversa] = useState(false);
+	// O "Ver tudo" da faixa da linha do tempo: a lista completa por dia num modal.
+	const [verTudo, setVerTudo] = useState(false);
+	// A tag da lista de baixo vem da rota (tagDaRota); a base dos ids liga as abas à lista (aria-controls e aria-labelledby).
+	const tag = tagDaRota(props.secao);
+	const baseIds = useId();
 
 	// A lista (para o número do caderno) e os materiais.
 	const { materiaId } = props;
@@ -128,17 +96,19 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 	// A matéria e os eventos dela; de novo quando muda quantos materiais estão
 	// prontos (cada material pronto ou removido vira um evento da linha do tempo).
 	const prontos = (estado.materiais ?? []).filter((material) => material.pasta === pastaMateriaisRelativa(materiaId) && material.estado === "pronto").length;
-	// E de novo ao trocar de seção: as notas também viram eventos, e voltar para a linha do tempo mostra os novos.
-	const secao = SECOES.find((item) => item.id === props.secao) ?? SECOES[0]!;
+	// E de novo ao trocar de tag e ao abrir ou fechar uma nota: as notas também viram eventos, e a linha do tempo
+	// agora fica sempre à vista, então os novos precisam aparecer logo ao voltar da nota ou de outra tag.
+	const notaAberta = tag === "notas" ? props.nota : undefined;
+	const comNotaAberta = notaAberta !== undefined;
 	useEffect(() => {
 		if (sessaoId) semEsperar(acoes.acaoDaInterface(PAINEL_CADERNOS, "abrir", { id: materiaId }));
-	}, [prontos, sessaoId, acoes, materiaId, secao.id]);
-	const notas = useListaNotas(props.janela, materiaId, `${secao.id}/${props.nota ?? ""}`);
-	// O mapa de conteúdo (a contagem do índice e a seção).
+	}, [prontos, sessaoId, acoes, materiaId, tag, comNotaAberta]);
+	const notas = useListaNotas(props.janela, materiaId, `${tag}/${props.nota ?? ""}`);
+	// O mapa de conteúdo (a contagem da tag e a lista).
 	const mapa = useMapa(props.janela, materiaId);
-	// Os cursos (a contagem do índice, a seção e o guia); de novo ao trocar de tela (voltar do guia traz a lista nova).
+	// Os cursos (a faixa e o guia); de novo ao trocar de tela (voltar do guia traz a lista nova).
 	const guia = props.guia;
-	const cursos = useCursos(props.janela, materiaId, `${secao.id}/${guia ? (guia.curso ?? "novo") : ""}/${props.curso ?? ""}`);
+	const cursos = useCursos(props.janela, materiaId, `${tag}/${guia ? (guia.curso ?? "novo") : ""}/${props.curso ?? ""}`);
 	// Os títulos para as menções do editor (o mesmo array enquanto a lista não muda).
 	const titulosNotas = useMemo(() => notas?.notas.map((nota) => nota.titulo), [notas]);
 	// Os arquivos de material para as menções do editor (só os desta matéria).
@@ -155,12 +125,10 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 	const indice = lista?.materias.findIndex((item) => item.id === materiaId) ?? -1;
 	const numero = indice >= 0 ? indice + 1 : undefined;
 	const materiais = estado.materiais?.filter((material) => material.pasta === pastaMateriaisRelativa(materiaId));
-	const contagem: Record<string, number | undefined> = {
-		"linha-do-tempo": caderno?.eventos.length,
-		materiais: materiais?.length,
+	const contagem = {
 		notas: notas?.notas.length,
+		materiais: materiais?.length,
 		mapa: mapa.mapa ? contarMapa(mapa.mapa).dentro : undefined,
-		cursos: cursos.lista?.length,
 	};
 	const voltar = () => props.navegar("");
 	// A conversa da matéria: a mais recente dela, ou uma nova com o contexto do caderno.
@@ -171,13 +139,24 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 			.then(() => props.abrirConversa())
 			.catch(() => setAbrindoConversa(false));
 	};
-	const irPara = (id: string) => props.navegar(id === SECOES[0]!.id ? `caderno/${materiaId}` : `caderno/${materiaId}/${id}`);
+	// Trocar de tag navega (o F5 e o histórico voltam na mesma tag); escolher a que já está aberta não faz nada.
+	const escolherTag = (nova: TagCaderno) => {
+		if (nova !== tag) props.navegar(rotaDaTag(materiaId, nova));
+	};
 	const abrirNota = (titulo: string) => props.navegar(`caderno/${materiaId}/notas/${titulo}`);
 	const tom = materia?.cor === "ink" || !materia ? "brick" : materia.cor;
 	// O agente da sessão (ou o padrão do perfil), para a foto no guia de curso.
 	const nomeAgente = estado.sessao?.agente ?? props.perfil?.agentePadrao;
 	const avatarAgente = nomeAgente ? props.perfil?.agentes.find((agente) => agente.nome === nomeAgente)?.avatar : undefined;
-	const notaAberta = secao.id === "notas" ? props.nota : undefined;
+	// A meta que fica ao lado do seletor: o que a visão dos materiais e o mapa de conteúdo já custaram.
+	const meta =
+		tag === "materiais" && materiais && custoDaVisao(materiais) > 0
+			? `Visão: ${formatarDolar(custoDaVisao(materiais))}`
+			: tag === "mapa" && mapa.mapa && custoDoMapa(mapa.mapa) > 0
+				? `Mapa: ${formatarDolar(custoDoMapa(mapa.mapa))}`
+				: undefined;
+	// Com movimento reduzido, a lista troca no lugar, sem a mola.
+	const parado = semMovimento();
 
 	// O módulo gerado: a CourseBar faz o papel da aba (TelaModulo desenha as duas linhas da tela).
 	const moduloAberto = props.modulo;
@@ -250,109 +229,90 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 					tom={tom}
 					{...(nomeAgente ? { agente: { nome: nomeAgente, ...(avatarAgente ? { avatar: avatarAgente } : {}) } } : {})}
 				/>
-			) : (
-				<div className="caderno">
-					<nav className="caderno__indice" aria-label="Seções do caderno">
-						<p className="overline caderno__indice-titulo">Neste caderno</p>
-						<ul>
-							{SECOES.map((item) => {
-								const quantos = contagem[item.id];
-								return (
-									<li key={item.id}>
-										<button
-											type="button"
-											className={`caderno__item${item.id === secao.id ? " caderno__item--atual" : ""}${item.emBreve ? " caderno__item--em-breve" : ""}`}
-											aria-current={item.id === secao.id ? "page" : undefined}
-											onClick={() => irPara(item.id)}
-										>
-											<Icon name={item.icone} size={20} strokeWidth={2.25} />
-											<span className="caderno__item-nome">{item.nome}</span>
-											<span className="caderno__item-conta data">{item.emBreve ? "em breve" : quantos === undefined ? "" : pad2(quantos)}</span>
-										</button>
-									</li>
-								);
-							})}
-						</ul>
-					</nav>
+				) : notaAberta ? (
+					// A nota aberta ocupa a área toda abaixo da aba, no lugar do painel; "voltar" leva ao painel com a tag Notas.
 					<motion.section
-						key={notaAberta ? `${secao.id}/nota` : secao.id}
-						className="caderno__secao"
-						{...(notaAberta ? { "aria-label": `Nota ${notaAberta}` } : { "aria-labelledby": "secao-titulo" })}
-						initial={{ opacity: 0, y: 12 }}
+						key="nota"
+						className="painel-caderno__nota"
+						aria-label={`Nota ${notaAberta}`}
+						initial={parado ? false : { opacity: 0, y: 12 }}
 						animate={{ opacity: 1, y: 0 }}
 						transition={{ type: "spring", stiffness: 380, damping: 32 }}
 					>
-						{notaAberta ? (
-							<EditorNota
-								key={materiaId}
-								janela={props.janela}
-								materiaId={materiaId}
-								{...(materia ? { materiaNome: materia.nome } : {})}
-								titulo={notaAberta}
-								voltar={() => irPara("notas")}
-								renomeada={abrirNota}
-								{...(titulosNotas ? { titulos: titulosNotas } : {})}
-								abrirNota={abrirNota}
-								{...(arquivosMencao ? { arquivos: arquivosMencao } : {})}
-								abrirMaterial={(nome) => props.navegar(`caderno/${materiaId}/materiais/${nome}`)}
+						<EditorNota
+							key={materiaId}
+							janela={props.janela}
+							materiaId={materiaId}
+							{...(materia ? { materiaNome: materia.nome } : {})}
+							titulo={notaAberta}
+							voltar={() => props.navegar(rotaDaTag(materiaId, "notas"))}
+							renomeada={abrirNota}
+							{...(titulosNotas ? { titulos: titulosNotas } : {})}
+							abrirNota={abrirNota}
+							{...(arquivosMencao ? { arquivos: arquivosMencao } : {})}
+							abrirMaterial={(nome) => props.navegar(`caderno/${materiaId}/materiais/${nome}`)}
+						/>
+					</motion.section>
+				) : (
+					// layoutScroll: o painel é quem rola, e o arrasto do mapa de conteúdo (Reorder) mede certo com ele rolado.
+					<motion.div className="painel-caderno" layoutScroll>
+						<div className="painel-caderno__bloco">
+							<FaixaCursos
+								cursos={cursos}
+								{...(materia ? { materia } : {})}
+								tom={tom}
+								novoCurso={() => props.navegar(`caderno/${materiaId}/cursos/novo`)}
+								continuar={(curso) => props.navegar(`caderno/${materiaId}/cursos/${curso.id}/guia`)}
+								abrir={(curso) => props.navegar(`caderno/${materiaId}/cursos/${curso.id}`)}
 							/>
-						) : (
-						<>
-						<header className="caderno__secao-cabeca">
-							<span className="overline">{materia?.nome ?? "Caderno"}</span>
-							<h2 id="secao-titulo" className="display-sm caderno__secao-titulo">
-								{secao.nome}
-							</h2>
-							{secao.id === "materiais" && materiais && custoDaVisao(materiais) > 0 ? (
-								<span className="data caderno__secao-meta">Visão: {formatarDolar(custoDaVisao(materiais))}</span>
-							) : null}
-							{secao.id === "mapa" && mapa.mapa && custoDoMapa(mapa.mapa) > 0 ? (
-								<span className="data caderno__secao-meta">Mapa: {formatarDolar(custoDoMapa(mapa.mapa))}</span>
-							) : null}
-						</header>
-						{/* layoutScroll: o arrasto do mapa de conteúdo (Reorder) mede certo com o corpo rolado. */}
-						<motion.div className="caderno__secao-corpo" layoutScroll>
-							{secao.emBreve ? (
-								<EmptyState glyph={secao.emBreve.glifo} tone={tom} title={secao.emBreve.titulo}>
-									{secao.emBreve.texto}
-								</EmptyState>
-							) : secao.id === "notas" ? (
-								<SecaoNotas janela={props.janela} materiaId={materiaId} {...(notas ? { lista: notas } : {})} tom={tom} abrirNota={abrirNota} />
-							) : secao.id === "cursos" ? (
-								<SecaoCursos
-									cursos={cursos}
-									{...(materia ? { materia } : {})}
-									tom={tom}
-									novoCurso={() => props.navegar(`caderno/${materiaId}/cursos/novo`)}
-									continuar={(curso) => props.navegar(`caderno/${materiaId}/cursos/${curso.id}/guia`)}
-									abrir={(curso) => props.navegar(`caderno/${materiaId}/cursos/${curso.id}`)}
-								/>
-							) : secao.id === "mapa" ? (
-								<SecaoMapa
-									mapa={mapa}
-									tom={tom}
-									irParaMateriais={() => irPara("materiais")}
-									abrirMaterial={(arquivo) => props.navegar(`caderno/${materiaId}/materiais/${arquivo}`)}
-								/>
-							) : secao.id === "materiais" ? (
-								<ConteudoMateriais
-									{...(materiais ? { materiais } : {})}
-									pasta={pastaMateriaisRelativa(materiaId)}
-									enviar={(arquivos) => acoes.enviarMateriais(pastaMateriaisRelativa(materiaId), arquivos)}
-									reprocessar={(caminho) => acoes.reprocessarMaterial(caminho)}
-									{...(secao.id === "materiais" && props.material ? { destaque: props.material } : {})}
-								/>
-							) : caderno ? (
-								<LinhaDoTempo eventos={caderno.eventos} invalidas={caderno.invalidas} />
+						</div>
+						<div className="painel-caderno__bloco">
+							{caderno ? (
+								<FaixaTempo eventos={caderno.eventos} invalidas={caderno.invalidas} verTudo={() => setVerTudo(true)} />
 							) : (
 								<p className="body caderno__carregando">Abrindo o caderno…</p>
 							)}
-						</motion.div>
-						</>
-						)}
-					</motion.section>
-				</div>
-			)}
+						</div>
+						<section className="painel-caderno__bloco painel-caderno__lista" aria-label="Notas, materiais e mapa de conteúdo">
+							<header className="painel-caderno__seletor">
+								<SeletorTags base={baseIds} atual={tag} contagem={contagem} escolher={escolherTag} />
+								{meta ? <span className="data painel-caderno__meta">{meta}</span> : null}
+							</header>
+							<motion.div
+								key={tag}
+								id={idDoPainel(baseIds)}
+								role="tabpanel"
+								aria-labelledby={idDaAba(baseIds, tag)}
+								className="painel-caderno__corpo"
+								initial={parado ? false : { opacity: 0, y: 12 }}
+								animate={{ opacity: 1, y: 0 }}
+								transition={{ type: "spring", stiffness: 380, damping: 32 }}
+							>
+								{tag === "notas" ? (
+									<SecaoNotas janela={props.janela} materiaId={materiaId} {...(notas ? { lista: notas } : {})} tom={tom} abrirNota={abrirNota} />
+								) : tag === "mapa" ? (
+									<SecaoMapa
+										mapa={mapa}
+										tom={tom}
+										irParaMateriais={() => escolherTag("materiais")}
+										abrirMaterial={(arquivo) => props.navegar(`caderno/${materiaId}/materiais/${arquivo}`)}
+									/>
+								) : (
+									<ConteudoMateriais
+										{...(materiais ? { materiais } : {})}
+										pasta={pastaMateriaisRelativa(materiaId)}
+										enviar={(arquivos) => acoes.enviarMateriais(pastaMateriaisRelativa(materiaId), arquivos)}
+										reprocessar={(caminho) => acoes.reprocessarMaterial(caminho)}
+										{...(props.material ? { destaque: props.material } : {})}
+									/>
+								)}
+							</motion.div>
+						</section>
+						{caderno ? (
+							<ModalLinhaDoTempo aberto={verTudo} fechar={() => setVerTudo(false)} eventos={caderno.eventos} invalidas={caderno.invalidas} titulo={caderno.materia.nome} />
+						) : null}
+					</motion.div>
+				)}
 			</>
 			)}
 			{materia ? (

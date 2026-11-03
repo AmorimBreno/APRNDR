@@ -6,13 +6,13 @@
 // módulos tem e abre a visão do curso (TelaCurso.tsx), pela linha inteira ou
 // por "Abrir".
 
-import { Button, Callout, EmptyState, Icon, Modal, Tag, type Tone } from "@estudos/design-system";
+import { Button, Callout, EmptyState, Icon, Tag, type Tone } from "@estudos/design-system";
 import { motion } from "motion/react";
-import { useState } from "react";
 import type { ResumoCurso } from "../../lib/curso-tipos.ts";
 import type { Materia } from "../../lib/materia-tipos.ts";
 import type { CursosDaMateria } from "./cursos-ponte.ts";
 import { rotuloCurso, textoEditado, textoPrazo } from "./guia-curso.ts";
+import { useDescartarCurso } from "./useDescartarCurso.tsx";
 
 export interface PropsSecaoCursos {
 	cursos: CursosDaMateria;
@@ -27,27 +27,7 @@ export interface PropsSecaoCursos {
 
 export function SecaoCursos(props: PropsSecaoCursos) {
 	const { lista, erroLista } = props.cursos;
-	const [descartando, setDescartando] = useState<ResumoCurso | undefined>(undefined);
-	// O último pedido de descarte: o título do modal continua enquanto ele fecha.
-	const [alvo, setAlvo] = useState<ResumoCurso | undefined>(undefined);
-	const [ocupado, setOcupado] = useState(false);
-	const [erro, setErro] = useState<string | undefined>(undefined);
-
-	const fecharModal = () => {
-		if (ocupado) return;
-		setDescartando(undefined);
-		setErro(undefined);
-	};
-	const descartar = () => {
-		if (!descartando || ocupado) return;
-		setOcupado(true);
-		setErro(undefined);
-		props.cursos
-			.descartar(descartando.id)
-			.then(() => setDescartando(undefined))
-			.catch((falha: unknown) => setErro((falha as Error).message))
-			.finally(() => setOcupado(false));
-	};
+	const { pedirDescarte, modalDescarte } = useDescartarCurso(props.cursos);
 
 	const aviso = erroLista ? (
 		<Callout tone="amber" label="Não deu certo" icon="alert">
@@ -119,14 +99,7 @@ export function SecaoCursos(props: PropsSecaoCursos) {
 							</span>
 							{curso.situacao === "rascunho" ? (
 								<span className="cursos__acoes">
-									<Button
-										variant="ghost"
-										size="sm"
-										onClick={() => {
-											setAlvo(curso);
-											setDescartando(curso);
-										}}
-									>
+									<Button variant="ghost" size="sm" onClick={() => pedirDescarte(curso)}>
 										Descartar
 									</Button>
 									<Button variant="secondary" size="sm" iconRight="arrow-right" onClick={() => props.continuar(curso)}>
@@ -152,28 +125,7 @@ export function SecaoCursos(props: PropsSecaoCursos) {
 					);
 				})}
 			</ul>
-			<Modal
-				open={Boolean(descartando)}
-				onClose={fecharModal}
-				kicker="Curso em rascunho"
-				title={`Descartar o rascunho ${alvo?.nome ?? ""}?`}
-				size="sm"
-				tone="brick"
-				dismissible={!ocupado}
-				footer={
-					<>
-						<Button variant="secondary" onClick={fecharModal} disabled={ocupado}>
-							Manter
-						</Button>
-						<Button variant="danger" onClick={descartar} disabled={ocupado} aria-busy={ocupado}>
-							{ocupado ? "Descartando…" : "Descartar"}
-						</Button>
-					</>
-				}
-			>
-				<p className="body">A pasta do curso é apagada.</p>
-				{erro ? <p className="body-sm cursos__erro">{erro}</p> : null}
-			</Modal>
+			{modalDescarte}
 		</div>
 	);
 }

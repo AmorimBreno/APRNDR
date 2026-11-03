@@ -501,6 +501,50 @@
 	.mapa__conceito--selecao .mapa__acoes { grid-column: 4 / -1; }
 }
 
+/* ── Faixa dos cursos do painel do caderno (FaixaCursos.tsx): cards altos e numerados lado a lado,
+ * o primeiro curso pronto na cor da matéria, e "Novo curso" tracejado no fim. A faixa rola na horizontal
+ * quando os cards não cabem. ── */
+.faixa-cursos { --faixa-fundo: var(--amber); --faixa-tinta: var(--on-amber); display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.faixa-cursos--amber { --faixa-fundo: var(--amber); --faixa-tinta: var(--on-amber); }
+.faixa-cursos--brick { --faixa-fundo: var(--brick); --faixa-tinta: var(--on-brick); }
+.faixa-cursos--sage { --faixa-fundo: var(--sage); --faixa-tinta: var(--on-sage); }
+.faixa-cursos--moss { --faixa-fundo: var(--moss); --faixa-tinta: var(--on-moss); }
+.faixa-cursos--cream { --faixa-fundo: var(--cream); --faixa-tinta: var(--on-cream); }
+.faixa-cursos--steel { --faixa-fundo: var(--steel); --faixa-tinta: var(--on-steel); }
+.faixa-cursos .ap-callout { margin: 0; }
+.faixa-cursos__topo { display: flex; align-items: baseline; gap: var(--space-3); }
+.faixa-cursos__titulo { margin: 0; color: var(--ink-muted); }
+.faixa-cursos__contagem { color: var(--ink-subtle); }
+/* O respiro de 8px em volta (desfeito pela margem negativa) deixa a subida do hover e o contorno do foco aparecerem: o overflow-x corta o que passa da caixa. */
+.faixa-cursos__trilho { display: flex; align-items: stretch; gap: var(--space-3); margin: calc(-1 * var(--space-2)); padding: var(--space-2); list-style: none; overflow-x: auto; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+.faixa-cursos__celula { flex: none; width: 220px; height: 208px; }
+.faixa-cursos__item { position: relative; height: 100%; transition: transform .32s cubic-bezier(.2, .8, .2, 1); }
+.faixa-cursos__celula:hover > .faixa-cursos__item { transform: translateY(-4px); }
+.faixa-cursos__card { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); width: 100%; height: 100%; margin: 0; padding: var(--space-4); border: var(--border-hair) solid var(--line); border-radius: var(--radius-lg); background: var(--surface-raised); color: var(--ink); font: inherit; text-align: left; cursor: pointer; transition: border-color .16s ease-out; }
+.faixa-cursos__card:hover { border-color: var(--line-strong); }
+.faixa-cursos__card:focus-visible { outline: var(--border-strong) solid var(--focus); outline-offset: 2px; }
+.faixa-cursos__numero { color: var(--ink-subtle); }
+.faixa-cursos__nome { flex: 1; min-height: 0; width: 100%; overflow: hidden; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; font-family: var(--font-display); font-size: 17px; line-height: 22px; font-weight: 700; letter-spacing: -0.01em; }
+.faixa-cursos__pe { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); width: 100%; min-width: 0; }
+/* A etiqueta quebra em duas linhas em vez de vazar do card ("Rascunho · parou em Diagnóstico"). */
+.faixa-cursos__rotulo { max-width: 100%; }
+.faixa-cursos__rotulo .ap-tag { max-width: 100%; height: auto; min-height: 26px; padding-block: 2px; border-radius: 14px; white-space: normal; }
+.faixa-cursos__prazo { color: var(--ink-muted); }
+/* O botão de descartar é irmão do card (botão não aninha botão) e fica sobre o canto de cima. */
+.faixa-cursos__descartar { position: absolute; top: var(--space-2); right: var(--space-2); }
+.faixa-cursos__card--destaque { border-color: transparent; background: var(--faixa-fundo); color: var(--faixa-tinta); }
+.faixa-cursos__card--destaque:hover { border-color: transparent; }
+.faixa-cursos__card--destaque .faixa-cursos__numero, .faixa-cursos__card--destaque .faixa-cursos__prazo { color: inherit; opacity: .78; }
+.faixa-cursos__card--novo { align-items: center; justify-content: center; gap: var(--space-3); border: var(--border-strong) dashed var(--line-strong); background: transparent; color: var(--ink-muted); transition: border-color .16s ease-out, color .16s ease-out; }
+.faixa-cursos__card--novo:hover { border-color: var(--ink-muted); color: var(--ink); }
+.faixa-cursos__novo-texto { font-family: var(--font-display); font-size: 14px; line-height: 18px; font-weight: 600; letter-spacing: 0.04em; }
+/* Sem curso nenhum, uma linha ao lado do card "Novo curso" diz para que servem. */
+.faixa-cursos__vazio { align-self: center; flex: 0 1 320px; padding-inline: var(--space-3); color: var(--ink-muted); }
+@media (prefers-reduced-motion: reduce) {
+	.faixa-cursos__item, .faixa-cursos__card, .faixa-cursos__card--novo { transition: none; }
+	.faixa-cursos__celula:hover > .faixa-cursos__item { transform: none; }
+}
+
 /* ── Cursos do caderno (SecaoCursos.tsx, item 5): a lista no ritmo da lista de notas ── */
 .cursos { display: flex; flex-direction: column; gap: var(--space-5); max-width: 880px; }
 .cursos .ap-callout { margin: 0; }

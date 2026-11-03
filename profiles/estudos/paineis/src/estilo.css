@@ -79,8 +79,26 @@
 .aba-caderno { overflow: hidden; border-radius: var(--radius-lg); }
 .aba-caderno .ap-cbar__course { max-width: 560px; }
 .aba-caderno__espaco { flex: 1; }
-.aba-caderno__editar:disabled { opacity: var(--opacity-disabled); cursor: not-allowed; }
-.aba-caderno .ap-cbar__next { border-radius: 0; }
+/* A capa edita a matéria: no hover e no foco, inclina como a capa da linha do meio da roda (.ap-wheel__cover). */
+.aba-caderno__capa { flex: none; display: grid; padding: 0; border: 0; border-radius: var(--radius-xs); background: none; cursor: pointer; }
+.aba-caderno__capa .ap-nb { transition: transform .32s cubic-bezier(.2, .8, .2, 1); }
+.aba-caderno__capa:hover .ap-nb, .aba-caderno__capa:focus-visible .ap-nb { transform: rotate(-5deg) scale(1.06); }
+.aba-caderno__capa:focus-visible { outline: var(--border-strong) solid var(--on-brick); outline-offset: 4px; }
+/* A foto do professor abre a conversa da matéria: pula uma vez no hover e fica pulando enquanto a conversa abre. */
+.aba-caderno__professor { flex: none; display: grid; place-items: center; margin-right: var(--space-6); padding: 0; border: 0; border-radius: var(--radius-full); background: none; cursor: pointer; }
+.aba-caderno__professor .avatar { box-shadow: 0 0 0 3px var(--on-brick), var(--sticker-shadow); transform-origin: 50% 100%; }
+.aba-caderno__professor:hover:not(:disabled) .avatar, .aba-caderno__professor:focus-visible .avatar { animation: professor-pula .6s cubic-bezier(.3, .7, .4, 1); }
+.aba-caderno__professor--abrindo .avatar { animation: professor-pula .6s cubic-bezier(.3, .7, .4, 1) infinite; }
+.aba-caderno__professor:disabled { cursor: progress; }
+.aba-caderno__professor:focus-visible { outline: var(--border-strong) solid var(--on-brick); outline-offset: 5px; }
+@keyframes professor-pula {
+	0% { transform: translateY(0) scale(1, 1); }
+	15% { transform: translateY(0) scale(1.08, .9); }
+	45% { transform: translateY(-14px) scale(.95, 1.06); }
+	70% { transform: translateY(0) scale(1.06, .93); }
+	85% { transform: translateY(-3px) scale(1, 1); }
+	100% { transform: translateY(0) scale(1, 1); }
+}
 
 .caderno { display: grid; grid-template-columns: var(--menu-rail) minmax(0, 1fr); gap: var(--space-4); min-height: 0; }
 .caderno__erro { display: grid; place-items: center; }
@@ -131,10 +149,11 @@
 	.caderno__item-nome { overflow: visible; }
 	.caderno__item-conta { display: none; }
 	.caderno__secao-cabeca, .caderno__secao-corpo { padding-left: var(--space-5); padding-right: var(--space-5); }
-	.aba-caderno__editar { display: none; }
+	.aba-caderno__professor { margin-right: var(--space-4); }
 }
 @media (prefers-reduced-motion: reduce) {
-	.caderno__item { transition: none; }
+	.caderno__item, .aba-caderno__capa .ap-nb { transition: none; }
+	.aba-caderno__professor .avatar, .aba-caderno__professor--abrindo .avatar { animation: none; }
 }
 
 /* Entrar no caderno (design-system/README.md, "Telas e fluxo"): a linha tijolo da roda sobe e vira
@@ -147,7 +166,6 @@
 ::view-transition-new(*.perfil):only-child { animation: folha-sobe .5s .06s cubic-bezier(.65, 0, .25, 1) both; }
 @keyframes folha-desce { to { opacity: 0; transform: translateY(32%); } }
 @keyframes folha-sobe { from { opacity: 0; transform: translateY(24%); } }
-.aba-caderno .ap-cbar__next:disabled { cursor: progress; }
 
 /* ── Notas do caderno (SecaoNotas.tsx e EditorNota.tsx, item 4.3, parte B) ── */
 .notas { display: flex; flex-direction: column; gap: var(--space-5); max-width: 880px; }

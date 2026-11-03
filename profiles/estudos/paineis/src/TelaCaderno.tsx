@@ -21,7 +21,7 @@
 // abre a visão do módulo gerado (TelaModulo), com a CourseBar no lugar da aba.
 
 import { Button, EmptyState, Icon, type IconName, NotebookCover, type OrnamentGlyph, pad2 } from "@estudos/design-system";
-import { type JanelaPerfilHook, type PropsTelaInicial, semEsperar } from "@estudos/ui";
+import { AvatarAgente, type DadosAvatarAgente, type JanelaPerfilHook, type PropsTelaInicial, semEsperar } from "@estudos/ui";
 import { motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Evento } from "../../lib/eventos.ts";
@@ -391,6 +391,7 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 				editar={() => setEditando(true)}
 				conversar={conversar}
 				abrindo={abrindoConversa}
+				{...(nomeAgente ? { agente: { nome: nomeAgente, ...(avatarAgente ? { avatar: avatarAgente } : {}) } } : {})}
 			/>
 			{erro && !materia ? (
 				<div className="caderno__erro">
@@ -560,9 +561,15 @@ interface PropsAbaCaderno {
 	conversar(): void;
 	/** A conversa da matéria está sendo aberta (a sessão troca no servidor). */
 	abrindo?: boolean;
+	/** O professor, para a foto do botão da conversa. */
+	agente?: { nome: string; avatar?: DadosAvatarAgente };
 }
 
-/** A aba tijolo do caderno, com as classes da CourseBar do design system (sem a trilha: o caderno não é um curso). */
+/**
+ * A aba tijolo do caderno, com as classes da CourseBar do design system (sem a trilha: o caderno não é um curso).
+ * A capa é o botão de editar a matéria (inclina como a capa da linha do meio da roda) e a foto do
+ * professor, que pula no hover, abre a conversa da matéria.
+ */
 function AbaCaderno(props: PropsAbaCaderno) {
 	const { materia } = props;
 	const prova = materia ? proximaProva(materia, new Date()) : undefined;
@@ -577,7 +584,9 @@ function AbaCaderno(props: PropsAbaCaderno) {
 			</button>
 			<div className="ap-cbar__course aba-caderno__materia">
 				{materia ? (
-					<NotebookCover size="sm" tone={materia.cor} glyph={materia.glifo as OrnamentGlyph} label={rotuloCapa(materia.nome)} {...(props.numero ? { number: pad2(props.numero) } : {})} />
+					<button type="button" className="aba-caderno__capa" onClick={props.editar} title="Editar o caderno" aria-label={`Editar o caderno ${materia.nome}`}>
+						<NotebookCover size="sm" tone={materia.cor} glyph={materia.glifo as OrnamentGlyph} label={rotuloCapa(materia.nome)} {...(props.numero ? { number: pad2(props.numero) } : {})} />
+					</button>
 				) : null}
 				<div className="ap-cbar__titles">
 					<span className="ap-cbar__kicker overline">{kicker}</span>
@@ -585,13 +594,16 @@ function AbaCaderno(props: PropsAbaCaderno) {
 				</div>
 			</div>
 			<span className="aba-caderno__espaco" />
-			<button type="button" className="ap-cbar__back button aba-caderno__editar" onClick={props.editar} disabled={!materia}>
-				Editar
-			</button>
-			<button type="button" className="ap-cbar__next" onClick={props.conversar} disabled={!materia || props.abrindo} aria-busy={props.abrindo}>
-				<span className="ap-cbar__next-kicker overline">{props.abrindo ? "Abrindo" : "Conversar"}</span>
-				<span className="ap-cbar__next-label body-strong">{props.abrindo ? "a conversa…" : "sobre a matéria"}</span>
-				<Icon name="arrow-right" size={20} strokeWidth={2.5} />
+			<button
+				type="button"
+				className={`aba-caderno__professor${props.abrindo ? " aba-caderno__professor--abrindo" : ""}`}
+				onClick={props.conversar}
+				disabled={!materia || props.abrindo}
+				aria-busy={props.abrindo}
+				title={props.abrindo ? "Abrindo a conversa…" : "Conversar sobre a matéria"}
+				aria-label={props.abrindo ? "Abrindo a conversa" : "Conversar com o professor sobre a matéria"}
+			>
+				<AvatarAgente nome={props.agente?.nome ?? "Professor"} {...(props.agente?.avatar ? { avatar: props.agente.avatar } : {})} tamanho={60} />
 			</button>
 		</header>
 	);

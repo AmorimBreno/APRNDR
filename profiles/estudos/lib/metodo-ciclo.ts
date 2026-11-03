@@ -1,55 +1,97 @@
 // O ciclo do método no disco (parte 4 do plano de 2026-10-28,
-// docs/metodo-ciclo.md):
+// docs/metodo-ciclo.md e, acima dele, docs/metodo-experimentos.md):
 // - o relatório de um módulo concluído em
 //   materias/<matéria>/cursos/<curso>/relatorios/<módulo>.json, gravado
 //   inteiro de uma vez (lib/arquivos.ts), com o evento gerou_relatorio_metodo
 //   no eventos.jsonl da matéria;
-// - a evidência: os eventos do módulo lidos do aprendiz/eventos.jsonl;
-// - os ajustes aprovados em aprendiz/metodo/<arquivo>.md (um por arquivo de
-//   metodologia), gravados inteiros pelo código; um arquivo que não se lê é
-//   ErroMetodo e nunca é sobrescrito;
-// - as decisões do Breno (aprovou_ajuste_metodo, rejeitou_ajuste_metodo) e o
-//   ligar e desligar de um ajuste (alterou_ajuste_metodo), no
-//   aprendiz/eventos.jsonl.
-// As regras são puras e ficam em metodo-ciclo-tipos.ts. Sem dependências: o
+// - a evidência e o placar: os eventos do módulo lidos do
+//   aprendiz/eventos.jsonl, e o histórico dos módulos concluídos antes dele
+//   (de todas as matérias e cursos), derivado dos arquivos de módulo e dos
+//   eventos (nada novo é gravado);
+// - os ajustes em aprendiz/metodo/<arquivo>.md (um por arquivo de
+//   metodologia; `em teste`, `mantido` ou `descartado`) e o que facilita em
+//   aprendiz/metodo/aprendizados.md, gravados inteiros pelo código; um
+//   arquivo que não se lê é ErroMetodo e nunca é sobrescrito;
+// - aplicar a análise (aplicarAnalise): as decisões, os experimentos novos e
+//   os aprendizados, uma vez só, com os eventos iniciou_experimento_metodo,
+//   decidiu_experimento_metodo, registrou_aprendizado_metodo e
+//   reviu_aprendizado_metodo no aprendiz/eventos.jsonl (só de acréscimo).
+// As regras são puras e ficam em metodo-ciclo-tipos.ts, metodo-placar-tipos.ts,
+// metodo-aprendizados-tipos.ts e metodo-analise-tipos.ts. Sem dependências: o
 // pi carrega a extensão desta pasta. Quem chama segura as travas (a da
-// matéria para o relatório; a dos ajustes para os arquivos de ajustes).
+// matéria para o relatório; a dos ajustes para os arquivos de ajustes e para
+// aplicar a análise, tomada dentro da trava da matéria, nunca o contrário).
 
 import { mkdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { gravarDeUmaVez } from "./arquivos.ts";
-import { type ContextoCurso, ehIdModulo, pastaDoCurso } from "./cursos.ts";
+import { type ContextoCurso, ehIdModulo, listarCursos, pastaDoCurso } from "./cursos.ts";
 import { acrescentarEvento, criarEvento, type Evento, lerEventos } from "./eventos.ts";
-import { eventosAprendiz, eventosMateria, pastaAprendiz } from "./materias.ts";
+import { eventosAprendiz, eventosMateria, listarMaterias, pastaAprendiz } from "./materias.ts";
+import {
+	acrescentarAprendizado,
+	type Aprendizado,
+	type AprendizadosDoArquivo,
+	type AprendizadosNaTela,
+	aprendizadosNaTela,
+	aprendizadosVazios,
+	blocoOQueFacilita,
+	comentarioDoAprendizado,
+	escreverAprendizadosMarkdown,
+	lerAprendizadosMarkdown,
+	mudarSituacaoDoAprendizado,
+} from "./metodo-aprendizados-tipos.ts";
+import {
+	conferirQuePodeGerarDeNovo,
+	type ExperimentoEmTeste,
+	type ModuloTestado,
+	relatorioLido,
+	relatorioNaOrdem,
+	type RelatorioMetodoV2,
+	relatorioV2NaOrdem,
+} from "./metodo-analise-tipos.ts";
 import {
 	acrescentarAjuste,
-	ajusteAtivoIgual,
-	ajustesAtivos,
 	type AjusteMetodo,
 	type AjustesDoArquivo,
+	ajustesComEstado,
 	ajustesNaTela,
+	ajustesQueValem,
 	ajustesVazios,
-	aplicarDecisao,
+	type AjusteUsado,
 	type ArquivoDeAjustesNaTela,
 	comentarioDaOrigem,
+	comentarioSubstituido,
 	dataLocal,
-	type DecisaoProposta,
 	ehArquivoMetodo,
 	ErroMetodo,
 	escreverAjustesMarkdown,
 	type EvidenciaMontada,
 	lerAjustesMarkdown,
-	ligarAjuste,
+	lerReferenciaDeAjuste,
 	montarEvidencia,
-	propostaPendente,
+	mudarEstadoDoAjuste,
+	origemDoMetodo,
+	referenciaDoAjuste,
 	type RelatorioMetodo,
-	relatorioLido,
-	relatorioNaOrdem,
-	validarDecisao,
+	ajusteQueValeIgual,
 } from "./metodo-ciclo-tipos.ts";
+import {
+	type Comparacao,
+	compararComHistorico,
+	type EntradaDoHistorico,
+	historicoDosModulos,
+	type ModuloConcluido,
+	type PlacarDoModulo,
+	placarDoModuloNosEventos,
+} from "./metodo-placar-tipos.ts";
 import { ARQUIVOS_METODO, type ArquivoMetodo, type ModuloGerado } from "./modulo-tipos.ts";
+import { situacoesDoCurso } from "./modulos.ts";
 
+export * from "./metodo-aprendizados-tipos.ts";
+export * from "./metodo-analise-tipos.ts";
 export * from "./metodo-ciclo-tipos.ts";
+export * from "./metodo-placar-tipos.ts";
 
 /** A sessão e o momento (sem ele, agora). */
 export type ContextoMetodo = Pick<ContextoCurso, "sessao" | "agora">;
@@ -67,10 +109,10 @@ export function caminhoDoRelatorio(dados: string, materia: string, curso: string
 }
 
 /**
- * O relatório do módulo. Sem arquivo, null (ainda não foi gerado, ou falhou).
- * Um arquivo que não dá para ler (JSON inválido, outro formato) é ErroMetodo:
- * quem chama não tem relatório para gravar, então o arquivo nunca é
- * sobrescrito sem ter sido lido.
+ * O relatório do módulo (da versão 2 ou da 1). Sem arquivo, null (ainda não
+ * foi gerado, ou falhou). Um arquivo que não dá para ler (JSON inválido,
+ * outro formato) é ErroMetodo: quem chama não tem relatório para gravar, então
+ * o arquivo nunca é sobrescrito sem ter sido lido.
  */
 export async function lerRelatorio(dados: string, materia: string, curso: string, modulo: string): Promise<RelatorioMetodo | null> {
 	const arquivo = caminhoDoRelatorio(dados, materia, curso, modulo);
@@ -106,11 +148,12 @@ export async function gravarRelatorio(dados: string, materia: string, curso: str
  * o evento gerou_relatorio_metodo no eventos.jsonl da matéria: objeto
  * {materia, curso, modulo}; resultado {situacao, propostas (quantas),
  * custo}; contexto {modelo, prompt}, quando o modelo foi chamado. Um
- * relatório anterior ilegível é ErroMetodo e não é sobrescrito. As decisões
- * do anterior ficam nos eventos.
+ * relatório anterior ilegível é ErroMetodo e não é sobrescrito, e um
+ * anterior já aplicado (aplicadoEm) também: "A análise deste módulo já foi
+ * aplicada.".
  */
 export async function registrarRelatorio(dados: string, materia: string, curso: string, relatorio: RelatorioMetodo, contexto: ContextoMetodo = {}): Promise<Evento> {
-	await lerRelatorio(dados, materia, curso, relatorio.modulo);
+	conferirQuePodeGerarDeNovo(await lerRelatorio(dados, materia, curso, relatorio.modulo));
 	const evento = criarEvento(
 		{
 			...daSessao(contexto),
@@ -126,7 +169,7 @@ export async function registrarRelatorio(dados: string, materia: string, curso: 
 	return evento;
 }
 
-// --- A evidência --------------------------------------------------------------------------------
+// --- A evidência e o placar ----------------------------------------------------------------------
 
 /** Os eventos do aprendiz/eventos.jsonl (as linhas que não são eventos são puladas). */
 export async function eventosDoAprendiz(dados: string): Promise<Evento[]> {
@@ -136,6 +179,32 @@ export async function eventosDoAprendiz(dados: string): Promise<Evento[]> {
 /** A evidência do relatório do módulo (montarEvidencia), com os eventos lidos do aprendiz/eventos.jsonl. */
 export async function evidenciaDoModulo(dados: string, modulo: ModuloGerado, limites: { linhas?: number; bloco?: number } = {}): Promise<EvidenciaMontada> {
 	return montarEvidencia(await eventosDoAprendiz(dados), modulo, limites);
+}
+
+/**
+ * Os módulos concluídos de todas as matérias e cursos (os gerados com
+ * concluidoEm), com o nome do curso e o do módulo no esqueleto. Um curso ou
+ * módulo que não se lê fica de fora (nada é gravado aqui).
+ */
+export async function modulosConcluidos(dados: string): Promise<ModuloConcluido[]> {
+	const saida: ModuloConcluido[] = [];
+	for (const materia of (await listarMaterias(dados)).materias) {
+		const { cursos } = await listarCursos(dados, materia.id);
+		for (const curso of cursos) {
+			let lidos;
+			try {
+				lidos = await situacoesDoCurso(dados, materia.id, curso.id);
+			} catch {
+				continue;
+			}
+			for (const id of lidos.concluidos) {
+				const modulo = lidos.modulos[id];
+				if (modulo?.situacao !== "gerado") continue;
+				saida.push({ modulo, cursoNome: curso.nome, moduloNome: curso.esqueleto?.modulos.find((item) => item.id === id)?.nome ?? id });
+			}
+		}
+	}
+	return saida;
 }
 
 // --- Os ajustes -----------------------------------------------------------------------------------
@@ -170,15 +239,22 @@ export async function lerAjustes(dados: string, arquivo: string): Promise<Ajuste
 	}
 }
 
-/** Grava o arquivo de ajustes inteiro de uma vez (escreverAjustesMarkdown). */
+/** Grava o arquivo de ajustes inteiro de uma vez (escreverAjustesMarkdown), sempre com os estados novos. */
 export async function gravarAjustes(dados: string, conteudo: AjustesDoArquivo): Promise<void> {
 	await mkdir(pastaAjustes(dados), { recursive: true });
 	await gravarDeUmaVez(caminhoDosAjustes(dados, conteudo.arquivo), escreverAjustesMarkdown(conteudo));
 }
 
-/** Os ajustes ligados de um arquivo de metodologia, na ordem (os que toda geração carrega depois da base). */
-export async function ajustesAtivosDe(dados: string, arquivo: string): Promise<AjusteMetodo[]> {
-	return ajustesAtivos(await lerAjustes(dados, arquivo));
+/** Os ajustes que valem (`em teste` e `mantido`) de um arquivo de metodologia, na ordem (os que toda geração carrega depois da base). */
+export async function ajustesQueValemDe(dados: string, arquivo: string): Promise<AjusteMetodo[]> {
+	return ajustesQueValem(await lerAjustes(dados, arquivo));
+}
+
+/** Os ajustes de todos os arquivos de metodologia, na ordem de ARQUIVOS_METODO. Um arquivo que não se lê é ErroMetodo. */
+export async function lerTodosOsAjustes(dados: string): Promise<AjustesDoArquivo[]> {
+	const saida: AjustesDoArquivo[] = [];
+	for (const arquivo of ARQUIVOS_METODO) saida.push(await lerAjustes(dados, arquivo));
+	return saida;
 }
 
 /**
@@ -199,105 +275,235 @@ export async function listarAjustes(dados: string): Promise<ArquivoDeAjustesNaTe
 	return saida;
 }
 
-/**
- * Liga ou desliga um ajuste (ligar_ajuste; nada é apagado): grava o arquivo
- * de ajustes e o evento alterou_ajuste_metodo no aprendiz/eventos.jsonl,
- * objeto {arquivo, ajuste}, resultado {ativo, texto}. Sem mudança, nada é
- * gravado e não há evento. Um arquivo ilegível ou um ajuste que não existe é
- * ErroMetodo.
- */
-export async function ligarAjusteNoDisco(dados: string, arquivo: unknown, ajuste: unknown, ativo: unknown, contexto: ContextoMetodo = {}): Promise<{ conteudo: AjustesDoArquivo; evento?: Evento }> {
-	if (typeof arquivo !== "string" || !arquivo) throw new ErroMetodo("Falta o arquivo de metodologia do ajuste.");
-	if (typeof ajuste !== "string" || !ajuste) throw new ErroMetodo("Falta o id do ajuste.");
-	if (typeof ativo !== "boolean") throw new ErroMetodo("O ativo do ajuste não é true nem false.");
-	const atual = await lerAjustes(dados, arquivo);
-	const ligado = ligarAjuste(atual, ajuste, ativo);
-	if (!ligado.mudou) return { conteudo: ligado.conteudo };
-	const evento = criarEvento(
-		{ ...daSessao(contexto), verbo: "alterou_ajuste_metodo", objeto: { arquivo: atual.arquivo, ajuste }, resultado: { ativo, texto: ligado.ajuste.texto } },
-		contexto.agora ?? new Date(),
-	);
-	await gravarAjustes(dados, ligado.conteudo);
-	await acrescentarEvento(eventosAprendiz(dados), evento);
-	return { conteudo: ligado.conteudo, evento };
-}
-
-// --- As decisões ------------------------------------------------------------------------------------
-
-/** O que decidirProposta fez. */
-export interface PropostaDecidida {
-	/** O relatório novo, com a decisão (gravado). */
-	relatorio: RelatorioMetodo;
-	/** O evento aprovou_ajuste_metodo ou rejeitou_ajuste_metodo. */
-	evento: Evento;
-	/** Na aprovação: o ajuste (o novo, ou o ativo igual que já existia). */
-	ajuste?: AjusteMetodo;
-}
-
-/**
- * A decisão do Breno numa proposta (decidir_proposta; validarDecisao). Lê o
- * relatório (pronto, com a proposta sem decisão; senão, ErroMetodo).
- * - Aprovar: o texto final é o editado (quando vier) ou o da proposta; o
- *   ajuste entra ligado no fim do aprendiz/metodo/<arquivo>.md, com o
- *   comentário de origem (comentarioDaOrigem); se já há um ajuste ligado
- *   igual (mesmoAjuste), a decisão aponta para ele e nada é acrescentado.
- *   Evento aprovou_ajuste_metodo: objeto {arquivo, ajuste, materia, curso,
- *   modulo, proposta}, resultado {texto, editado, evidencias}.
- * - Rejeitar: evento rejeitou_ajuste_metodo: objeto {arquivo, materia, curso,
- *   modulo, proposta}, resultado {texto (o da proposta), evidencias, motivo}
- *   (o motivo vazio quando não veio): o relatório pode ser gerado de novo e
- *   substituído, e o texto rejeitado fica nos eventos.
- * A decisão vai para o relatório. Grava o arquivo de ajustes (na aprovação),
- * o relatório e, por último, o evento. Um relatório ou um arquivo de ajustes
- * ilegível é ErroMetodo e não é sobrescrito.
- */
-export async function decidirProposta(dados: string, materia: string, curso: string, modulo: string, entrada: unknown, contexto: ContextoMetodo = {}): Promise<PropostaDecidida> {
-	const pedida = validarDecisao(entrada);
-	const relatorio = await lerRelatorio(dados, materia, curso, modulo);
-	if (!relatorio) throw new ErroMetodo(`O módulo ${modulo} ainda não tem relatório do método.`);
-	const proposta = propostaPendente(relatorio, pedida.proposta);
-	const agora = contexto.agora ?? new Date();
-	const em = agora.toISOString();
-	const comum = { arquivo: proposta.arquivo, materia, curso, modulo, proposta: proposta.id };
-	if (pedida.decisao === "rejeitar") {
-		const evento = criarEvento(
-			{
-				...daSessao(contexto),
-				verbo: "rejeitou_ajuste_metodo",
-				objeto: comum,
-				resultado: { texto: proposta.ajuste, evidencias: [...proposta.evidencias], motivo: pedida.motivo ?? "" },
-			},
-			agora,
-		);
-		const decisao: DecisaoProposta = { tipo: "rejeitada", ...(pedida.motivo ? { motivo: pedida.motivo } : {}), em, evento: evento.id };
-		const novo = aplicarDecisao(relatorio, proposta.id, decisao);
-		await gravarRelatorio(dados, materia, curso, novo);
-		await acrescentarEvento(eventosAprendiz(dados), evento);
-		return { relatorio: novo, evento };
+/** Quantos experimentos estão em teste agora, em todos os arquivos (um arquivo que não se lê não conta). */
+export async function contarEmTeste(dados: string): Promise<number> {
+	let total = 0;
+	for (const arquivo of ARQUIVOS_METODO) {
+		try {
+			total += ajustesComEstado(await lerAjustes(dados, arquivo), "em teste").length;
+		} catch {
+			// Um arquivo ilegível aparece no listar_ajustes; aqui só não conta.
+		}
 	}
-	const texto = pedida.texto ?? proposta.ajuste;
-	const atuais = await lerAjustes(dados, proposta.arquivo);
-	const igual = ajusteAtivoIgual(atuais, texto);
-	const acrescentado = igual
-		? undefined
-		: acrescentarAjuste(atuais, {
-				texto,
-				comentario: comentarioDaOrigem({ materia, curso, modulo, proposta: proposta.id, evidencias: proposta.evidencias, aprovadoEm: dataLocal(agora) }),
+	return total;
+}
+
+// --- O que facilita (aprendizados.md) ------------------------------------------------------------------
+
+/** O aprendiz/metodo/aprendizados.md. */
+export const caminhoDosAprendizados = (dados: string) => join(pastaAjustes(dados), "aprendizados.md");
+
+/** Os aprendizados. Sem arquivo, nenhum. Um arquivo que não dá para ler é ErroMetodo e nunca é sobrescrito. */
+export async function lerAprendizados(dados: string): Promise<AprendizadosDoArquivo> {
+	const caminho = caminhoDosAprendizados(dados);
+	let conteudo: string;
+	try {
+		conteudo = await readFile(caminho, "utf8");
+	} catch (erro) {
+		if ((erro as NodeJS.ErrnoException).code === "ENOENT") return aprendizadosVazios();
+		throw erro;
+	}
+	try {
+		return lerAprendizadosMarkdown(conteudo);
+	} catch (erro) {
+		throw new ErroMetodo(`Não consegui ler os aprendizados do método ${caminho}: ${(erro as Error).message}. Corrija o arquivo ou tire-o da pasta; nada foi gravado por cima.`);
+	}
+}
+
+/** Grava o aprendizados.md inteiro de uma vez. */
+export async function gravarAprendizados(dados: string, conteudo: AprendizadosDoArquivo): Promise<void> {
+	await mkdir(pastaAjustes(dados), { recursive: true });
+	await gravarDeUmaVez(caminhoDosAprendizados(dados), escreverAprendizadosMarkdown(conteudo));
+}
+
+/** Os aprendizados na mensagem ajustes; um arquivo que não se lê vai sem itens e com `erro`. */
+export async function listarAprendizados(dados: string): Promise<AprendizadosNaTela> {
+	try {
+		return { itens: aprendizadosNaTela(await lerAprendizados(dados)) };
+	} catch (erro) {
+		return { itens: [], erro: (erro as Error).message };
+	}
+}
+
+/**
+ * O bloco <o-que-facilita> das gerações (blocoOQueFacilita) com o aprendizados.md
+ * de agora (o hash dele vai nos eventos, que quem chama monta com hashDoPrompt).
+ * Sem aprendizado que entre, "". Um arquivo que não se lê é ErroMetodo: a geração também não sai
+ * sem o que o Breno escreveu lá.
+ */
+export async function lerOQueFacilita(dados: string): Promise<string> {
+	return blocoOQueFacilita(await lerAprendizados(dados));
+}
+
+// --- Montar o que a análise recebe ----------------------------------------------------------------------
+
+/** Tudo que a análise de um módulo recebe além da evidência (a mensagem ao modelo e a conferência do que ele devolve). */
+export interface ContextoDaAnalise {
+	placar: PlacarDoModulo;
+	/** Os módulos concluídos antes do atual, até 8, com o placar recalculado. */
+	historico: EntradaDoHistorico[];
+	comparacao: Comparacao;
+	/** Os ajustes do módulo atual que valeram na geração dele. */
+	ajustesUsados: AjusteUsado[];
+	/** Os ajustes de todos os arquivos, como estão agora. */
+	ajustes: AjustesDoArquivo[];
+	/** Os experimentos em teste, na ordem dos arquivos, com os módulos em que valeram (contando o atual). */
+	emTeste: ExperimentoEmTeste[];
+	/** Os ajustes mantidos e os descartados (arquivo, id e texto). */
+	mantidos: Array<{ arquivo: ArquivoMetodo; id: string; texto: string }>;
+	descartados: Array<{ arquivo: ArquivoMetodo; id: string; texto: string }>;
+	/** Os aprendizados registrados. */
+	aprendizados: Aprendizado[];
+}
+
+/**
+ * Monta o contexto da análise do módulo concluído: o placar dele, o histórico
+ * (módulos concluídos antes, de todas as matérias e cursos, até 8) e a
+ * comparação, os ajustes de agora (os `em teste` com os módulos em que
+ * valeram, pelos ajustesUsados do histórico e do atual), os mantidos, os
+ * descartados e os aprendizados. Um arquivo de ajustes ou de aprendizados que
+ * não se lê é ErroMetodo.
+ */
+export async function montarContextoDaAnalise(dados: string, modulo: ModuloGerado, eventos?: readonly Evento[]): Promise<ContextoDaAnalise> {
+	const doAprendiz = eventos ?? (await eventosDoAprendiz(dados));
+	const placar = placarDoModuloNosEventos(doAprendiz, modulo);
+	const concluidos = await modulosConcluidos(dados);
+	const historico = historicoDosModulos(concluidos, doAprendiz, { materia: modulo.materia, curso: modulo.curso, modulo: modulo.id, ...(modulo.concluidoEm ? { concluidoEm: modulo.concluidoEm } : {}) });
+	const nomeDoAtual = concluidos.find((item) => item.modulo.materia === modulo.materia && item.modulo.curso === modulo.curso && item.modulo.id === modulo.id)?.moduloNome ?? modulo.id;
+	const ajustesUsados = (modulo.ajustesUsados ?? []).map((item) => ({ ...item }));
+	const ajustes = await lerTodosOsAjustes(dados);
+	const aprendizados = (await lerAprendizados(dados)).aprendizados;
+	const valeuEm = (arquivo: ArquivoMetodo, id: string): ModuloTestado[] => [
+		...historico
+			.filter((entrada) => entrada.ajustesUsados.some((usado) => usado.arquivo === arquivo && usado.ajuste === id))
+			.map((entrada): ModuloTestado => ({ materia: entrada.materia, curso: entrada.curso, modulo: entrada.modulo, moduloNome: entrada.moduloNome, atual: false })),
+		...(ajustesUsados.some((usado) => usado.arquivo === arquivo && usado.ajuste === id)
+			? [{ materia: modulo.materia, curso: modulo.curso, modulo: modulo.id, moduloNome: nomeDoAtual, atual: true }]
+			: []),
+	];
+	const emTeste: ExperimentoEmTeste[] = ajustes.flatMap((doArquivo) =>
+		ajustesComEstado(doArquivo, "em teste").map((ajuste) => ({ arquivo: doArquivo.arquivo, id: ajuste.id, texto: ajuste.texto, comecouEm: origemDoMetodo(ajuste)?.em ?? null, testadoEm: valeuEm(doArquivo.arquivo, ajuste.id) })),
+	);
+	const comEstado = (estado: "mantido" | "descartado") => ajustes.flatMap((doArquivo) => ajustesComEstado(doArquivo, estado).map((ajuste) => ({ arquivo: doArquivo.arquivo, id: ajuste.id, texto: ajuste.texto })));
+	return { placar, historico, comparacao: compararComHistorico(placar, historico), ajustesUsados, ajustes, emTeste, mantidos: comEstado("mantido"), descartados: comEstado("descartado"), aprendizados };
+}
+
+// --- Aplicar a análise -------------------------------------------------------------------------------------
+
+/**
+ * Aplica a análise de um relatório pronto, uma vez só (docs/metodo-experimentos.md,
+ * "Aplicar a análise"); quem chama segura a trava da matéria e a dos ajustes.
+ * Na ordem:
+ * - `manter` muda o estado para `mantido` e `descartar` para `descartado`;
+ *   `reescrever` deixa o antigo `descartado` ("substituído por <id>" no
+ *   comentário) e acrescenta o texto novo `em teste`, com "reescrita de
+ *   <arquivo>#<id>" no comentário; `continuar` não muda nada;
+ * - cada proposta que entrou vira um ajuste `em teste`, com o comentário de
+ *   origem;
+ * - cada aprendizado novo é acrescentado ao aprendizados.md (`observado`) e
+ *   cada revisão muda a situação do aprendizado.
+ * Cada passo grava o arquivo e o evento (iniciou_experimento_metodo,
+ * decidiu_experimento_metodo, registrou_aprendizado_metodo,
+ * reviu_aprendizado_metodo, no aprendiz/eventos.jsonl). Devolve o relatório
+ * com `aplicadoEm` e o `novo` de cada item que criou algo. Se falhar no meio,
+ * devolve o relatório com `erroAoAplicar` (a frase) e o `novo` do que já foi
+ * aplicado; com algo já aplicado, também com `aplicadoEm` (gerar de novo
+ * repetiria o que já foi feito). Não há nova tentativa. Só mexe nos arquivos e
+ * nos eventos; gravar o relatório é de quem chama.
+ */
+export async function aplicarAnalise(dados: string, materia: string, curso: string, relatorio: RelatorioMetodoV2, contexto: ContextoMetodo = {}): Promise<RelatorioMetodoV2> {
+	const agora = contexto.agora ?? new Date();
+	const copia = relatorioV2NaOrdem(relatorio);
+	if (copia.situacao !== "pronto") return copia;
+	const modulo = copia.modulo;
+	let aplicou = false;
+	let passo = 0;
+	// Os eventos de uma aplicação saem com instantes crescentes (o ts ordena).
+	const acrescentar = async (dadosDoEvento: Omit<Evento, "id" | "ts">) => {
+		await acrescentarEvento(eventosAprendiz(dados), criarEvento({ ...daSessao(contexto), ...dadosDoEvento }, new Date(agora.getTime() + passo++)));
+	};
+	const em = dataLocal(agora);
+	const comum = { materia, curso, modulo };
+	try {
+		for (const experimento of copia.experimentos) {
+			if (experimento.decisao === "continuar") continue;
+			const referencia = lerReferenciaDeAjuste(experimento.ajuste);
+			if (!referencia) throw new ErroMetodo(`O experimento "${experimento.ajuste}" não está no formato <arquivo>#<id>.`);
+			const atuais = await lerAjustes(dados, referencia.arquivo);
+			const doAjuste = atuais.ajustes.find((item) => item.id === referencia.id);
+			if (!doAjuste || doAjuste.estado !== "em teste") throw new ErroMetodo(`O experimento ${experimento.ajuste} não está mais em teste; a decisão sobre ele não foi aplicada.`);
+			const decisao = { decisao: experimento.decisao, porque: experimento.porque, modulosTestados: experimento.modulosTestados };
+			const objeto = { arquivo: referencia.arquivo, ajuste: referencia.id, ...comum };
+			if (experimento.decisao === "reescrever") {
+				const novoTexto = experimento.textoNovo ?? "";
+				const comNovo = acrescentarAjuste(atuais, {
+					texto: novoTexto,
+					comentario: comentarioDaOrigem({ ...comum, evidencias: [], em, reescritaDe: experimento.ajuste }),
+					agora,
+				});
+				const trocado = mudarEstadoDoAjuste(comNovo.conteudo, referencia.id, "descartado", { comentario: comentarioSubstituido(doAjuste.comentario, comNovo.ajuste.id) });
+				await gravarAjustes(dados, trocado.conteudo);
+				aplicou = true;
+				const novo = referenciaDoAjuste(referencia.arquivo, comNovo.ajuste.id);
+				experimento.novo = novo;
+				await acrescentar({ verbo: "decidiu_experimento_metodo", objeto, resultado: { ...decisao, novo } });
+				await acrescentar({
+					verbo: "iniciou_experimento_metodo",
+					objeto: { arquivo: referencia.arquivo, ajuste: comNovo.ajuste.id, ...comum, reescritaDe: experimento.ajuste },
+					resultado: { texto: comNovo.ajuste.texto, evidencias: [] },
+				});
+				continue;
+			}
+			const mudado = mudarEstadoDoAjuste(atuais, referencia.id, experimento.decisao === "manter" ? "mantido" : "descartado");
+			await gravarAjustes(dados, mudado.conteudo);
+			aplicou = true;
+			await acrescentar({ verbo: "decidiu_experimento_metodo", objeto, resultado: decisao });
+		}
+		for (const proposta of copia.propostas) {
+			const atuais = await lerAjustes(dados, proposta.arquivo);
+			const igual = ajusteQueValeIgual(atuais, proposta.ajuste);
+			if (igual) {
+				// Já vale um igual (o Breno pode ter escrito à mão depois da conferência): não repete.
+				proposta.novo = referenciaDoAjuste(proposta.arquivo, igual.id);
+				continue;
+			}
+			const comNovo = acrescentarAjuste(atuais, {
+				texto: proposta.ajuste,
+				comentario: comentarioDaOrigem({ ...comum, proposta: proposta.id, evidencias: proposta.evidencias, em }),
 				agora,
 			});
-	const ajuste = igual ?? acrescentado!.ajuste;
-	const evento = criarEvento(
-		{
-			...daSessao(contexto),
-			verbo: "aprovou_ajuste_metodo",
-			objeto: { ...comum, ajuste: ajuste.id },
-			resultado: { texto: ajuste.texto, editado: texto !== proposta.ajuste, evidencias: [...proposta.evidencias] },
-		},
-		agora,
-	);
-	const novo = aplicarDecisao(relatorio, proposta.id, { tipo: "aprovada", texto: ajuste.texto, em, evento: evento.id, ajuste: ajuste.id });
-	if (acrescentado) await gravarAjustes(dados, acrescentado.conteudo);
-	await gravarRelatorio(dados, materia, curso, novo);
-	await acrescentarEvento(eventosAprendiz(dados), evento);
-	return { relatorio: novo, evento, ajuste };
+			await gravarAjustes(dados, comNovo.conteudo);
+			aplicou = true;
+			proposta.novo = referenciaDoAjuste(proposta.arquivo, comNovo.ajuste.id);
+			await acrescentar({
+				verbo: "iniciou_experimento_metodo",
+				objeto: { arquivo: proposta.arquivo, ajuste: comNovo.ajuste.id, ...comum, proposta: proposta.id },
+				resultado: { texto: comNovo.ajuste.texto, evidencias: [...proposta.evidencias] },
+			});
+		}
+		for (const aprendizado of copia.aprendizados) {
+			const atuais = await lerAprendizados(dados);
+			const comNovo = acrescentarAprendizado(atuais, { texto: aprendizado.texto, comentario: comentarioDoAprendizado({ ...comum, evidencias: aprendizado.evidencias, em }), agora });
+			await gravarAprendizados(dados, comNovo.conteudo);
+			aplicou = true;
+			aprendizado.novo = comNovo.aprendizado.id;
+			await acrescentar({
+				verbo: "registrou_aprendizado_metodo",
+				objeto: { aprendizado: comNovo.aprendizado.id, ...comum },
+				resultado: { texto: comNovo.aprendizado.texto, porque: aprendizado.porque, evidencias: [...aprendizado.evidencias] },
+			});
+		}
+		for (const revisao of copia.revisoes) {
+			const atuais = await lerAprendizados(dados);
+			const mudado = mudarSituacaoDoAprendizado(atuais, revisao.aprendizado, revisao.situacao);
+			await gravarAprendizados(dados, mudado.conteudo);
+			aplicou = true;
+			await acrescentar({ verbo: "reviu_aprendizado_metodo", objeto: { aprendizado: revisao.aprendizado, ...comum }, resultado: { situacao: revisao.situacao, porque: revisao.porque } });
+		}
+		copia.aplicadoEm = agora.toISOString();
+	} catch (erro) {
+		copia.erroAoAplicar = (erro as Error).message;
+		if (aplicou) copia.aplicadoEm = agora.toISOString();
+	}
+	return copia;
 }

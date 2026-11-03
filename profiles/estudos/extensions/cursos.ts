@@ -18,7 +18,7 @@
 //   ../prompts/corretor.md (frontmatter "model: provedor/id"), com a
 //   metodologia de ../metodo/ no system prompt (as questões, quiz.md e
 //   dissertativa.md; o corretor, dissertativa.md), cada arquivo seguido dos
-//   ajustes ativos do Breno (aprendiz/metodo/, docs/metodo-ciclo.md), pelo
+//   ajustes do Breno que valem (aprendiz/metodo/, docs/metodo-experimentos.md), pelo
 //   ctx.modelRegistry do pi, como o mapeador (extensions/mapa.ts): a chamada
 //   vai fora da trava, com uma nova tentativa se a resposta não vier no
 //   formato, e o resultado é gravado dentro dela. Toda mensagem "curso" passa
@@ -111,7 +111,7 @@ import { lerEscrita, regrasQueValem, secaoDasRegras } from "../lib/escrita.ts";
 import { objetoJsonDoModelo } from "../lib/json-do-modelo.ts";
 import { ErroMapa, lerMapa, type MapaConteudo } from "../lib/mapa.ts";
 import { arquivoMateria, ErroMaterias } from "../lib/materias.ts";
-import { type AjusteMetodo, ajustesAtivosDe, blocoDeAjustes, ehArquivoMetodo } from "../lib/metodo-ciclo.ts";
+import { type AjusteMetodo, ajustesQueValemDe, blocoDeAjustes, ehArquivoMetodo } from "../lib/metodo-ciclo.ts";
 import { lerPromptMapeador } from "./mapa.ts";
 import { materiaDaConversa } from "./notas.ts";
 
@@ -238,7 +238,7 @@ async function lerPrompt(caminho: string): Promise<PromptLido> {
 
 /**
  * O nome e o hash do prompt com os da metodologia e dos ajustes do Breno
- * (usadoComMetodo; com `dados`, os ajustes ativos de aprendiz/metodo/), para
+ * (usadoComMetodo; com `dados`, os ajustes que valem de aprendiz/metodo/), para
  * os eventos que não chamam o modelo; sem o prompt, nada, e sem a
  * metodologia (ou com um arquivo de ajustes ilegível), só o prompt (não
  * impede gravar).
@@ -269,23 +269,23 @@ export const METODO_CORRETOR = ["dissertativa.md"] as const;
 /**
  * Um arquivo da metodologia lido: o nome, o conteúdo e o nome
  * (metodo/<arquivo>) com o hash do conteúdo, como os prompts; e, quando o
- * Breno tem ajustes ativos para ele (docs/metodo-ciclo.md, "Os ajustes
- * aprovados"), os ajustes e o nome (aprendiz/metodo/<arquivo>) com o hash do
- * bloco <ajustes-do-breno> que vai ao modelo (uma mudança nos ajustes muda o
- * hash).
+ * Breno tem ajustes que valem para ele (`em teste` e `mantido`,
+ * docs/metodo-experimentos.md, "Os experimentos"), os ajustes e o nome
+ * (aprendiz/metodo/<arquivo>) com o hash do bloco <ajustes-do-breno> que vai
+ * ao modelo (uma mudança nos ajustes, ou no estado deles, muda o hash).
  */
 export interface MetodoLido {
 	arquivo: string;
 	conteudo: string;
 	usado: PromptUsado;
-	ajustes?: { ativos: AjusteMetodo[]; usado: PromptUsado };
+	ajustes?: { vigentes: AjusteMetodo[]; usado: PromptUsado };
 }
 
 /**
  * Lê os arquivos da metodologia, na ordem dada. Um que não dá para ler é
  * ErroCurso (a chamada não sai sem a metodologia). Com `dados` (a pasta de
- * dados), cada arquivo vem com os ajustes ativos do Breno
- * (aprendiz/metodo/<arquivo>.md); um arquivo de ajustes ilegível é
+ * dados), cada arquivo vem com os ajustes do Breno que valem
+ * (aprendiz/metodo/<arquivo>.md: em teste e mantido); um arquivo de ajustes ilegível é
  * ErroMetodo (um ErroCurso): a chamada também não sai sem os ajustes dele.
  */
 export async function lerMetodo(pasta: string, arquivos: readonly string[], dados?: string): Promise<MetodoLido[]> {
@@ -299,8 +299,8 @@ export async function lerMetodo(pasta: string, arquivos: readonly string[], dado
 		}
 		const lido: MetodoLido = { arquivo, conteudo, usado: { nome: `metodo/${arquivo}`, hash: hashDoPrompt(conteudo) } };
 		if (dados !== undefined && ehArquivoMetodo(arquivo)) {
-			const ativos = await ajustesAtivosDe(dados, arquivo);
-			if (ativos.length > 0) lido.ajustes = { ativos, usado: { nome: `aprendiz/metodo/${arquivo}`, hash: hashDoPrompt(blocoDeAjustes(arquivo, ativos)) } };
+			const vigentes = await ajustesQueValemDe(dados, arquivo);
+			if (vigentes.length > 0) lido.ajustes = { vigentes, usado: { nome: `aprendiz/metodo/${arquivo}`, hash: hashDoPrompt(blocoDeAjustes(arquivo, vigentes)) } };
 		}
 		lidos.push(lido);
 	}
@@ -310,18 +310,22 @@ export async function lerMetodo(pasta: string, arquivos: readonly string[], dado
 /**
  * O system prompt: as instruções do prompt e, depois, cada arquivo da
  * metodologia entre <metodologia arquivo="…"> e </metodologia>, cada um
- * seguido, quando há, do bloco dos ajustes ativos do Breno
- * (<ajustes-do-breno arquivo="…">, blocoDeAjustes). Sem metodologia, as
+ * seguido, quando há, do bloco dos ajustes do Breno que valem
+ * (<ajustes-do-breno arquivo="…">, blocoDeAjustes, cada um com o estado).
+ * Depois de tudo vão os `extras` (o bloco <o-que-facilita> das lições e da
+ * reescrita de um bloco; os vazios saem). Sem metodologia nem extras, as
  * instruções como estão.
  */
-export function instrucoesComMetodo(instrucoes: string, metodo: readonly MetodoLido[]): string {
-	if (metodo.length === 0) return instrucoes;
+export function instrucoesComMetodo(instrucoes: string, metodo: readonly MetodoLido[], extras: readonly string[] = []): string {
+	const blocos = extras.map((extra) => extra.trim()).filter(Boolean);
+	if (metodo.length === 0 && blocos.length === 0) return instrucoes;
 	return [
 		instrucoes.trimEnd(),
 		...metodo.flatMap((item) => [
 			`<metodologia arquivo=${JSON.stringify(item.arquivo)}>\n${item.conteudo.trim()}\n</metodologia>`,
-			...(item.ajustes ? [blocoDeAjustes(item.arquivo, item.ajustes.ativos)] : []),
+			...(item.ajustes ? [blocoDeAjustes(item.arquivo, item.ajustes.vigentes)] : []),
 		]),
+		...blocos,
 	].join("\n\n");
 }
 
@@ -334,11 +338,12 @@ export const usadosDoMetodo = (item: MetodoLido): PromptUsado[] => [item.usado, 
  * nomes e os hashes juntos, na mesma ordem, separados por " + "
  * ("diagnostico.md + metodo/quiz.md", "a1b2… + c3d4…"); os ajustes do Breno
  * vão logo depois do arquivo deles ("metodo/quiz.md +
- * aprendiz/metodo/quiz.md"). Sem metodologia, o prompt como está.
+ * aprendiz/metodo/quiz.md"). Os `extras` (o <o-que-facilita>, quando entrou)
+ * vão no fim. Sem metodologia nem extras, o prompt como está.
  */
-export function usadoComMetodo(prompt: PromptUsado, metodo: readonly MetodoLido[]): PromptUsado {
-	if (metodo.length === 0) return prompt;
-	const usados = metodo.flatMap(usadosDoMetodo);
+export function usadoComMetodo(prompt: PromptUsado, metodo: readonly MetodoLido[], extras: readonly PromptUsado[] = []): PromptUsado {
+	if (metodo.length === 0 && extras.length === 0) return prompt;
+	const usados = [...metodo.flatMap(usadosDoMetodo), ...extras];
 	return { nome: [prompt.nome, ...usados.map((item) => item.nome)].join(" + "), hash: [prompt.hash, ...usados.map((item) => item.hash)].join(" + ") };
 }
 

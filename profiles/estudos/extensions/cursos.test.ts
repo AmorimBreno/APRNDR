@@ -635,18 +635,19 @@ describe("diagnóstico", () => {
 		expect(await readFile(arquivoEscrita(dados), "utf8")).toBe("{ quebrado");
 	});
 
-	it("os ajustes ativos do Breno vão logo depois do arquivo deles e entram no hash; um arquivo de ajustes ilegível impede gerar", async () => {
+	it("os ajustes do Breno que valem (em teste e mantido) vão logo depois do arquivo deles, com o estado, e entram no hash; um arquivo de ajustes ilegível impede gerar", async () => {
 		const id = await cursoNoDiagnostico();
 		await gravarAjustes(dados, {
 			arquivo: "quiz.md",
 			titulo: "Ajustes do Breno para quiz.md",
 			ajustes: [
-				{ id: "a-1", ativo: true, texto: "Alternativas erradas plausíveis.", comentario: null },
-				{ id: "a-2", ativo: false, texto: "Desligado.", comentario: null },
+				{ id: "a-1", estado: "em teste", texto: "Alternativas erradas plausíveis.", comentario: null },
+				{ id: "a-2", estado: "descartado", texto: "Desligado.", comentario: null },
+				{ id: "a-3", estado: "mantido", texto: "Uma regra mantida.", comentario: null },
 			],
 		});
 		await gerar(id, "g1");
-		const ajustes = `<ajustes-do-breno arquivo="quiz.md">\n${FRASE_DOS_AJUSTES}\n\n- Alternativas erradas plausíveis.\n</ajustes-do-breno>`;
+		const ajustes = `<ajustes-do-breno arquivo="quiz.md">\n${FRASE_DOS_AJUSTES}\n\n- (em teste) Alternativas erradas plausíveis.\n- (mantido) Uma regra mantida.\n</ajustes-do-breno>`;
 		const [base, quiz, dissertativa] = comMetodo("Gere as questões.", ["quiz.md", "dissertativa.md"]).split("\n\n<metodologia");
 		expect(chamadas[0]!.contexto.systemPrompt).toBe(`${base}\n\n<metodologia${quiz}\n\n${ajustes}\n\n<metodologia${dissertativa}`);
 		expect(chamadas[0]!.contexto.systemPrompt).not.toContain("Desligado.");

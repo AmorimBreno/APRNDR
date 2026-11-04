@@ -127,7 +127,7 @@ apps/web/ — @estudos/web: Vite + React na porta 7430, com proxy de /api e /ws 
 apps/web/vite.config.ts — porta e proxy do Vite
 apps/web/index.html — página do Vite (título APRNDR)
 apps/web/src/main.tsx — carrega os estilos (tokens.css e componentes.css do design system, estilo.css do @estudos/ui, estilo.css do app) e monta o App no #raiz
-apps/web/src/estilo.css — estilo do app por cima do design system: altura da página, cards da tela de perfis, tela de carregamento e o layout da janela do perfil
+apps/web/src/estilo.css — estilo do app por cima do design system: altura da página e a trava dela (html, body e #raiz sem rolagem nem elástico do overscroll; só rolam as áreas internas), cards da tela de perfis, tela de carregamento e o layout da janela do perfil
 packages/ui/src/visual/FaixaMarca.tsx — faixa escura da esquerda (Wordmark, legenda, Ornament, pé livre), usada pela tela de carregamento e pela tela de cadernos
 apps/web/src/telas/TelaPerfis.tsx — tela inicial: um card por perfil, até 4 numa linha com a altura da tela (1 ou 2 com metade da largura cada) (capa no papel, nome, ideograma, barra que enche no hover, lema, selo), perfis com erro, servidor fora do ar
 apps/web/src/telas/TelaCarregando.tsx — tela enquanto a sessão do perfil é montada: etapa atual, aviso de conexão e erros

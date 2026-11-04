@@ -3,7 +3,18 @@
  * e as telas (classes sem o prefixo ap-, que é do design system). */
 
 :root { color-scheme: dark; }
-html, body, #raiz { height: 100%; }
+/* A página é uma janela fixa: o documento nunca rola nem estica (sem o elástico do overscroll do
+ * touchpad, que deixava o app "solto"); só rolam as áreas internas, que têm o próprio overflow.
+ * overscroll-behavior: none no html e no body também impede que o fim de uma lista interna passe a
+ * rolagem para o documento. As áreas internas ficam com o padrão de propósito: um none/contain
+ * geral cria zona morta para a roda do mouse (um contêiner com overflow: auto trava a rolagem
+ * mesmo sem ter o que rolar, em qualquer eixo) e impediria rolar o painel do caderno com o mouse
+ * em cima da lista de baixo. */
+html, body, #raiz { height: 100%; overscroll-behavior: none; }
+html { overflow: hidden; }
+/* clip no body e no #raiz: ao contrário de hidden, nem scrollIntoView nem o foco conseguem
+ * deslocá-los (o que deixaria uma faixa vazia em volta). */
+body, #raiz { overflow: clip; }
 /* Escala do app (design-system/ESTUDOS.md): os tamanhos do manual ficaram grandes na tela do
  * Breno; 90% foi o que ficou bom. No body, para valer também nos modais (que vão para o body).
  * O Edge resolve as alturas de 100% com o zoom aplicado: a tela continua cheia. */
@@ -70,9 +81,10 @@ a.cartao:hover .cartao__carregar .overline, a.cartao:focus-visible .cartao__carr
 .cartao__mensagem { flex: 1; min-height: 0; margin: 0; overflow-y: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink-muted); }
 
 @media (max-width: 760px) {
-	.perfis { height: auto; min-height: 100%; padding: var(--space-5) var(--space-4) var(--space-8); }
-	.perfis__corpo { overflow: visible; }
-	.perfis__grade { flex-direction: column; height: auto; }
+	/* Cards empilhados passam da janela: quem rola é a própria tela (o documento não rola). */
+	.perfis { overflow-y: auto; padding: var(--space-5) var(--space-4) var(--space-8); scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+	.perfis__corpo { flex: none; overflow: visible; }
+	.perfis__grade { flex-direction: column; align-items: stretch; height: auto; }
 	.perfis__grade > .cartao { flex: none; height: auto; aspect-ratio: 4 / 5; }
 }
 

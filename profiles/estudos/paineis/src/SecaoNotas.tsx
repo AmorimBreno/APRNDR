@@ -8,8 +8,9 @@
 import { Button, EmptyState, Icon, type Tone, TextField } from "@estudos/design-system";
 import { type JanelaPerfilHook, semEsperar } from "@estudos/ui";
 import { motion } from "motion/react";
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 import { conferirTitulo, type ListaNotas, TAMANHO_TITULO } from "../../lib/nota-tipos.ts";
+import { FixoERolagem } from "./FixoERolagem.tsx";
 import { mesmoTitulo, PAINEL_NOTAS, ultimaLista, useNovasRespostas } from "./notas-ponte.ts";
 
 const diaMesHora = new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -50,6 +51,8 @@ export interface PropsSecaoNotas {
 	criando: boolean;
 	/** Abre ou fecha o formulário da nota nova. */
 	definirCriando(criando: boolean): void;
+	/** Só o caderno liga: o formulário da nota nova fica fixo no topo e só a lista de notas rola (FixoERolagem). */
+	dividir?: boolean;
 }
 
 export function SecaoNotas(props: PropsSecaoNotas) {
@@ -116,20 +119,22 @@ export function SecaoNotas(props: PropsSecaoNotas) {
 		</form>
 	) : null;
 
-	if (!lista) return <p className="body caderno__carregando">Abrindo as notas…</p>;
+	// Dividido (no caderno), até o aviso e o estado vazio ficam na parte que rola, para a tela baixa não cortar.
+	const envolver = (conteudo: ReactNode) => (props.dividir ? <FixoERolagem classe="notas" dividir fixo={null}>{conteudo}</FixoERolagem> : conteudo);
+
+	if (!lista) return envolver(<p className="body caderno__carregando">Abrindo as notas…</p>);
 
 	if (lista.notas.length === 0 && !criando) {
-		return (
+		return envolver(
 			<EmptyState glyph="書" tone={props.tom} title="Nenhuma nota ainda">
 				Suas anotações em markdown: títulos, listas, tarefas, citações e código. Cada nota é um arquivo em notas/ que abre fora do app. Só você escreve nelas;
 				o professor pode lê-las na conversa do caderno. O botão Nova nota, ao lado das tags, cria a primeira.
-			</EmptyState>
+			</EmptyState>,
 		);
 	}
 
 	return (
-		<div className="notas">
-			{formulario}
+		<FixoERolagem classe="notas" {...(props.dividir ? { dividir: true } : {})} fixo={formulario}>
 			<ul className="notas__lista">
 				{lista.notas.map((nota, indice) => (
 					<motion.li
@@ -149,6 +154,6 @@ export function SecaoNotas(props: PropsSecaoNotas) {
 					</motion.li>
 				))}
 			</ul>
-		</div>
+		</FixoERolagem>
 	);
 }

@@ -34,6 +34,7 @@ import {
 	textoAndamento,
 	textoPendentes,
 } from "./mapa-ponte.ts";
+import { FixoERolagem } from "./FixoERolagem.tsx";
 import { formatarDolar } from "./ModalMateriais.tsx";
 
 const MOLA = { type: "spring", stiffness: 420, damping: 34 } as const;
@@ -51,6 +52,8 @@ export interface PropsSecaoMapa {
 	irParaMateriais(): void;
 	/** Abre a seção Materiais com o arquivo em destaque. */
 	abrirMaterial(arquivo: string): void;
+	/** Só o caderno liga: o erro, a situação com os botões e o andamento ficam fixos no topo e só a lista dos conceitos rola (FixoERolagem). */
+	dividir?: boolean;
 }
 
 /** Um id por abertura (da seção ou da etapa do guia): a extensão grava um evento revisou_mapa por edicao. */
@@ -122,13 +125,13 @@ export function SecaoMapa(props: PropsSecaoMapa) {
 	const [confirmarRefazer, setConfirmarRefazer] = useState(false);
 
 	const avisos = <AvisosMapa mapa={props.mapa} />;
+	const dividir = props.dividir ? { dividir: true } : {};
 
 	if (!estado || !mapa) {
 		return (
-			<div className="mapa">
-				{avisos}
+			<FixoERolagem classe="mapa" {...dividir} fixo={avisos}>
 				<p className="body caderno__carregando">Abrindo o mapa…</p>
-			</div>
+			</FixoERolagem>
 		);
 	}
 
@@ -140,8 +143,7 @@ export function SecaoMapa(props: PropsSecaoMapa) {
 
 	if (vazio) {
 		return (
-			<div className="mapa">
-				{avisos}
+			<FixoERolagem classe="mapa" {...dividir} fixo={avisos}>
 				<EmptyState
 					glyph="知"
 					tone={props.tom}
@@ -154,7 +156,7 @@ export function SecaoMapa(props: PropsSecaoMapa) {
 				>
 					Adicione materiais na seção Materiais: o mapa é montado sozinho a partir deles.
 				</EmptyState>
-			</div>
+			</FixoERolagem>
 		);
 	}
 
@@ -164,8 +166,9 @@ export function SecaoMapa(props: PropsSecaoMapa) {
 	const porQueNaoAprova =
 		mapa.situacao === "aprovado" ? "O mapa já está aprovado." : contas.dentro === 0 ? "Traga ou escreva pelo menos um conceito antes de aprovar." : mapeando ? "Espere o mapeamento terminar." : undefined;
 
-	return (
-		<div className="mapa">
+	// A parte de controle (o erro, a situação com os botões, o andamento ou os pendentes) fica fixa no topo no caderno; os conceitos rolam por baixo.
+	const controle = (
+		<>
 			{avisos}
 			<div className="mapa__situacao">
 				<Tag size="sm" tone={situacao.tom} {...(mapa.situacao === "aprovado" ? { icon: "check" as const } : mapa.situacao === "alterado" ? { icon: "alert" as const } : {})}>
@@ -185,7 +188,11 @@ export function SecaoMapa(props: PropsSecaoMapa) {
 			</div>
 
 			<ProgressoMapa mapa={props.mapa} />
+		</>
+	);
 
+	return (
+		<FixoERolagem classe="mapa" {...dividir} fixo={controle}>
 			<ListaConceitos conceitos={mapa.conceitos} operar={operar} abrirMaterial={props.abrirMaterial} />
 			<ConceitoNovo adicionar={(nome, descricao) => operar([{ tipo: "adicionar", id: novoIdConceito(), nome, ...(descricao ? { descricao } : {}) }])} />
 			<ForaDoMapa conceitos={mapa.conceitos} operar={operar} />
@@ -220,7 +227,7 @@ export function SecaoMapa(props: PropsSecaoMapa) {
 				</p>
 				{custo > 0 ? <p className="body">O primeiro mapeamento custou {formatarDolar(custo)}.</p> : null}
 			</Modal>
-		</div>
+		</FixoERolagem>
 	);
 }
 

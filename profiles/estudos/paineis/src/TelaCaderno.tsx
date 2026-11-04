@@ -271,7 +271,7 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 						/>
 					</motion.section>
 				) : (
-					// layoutScroll: o painel só rola se a janela for baixa; o contêiner do conteúdo da lista também tem layoutScroll, e o arrasto do mapa de conteúdo (Reorder) mede certo com qualquer um rolado.
+					// layoutScroll: o painel só rola se a janela for baixa; a lista de dentro de cada seção (FixoERolagem) também tem layoutScroll, e o arrasto do mapa de conteúdo (Reorder) mede certo com qualquer um rolado.
 					<motion.div className="painel-caderno" layoutScroll>
 						<div className="painel-caderno__bloco">
 							<FaixaCursos
@@ -296,10 +296,10 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 									</div>
 								) : null}
 							</header>
-							{/* layoutScroll: o conteúdo da tag é quem rola dentro do cartão (o seletor fica fixo em cima), e o arrasto do mapa mede por ele. A chave faz cada tag abrir no topo. */}
+							{/* O corpo não rola: cada seção (dividir) separa a parte de controle e de entrada, fixa em cima, da lista, que é o motion.div com layoutScroll que rola
+								    dentro do cartão (FixoERolagem; o arrasto do mapa mede por ele). A chave faz cada tag abrir no topo. */}
 							<motion.div
 								key={tag}
-								layoutScroll
 								id={idDoPainel(baseIds)}
 								role="tabpanel"
 								aria-labelledby={idDaAba(baseIds, tag)}
@@ -317,11 +317,13 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 											abrirNota={abrirNota}
 											criando={criandoNota}
 											definirCriando={setCriandoNota}
+											dividir
 										/>
 								) : tag === "mapa" ? (
 									<SecaoMapa
 										mapa={mapa}
 										tom={tom}
+										dividir
 										irParaMateriais={() => escolherTag("materiais")}
 										abrirMaterial={(arquivo) => props.navegar(`caderno/${materiaId}/materiais/${arquivo}`)}
 									/>
@@ -332,6 +334,7 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 										enviar={(arquivos) => acoes.enviarMateriais(pastaMateriaisRelativa(materiaId), arquivos)}
 										reprocessar={(caminho) => acoes.reprocessarMaterial(caminho)}
 										{...(props.material ? { destaque: props.material } : {})}
+										dividir
 									/>
 								)}
 							</motion.div>

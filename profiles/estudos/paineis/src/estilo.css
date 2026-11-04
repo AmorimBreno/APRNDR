@@ -125,15 +125,30 @@
 .painel-caderno__nota { display: flex; flex-direction: column; min-height: 0; overflow: hidden; border-radius: var(--radius-lg); background: var(--surface-panel); }
 /* A lista de baixo: o seletor de tags (e a meta à direita) em cima, o conteúdo da tag escolhida embaixo. */
 /* A lista é um cartão da altura que sobra da janela (--resto, medido pelo BaixoDoCaderno), como as tarefas e o calendário, e fica fixa no topo
- * se o painel rolar. O seletor fica em cima e só o corpo rola (min-height: 0 deixa o corpo encolher); abaixo de 1100 px, ver o fim do arquivo. */
+ * se o painel rolar. O seletor fica em cima e o corpo ocupa o resto (min-height: 0 deixa o corpo encolher); quem rola é só a lista de dentro
+ * (.painel-caderno__rolagem). Abaixo de 1100 px, ver o fim do arquivo. */
 .painel-caderno__lista { position: sticky; top: 0; align-self: start; display: flex; flex-direction: column; gap: var(--space-5); box-sizing: border-box; height: var(--resto, auto); min-height: 400px; }
 .painel-caderno__seletor { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-4); min-width: 0; }
 .painel-caderno__meta { flex: none; color: var(--ink-muted); }
 /* As ações da tag aberta, à direita do seletor (hoje o botão Nova nota, na tag Notas). */
 .painel-caderno__acoes { flex: none; display: flex; align-items: center; gap: var(--space-2); }
-/* O conteúdo da tag rola por dentro (é o motion.div com layoutScroll). O respiro negativo/positivo deixa a sombra e o anel de foco aparecerem
- * sem o corte da rolagem; o de baixo deixa o último item respirar. */
-.painel-caderno__corpo { flex: 1 1 auto; min-width: 0; min-height: 0; overflow-y: auto; margin: calc(-1 * var(--space-1)); padding: var(--space-1) var(--space-2) var(--space-5) var(--space-1); scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+/* O corpo da tag é uma coluna que não rola: a seção (FixoERolagem) põe em cima a parte de controle e de entrada (.painel-caderno__fixo: o formulário
+ * da nota nova, a área de soltar, a barra do mapa com os botões) e embaixo a lista (.painel-caderno__rolagem), a única que rola. */
+.painel-caderno__corpo { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.painel-caderno__secao { flex: 1 1 auto; width: 100%; min-height: 0; }
+/* A parte fixa pega a altura do que tem e só encolhe (e rola) se a lista de baixo ficar sem o mínimo, numa janela muito baixa. O respiro negativo/positivo
+ * deixa a sombra e o anel de foco aparecerem sem o corte. */
+.painel-caderno__fixo { flex: 0 1 auto; display: flex; flex-direction: column; gap: var(--space-4); min-height: 0; margin: calc(-1 * var(--space-1)); padding: var(--space-1); overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+/* A lista rola por dentro (é o motion.div com layoutScroll). Mesmo respiro da parte fixa; o de baixo deixa o último item respirar. Com parte fixa em cima,
+ * uma linha fina separa as duas, e a lista tem o mínimo de 120 px. */
+.painel-caderno__rolagem { flex: 1 1 0; display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; min-height: 0; margin: calc(-1 * var(--space-1)); padding: var(--space-1) var(--space-2) var(--space-5) var(--space-1); overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+.painel-caderno__fixo:not(:empty) + .painel-caderno__rolagem { min-height: 120px; padding-top: var(--space-3); border-top: var(--border-hair) solid var(--line); }
+/* A área de soltar quando já há arquivos: uma faixa baixa, com o ícone e o texto numa linha (a dica se corta com reticências). */
+.materiais__soltar--faixa .ap-drop { flex-direction: row; flex-wrap: wrap; justify-content: flex-start; gap: var(--space-1) var(--space-3); padding: var(--space-3) var(--space-4); text-align: left; }
+.materiais__soltar--faixa .ap-drop__icon { width: 32px; height: 32px; margin: 0; }
+.materiais__soltar--faixa .ap-drop__icon svg { width: 18px; height: 18px; }
+.materiais__soltar--faixa .ap-drop__title { flex: none; }
+.materiais__soltar--faixa .ap-drop__hint { flex: 1 1 0; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .painel-caderno__corpo .ap-empty { max-width: 760px; background: var(--surface-raised); }
 .painel-caderno__corpo .materiais { max-width: 880px; }
 /* As tags do seletor: teclas de papel como as do diagnóstico (.diag__tecla), mas com ícone e contagem; a escolhida fica âmbar.

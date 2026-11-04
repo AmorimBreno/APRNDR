@@ -11,6 +11,7 @@ import type { SituacaoMaterial } from "@estudos/ui";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import type { Materia } from "../../lib/materia-tipos.ts";
+import { FixoERolagem } from "./FixoERolagem.tsx";
 
 const ACEITOS = ".pdf,.py,.ipynb,.md,.markdown,.txt";
 
@@ -100,6 +101,8 @@ export interface PropsConteudoMateriais {
 	reprocessar(caminho: string): Promise<void>;
 	/** O nome do arquivo em destaque (vindo de uma menção numa nota): marcado e rolado até ficar à vista. */
 	destaque?: string;
+	/** Só o caderno liga: a área de soltar e os avisos ficam fixos no topo e só a lista dos arquivos rola (FixoERolagem). */
+	dividir?: boolean;
 }
 
 /** A área de soltar e a lista, sem o modal: o modal da tela de cadernos e a seção Materiais do caderno usam. */
@@ -125,16 +128,25 @@ export function ConteudoMateriais(props: PropsConteudoMateriais) {
 	};
 
 	return (
-		<div className="materiais">
-			<FileDrop
-				title="Arraste aqui os PDFs das aulas, .py, .ipynb ou markdown"
-				hint={`ou clique para escolher. Copiar para a pasta ${props.pasta.split("/").join("\\")} no Drive também funciona (aparece em até 30 s).`}
-				accept={ACEITOS}
-				files={enviando.map((nome) => ({ name: nome, size: "enviando…" }))}
-				onFiles={receber}
-				{...(erro ? { error: erro } : {})}
-			/>
-			{aviso ? <p className="materiais__aviso body-sm">{aviso}</p> : null}
+		<FixoERolagem
+			classe="materiais"
+			{...(props.dividir ? { dividir: true } : {})}
+			fixo={
+				<>
+					<FileDrop
+						// Fixa no topo (caderno) e com arquivos na lista, a área de soltar vira uma faixa baixa: o espaço fica para a lista.
+						className={props.dividir && materiais.length > 0 ? "materiais__soltar--faixa" : ""}
+						title="Arraste aqui os PDFs das aulas, .py, .ipynb ou markdown"
+						hint={`ou clique para escolher. Copiar para a pasta ${props.pasta.split("/").join("\\")} no Drive também funciona (aparece em até 30 s).`}
+						accept={ACEITOS}
+						files={enviando.map((nome) => ({ name: nome, size: "enviando…" }))}
+						onFiles={receber}
+						{...(erro ? { error: erro } : {})}
+					/>
+					{aviso ? <p className="materiais__aviso body-sm">{aviso}</p> : null}
+				</>
+			}
+		>
 			{props.materiais === undefined ? (
 				<p className="materiais__vazio body-sm">Carregando a lista…</p>
 			) : materiais.length === 0 ? (
@@ -155,7 +167,7 @@ export function ConteudoMateriais(props: PropsConteudoMateriais) {
 					</AnimatePresence>
 				</ul>
 			)}
-		</div>
+		</FixoERolagem>
 	);
 }
 

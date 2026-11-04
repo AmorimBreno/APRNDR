@@ -14,6 +14,12 @@
 // topo do painel, acompanha a rolagem. Nada é medido no painel além da altura dele
 // e da posição do bloco, então o `layoutScroll` do motion.div (o arrasto do mapa
 // de conteúdo) continua igual. Na tela estreita o CSS ignora a variável.
+//
+// A lista também é um cartão dessa altura (height: var(--resto), sticky): o seletor
+// de tags fica fixo em cima e só o conteúdo da tag rola por dentro. Por isso a lista
+// não aumenta mais a página; o painel só rola se a janela for mais baixa que a
+// faixa dos cursos mais a altura mínima dos cartões. Na tela estreita a lista usa
+// `--altura-painel` (a altura visível do painel, com um mínimo).
 
 import { type ReactNode, useLayoutEffect, useRef } from "react";
 import { restoDoPainel } from "./painel-caderno.ts";
@@ -36,6 +42,8 @@ export function BaixoDoCaderno(props: { children: ReactNode }) {
 				rolagem: painel.scrollTop,
 			});
 			elemento.style.setProperty("--resto", `${resto}px`);
+			// A altura visível do painel: na tela estreita a lista usa ela (o CSS ignora o --resto).
+			elemento.style.setProperty("--altura-painel", `${painel.clientHeight}px`);
 		};
 		medir();
 		if (typeof ResizeObserver === "undefined") return;

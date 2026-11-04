@@ -124,12 +124,16 @@
 .painel-caderno__bloco { flex: none; min-width: 0; padding: var(--space-5) var(--space-6); border-radius: var(--radius-lg); background: var(--surface-panel); }
 .painel-caderno__nota { display: flex; flex-direction: column; min-height: 0; overflow: hidden; border-radius: var(--radius-lg); background: var(--surface-panel); }
 /* A lista de baixo: o seletor de tags (e a meta à direita) em cima, o conteúdo da tag escolhida embaixo. */
-.painel-caderno__lista { display: flex; flex-direction: column; gap: var(--space-5); }
+/* A lista é um cartão da altura que sobra da janela (--resto, medido pelo BaixoDoCaderno), como as tarefas e o calendário, e fica fixa no topo
+ * se o painel rolar. O seletor fica em cima e só o corpo rola (min-height: 0 deixa o corpo encolher); abaixo de 1100 px, ver o fim do arquivo. */
+.painel-caderno__lista { position: sticky; top: 0; align-self: start; display: flex; flex-direction: column; gap: var(--space-5); box-sizing: border-box; height: var(--resto, auto); min-height: 400px; }
 .painel-caderno__seletor { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-4); min-width: 0; }
 .painel-caderno__meta { flex: none; color: var(--ink-muted); }
 /* As ações da tag aberta, à direita do seletor (hoje o botão Nova nota, na tag Notas). */
 .painel-caderno__acoes { flex: none; display: flex; align-items: center; gap: var(--space-2); }
-.painel-caderno__corpo { min-width: 0; }
+/* O conteúdo da tag rola por dentro (é o motion.div com layoutScroll). O respiro negativo/positivo deixa a sombra e o anel de foco aparecerem
+ * sem o corte da rolagem; o de baixo deixa o último item respirar. */
+.painel-caderno__corpo { flex: 1 1 auto; min-width: 0; min-height: 0; overflow-y: auto; margin: calc(-1 * var(--space-1)); padding: var(--space-1) var(--space-2) var(--space-5) var(--space-1); scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
 .painel-caderno__corpo .ap-empty { max-width: 760px; background: var(--surface-raised); }
 .painel-caderno__corpo .materiais { max-width: 880px; }
 /* As tags do seletor: teclas de papel como as do diagnóstico (.diag__tecla), mas com ícone e contagem; a escolhida fica âmbar.
@@ -1601,7 +1605,7 @@ button.relatorio__evidencia:focus-visible { outline: none; box-shadow: var(--foc
 @media (max-width: 1100px) {
 	/* A lista na largura toda; as tarefas e o calendário lado a lado embaixo, cada um com metade. Os cartões voltam a ter altura própria. */
 	.painel-caderno__baixo { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-	.painel-caderno__baixo > .painel-caderno__lista { grid-column: 1 / -1; }
+	.painel-caderno__baixo > .painel-caderno__lista { grid-column: 1 / -1; position: static; align-self: stretch; height: max(var(--altura-painel, 560px), 420px); min-height: 0; }
 	.painel-caderno__coluna > section { position: static; max-height: none; }
 	.painel-caderno__coluna--tarefas > section { max-height: 560px; }
 }

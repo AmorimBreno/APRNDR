@@ -1,6 +1,5 @@
 // Testes que definem o contrato das funções puras de contexto-tela.ts (WP0).
-// O WP1 tira o .skip e implementa até passarem; mudar um teste é mudar o
-// contrato (só o orquestrador).
+// Mudar um teste é mudar o contrato (só o orquestrador).
 
 import { describe, expect, it } from "vitest";
 import { hashConteudo, resumoDoContexto, TIPO_MENSAGEM_CONTEXTO_TELA, textoParaModelo, ultimoHashVisivel } from "./contexto-tela.ts";
@@ -17,7 +16,7 @@ const aberto: ContextoTela = {
 
 const custom = (details: unknown) => ({ role: "custom", customType: TIPO_MENSAGEM_CONTEXTO_TELA, content: "…", display: false, details, timestamp: 1 });
 
-describe.skip("contexto-tela", () => {
+describe("contexto-tela", () => {
 	it("hashConteudo: sha256 em hexadecimal, estável e diferente para conteúdos diferentes", () => {
 		const hash = hashConteudo("abc");
 		expect(hash).toMatch(/^[0-9a-f]{64}$/);

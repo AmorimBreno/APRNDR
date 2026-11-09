@@ -27,24 +27,36 @@
 // com responder e acaoDaInterface aqui), a ferramenta ask_user_question
 // (pergunta.ts) e a ferramenta subagent (subagentes.ts), além das que vierem em opcoes.extensoesNucleo. As sessões
 // filhas dos subagentes não recebem nenhuma delas.
+//
+// Contexto da tela (ESPECIFICACAO.md 13.19; docs/mesa-de-estudo.md, 2.5): cada
+// mensagem do usuário pode levar o que estava aberto na interface. Ele entra
+// pelo before_agent_start da extensão da ponte como mensagem custom invisível
+// (contexto-tela.ts). Como o before_agent_start só roda no começo de uma
+// execução, a janela tem a própria fila para as mensagens mandadas durante uma
+// resposta (em vez do followUp do pi), e cada uma começa a sua execução.
 
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import {
 	type AgentSession,
+	type BeforeAgentStartEvent,
+	type BeforeAgentStartEventResult,
 	getAgentDir,
 	type ModelRuntime,
 	type SessionStartEvent,
 	SessionManager,
 } from "@earendil-works/pi-coding-agent";
+import { mensagemDoContexto } from "./contexto-tela.ts";
 import {
+	type ContextoTela,
 	converterHistorico,
 	criarTradutorEventos,
 	type Diagnostico,
 	type EstadoSessao,
 	type EventoNucleo,
 	type ItemHistorico,
+	type UsoModelo,
 } from "./eventos.ts";
 import {
 	criarRegistroModelos,
@@ -78,6 +90,7 @@ import {
 	type ResumoSessao,
 	TIPO_ENTRADA_AGENTE,
 	TIPO_ENTRADA_CONTEXTO,
+	usoDoRamo,
 } from "./sessoes.ts";
 import { criarExtensaoMateriais } from "./materiais/extensao.ts";
 import { ServicoMateriais } from "./materiais/servico.ts";
@@ -159,6 +172,19 @@ export class JanelaPerfil {
 	private execucao?: Promise<void>;
 	/** true entre chamar prompt() e o pi começar a execução. */
 	private iniciando = false;
+	/**
+	 * Fila própria das mensagens mandadas enquanto a sessão respondia. Não usa o
+	 * followUp do pi: ele entra na execução em andamento sem passar pelo
+	 * before_agent_start e só aceita texto, então o contexto da tela de cada
+	 * mensagem se perderia. Cada item sai com prompt() quando a execução termina.
+	 */
+	private filaPropria: Array<{ texto: string; contextoTela?: ContextoTela }> = [];
+	/** O que está na fila do pi (steer e followUp de extensões), para o evento "fila" juntar as duas. */
+	private filaPi: string[] = [];
+	/** O contexto da tela do prompt() que está começando; o before_agent_start o consome. */
+	private proximoContexto?: ContextoTela;
+	/** A última execução terminou abortada (evento execucao_fim). */
+	private ultimaAbortada = false;
 
 	constructor(perfil: Perfil, opcoes: OpcoesJanelaPerfil = {}) {
 		this.perfilAtual = perfil;
@@ -183,9 +209,9 @@ export class JanelaPerfil {
 		return this.sessao?.systemPrompt;
 	}
 
-	/** true enquanto a sessão responde. */
+	/** true enquanto a sessão responde (inclusive entre uma execução e a próxima da fila própria). */
 	get respondendo(): boolean {
-		return this.iniciando || (this.sessao?.isStreaming ?? false);
+		return this.iniciando || this.execucao !== undefined || (this.sessao?.isStreaming ?? false);
 	}
 
 	/** Sessão do pi por baixo, para o próprio núcleo e o servidor. Muda a cada troca. */
@@ -225,53 +251,56 @@ export class JanelaPerfil {
 	}
 
 	/**
-	 * Envia uma mensagem do usuário. Se a sessão já está respondendo, a mensagem
-	 * entra na fila como follow-up (o pi a entrega quando a execução atual
-	 * termina). Não espera a resposta: ela chega pelos eventos. Erros também
-	 * viram eventos ("erro"), nunca uma promessa rejeitada solta.
+	 * Envia uma mensagem do usuário, com o contexto da tela opcional (13.19).
+	 * Se a sessão já está respondendo, a mensagem entra na fila própria da janela
+	 * e sai com prompt() quando a execução termina sem ser abortada; assim toda
+	 * mensagem passa pelo before_agent_start e leva o próprio contexto. Não
+	 * espera a resposta: ela chega pelos eventos. Erros também viram eventos
+	 * ("erro"), nunca uma promessa rejeitada solta.
 	 */
-	enviar(texto: string): Promise<"iniciada" | "enfileirada"> {
+	enviar(texto: string, contextoTela?: ContextoTela): Promise<"iniciada" | "enfileirada"> {
 		return this.emOrdem(async () => {
 			const sessao = this.exigirSessao();
-			if (this.iniciando || sessao.isStreaming) {
-				await sessao.followUp(texto);
+			const item = { texto, ...(contextoTela ? { contextoTela } : {}) };
+			// this.execucao cobre o intervalo entre o fim da execução no pi e o
+			// finally do prompt(), que manda o próximo da fila.
+			if (this.execucao || this.iniciando || sessao.isStreaming) {
+				this.filaPropria.push(item);
+				this.emitirFila();
 				return "enfileirada";
 			}
-			this.iniciando = true;
-			const execucao: Promise<void> = sessao
-				.prompt(texto)
-				.catch((erro: unknown) => this.emitir({ tipo: "erro", origem: "nucleo", mensagem: mensagemDe(erro) }))
-				.finally(() => {
-					if (this.execucao === execucao) {
-						this.execucao = undefined;
-						this.iniciando = false;
-					}
-				});
-			this.execucao = execucao;
+			if (this.filaPropria.length > 0) {
+				// A fila ficou parada (a última execução foi abortada sem passar por
+				// abortar()): a mensagem nova entra depois das que esperavam.
+				this.filaPropria.push(item);
+				this.mandarProximo(sessao);
+				return "iniciada";
+			}
+			this.comecar(sessao, item);
 			return "iniciada";
 		});
 	}
 
-	/** Espera a resposta em andamento (e a fila dela) terminar. */
+	/** Espera a resposta em andamento, a fila própria e a fila do pi terminarem. */
 	async aguardarOcioso(): Promise<void> {
 		await this.fila;
-		await this.execucao;
-		await this.sessao?.waitForIdle();
+		await this.aguardarExecucoes();
 	}
 
 	/**
-	 * Interrompe a resposta em andamento e esvazia a fila de follow-ups.
+	 * Interrompe a resposta em andamento e esvazia a fila própria e a do pi.
 	 * Devolve as mensagens que estavam na fila (para a interface devolvê-las ao campo de texto).
 	 */
 	async abortar(): Promise<string[]> {
 		const sessao = this.sessao;
 		if (!sessao) return [];
+		const minhas = this.esvaziarFila();
 		const fila = sessao.clearQueue();
 		// Antes do abort: uma ferramenta que espera a interface recebe o
 		// cancelamento e pode terminar (o abort espera a sessão ficar ociosa).
 		this.ponte?.cancelarPendentes("abortado");
 		await sessao.abort();
-		return [...fila.steering, ...fila.followUp];
+		return [...minhas, ...fila.steering, ...fila.followUp];
 	}
 
 	/**
@@ -321,9 +350,10 @@ export class JanelaPerfil {
 	 */
 	trocarAgente(nome: string): Promise<EstadoSessao> {
 		return this.emOrdem(async () => {
-			const sessao = this.exigirSessao();
+			this.exigirSessao();
 			const pedido: PedidoMontagem = { ...(await this.pedidoComAgente(nome)), contexto: this.contextoAtual ?? null };
-			await sessao.waitForIdle();
+			// Espera também a fila própria: com o followUp do pi ela era parte da execução.
+			await this.aguardarExecucoes();
 			return this.trocarSessao(this.gerenteDaSessaoAtual(), pedido, "reload");
 		});
 	}
@@ -404,10 +434,23 @@ export class JanelaPerfil {
 		return listarModelosDisponiveis(await this.obterRegistro());
 	}
 
-	/** Conversa da sessão aberta (ramo ativo), no formato genérico. */
+	/**
+	 * Conversa da sessão aberta (ramo ativo), no formato genérico. O contexto da
+	 * tela de cada mensagem vem como resumo no item do usuário (contextoTela).
+	 */
 	historico(): ItemHistorico[] {
 		if (!this.sessao) return [];
 		return converterHistorico(this.sessao.messages, agentesPorMomento(this.sessao.sessionManager.getBranch()));
+	}
+
+	/**
+	 * O uso somado do ramo ativo inteiro, lido das entradas do arquivo (não de
+	 * sessao.messages, que perde o que foi compactado): respostas e subagentes.
+	 * Indefinido sem sessão.
+	 */
+	usoDoRamo(): UsoModelo | undefined {
+		if (!this.sessao) return undefined;
+		return usoDoRamo(this.sessao.sessionManager.getBranch());
 	}
 
 	/**
@@ -425,6 +468,7 @@ export class JanelaPerfil {
 
 	/** Encerra a janela: interrompe a resposta, avisa as extensões e descarta a sessão. */
 	async descartar(): Promise<void> {
+		this.esvaziarFila();
 		this.ponte?.cancelarPendentes("sessao_encerrada");
 		await this.sessao?.abort();
 		await this.emOrdem(async () => {
@@ -509,6 +553,87 @@ export class JanelaPerfil {
 		return resultado;
 	}
 
+	// --- Fila própria e contexto da tela -------------------------------------------
+
+	/**
+	 * Começa uma execução com prompt(). O contexto vai para this.proximoContexto,
+	 * que o before_agent_start dessa execução consome. Quando o prompt() termina
+	 * (o pi resolve depois do agent_settled), manda o próximo da fila, a menos que
+	 * a execução tenha sido abortada ou a sessão trocada.
+	 */
+	private comecar(sessao: AgentSession, item: { texto: string; contextoTela?: ContextoTela }): void {
+		this.iniciando = true;
+		this.ultimaAbortada = false;
+		this.proximoContexto = item.contextoTela;
+		const execucao: Promise<void> = sessao
+			.prompt(item.texto)
+			.catch((erro: unknown) => {
+				// O contexto não pode sobrar para a mensagem seguinte.
+				this.proximoContexto = undefined;
+				this.emitir({ tipo: "erro", origem: "nucleo", mensagem: mensagemDe(erro) });
+			})
+			.finally(() => {
+				if (this.execucao !== execucao) return;
+				this.execucao = undefined;
+				this.iniciando = false;
+				// Um prompt() que não chegou a começar uma execução (comando de
+				// extensão, entrada tratada por extensão) não consumiu o contexto.
+				this.proximoContexto = undefined;
+				if (this.sessao !== sessao || this.ultimaAbortada) return;
+				this.mandarProximo(sessao);
+			});
+		this.execucao = execucao;
+	}
+
+	/** Tira o primeiro da fila própria e o manda. */
+	private mandarProximo(sessao: AgentSession): void {
+		const item = this.filaPropria.shift();
+		if (!item) return;
+		this.emitirFila();
+		this.comecar(sessao, item);
+	}
+
+	/**
+	 * Esvazia a fila própria (e avisa a interface, se havia algo). Devolve os
+	 * textos. Não mexe no proximoContexto: uma mensagem abortada enquanto começa
+	 * ainda é gravada pelo pi, e o contexto dela vai junto.
+	 */
+	private esvaziarFila(): string[] {
+		const textos = this.filaPropria.map((item) => item.texto);
+		this.filaPropria = [];
+		if (textos.length > 0) this.emitirFila();
+		return textos;
+	}
+
+	/** Evento "fila": a fila própria e, depois, a do pi. */
+	private emitirFila(): void {
+		this.emitir({ tipo: "fila", mensagens: [...this.filaPropria.map((item) => item.texto), ...this.filaPi] });
+	}
+
+	/** Espera a execução em andamento e as que a fila própria começar depois dela. */
+	private async aguardarExecucoes(): Promise<void> {
+		// O finally de cada prompt() já começou a próxima execução antes de a
+		// promessa resolver; por isso o laço vê a nova.
+		while (this.execucao) await this.execucao;
+		await this.sessao?.waitForIdle();
+	}
+
+	/**
+	 * before_agent_start da sessão `ponte`: devolve a mensagem custom com o
+	 * contexto da tela da mensagem que está começando. Só para execuções começadas
+	 * por uma mensagem do usuário e só na sessão atual. O "repetido" compara com
+	 * as mensagens que o modelo vê agora (sessao.messages, já compactadas).
+	 */
+	private contextoParaModelo(ponte: PonteSessao, evento: BeforeAgentStartEvent): BeforeAgentStartEventResult | undefined {
+		if (evento.messageType !== "user" || this.ponte !== ponte || !this.sessao) return undefined;
+		const contexto = this.proximoContexto;
+		this.proximoContexto = undefined;
+		if (!contexto) return undefined;
+		return { message: mensagemDoContexto(contexto, this.sessao.messages) };
+	}
+
+	// ---------------------------------------------------------------------------
+
 	private emitir(evento: EventoNucleo): void {
 		if (evento.tipo === "execucao_inicio") this.iniciando = false;
 		for (const ouvinte of this.ouvintes) {
@@ -563,6 +688,9 @@ export class JanelaPerfil {
 	/** Monta a sessão nova e só então descarta a antiga. */
 	private async trocarSessao(gerente: SessionManager, pedido: PedidoMontagem, motivo: MotivoTroca): Promise<EstadoSessao> {
 		const antiga = this.sessao;
+		// A fila própria é da conversa que sai: não pode ir para a sessão nova.
+		this.esvaziarFila();
+		this.filaPi = [];
 		// Aborta primeiro para a resposta interrompida ficar gravada antes de o
 		// arquivo ser relido. Os pedidos da interface são cancelados antes, para
 		// nenhuma ferramenta segurar o abort esperando o usuário.
@@ -593,6 +721,7 @@ export class JanelaPerfil {
 		this.diagnosticos = montada.diagnosticos;
 		this.execucao = undefined;
 		this.iniciando = false;
+		this.proximoContexto = undefined;
 		await this.vincular(montada.sessao, montada.agente, montada.ponte);
 		const estado = this.atualizarEstado();
 		for (const diagnostico of this.diagnosticos) this.emitir({ tipo: "diagnostico", ...diagnostico });
@@ -624,7 +753,9 @@ export class JanelaPerfil {
 		const contextoNaSessao = contextoGravado(gerente.getBranch());
 		const contexto = pedido.contexto === undefined ? contextoNaSessao : (pedido.contexto ?? undefined);
 
-		const ponte = new PonteSessao((evento) => this.emitir(evento));
+		const ponte: PonteSessao = new PonteSessao((evento) => this.emitir(evento), {
+			antesDeComecar: (evento) => this.contextoParaModelo(ponte, evento),
+		});
 		const extensoesNucleo = [
 			ponte.extensao,
 			criarExtensaoPergunta(),
@@ -709,8 +840,17 @@ export class JanelaPerfil {
 		const traduzir = criarTradutorEventos();
 		this.cancelarAssinatura = sessao.subscribe((evento) => {
 			for (const traduzido of traduzir(evento)) {
-				// A execução acabou: nenhuma ferramenta espera mais a interface.
-				if (traduzido.tipo === "execucao_fim") ponte.cancelarPendentes("execucao_terminada");
+				if (traduzido.tipo === "execucao_fim") {
+					// A execução acabou: nenhuma ferramenta espera mais a interface.
+					ponte.cancelarPendentes("execucao_terminada");
+					this.ultimaAbortada = traduzido.abortada;
+				}
+				if (traduzido.tipo === "fila") {
+					// A fila do pi (steer e followUp de extensões) sai junto com a própria.
+					this.filaPi = traduzido.mensagens;
+					this.emitirFila();
+					continue;
+				}
 				this.emitir(traduzido);
 			}
 		});

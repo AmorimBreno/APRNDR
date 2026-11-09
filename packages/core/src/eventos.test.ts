@@ -1,5 +1,6 @@
 import type { AgentSession, AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
+import { TIPO_MENSAGEM_CONTEXTO_TELA } from "./contexto-tela.ts";
 import { converterHistorico, criarTradutorEventos, type EventoNucleo, resumirResultado } from "./eventos.ts";
 
 // Os eventos de exemplo têm só os campos que a tradução lê.
@@ -209,7 +210,72 @@ describe("converterHistorico", () => {
 
 // Contrato do WP1 (docs/mesa-de-estudo.md, 2.5).
 describe("contexto da tela nos eventos (WP1)", () => {
-	it.todo("converterHistorico prende o resumo da mensagem custom nucleo.contexto-tela ao item do usuário que vem antes dela, e nunca leva o conteúdo");
-	it.todo("converterHistorico ignora mensagens custom de outros tipos e contexto sem item de usuário antes");
-	it.todo("o tradutor emite contexto_tela (só o resumo) quando a mensagem custom do contexto termina");
+	const mensagens = (dados: unknown[]) => dados as AgentSession["messages"];
+	// Como o pi grava: o texto para o modelo no content e o resumo e o hash nos details.
+	const contextoCustom = (rotulo: string, extra: Record<string, unknown> = {}) => ({
+		role: "custom",
+		customType: TIPO_MENSAGEM_CONTEXTO_TELA,
+		content: `# ${rotulo}
+conteúdo inteiro da nota`,
+		display: false,
+		details: { tipo: "nota", rotulo, olho: true, selecao: "um trecho", hash: "a".repeat(64), ...extra },
+		timestamp: 2,
+	});
+
+	it("converterHistorico prende o resumo da mensagem custom nucleo.contexto-tela ao item do usuário que vem antes dela, e nunca leva o conteúdo", () => {
+		const historico = converterHistorico(
+			mensagens([
+				{ role: "user", content: "primeira", timestamp: 1 },
+				contextoCustom("Nota A", { origem: "caderno/a", parcial: true, conteudo: "vazou?" }),
+				{ ...respostaComFerramenta, content: [{ type: "text", text: "Resposta." }], stopReason: "stop" },
+				{ role: "user", content: "segunda", timestamp: 3 },
+				{ role: "assistant", content: [{ type: "text", text: "Outra." }], provider: "p", model: "m", usage: uso, stopReason: "stop", timestamp: 4 },
+				{ role: "user", content: "terceira (sem contexto)", timestamp: 5 },
+				contextoCustom("Nota B", { olho: false, hash: undefined }),
+			]),
+		);
+		const usuarios = historico.filter((item) => item.papel === "usuario");
+		expect(usuarios.map((item) => [item.texto, item.contextoTela])).toEqual([
+			["primeira", { tipo: "nota", rotulo: "Nota A", origem: "caderno/a", olho: true, parcial: true, selecao: "um trecho" }],
+			["segunda", undefined],
+			["terceira (sem contexto)", { tipo: "nota", rotulo: "Nota B", olho: false, selecao: "um trecho" }],
+		]);
+		// A mensagem custom não vira item, e nada do conteúdo (nem o hash) chega ao histórico.
+		expect(historico).toHaveLength(5);
+		const texto = JSON.stringify(historico);
+		expect(texto).not.toContain("conteúdo inteiro");
+		expect(texto).not.toContain("vazou");
+		expect(texto).not.toContain("a".repeat(64));
+	});
+
+	it("converterHistorico ignora mensagens custom de outros tipos e contexto sem item de usuário antes", () => {
+		const historico = converterHistorico(
+			mensagens([
+				contextoCustom("Órfão"),
+				{ role: "user", content: "oi", timestamp: 1 },
+				{ role: "custom", customType: "outro.tipo", content: "x", display: false, details: { tipo: "nota", rotulo: "Outro", olho: true }, timestamp: 2 },
+				{ role: "assistant", content: [{ type: "text", text: "Olá." }], provider: "p", model: "m", usage: uso, stopReason: "stop", timestamp: 3 },
+				contextoCustom("Depois da resposta"),
+				{ role: "user", content: "de novo", timestamp: 4 },
+				{ role: "custom", customType: TIPO_MENSAGEM_CONTEXTO_TELA, content: "x", display: false, details: { rotulo: "sem tipo" }, timestamp: 5 },
+			]),
+		);
+		expect(historico.map((item) => item.papel)).toEqual(["usuario", "assistente", "usuario"]);
+		for (const item of historico) if (item.papel === "usuario") expect(item.contextoTela).toBeUndefined();
+	});
+
+	it("o tradutor emite contexto_tela (só o resumo) quando a mensagem custom do contexto termina", () => {
+		const traduzir = criarTradutorEventos();
+		const saida = [
+			...traduzir(evento({ type: "message_start", message: { role: "user", content: "oi", timestamp: 1 } })),
+			...traduzir(evento({ type: "message_end", message: { role: "user", content: "oi", timestamp: 1 } })),
+			...traduzir(evento({ type: "message_start", message: contextoCustom("Nota A", { conteudo: "vazou?" }) })),
+			...traduzir(evento({ type: "message_end", message: contextoCustom("Nota A", { conteudo: "vazou?" }) })),
+			...traduzir(evento({ type: "message_end", message: { role: "custom", customType: "outro.tipo", content: "", display: false, details: { tipo: "x", rotulo: "y", olho: true }, timestamp: 2 } })),
+		];
+		expect(saida).toEqual([
+			{ tipo: "mensagem_usuario", texto: "oi", momento: new Date(1).toISOString() },
+			{ tipo: "contexto_tela", contexto: { tipo: "nota", rotulo: "Nota A", olho: true, selecao: "um trecho" } },
+		]);
+	});
 });

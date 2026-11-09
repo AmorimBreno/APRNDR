@@ -41,6 +41,7 @@ export type JanelaDoServidor = Pick<
 	| "modelosDisponiveis"
 	| "historico"
 	| "historicoPonte"
+	| "usoDoRamo"
 	| "responder"
 	| "cancelarPedido"
 	| "acaoDaInterface"
@@ -50,6 +51,16 @@ export type JanelaDoServidor = Pick<
 	| "assinar"
 	| "descartar"
 >;
+
+/**
+ * A mensagem "historico" da janela: os itens, os registros da ponte e o uso
+ * somado do ramo inteiro da sessão (respostas e subagentes), para o custo da
+ * conversa ao reabrir ser o mesmo de antes.
+ */
+function mensagemHistorico(perfil: string, janela: JanelaDoServidor): MensagemServidor {
+	const uso = janela.usoDoRamo();
+	return { tipo: "historico", perfil, itens: janela.historico(), ponte: janela.historicoPonte(), ...(uso ? { uso } : {}) };
+}
 
 export type FabricaJanela = (
 	perfil: Perfil,
@@ -248,7 +259,7 @@ export class Janelas {
 			try {
 				const estado = await inicio;
 				this.log.info(`[${perfil}] sessão ${estado.sessaoId} aberta (agente ${estado.agente}, modelo ${estado.modelo ?? "padrão"})`);
-				this.transmitir(perfil, { tipo: "historico", perfil, itens: janela.historico(), ponte: janela.historicoPonte() });
+				this.transmitir(perfil, mensagemHistorico(perfil, janela));
 				return estado;
 			} catch (erro) {
 				// Deixa a próxima abertura tentar de novo.
@@ -271,11 +282,11 @@ export class Janelas {
 			trocou = true;
 		}
 		if (trocou) {
-			this.transmitir(perfil, { tipo: "historico", perfil, itens: janela.historico(), ponte: janela.historicoPonte() });
+			this.transmitir(perfil, mensagemHistorico(perfil, janela));
 		} else {
 			// Entrou numa conversa já aberta: o estado e o histórico vão só para ela.
 			conexao.enviar({ tipo: "evento", perfil, evento: { tipo: "estado_sessao", estado } });
-			conexao.enviar({ tipo: "historico", perfil, itens: janela.historico(), ponte: janela.historicoPonte() });
+			conexao.enviar(mensagemHistorico(perfil, janela));
 		}
 		return estado;
 	}
@@ -288,7 +299,7 @@ export class Janelas {
 		const janela = this.janela(perfil);
 		this.transmitir(perfil, { tipo: "carregando", perfil, mensagem });
 		const estado = await operacao(janela);
-		this.transmitir(perfil, { tipo: "historico", perfil, itens: janela.historico(), ponte: janela.historicoPonte() });
+		this.transmitir(perfil, mensagemHistorico(perfil, janela));
 		return estado;
 	}
 

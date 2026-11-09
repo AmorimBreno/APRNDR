@@ -37,7 +37,7 @@
 //   (loader.js: só invalidate() as desliga, no dispose da sessão); por isso a
 //   ponte cancela as assinaturas anteriores a cada nova carga da fábrica.
 
-import type { ExtensionAPI, InlineExtension } from "@earendil-works/pi-coding-agent";
+import type { BeforeAgentStartEvent, BeforeAgentStartEventResult, ExtensionAPI, InlineExtension } from "@earendil-works/pi-coding-agent";
 import type { EventoNucleo, MotivoCancelamento } from "./eventos.ts";
 
 /** Nomes dos eventos da ponte no barramento pi.events. */
@@ -81,6 +81,15 @@ export type RespostaInterface =
 
 type Barramento = ExtensionAPI["events"];
 
+export interface OpcoesPonte {
+	/**
+	 * Chamado no before_agent_start de cada execução da sessão (enquanto a
+	 * ponte está ativa). O que devolver vai para o pi (por exemplo, a mensagem
+	 * custom com o contexto da tela).
+	 */
+	antesDeComecar?: (evento: BeforeAgentStartEvent) => BeforeAgentStartEventResult | undefined;
+}
+
 function textoNaoVazio(valor: unknown): valor is string {
 	return typeof valor === "string" && valor.trim().length > 0;
 }
@@ -113,10 +122,18 @@ export class PonteSessao {
 		factory: (pi) => {
 			this.gravarNaSessao = (registro) => pi.appendEntry(TIPO_ENTRADA_PONTE, registro);
 			this.ligar(pi.events);
+			// O contexto da tela entra pela mesma extensão interna: o
+			// before_agent_start roda no começo de cada execução e o que ele devolve
+			// em message vira uma mensagem custom gravada depois da do usuário.
+			const antesDeComecar = this.opcoes.antesDeComecar;
+			if (antesDeComecar) pi.on("before_agent_start", (evento) => (this.ativa ? antesDeComecar(evento) : undefined));
 		},
 	};
 
-	constructor(private readonly emitir: (evento: EventoNucleo) => void) {}
+	constructor(
+		private readonly emitir: (evento: EventoNucleo) => void,
+		private readonly opcoes: OpcoesPonte = {},
+	) {}
 
 	/** ids dos pedidos que esperam resposta. */
 	get pedidosPendentes(): string[] {

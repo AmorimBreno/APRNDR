@@ -9,6 +9,7 @@
 // "agent_settled" é o fim de verdade, por isso fecha a execução aqui.
 
 import type { AgentSession, AgentSessionEvent } from "@earendil-works/pi-coding-agent";
+import { resumoDaMensagemContexto } from "./contexto-tela.ts";
 import type { SituacaoMaterial } from "./materiais/tipos.ts";
 
 /** Diagnóstico de montagem ou de execução (por exemplo, ferramenta inexistente). */
@@ -254,6 +255,12 @@ export function criarTradutorEventos(): (evento: AgentSessionEvent) => EventoNuc
 
 			case "message_end": {
 				const mensagem = evento.message;
+				// O contexto da tela sai quando a mensagem custom termina (o pi a grava
+				// no arquivo nesse momento), logo depois do mensagem_usuario da mesma
+				// execução: o agent-loop emite as mensagens iniciais em ordem (a do
+				// usuário e depois as do before_agent_start). Só o resumo dos details.
+				const contexto = resumoDaMensagemContexto(mensagem);
+				if (contexto) return [{ tipo: "contexto_tela", contexto }];
 				if (mensagem.role === "user") {
 					const momento = momentoDe((mensagem as { timestamp?: unknown }).timestamp);
 					return [{ tipo: "mensagem_usuario", texto: juntarBlocos(mensagem.content, "text"), ...(momento ? { momento } : {}) }];
@@ -362,7 +369,14 @@ function dadosDaResposta(mensagem: { timestamp?: unknown; durationMs?: unknown }
 export function converterHistorico(mensagens: readonly MensagemPi[], agentes?: ReadonlyMap<number, string>): ItemHistorico[] {
 	const historico: ItemHistorico[] = [];
 	for (const mensagem of mensagens) {
-		if (mensagem.role === "user") {
+		const contexto = resumoDaMensagemContexto(mensagem);
+		if (contexto) {
+			// O before_agent_start grava o contexto logo depois da mensagem do
+			// usuário: ele vai como resumo no item do usuário que vem antes. Sem
+			// esse item (o histórico começou depois dele), o contexto fica de fora.
+			const anterior = historico.at(-1);
+			if (anterior?.papel === "usuario") anterior.contextoTela = contexto;
+		} else if (mensagem.role === "user") {
 			const momento = momentoDe((mensagem as { timestamp?: unknown }).timestamp);
 			historico.push({ papel: "usuario", texto: juntarBlocos(mensagem.content, "text"), ...(momento ? { momento } : {}) });
 		} else if (mensagem.role === "assistant") {

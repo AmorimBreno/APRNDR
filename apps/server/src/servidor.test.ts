@@ -4,14 +4,14 @@
 import { mkdir, mkdtemp, readFile, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { EstadoSessao, EventoNucleo, Perfil } from "@estudos/core";
+import type { ContextoTela, EstadoSessao, EventoNucleo, Perfil, UsoModelo } from "@estudos/core";
 import type { MensagemServidor } from "@estudos/core/protocolo";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { criarApp } from "./app.ts";
 import { interpretarSaidaReg } from "./chaves.ts";
 import { resumirMensagem, tratarMensagem } from "./conexao.ts";
 import { type Conexao, type JanelaDoServidor, Janelas } from "./janelas.ts";
-import { logMudo } from "./log.ts";
+import { type Log, logMudo } from "./log.ts";
 import { aplicarMudancas, mudancasVazias, ReferenciaArquivos, registrarMudancaGlobal, registrarMudancaPerfil } from "./observador.ts";
 
 const profileJson = (id: string, pastaDados: string) => ({
@@ -45,6 +45,10 @@ async function criarPerfil(pastaPerfis: string, pasta: string, id: string, pasta
 class JanelaFalsa implements JanelaDoServidor {
 	estado: EstadoSessao | undefined;
 	readonly chamadas: string[] = [];
+	/** O contextoTela de cada enviar, na ordem. */
+	readonly contextos: Array<ContextoTela | undefined> = [];
+	/** O que usoDoRamo devolve. */
+	uso: UsoModelo | undefined;
 	private readonly ouvintes = new Set<(evento: EventoNucleo) => void>();
 	private sessao = 0;
 	private conversa: string[] = [];
@@ -68,8 +72,9 @@ class JanelaFalsa implements JanelaDoServidor {
 		if (opcoes.sessaoId === "nao-existe") throw new Error("Sessão nao-existe não encontrada");
 		return this.novoEstado(opcoes.sessaoId ?? `s${++this.sessao}`, opcoes.agente ?? this.perfil.agentePadrao);
 	}
-	async enviar(texto: string) {
+	async enviar(texto: string, contextoTela?: ContextoTela) {
 		this.chamadas.push(`enviar ${texto}`);
+		this.contextos.push(contextoTela);
 		this.conversa.push(texto);
 		this.emitir({ tipo: "execucao_inicio" });
 		return "iniciada" as const;
@@ -110,6 +115,9 @@ class JanelaFalsa implements JanelaDoServidor {
 	}
 	historicoPonte() {
 		return { sessaoId: "s1", registros: [], pendentes: [] };
+	}
+	usoDoRamo() {
+		return this.uso;
 	}
 	responder(id: string) {
 		this.chamadas.push(`responder ${id}`);
@@ -485,6 +493,63 @@ describe("chaves", () => {
 
 // Contrato do WP1 (docs/mesa-de-estudo.md, 2.5).
 describe("contexto da tela no servidor (WP1)", () => {
-	it.todo("enviar repassa o contextoTela à janela do perfil");
-	it.todo("o log do pedido enviar registra só o tipo e os tamanhos do contextoTela, nunca o conteúdo nem a seleção");
+	const contexto: ContextoTela = {
+		tipo: "nota",
+		rotulo: "Título secreto",
+		origem: "caderno/x/notas/Título secreto",
+		olho: true,
+		conteudo: "conteúdo secreto da nota",
+		selecao: "trecho secreto",
+	};
+
+	/** Log que guarda as linhas, para conferir o que iria para o arquivo. */
+	function logGuardado(): { log: Log; linhas: string[] } {
+		const linhas: string[] = [];
+		return {
+			linhas,
+			log: {
+				info: (mensagem) => linhas.push(mensagem),
+				aviso: (mensagem) => linhas.push(mensagem),
+				erro: (mensagem) => linhas.push(mensagem),
+			},
+		};
+	}
+
+	it("enviar repassa o contextoTela à janela do perfil", async () => {
+		const conexao = new ConexaoFalsa(1);
+		await tratarMensagem(janelas, conexao, JSON.stringify({ tipo: "abrir_perfil", perfil: "teste" }), logMudo);
+		await tratarMensagem(janelas, conexao, JSON.stringify({ tipo: "enviar", pedidoId: "e1", perfil: "teste", texto: "explica", contextoTela: contexto }), logMudo);
+		expect(conexao.ultima()).toMatchObject({ tipo: "resposta", pedidoId: "e1", ok: true, dados: "iniciada" });
+		await tratarMensagem(janelas, conexao, JSON.stringify({ tipo: "enviar", pedidoId: "e2", perfil: "teste", texto: "sem contexto" }), logMudo);
+		expect(falsas[0]?.contextos).toEqual([contexto, undefined]);
+	});
+
+	it("o log do pedido enviar registra só o tipo e os tamanhos do contextoTela, nunca o conteúdo nem a seleção", async () => {
+		expect(resumirMensagem({ tipo: "enviar", perfil: "teste", texto: "oi", contextoTela: contexto })).toBe(
+			"enviar perfil=teste texto=2 car. contexto=nota olho=aberto conteudo=24 car. selecao=14 car.",
+		);
+		const { conteudo: _conteudo, selecao: _selecao, ...semConteudo } = contexto;
+		expect(resumirMensagem({ tipo: "enviar", perfil: "teste", texto: "oi", contextoTela: { ...semConteudo, olho: false } })).toBe(
+			"enviar perfil=teste texto=2 car. contexto=nota olho=fechado conteudo=0 car. selecao=0 car.",
+		);
+
+		// O caminho inteiro: o que o tratarMensagem manda para o log.
+		const { log, linhas } = logGuardado();
+		const conexao = new ConexaoFalsa(1);
+		await tratarMensagem(janelas, conexao, JSON.stringify({ tipo: "abrir_perfil", perfil: "teste" }), log);
+		await tratarMensagem(janelas, conexao, JSON.stringify({ tipo: "enviar", perfil: "teste", texto: "pergunta secreta", contextoTela: contexto }), log);
+		const texto = linhas.join("\n");
+		expect(texto).toContain("contexto=nota");
+		for (const segredo of ["secreto", "secreta"]) expect(texto).not.toContain(segredo);
+	});
+
+	it("o historico leva o uso somado do ramo quando a janela o tem", async () => {
+		const conexao = new ConexaoFalsa(1);
+		await tratarMensagem(janelas, conexao, JSON.stringify({ tipo: "abrir_perfil", perfil: "teste" }), logMudo);
+		expect(conexao.recebidas.find((mensagem) => mensagem.tipo === "historico")).not.toHaveProperty("uso");
+		const uso: UsoModelo = { tokensEntrada: 10, tokensSaida: 5, tokensCacheLeitura: 0, tokensCacheEscrita: 0, tokensTotal: 15, custo: 0.25 };
+		falsas[0]!.uso = uso;
+		await tratarMensagem(janelas, conexao, JSON.stringify({ tipo: "nova_sessao", perfil: "teste" }), logMudo);
+		expect(conexao.recebidas.filter((mensagem) => mensagem.tipo === "historico").at(-1)).toMatchObject({ tipo: "historico", uso });
+	});
 });

@@ -35,7 +35,7 @@ import {
 	SessionManager,
 	type Skill,
 } from "@earendil-works/pi-coding-agent";
-import type { Diagnostico } from "./eventos.ts";
+import type { Diagnostico, UsoModelo } from "./eventos.ts";
 import type { AgenteDoPerfil, Perfil } from "./perfis.ts";
 
 /** Subpasta da pasta de dados onde ficam os arquivos de sessão do pi. */
@@ -274,6 +274,38 @@ export function registrosDaPonte(entradas: readonly SessionEntry[]): RegistroPon
 		if (tipo === "pedido" || tipo === "fim" || tipo === "mostrar") registros.push(data as RegistroPonte);
 	}
 	return registros;
+}
+
+function numero(valor: unknown): number {
+	return typeof valor === "number" && Number.isFinite(valor) ? valor : 0;
+}
+
+/**
+ * Soma o uso e o custo de um caminho de entradas da sessão (o ramo ativo, lido
+ * do arquivo): as respostas do modelo e os resultados de ferramenta com usage,
+ * que é onde a ferramenta subagent grava o uso das respostas da filha
+ * (subagentes.ts). É a mesma soma que a interface faz ao vivo com os eventos
+ * "uso" (respostas e subagentes), por isso o custo ao reabrir bate com o de
+ * antes. Usa as entradas, não sessao.messages: depois de compactar, as
+ * mensagens antigas saem de lá, mas o custo delas continua valendo.
+ */
+export function usoDoRamo(entradas: readonly SessionEntry[]): UsoModelo {
+	const total: UsoModelo = { tokensEntrada: 0, tokensSaida: 0, tokensCacheLeitura: 0, tokensCacheEscrita: 0, tokensTotal: 0, custo: 0 };
+	for (const entrada of entradas) {
+		if (entrada.type !== "message") continue;
+		const mensagem = (entrada as { message?: { role?: unknown; usage?: unknown } }).message;
+		if (mensagem?.role !== "assistant" && mensagem?.role !== "toolResult") continue;
+		const uso = mensagem.usage;
+		if (!uso || typeof uso !== "object") continue;
+		const u = uso as { input?: unknown; output?: unknown; cacheRead?: unknown; cacheWrite?: unknown; totalTokens?: unknown; cost?: { total?: unknown } };
+		total.tokensEntrada += numero(u.input);
+		total.tokensSaida += numero(u.output);
+		total.tokensCacheLeitura += numero(u.cacheRead);
+		total.tokensCacheEscrita += numero(u.cacheWrite);
+		total.tokensTotal += numero(u.totalTokens);
+		total.custo += numero(u.cost?.total);
+	}
+	return total;
 }
 
 /** Agente gravado num caminho de entradas da sessão (o último vale). */

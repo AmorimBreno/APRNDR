@@ -169,3 +169,14 @@ Regras dos pacotes: um commit por pacote, feito pelo orquestrador depois de ler 
 4. O painel do professor começa fechado na primeira vez; abre pela foto ou por Ctrl+J, e depois lembra a escolha.
 5. Duas abas do navegador dividem a mesma conversa, com o aviso e "Voltar para <matéria>" (recomendação aceita).
 6. O WP1 é feito no Opus.
+
+## 6. Estado (2026-11-09)
+
+Partes A e B implementadas, um commit por pacote: WP0 b9e0296, WP6 8f6ad5d, WP1 60c39fc, WP2 4dd1f35, WP4 1dda0ab, WP3 909d0be, WP5a 98105cc, WP7a 0ab3ef1, WP5b 0e942fd, WP7b df7ff3d. pnpm typecheck limpo e pnpm test verde (92 arquivos, 1712 testes).
+
+Mudanças pedidas pelo Breno na parada 1: o professor fica abaixo da barra do caderno (ou da do curso), que ocupa a largura toda, e ocupa 40 % da largura da mesa (mínimo 380 px; 7b93c1f); o nome da matéria saiu do topo do professor (61def70); a foto do professor na aba do caderno abre e fecha o painel (92fdd51).
+
+Conferido no navegador na parada 1: a mesa na nota a 1600 e a 1024 px, abrir e fechar pela foto e por Ctrl+J, o seletor, Nova e o custo, a conversa em tela cheia sem mudança, e o aviso "A conversa mudou em outra aba" sem trocar de volta. Não conferido no navegador (abrir um caderno troca a conversa que o Breno está usando): as abas, o chip e o olho, a barra de seleção e a citação; ficam para o roteiro da parada 2.
+
+Lacunas conhecidas: renomear uma nota deixa a aba antiga até ser fechada; na lição, a seleção vale por bloco (o título e o objetivo não abrem a barra); o Alt+F10 leva o foco à barra de seleção (atalho escolhido pelo agente).
+

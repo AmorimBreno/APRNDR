@@ -82,6 +82,8 @@ export function CabecalhoProfessor({ janela, perfilId, materia }: PropsCabecalho
 		return daMateria;
 	}, [sessoes, chave, atualDaMateria, sessaoId]);
 
+	const opcaoAtual = opcoes.find((opcao) => opcao.id === sessaoId);
+
 	/** Salva o que está aberto, troca e guarda a sessão para a conversa em tela cheia abrir nela. */
 	const trocar = useCallback(
 		async (fazer: () => Promise<{ sessaoId: string }>) => {
@@ -161,7 +163,12 @@ export function CabecalhoProfessor({ janela, perfilId, materia }: PropsCabecalho
 							opcoes={opcoes}
 							atual={atualDaMateria && sessaoId ? sessaoId : ID_ATUAL}
 							escolher={abrir}
-							conteudoBotao={<span className="mesa-cab__atual">{opcoes.find((opcao) => opcao.id === sessaoId)?.titulo ?? "Conversas da matéria"}</span>}
+							conteudoBotao={
+									<span className="mesa-cab__atual">
+										<span className="mesa-cab__atual-titulo body-sm">{opcaoAtual?.titulo ?? "Conversas da matéria"}</span>
+										{opcaoAtual?.detalhe ? <span className="mesa-cab__atual-data overline">{opcaoAtual.detalhe}</span> : null}
+									</span>
+								}
 							classeBotao="mesa-cab__botao"
 							rotulo="Conversas desta matéria"
 							rotuloMenu="Conversas desta matéria"

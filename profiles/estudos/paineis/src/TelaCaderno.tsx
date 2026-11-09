@@ -39,7 +39,7 @@ import { type ReactNode, useEffect, useId, useMemo, useRef, useState } from "rea
 import { type CorMateria, type Materia, pastaMateriaisRelativa } from "../../lib/materia-tipos.ts";
 import { contextoDaMateria, type DadosCaderno, dataCurta, lerAcoes, PAINEL_CADERNOS, prepararConversa, proximaProva, quando, rotuloCapa } from "./comum.ts";
 import { EditorNota } from "./EditorNota.tsx";
-import { MesaEstudo } from "./MesaEstudo.tsx";
+import { MesaEstudo, useProfessorDaMesa } from "./MesaEstudo.tsx";
 import { ModalMateria } from "./ModalMateria.tsx";
 import { contarMapa } from "../../lib/mapa-tipos.ts";
 import { custoDoMapa, useMapa } from "./mapa-ponte.ts";
@@ -179,13 +179,14 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 	const moduloAberto = props.modulo;
 	const agente = nomeAgente ? { nome: nomeAgente, ...(avatarAgente ? { avatar: avatarAgente } : {}) } : undefined;
 	// A mesa de estudo: a nota aberta e o módulo ficam à esquerda, com o painel do professor à direita (MesaEstudo).
-	const naMesa = (filhos: ReactNode) => (
+	const naMesa = (filhos: ReactNode, noModulo = false) => (
 		<MesaEstudo
 			janela={props.janela}
 			perfilId={props.perfilId}
 			{...(props.conversa ? { conversa: props.conversa } : {})}
 			{...(materia ? { materia } : {})}
 			{...(agente ? { agente } : {})}
+			{...(noModulo ? { botaoNaFaixa: true } : {})}
 		>
 			{filhos}
 		</MesaEstudo>
@@ -222,7 +223,8 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 					tom={tom}
 					{...(lista ? { materias: lista.materias } : {})}
 					{...(nomeAgente ? { agente: { nome: nomeAgente, ...(avatarAgente ? { avatar: avatarAgente } : {}) } } : {})}
-				/>
+				/>,
+					true,
 				)
 			) : mostraNota && notaAberta !== undefined ? (
 				naMesa(
@@ -446,6 +448,8 @@ function capasDoLeque(materias: Materia[] | undefined): [CapaLeque, CapaLeque, C
  */
 function AbaCaderno(props: PropsAbaCaderno) {
 	const { materia } = props;
+	// Dentro da mesa, a foto abre e fecha o painel do professor; fora dela, abre a conversa em tela cheia.
+	const mesa = useProfessorDaMesa();
 	// A capa da frente é a da primeira matéria; as de trás ficam uma para cada lado.
 	const [frente, esquerda, direita] = capasDoLeque(props.materias);
 	const prova = materia ? proximaProva(materia, new Date()) : undefined;
@@ -482,13 +486,35 @@ function AbaCaderno(props: PropsAbaCaderno) {
 				<Icon name="clock" size={22} strokeWidth={2.25} />
 			</button>
 			<button
+				ref={mesa?.botao}
 				type="button"
-				className={`aba-caderno__professor${props.abrindo ? " aba-caderno__professor--abrindo" : ""}`}
-				onClick={props.conversar}
-				disabled={!materia || props.abrindo}
-				aria-busy={props.abrindo}
-				title={props.abrindo ? "Abrindo a conversa…" : "Conversar sobre a matéria"}
-				aria-label={props.abrindo ? "Abrindo a conversa" : "Conversar com o professor sobre a matéria"}
+				className={`aba-caderno__professor${props.abrindo ? " aba-caderno__professor--abrindo" : ""}${mesa?.pulsa ? " aba-caderno__professor--pulsa" : ""}`}
+				onClick={mesa ? mesa.alternar : props.conversar}
+				disabled={mesa ? false : !materia || props.abrindo}
+				aria-busy={mesa ? undefined : props.abrindo}
+				{...(mesa ? { "aria-expanded": mesa.aberto, "aria-controls": mesa.idPainel } : {})}
+				title={
+					mesa
+						? mesa.aberto
+							? "Fechar o professor (Ctrl+J)"
+							: mesa.pendente
+								? "O professor espera sua resposta (Ctrl+J)"
+								: "Abrir o professor (Ctrl+J)"
+						: props.abrindo
+							? "Abrindo a conversa…"
+							: "Conversar sobre a matéria"
+				}
+				aria-label={
+					mesa
+						? mesa.aberto
+							? "Fechar o painel do professor"
+							: mesa.pendente
+								? "Abrir o painel do professor: há uma pergunta esperando resposta"
+								: "Abrir o painel do professor"
+						: props.abrindo
+							? "Abrindo a conversa"
+							: "Conversar com o professor sobre a matéria"
+				}
 			>
 				<AvatarAgente nome={props.agente?.nome ?? "Professor"} {...(props.agente?.avatar ? { avatar: props.agente.avatar } : {})} tamanho={60} />
 			</button>

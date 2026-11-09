@@ -1,8 +1,9 @@
 // A mesa de estudo (ESPECIFICACAO 13.19; docs/mesa-de-estudo.md, 2.1 e 2.10):
 // quando uma nota ou uma lição está aberta, a tela do caderno vira a área de
 // estudo à esquerda (children) e o painel do professor à direita, que abre e
-// fecha. Em cima da área da esquerda fica a faixa da mesa (por ora só o botão
-// do professor, à direita; as abas entram no WP5b).
+// fecha. Em cima da área da esquerda fica a faixa da mesa (vazia por ora, e sem
+// ocupar espaço; as abas entram no WP5b). O botão do professor é a foto da aba
+// do caderno (useProfessorDaMesa); no módulo, que não tem aba, é um botão na faixa.
 //
 // O painel é a conversa embutida do app (props.conversa) e fica sempre
 // montado: fechado quer dizer escondido (o componente embutido cuida de hidden
@@ -19,7 +20,7 @@
 
 import { AvatarAgente, type DadosAvatarAgente, type PropsConversaEmbutida, semMovimento } from "@estudos/ui";
 import { motion } from "motion/react";
-import { type ComponentType, type ReactNode, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { type ComponentType, createContext, type ReactNode, type RefObject, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import type { Materia } from "../../lib/materia-tipos.ts";
 import { CabecalhoProfessor } from "./CabecalhoProfessor.tsx";
 
@@ -56,6 +57,23 @@ function guardarAberto(perfilId: string, aberto: boolean): void {
 	}
 }
 
+/** O que a aba do caderno (dentro da mesa) usa para abrir e fechar o painel do professor. */
+export interface ProfessorDaMesa {
+	aberto: boolean;
+	pendente: boolean;
+	pulsa: boolean;
+	alternar(): void;
+	idPainel: string;
+	botao: RefObject<HTMLButtonElement | null>;
+}
+
+const ContextoProfessor = createContext<ProfessorDaMesa | undefined>(undefined);
+
+/** Fora da mesa (ou sem conversa embutida) devolve undefined: a foto abre a conversa em tela cheia. */
+export function useProfessorDaMesa(): ProfessorDaMesa | undefined {
+	return useContext(ContextoProfessor);
+}
+
 export interface PropsMesaEstudo {
 	janela: PropsConversaEmbutida["janela"];
 	perfilId: string;
@@ -64,6 +82,8 @@ export interface PropsMesaEstudo {
 	materia?: Materia;
 	/** O professor, para a foto do botão. */
 	agente?: { nome: string; avatar?: DadosAvatarAgente };
+	/** O botão do professor na faixa do topo: só onde a aba do caderno não existe (o módulo). */
+	botaoNaFaixa?: boolean;
 	/** A área de estudo: o que a tela do caderno mostrava (aba e nota, ou o módulo). */
 	children: ReactNode;
 }
@@ -131,12 +151,15 @@ export function MesaEstudo(props: PropsMesaEstudo) {
 	const animar = modo === "lado" ? { width: aberto ? LARGURA_PAINEL : 0, x: 0 } : { width: larguraAberta, x: aberto ? 0 : "105%" };
 	const pulsa = pendente && !aberto && !parado;
 
+	const contexto: ProfessorDaMesa | undefined = Conversa ? { aberto, pendente, pulsa, alternar, idPainel, botao } : undefined;
+
 	return (
+		<ContextoProfessor.Provider value={contexto}>
 		<div ref={raiz} className="mesa" data-modo={modo} data-aberta={aberto ? "sim" : "nao"}>
 			<div className="mesa__esquerda">
-				<div className="mesa__faixa">
-					<span className="mesa__faixa-espaco" />
-					{Conversa ? (
+				{Conversa && props.botaoNaFaixa ? (
+					<div className="mesa__faixa">
+						<span className="mesa__faixa-espaco" />
 						<button
 							ref={botao}
 							type="button"
@@ -147,10 +170,10 @@ export function MesaEstudo(props: PropsMesaEstudo) {
 							title={aberto ? "Fechar o professor (Ctrl+J)" : pendente ? "O professor espera sua resposta (Ctrl+J)" : "Abrir o professor (Ctrl+J)"}
 							aria-label={aberto ? "Fechar o painel do professor" : pendente ? "Abrir o painel do professor: há uma pergunta esperando resposta" : "Abrir o painel do professor"}
 						>
-							<AvatarAgente nome={props.agente?.nome ?? "Professor"} {...(props.agente?.avatar ? { avatar: props.agente.avatar } : {})} tamanho={44} />
+							<AvatarAgente nome={props.agente?.nome ?? "Professor"} {...(props.agente?.avatar ? { avatar: props.agente.avatar } : {})} tamanho={36} />
 						</button>
-					) : null}
-				</div>
+					</div>
+				) : null}
 				<div className="mesa__area">{props.children}</div>
 			</div>
 			{Conversa ? (
@@ -174,5 +197,6 @@ export function MesaEstudo(props: PropsMesaEstudo) {
 				</motion.aside>
 			) : null}
 		</div>
+		</ContextoProfessor.Provider>
 	);
 }

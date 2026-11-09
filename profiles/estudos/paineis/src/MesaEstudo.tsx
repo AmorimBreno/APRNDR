@@ -2,7 +2,12 @@
 // quando uma nota ou uma lição está aberta, a tela do caderno vira a área de
 // estudo à esquerda (children) e o painel do professor à direita, que abre e
 // fecha. Em cima da área da esquerda fica a faixa da mesa (vazia por ora, e sem
-// ocupar espaço; as abas entram no WP5b). O botão do professor é a foto da aba
+// ocupar espaço). Entre a barra e o corpo, só na coluna da esquerda, fica a faixa
+// das abas (AbasMesa.tsx): as notas e lições abertas da matéria; a rota de agora
+// é a aba ativa, e a rolagem de cada aba é guardada e devolvida. O provedor do
+// Vendo (vendo.tsx) envolve tudo: a aba ativa se registra nele, o chip do
+// professor mostra o que está aberto e o contexto da tela vai junto da mensagem
+// (obterContexto). O botão do professor é a foto da aba
 // do caderno (useProfessorDaMesa); no módulo, que não tem aba, é um botão na faixa.
 //
 // O painel é a conversa embutida do app (props.conversa) e fica sempre
@@ -22,7 +27,11 @@ import { AvatarAgente, type DadosAvatarAgente, type PropsConversaEmbutida, semMo
 import { motion } from "motion/react";
 import { type ComponentType, createContext, type CSSProperties, type ReactNode, type RefObject, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import type { Materia } from "../../lib/materia-tipos.ts";
+import { abaDoCaminho, abrirAba, fecharAba, guardarRolagem, type TipoAbaMesa } from "./abas-mesa.ts";
+import { AbasMesa, useAbasGuardadas } from "./AbasMesa.tsx";
 import { CabecalhoProfessor } from "./CabecalhoProfessor.tsx";
+import { ChipVendo } from "./ChipVendo.tsx";
+import { ProvedorVendo, useVendo } from "./vendo.tsx";
 
 type Modo = "lado" | "gaveta" | "tela";
 
@@ -78,9 +87,24 @@ export function useProfessorDaMesa(): ProfessorDaMesa | undefined {
 	return useContext(ContextoProfessor);
 }
 
+/** O elemento que rola em cada tipo de aba (a nota e a lição); a rolagem de cada aba é a dele. */
+const ELEMENTO_QUE_ROLA = ".editor-nota__corpo, .modulo__corpo";
+/** Quantos quadros esperar o conteúdo da aba ficar alto o bastante para devolver a rolagem (a nota carrega do servidor). */
+const QUADROS_PARA_ROLAR = 45;
+
+/** O rótulo inicial de uma aba, pela rota: o título da nota; "Lição" no módulo (a lição registrada troca por um melhor). */
+function rotuloDaRota(caminho: string, tipo: TipoAbaMesa): string {
+	return tipo === "nota" ? caminho.split("/").slice(3).join("/") : "Lição";
+}
+
 export interface PropsMesaEstudo {
 	janela: PropsConversaEmbutida["janela"];
 	perfilId: string;
+	/** O id da matéria, para lembrar abas e olho por matéria. */
+	materiaId: string;
+	/** A rota de agora (a aba ativa, se for uma nota ou lição) e como navegar. */
+	caminho: string;
+	navegar(caminho: string): void;
 	/** A conversa embutida do app; sem ela a mesa não mostra o professor (nem o botão). */
 	conversa?: ComponentType<PropsConversaEmbutida>;
 	materia?: Materia;
@@ -93,7 +117,16 @@ export interface PropsMesaEstudo {
 }
 
 export function MesaEstudo(props: PropsMesaEstudo) {
-	const { perfilId, conversa: Conversa } = props;
+	return (
+		<ProvedorVendo perfilId={props.perfilId} materiaId={props.materiaId}>
+			<MesaInterna {...props} />
+		</ProvedorVendo>
+	);
+}
+
+function MesaInterna(props: PropsMesaEstudo) {
+	const { perfilId, materiaId, caminho, navegar, conversa: Conversa } = props;
+	const vendo = useVendo();
 	const [aberto, setAberto] = useState(() => lerAberto(perfilId));
 	const [pendente, setPendente] = useState(false);
 	const [modo, setModo] = useState<Modo>("lado");
@@ -103,6 +136,101 @@ export function MesaEstudo(props: PropsMesaEstudo) {
 	const botao = useRef<HTMLButtonElement>(null);
 	const idPainel = useId();
 	const parado = semMovimento();
+
+	// As abas: a rota de agora, se for uma nota ou lição, é a aba ativa e entra na lista da matéria.
+	const [abas, atualizarAbas] = useAbasGuardadas(perfilId, materiaId);
+	const abasRef = useRef(abas);
+	abasRef.current = abas;
+	const atualizarAbasRef = useRef(atualizarAbas);
+	atualizarAbasRef.current = atualizarAbas;
+	const abaAtiva = caminho.split("/")[1] === materiaId ? abaDoCaminho(caminho) : undefined;
+	const chaveAtiva = abaAtiva?.chave;
+	const fonte = vendo.ativa();
+	// O rótulo que a aba ativa registrou (o título de agora da nota, "Lição 2.3 · …") vale mais que o da rota.
+	const rotuloDaFonte = fonte && abaAtiva && fonte.tipo === abaAtiva.tipo ? fonte.rotulo : undefined;
+
+	// abaAtiva é derivada do caminho: as dependências são o caminho e o que sai dele.
+	useLayoutEffect(() => {
+		if (!abaAtiva) return;
+		atualizarAbasRef.current((atuais) => {
+			const existente = atuais.find((aba) => aba.chave === abaAtiva.chave);
+			return abrirAba(atuais, { chave: abaAtiva.chave, caminho, tipo: abaAtiva.tipo, rotulo: existente?.rotulo ?? rotuloDaRota(caminho, abaAtiva.tipo) });
+		});
+	}, [caminho, abaAtiva?.chave, abaAtiva?.tipo]);
+
+	// Guarda o rótulo registrado na aba, para as abas fechadas (outras abas) continuarem com o nome certo.
+	useEffect(() => {
+		if (!rotuloDaFonte || !chaveAtiva) return;
+		atualizarAbasRef.current((atuais) => (atuais.some((aba) => aba.chave === chaveAtiva && aba.rotulo !== rotuloDaFonte) ? atuais.map((aba) => (aba.chave === chaveAtiva ? { ...aba, rotulo: rotuloDaFonte } : aba)) : atuais));
+	}, [rotuloDaFonte, chaveAtiva]);
+
+	// A rolagem de cada aba: o elemento que rola (nota ou lição) avisa por scroll (que não sobe, daí a captura);
+	// ao sair da aba a última posição vai para ela, e ao chegar numa aba a posição dela é devolvida.
+	const ultimaRolagem = useRef<{ chave: string; topo: number } | undefined>(undefined);
+	const chaveDaRolagem = useRef<string | undefined>(undefined);
+	const devolvendo = useRef(false);
+	useEffect(() => {
+		const elemento = raiz.current;
+		if (!elemento) return;
+		const aoRolar = (evento: Event) => {
+			const alvo = evento.target;
+			const chave = chaveDaRolagem.current;
+			if (devolvendo.current || !chave || !(alvo instanceof HTMLElement) || !alvo.matches(ELEMENTO_QUE_ROLA)) return;
+			ultimaRolagem.current = { chave, topo: alvo.scrollTop };
+		};
+		elemento.addEventListener("scroll", aoRolar, true);
+		return () => elemento.removeEventListener("scroll", aoRolar, true);
+	}, []);
+	useLayoutEffect(() => {
+		const antiga = chaveDaRolagem.current;
+		const ultima = ultimaRolagem.current;
+		if (antiga && antiga !== chaveAtiva && ultima?.chave === antiga) {
+			atualizarAbasRef.current((atuais) => guardarRolagem(atuais, antiga, ultima.topo));
+		}
+		chaveDaRolagem.current = chaveAtiva;
+		if (!chaveAtiva) return;
+		// O conteúdo da aba pode ainda estar chegando (a nota vem do servidor): espera ele ficar alto o bastante.
+		const topo = abasRef.current.find((aba) => aba.chave === chaveAtiva)?.rolagem ?? 0;
+		if (topo === 0 && (!antiga || antiga === chaveAtiva)) return;
+		let quadro = 0;
+		let tentativas = 0;
+		const devolver = () => {
+			const alvo = raiz.current?.querySelector<HTMLElement>(ELEMENTO_QUE_ROLA);
+			if (alvo && (alvo.scrollHeight - alvo.clientHeight >= topo - 1 || tentativas >= QUADROS_PARA_ROLAR)) {
+				devolvendo.current = true;
+				alvo.scrollTop = topo;
+				// O scroll chega depois do quadro: só então volta a anotar.
+				quadro = requestAnimationFrame(() => {
+					devolvendo.current = false;
+				});
+				return;
+			}
+			if (++tentativas <= QUADROS_PARA_ROLAR) quadro = requestAnimationFrame(devolver);
+		};
+		quadro = requestAnimationFrame(devolver);
+		return () => {
+			cancelAnimationFrame(quadro);
+			devolvendo.current = false;
+		};
+	}, [chaveAtiva]);
+	// Ao sair da mesa (o painel do caderno, a conversa em tela cheia) a rolagem de agora também fica guardada.
+	useEffect(
+		() => () => {
+			const ultima = ultimaRolagem.current;
+			if (ultima && ultima.chave === chaveDaRolagem.current) atualizarAbasRef.current((atuais) => guardarRolagem(atuais, ultima.chave, ultima.topo));
+		},
+		[],
+	);
+
+	const escolherAba = (aba: { chave: string; caminho: string }) => {
+		if (aba.chave !== chaveAtiva) navegar(aba.caminho);
+	};
+	const fecharUmaAba = (aba: { chave: string }) => {
+		const resultado = fecharAba(abasRef.current, aba.chave, chaveAtiva);
+		atualizarAbas(() => resultado.abas);
+		// Fechou a ativa: vai para a vizinha, ou para o painel do caderno quando não sobra nenhuma.
+		if (aba.chave === chaveAtiva) navegar(resultado.ativar ?? `caderno/${materiaId}/notas`);
+	};
 
 	const alternar = useCallback(() => {
 		setAberto((atual) => {
@@ -147,8 +275,20 @@ export function MesaEstudo(props: PropsMesaEstudo) {
 		if (anterior.current === aberto) return;
 		anterior.current = aberto;
 		if (aberto) {
-			// Depois do commit, o inert já saiu; preventScroll porque o painel ainda está abrindo.
-			const quadro = requestAnimationFrame(() => painel.current?.querySelector<HTMLElement>("textarea, [contenteditable='true']")?.focus({ preventScroll: true }));
+			// Depois do commit o hidden e o inert já saíram. O campo é o da barra de pergunta
+			// (não a primeira textarea do painel, que pode ser de um pedido no documento) e só
+			// aceita foco habilitado: com a sessão ainda carregando ele está desligado, então
+			// tenta de novo por alguns quadros. Para assim que o foco entra em algo do painel.
+			let quadro = 0;
+			let tentativas = 0;
+			const tentar = () => {
+				const campo = painel.current?.querySelector<HTMLTextAreaElement>(".barra textarea:not(:disabled)");
+				campo?.focus({ preventScroll: true });
+				const foco = document.activeElement;
+				if (foco && foco !== document.body && painel.current?.contains(foco)) return;
+				if (++tentativas < 30) quadro = requestAnimationFrame(tentar);
+			};
+			quadro = requestAnimationFrame(tentar);
 			return () => cancelAnimationFrame(quadro);
 		}
 		if (painel.current?.contains(document.activeElement) || document.activeElement === document.body) botao.current?.focus();
@@ -198,6 +338,7 @@ export function MesaEstudo(props: PropsMesaEstudo) {
 					</div>
 				) : null}
 				<div className="mesa__area">{props.children}</div>
+				<AbasMesa abas={abas} {...(chaveAtiva ? { ativa: chaveAtiva } : {})} {...(rotuloDaFonte ? { rotuloDaAtiva: rotuloDaFonte } : {})} escolher={escolherAba} fechar={fecharUmaAba} />
 			</div>
 			{Conversa ? (
 				<motion.aside
@@ -214,7 +355,13 @@ export function MesaEstudo(props: PropsMesaEstudo) {
 							janela={props.janela}
 							aberta={aberto}
 							aoPedidoPendente={setPendente}
-							cabecalho={<CabecalhoProfessor janela={props.janela} perfilId={perfilId} {...(props.materia ? { materia: props.materia } : {})} />}
+							obterContexto={vendo.obterContexto}
+							cabecalho={
+								<>
+									<CabecalhoProfessor janela={props.janela} perfilId={perfilId} {...(props.materia ? { materia: props.materia } : {})} />
+									<ChipVendo />
+								</>
+							}
 						/>
 					</div>
 				</motion.aside>

@@ -183,6 +183,9 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 		<MesaEstudo
 			janela={props.janela}
 			perfilId={props.perfilId}
+			materiaId={materiaId}
+			caminho={props.caminho}
+			navegar={props.navegar}
 			{...(props.conversa ? { conversa: props.conversa } : {})}
 			{...(materia ? { materia } : {})}
 			{...(agente ? { agente } : {})}

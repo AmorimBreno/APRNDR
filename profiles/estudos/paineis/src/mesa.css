@@ -47,11 +47,10 @@
 /* Abaixo de 760 px: um lado por vez; o painel aberto ocupa a tela toda. */
 .mesa[data-modo="tela"] .mesa__professor { left: 0; }
 
-/* O topo do painel: matéria, custo, seletor de conversas e Nova; avisos embaixo. */
+/* O topo do painel: seletor de conversas, custo e Nova numa linha; avisos embaixo. */
 /* A altura é a da aba tijolo do caderno (--course-bar), para as duas colunas terem o topo igual. */
 .mesa-cab { box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; gap: var(--space-2); min-width: 0; min-height: var(--course-bar); padding: var(--space-3) var(--space-4); }
 .mesa-cab__linha { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-width: 0; }
-.mesa-cab__materia { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mesa-cab__seletor { flex: 1; min-width: 0; }
 .mesa-cab__menu { max-width: 100%; }
 /* O botão do seletor (MenuSuspenso): no estilo dos controles do tema, com a conversa atual, a data e o chevron. */

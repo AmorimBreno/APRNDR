@@ -1,6 +1,6 @@
 // O topo do painel do professor na mesa de estudo (docs/mesa-de-estudo.md, 2.4):
-// o nome da matéria na cor dela, o seletor das conversas da matéria, o botão
-// Nova e o custo da conversa. Embaixo do topo, o aviso da troca de sessão
+// o seletor das conversas da matéria, o custo da conversa e o botão Nova, numa
+// linha (o nome da matéria já está na barra do caderno, logo acima). Embaixo do topo, o aviso da troca de sessão
 // (2.3): a conversa mudou em outra aba, o professor está terminando outra
 // resposta, ou a conversa da matéria está abrindo. É o `cabecalho` que a
 // MesaEstudo passa à conversa embutida (PropsConversaEmbutida.cabecalho).
@@ -135,20 +135,10 @@ export function CabecalhoProfessor({ janela, perfilId, materia }: PropsCabecalho
 		) : null;
 
 	const desligado = trocando || troca.situacao === "trocando" || !materia;
-	const cor = materia ? (materia.cor === "ink" ? "var(--ink)" : `var(--${materia.cor})`) : undefined;
 
 	return (
 		<div className="mesa-cab">
-			<div className="mesa-cab__linha">
-				{materia ? (
-					<span className="mesa-cab__materia display-sm" style={cor ? { color: cor } : undefined} title={materia.nome}>
-						{materia.nome}
-					</span>
-				) : null}
-				<Tag size="sm" tone="neutral" title="Custo desta conversa, com os subagentes">
-					{`US$ ${dolar.format(estado.uso.custo)}`}
-				</Tag>
-			</div>
+			{/* Sem o nome da matéria: ele já está na barra do caderno, logo acima (pedido do Breno). */}
 			<div className="mesa-cab__linha">
 				<div
 					className="mesa-cab__seletor"
@@ -179,6 +169,9 @@ export function CabecalhoProfessor({ janela, perfilId, materia }: PropsCabecalho
 						<span className="mesa-cab__vazio">Nenhuma conversa anterior</span>
 					)}
 				</div>
+				<Tag size="sm" tone="neutral" title="Custo desta conversa, com os subagentes">
+					{`US$ ${dolar.format(estado.uso.custo)}`}
+				</Tag>
 				<Button size="sm" variant="secondary" icon="plus" disabled={desligado} onClick={nova}>
 					Nova
 				</Button>

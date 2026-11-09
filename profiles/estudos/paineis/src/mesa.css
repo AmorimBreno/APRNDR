@@ -27,8 +27,12 @@
 .mesa-abas { grid-area: abas; display: flex; align-items: flex-end; gap: var(--space-1); min-width: 0; margin-bottom: var(--space-2); overflow-x: auto; scrollbar-width: thin; }
 .mesa-aba { flex: 0 1 220px; min-width: 96px; display: flex; align-items: center; border-radius: var(--radius-sm); color: var(--ink-muted); box-shadow: inset 0 0 0 var(--border-hair) var(--line); transition: background-color .12s ease-out, color .12s ease-out; }
 .mesa-aba:hover { background: var(--surface-hover); color: var(--ink); }
-.mesa-aba--ativa, .mesa-aba--ativa:hover { background: var(--surface-panel); color: var(--ink); box-shadow: inset 0 0 0 var(--border-hair) var(--line-strong); }
-.mesa-aba:focus-within { box-shadow: var(--focus-ring); }
+/* A aba aberta: fundo âmbar e texto escuro, como a tag escolhida do caderno (pedido do Breno). */
+.mesa-aba--ativa, .mesa-aba--ativa:hover { background: var(--amber); color: var(--on-amber); box-shadow: none; }
+.mesa-aba--ativa .mesa-aba__fechar { color: var(--on-amber); }
+.mesa-aba--ativa .mesa-aba__fechar:hover { background: color-mix(in srgb, var(--on-amber) 14%, transparent); color: var(--on-amber); }
+/* O anel só no foco pelo teclado: um clique na aba não deixa contorno. */
+.mesa-aba:has(:focus-visible) { box-shadow: var(--focus-ring); }
 .mesa-aba__botao { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-2); min-height: var(--control-md); padding: 0 var(--space-1) 0 var(--space-3); border: 0; background: none; color: inherit; font: inherit; cursor: pointer; text-align: left; }
 .mesa-aba__botao:focus-visible, .mesa-aba__fechar:focus-visible { outline: none; }
 .mesa-aba__botao > .ap-icon { flex: none; }

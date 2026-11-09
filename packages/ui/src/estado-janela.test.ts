@@ -301,3 +301,10 @@ describe("reduzirJanela", () => {
 		expect(estado.conversa[0]).toMatchObject({ emAndamento: false });
 	});
 });
+
+// Contrato do WP2 (docs/mesa-de-estudo.md, 2.5).
+describe("contexto da tela e custo ao reabrir (WP2)", () => {
+	it.todo("o evento contexto_tela prende o resumo ao último item do usuário da conversa");
+	it.todo("o historico traz o contextoTela de cada item do usuário");
+	it.todo("o historico com uso põe o total em estado.uso, em vez de zerar; sem uso, zera como antes");
+});

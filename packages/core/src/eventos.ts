@@ -27,6 +27,32 @@ export interface UsoModelo {
 	custo: number;
 }
 
+/**
+ * O que estava aberto na tela quando o usuário mandou uma mensagem
+ * (ESPECIFICACAO.md 13.19; docs/mesa-de-estudo.md, 2.5). Genérico: o núcleo
+ * não interpreta tipo nem origem (no perfil de estudos, "nota" e "licao"; num
+ * perfil de programação, um arquivo e as linhas selecionadas).
+ */
+export interface ContextoTela {
+	/** O tipo do que está aberto, do perfil ("nota", "licao"). */
+	tipo: string;
+	/** O nome para o modelo e para o chip ("Séries convergentes"). */
+	rotulo: string;
+	/** Opaco, do perfil: onde voltar com "Ir ao trecho" (parte C). */
+	origem?: string;
+	/** O olho do chip: aberto manda o conteúdo; fechado, nunca. */
+	olho: boolean;
+	/** O arquivo inteiro, só com o olho aberto. */
+	conteudo?: string;
+	/** O perfil cortou o conteúdo para caber no limite. */
+	parcial?: boolean;
+	/** O trecho citado pelo usuário (a citação de "Perguntar"). */
+	selecao?: string;
+}
+
+/** O contexto como volta à interface (evento e histórico): sem o conteúdo, que só o modelo vê. */
+export type ResumoContextoTela = Omit<ContextoTela, "conteudo">;
+
 /** Estado de uma janela de perfil: qual sessão, agente, modelo e recursos estão ativos. */
 export interface EstadoSessao {
 	/** id do perfil. */
@@ -61,6 +87,12 @@ export type EventoNucleo =
 	/** A sessão terminou de verdade (agent_settled): não vai continuar sozinha. */
 	| { tipo: "execucao_fim"; abortada: boolean }
 	| { tipo: "mensagem_usuario"; texto: string; momento?: string }
+	/**
+	 * O contexto da tela que foi junto da última mensagem do usuário (13.19).
+	 * Chega depois do mensagem_usuario: a interface o prende ao último item do
+	 * usuário. Nunca traz o conteúdo.
+	 */
+	| { tipo: "contexto_tela"; contexto: ResumoContextoTela }
 	| { tipo: "texto_delta"; delta: string }
 	| { tipo: "raciocinio_delta"; delta: string }
 	/** Mensagem do assistente concluída. `erro` vem quando o provedor falhou. */
@@ -104,7 +136,7 @@ export type EventoNucleo =
 
 /** Item do histórico de uma sessão, para mostrar a conversa ao reabrir. */
 export type ItemHistorico =
-	| { papel: "usuario"; texto: string; momento?: string }
+	| { papel: "usuario"; texto: string; momento?: string; contextoTela?: ResumoContextoTela }
 	| {
 			papel: "assistente";
 			texto: string;

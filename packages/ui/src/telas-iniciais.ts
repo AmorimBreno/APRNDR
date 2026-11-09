@@ -3,7 +3,8 @@
 // de painéis: o front liga o id do perfil a um componente; um perfil sem tela
 // inicial abre direto na janela de conversa.
 
-import type { ComponentType } from "react";
+import type { ContextoTela } from "@estudos/core/protocolo";
+import type { ComponentType, ReactNode } from "react";
 import type { JanelaPerfilHook } from "./use-janela-perfil.ts";
 import type { ResumoPerfil } from "./use-perfis.ts";
 
@@ -19,6 +20,29 @@ export interface PropsTelaInicial {
 	abrirConversa(): void;
 	/** Volta para a tela de perfis. */
 	voltar(): void;
+	/**
+	 * A conversa do perfil para embutir na própria tela (a mesa de estudo,
+	 * 13.19; docs/mesa-de-estudo.md, 2.9). O app monta este componente com os
+	 * mesmos pedaços da janela de conversa em tela cheia. Ausente num app que
+	 * não oferece a conversa embutida.
+	 */
+	conversa?: ComponentType<PropsConversaEmbutida>;
+}
+
+/** O que a tela inicial passa à conversa embutida. */
+export interface PropsConversaEmbutida {
+	/** A janela que a tela inicial já usa (um useJanelaPerfil só: abrir de novo duplicaria o perfil). */
+	janela: JanelaPerfilHook;
+	/** false = escondida (hidden e inert), nunca desmontada: o rascunho, a citação e a resposta em andamento continuam. */
+	aberta: boolean;
+	/** O contexto da tela na hora de mandar (lido a cada envio); undefined = a mensagem vai sem contexto. */
+	obterContexto?(): ContextoTela | undefined;
+	/** O topo, desenhado pelo perfil (na mesa: a matéria, o seletor de conversas, Nova, o custo e o chip do olho). */
+	cabecalho?: ReactNode;
+	/** O trecho citado (Perguntar): aparece acima do campo com um X; vai junto da próxima mensagem e é limpo depois. */
+	citacao?: { texto: string; limpar(): void };
+	/** Avisa se há pedido esperando resposta, para a tela mostrar isso com a conversa fechada (a foto pulsa). */
+	aoPedidoPendente?(pendente: boolean): void;
 }
 
 export interface EntradaTelaInicial {
@@ -35,6 +59,12 @@ export interface EntradaTelaInicial {
 	 * o rótulo e a cor gravados na sessão.
 	 */
 	usarAparenciaContextos?(janela: JanelaPerfilHook): AparenciaContextos;
+	/**
+	 * Diz se a troca de subtela `de` -> `para` (caminhos sem barras nas pontas)
+	 * deve acontecer sem a View Transition da página (as abas da mesa de estudo,
+	 * para a conversa ao lado não piscar). Sem ele, toda troca anima.
+	 */
+	semTransicao?(de: string, para: string): boolean;
 }
 
 /** Rótulo e cor de agora de cada contexto, pela chave. */

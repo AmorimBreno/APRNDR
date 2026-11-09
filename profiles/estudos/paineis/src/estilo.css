@@ -1,6 +1,9 @@
 /* Estilos dos painéis do perfil de estudos, por cima do design system APRNDR
  * (as alternativas usam as classes ap-quiz e ap-opt do QuizQuestion). */
 
+/* A mesa de estudo (docs/mesa-de-estudo.md) tem o próprio arquivo. */
+@import "./mesa.css";
+
 /* A largura da coluna de leitura do perfil: a lição do módulo e a página da nota (mais larga que o
  * measure-read do design system, de 720 px, para o texto usar melhor a tela). */
 :root { --largura-leitura-estudos: 1000px; }

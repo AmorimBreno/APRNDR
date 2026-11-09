@@ -152,6 +152,12 @@ Parada 2 (parte B): o chip, o olho aberto e fechado (conferindo no botão de inf
 
 Fim: /code-review e /security-review, correções, roteiro docs/teste-mesa.md, filemap e PLANO.
 
+Estado do WP0 (feito em 2026-11-09):
+- Núcleo: ContextoTela e ResumoContextoTela (eventos.ts), o evento contexto_tela, o contextoTela do item do usuário, o esquema com LIMITES_CONTEXTO_TELA no pedido enviar e o uso no historico (protocolo.ts), e contexto-tela.ts com as assinaturas e os testes pulados.
+- Interface: PropsConversaEmbutida, a prop conversa da tela inicial e semTransicao (packages/ui/src/telas-iniciais.ts). O reducer ignora contexto_tela até o WP2.
+- Perfil: vendo.ts (só tipos; o provedor do React será vendo.tsx no WP5b), licao-texto.ts com o teste pulado, mesa.css importado pelo estilo.css. abas-mesa.ts e sessao-materia.ts já foram implementados no WP0, com testes: o WP4 e o WP5b só os usam.
+- Testes pendentes (it.todo) nos arquivos do WP1, WP2 e WP3: janela-perfil.test, eventos.test, servidor.test, estado-janela.test e App.test. Cada pacote troca os seus por testes de verdade.
+
 Regras dos pacotes: um commit por pacote, feito pelo orquestrador depois de ler o diff e rodar pnpm typecheck e pnpm test. Paralelo só com arquivos disjuntos (WP1 com WP6; WP3 com WP4; WP5b com WP7a). Falha de Haiku: até 2 novas tentativas com o diff e o critério que falhou; na terceira sobe para o Sonnet.
 
 

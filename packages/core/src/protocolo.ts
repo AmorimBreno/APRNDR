@@ -12,7 +12,7 @@
 // "evento" para todas as conexões que abriram aquele perfil.
 
 import { z } from "zod";
-import type { EstadoSessao, EventoNucleo, ItemHistorico } from "./eventos.ts";
+import type { ContextoTela, EstadoSessao, EventoNucleo, ItemHistorico, UsoModelo } from "./eventos.ts";
 import type { SituacaoMaterial } from "./materiais/tipos.ts";
 import type { InfoModelo } from "./modelos.ts";
 import type { RegistroPonte } from "./ponte.ts";
@@ -20,6 +20,7 @@ import type { ResumoSessao } from "./sessoes.ts";
 
 export type { RegistroPonte } from "./ponte.ts";
 export type { ContextoSessao } from "./sessoes.ts";
+export type { ContextoTela, ResumoContextoTela } from "./eventos.ts";
 export type { EstadoMaterial, SituacaoMaterial } from "./materiais/tipos.ts";
 
 /** Os registros da ponte de uma sessão e os pedidos que ainda esperam ao vivo. */
@@ -52,11 +53,37 @@ const esquemaContexto = z.strictObject({
 		.optional(),
 });
 
+/**
+ * Os limites do contexto da tela (13.19), em caracteres. São só uma trava: o
+ * perfil corta o conteúdo antes de mandar e marca parcial. Passar do limite
+ * faz o envio inteiro falhar.
+ */
+export const LIMITES_CONTEXTO_TELA = { tipo: 40, rotulo: 200, origem: 500, conteudo: 200_000, selecao: 20_000 } as const;
+
+/** O contexto da tela de uma mensagem (eventos.ts, ContextoTela). Com o olho fechado, o conteúdo não vai. */
+const esquemaContextoTela = z
+	.strictObject({
+		tipo: z.string().min(1).max(LIMITES_CONTEXTO_TELA.tipo),
+		rotulo: z.string().min(1).max(LIMITES_CONTEXTO_TELA.rotulo),
+		origem: z.string().min(1).max(LIMITES_CONTEXTO_TELA.origem).optional(),
+		olho: z.boolean(),
+		conteudo: z.string().max(LIMITES_CONTEXTO_TELA.conteudo).optional(),
+		parcial: z.boolean().optional(),
+		selecao: z.string().min(1).max(LIMITES_CONTEXTO_TELA.selecao).optional(),
+	})
+	.refine((contexto) => contexto.olho || contexto.conteudo === undefined, "com o olho fechado o conteúdo não vai");
+
+// Confere em tempo de compilação que o esquema e o tipo de eventos.ts são o mesmo.
+type _ContextoTelaConfere = [z.infer<typeof esquemaContextoTela>] extends [ContextoTela] ? ([ContextoTela] extends [z.infer<typeof esquemaContextoTela>] ? true : never) : never;
+const _contextoTelaConfere: _ContextoTelaConfere = true;
+void _contextoTelaConfere;
+
 export const esquemaMensagemCliente = z.discriminatedUnion("tipo", [
 	z.strictObject({ tipo: z.literal("ping"), pedidoId }),
 	/** Abre a janela do perfil (ou entra na que já está aberta). Com sessaoId, continua essa sessão. */
 	z.strictObject({ tipo: z.literal("abrir_perfil"), ...comPerfil, sessaoId: texto.optional(), agente: texto.optional() }),
-	z.strictObject({ tipo: z.literal("enviar"), ...comPerfil, texto }),
+	/** contextoTela: o que estava aberto na tela (13.19); o modelo o vê, a conversa mostra só o resumo. */
+	z.strictObject({ tipo: z.literal("enviar"), ...comPerfil, texto, contextoTela: esquemaContextoTela.optional() }),
 	z.strictObject({ tipo: z.literal("abortar"), ...comPerfil }),
 	/** modelo no formato provedor/id. */
 	z.strictObject({ tipo: z.literal("trocar_modelo"), ...comPerfil, modelo: texto }),
@@ -115,7 +142,8 @@ export type MensagemServidor =
 	| { tipo: "evento"; perfil: string; evento: EventoNucleo }
 	/** Conversa inteira da sessão aberta: depois de abrir o perfil, abrir ou criar sessão, trocar de agente e recarregar. */
 	/** A conversa da sessão aberta e, à parte, o que a ponte gravou (pedidos, fins, ações mostradas). */
-	| { tipo: "historico"; perfil: string; itens: ItemHistorico[]; ponte?: HistoricoPonte }
+	/** uso: a soma do uso do ramo inteiro da sessão (respostas e subagentes), para o custo da conversa ao reabrir. */
+	| { tipo: "historico"; perfil: string; itens: ItemHistorico[]; ponte?: HistoricoPonte; uso?: UsoModelo }
 	/** A sessão do perfil está sendo montada (a tela de carregamento usa isto). */
 	| { tipo: "carregando"; perfil: string; mensagem: string }
 	/** A sessão foi remontada: por mudança de arquivo (watcher) ou por pedido do usuário. */

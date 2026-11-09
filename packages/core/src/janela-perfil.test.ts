@@ -330,3 +330,16 @@ describe("JanelaPerfil sem rede", () => {
 		expect((await janela.iniciar()).agente).toBe("geral");
 	});
 });
+
+// Contrato do WP1 (docs/mesa-de-estudo.md, 2.5): o WP1 troca cada it.todo por um teste de verdade, com a sessão falsa.
+describe("contexto da tela e fila própria (WP1)", () => {
+	it.todo("enviar com contextoTela grava a mensagem custom nucleo.contexto-tela (display false) logo depois da mensagem do usuário, pelo before_agent_start");
+	it.todo("enviar durante uma resposta guarda {texto, contextoTela} na fila própria, emite o evento fila e manda com prompt() quando a execução termina sem abortar");
+	it.todo("dois envios seguidos, um durante a resposta, deixam dois contextos na sessão, cada um com o seu texto");
+	it.todo("abortar e trocar de sessão esvaziam a fila própria; abortar devolve os textos da fila");
+	it.todo("se prompt() lançar, o contexto pendente é limpo e não vai na mensagem seguinte");
+	it.todo("conteúdo com o mesmo hash do último contexto ainda em sessao.messages vai como repetido; depois de compactar, de reabrir a sessão e de trocar de agente, o hash vem das mensagens");
+	it.todo("olho fechado nunca leva conteúdo nem hash");
+	it.todo("o evento contexto_tela sai depois do mensagem_usuario, com o resumo sem o conteúdo");
+	it.todo("historico() prende o resumo do contexto ao item do usuário anterior e o estado do historico traz o uso somado do ramo inteiro, com os subagentes");
+});

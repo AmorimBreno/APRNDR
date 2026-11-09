@@ -206,3 +206,10 @@ describe("converterHistorico", () => {
 		]);
 	});
 });
+
+// Contrato do WP1 (docs/mesa-de-estudo.md, 2.5).
+describe("contexto da tela nos eventos (WP1)", () => {
+	it.todo("converterHistorico prende o resumo da mensagem custom nucleo.contexto-tela ao item do usuário que vem antes dela, e nunca leva o conteúdo");
+	it.todo("converterHistorico ignora mensagens custom de outros tipos e contexto sem item de usuário antes");
+	it.todo("o tradutor emite contexto_tela (só o resumo) quando a mensagem custom do contexto termina");
+});

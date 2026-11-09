@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { esquemaMensagemCliente, validarMensagemCliente } from "./protocolo.ts";
+import { esquemaMensagemCliente, LIMITES_CONTEXTO_TELA, validarMensagemCliente } from "./protocolo.ts";
 
 describe("mensagens válidas do cliente", () => {
 	const validas: unknown[] = [
@@ -85,5 +85,36 @@ describe("isolamento do pi", () => {
 			modulo: achado[2],
 		}));
 		expect(importacoes.filter((importacao) => !importacao.soTipo).map((importacao) => importacao.modulo)).toEqual(["zod"]);
+	});
+});
+
+describe("contexto da tela no enviar (13.19)", () => {
+	const enviar = (contextoTela: unknown) => validarMensagemCliente({ tipo: "enviar", perfil: "estudos", texto: "Por quê?", contextoTela });
+
+	it("aceita o contexto com o olho aberto e o conteúdo, e com o olho fechado sem ele", () => {
+		expect(enviar({ tipo: "nota", rotulo: "Séries", olho: true, conteudo: "# Séries", selecao: "L = 1", origem: "caderno/calc/notas/Séries" }).ok).toBe(true);
+		expect(enviar({ tipo: "licao", rotulo: "Lição 2.3", olho: false }).ok).toBe(true);
+		expect(enviar({ tipo: "nota", rotulo: "Séries", olho: true, conteudo: "", parcial: true }).ok).toBe(true);
+	});
+
+	it("recusa o conteúdo com o olho fechado", () => {
+		expect(enviar({ tipo: "nota", rotulo: "Séries", olho: false, conteudo: "# Séries" }).ok).toBe(false);
+	});
+
+	it("recusa campos a mais, olho ausente e textos vazios", () => {
+		expect(enviar({ tipo: "nota", rotulo: "Séries", olho: true, extra: 1 }).ok).toBe(false);
+		expect(enviar({ tipo: "nota", rotulo: "Séries" }).ok).toBe(false);
+		expect(enviar({ tipo: "", rotulo: "Séries", olho: true }).ok).toBe(false);
+		expect(enviar({ tipo: "nota", rotulo: "", olho: true }).ok).toBe(false);
+		expect(enviar({ tipo: "nota", rotulo: "Séries", olho: true, selecao: "" }).ok).toBe(false);
+	});
+
+	it("respeita os limites", () => {
+		expect(enviar({ tipo: "nota", rotulo: "x".repeat(LIMITES_CONTEXTO_TELA.rotulo), olho: true }).ok).toBe(true);
+		expect(enviar({ tipo: "nota", rotulo: "x".repeat(LIMITES_CONTEXTO_TELA.rotulo + 1), olho: true }).ok).toBe(false);
+		expect(enviar({ tipo: "nota", rotulo: "Séries", olho: true, conteudo: "x".repeat(LIMITES_CONTEXTO_TELA.conteudo) }).ok).toBe(true);
+		expect(enviar({ tipo: "nota", rotulo: "Séries", olho: true, conteudo: "x".repeat(LIMITES_CONTEXTO_TELA.conteudo + 1) }).ok).toBe(false);
+		expect(enviar({ tipo: "nota", rotulo: "Séries", olho: true, selecao: "x".repeat(LIMITES_CONTEXTO_TELA.selecao + 1) }).ok).toBe(false);
+		expect(enviar({ tipo: "nota", rotulo: "Séries", olho: true, origem: "x".repeat(LIMITES_CONTEXTO_TELA.origem + 1) }).ok).toBe(false);
 	});
 });

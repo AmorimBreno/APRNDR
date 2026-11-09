@@ -15,3 +15,8 @@ describe("rotaDoHash", () => {
 		expect(rotaDoHash("#/outra")).toEqual({ conversa: false });
 	});
 });
+
+// Contrato do WP3 (docs/mesa-de-estudo.md, 2.9).
+describe("semTransicao da tela inicial (WP3)", () => {
+	it.todo("a troca de subtela que a entrada marca com semTransicao acontece sem a View Transition; as outras animam como antes");
+});

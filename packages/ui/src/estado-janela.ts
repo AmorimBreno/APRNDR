@@ -411,6 +411,10 @@ function aplicarEvento(estado: EstadoJanela, evento: EventoNucleo): EstadoJanela
 			return { ...estado, conversa: [...estado.conversa, item], contador };
 		}
 
+		// O contexto da tela da última mensagem (13.19): o WP2 o prende ao último item do usuário.
+		case "contexto_tela":
+			return estado;
+
 		case "texto_delta":
 			return acrescentarDelta(estado, "texto", evento.delta);
 

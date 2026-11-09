@@ -482,3 +482,9 @@ describe("chaves", () => {
 		expect(interpretarSaidaReg(saida, "OUTRA")).toBeUndefined();
 	});
 });
+
+// Contrato do WP1 (docs/mesa-de-estudo.md, 2.5).
+describe("contexto da tela no servidor (WP1)", () => {
+	it.todo("enviar repassa o contextoTela à janela do perfil");
+	it.todo("o log do pedido enviar registra só o tipo e os tamanhos do contextoTela, nunca o conteúdo nem a seleção");
+});

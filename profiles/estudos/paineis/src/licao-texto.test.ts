@@ -61,7 +61,7 @@ function pedido(campos: Partial<ExplicacaoPedida>): ExplicacaoPedida {
 	return { id: "x-1", licao: "l1", bloco: "l1-b1", versao: 1, trecho: "termos seguidos", tipo: "explique_melhor", em: "2026-11-09T10:00:00.000Z", explicacao: "Termos vizinhos: a_n e a_{n+1}.", ...campos };
 }
 
-describe.skip("textoDaLicao", () => {
+describe("textoDaLicao", () => {
 	it("monta o texto da lição no formato do contrato", () => {
 		expect(textoDaLicao(licao)).toBe(
 			[

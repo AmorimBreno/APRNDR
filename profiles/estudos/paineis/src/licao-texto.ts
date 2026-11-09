@@ -20,11 +20,50 @@
 // respostaEsperada, rubrica, respostaModelo, as referências, as versões
 // anteriores dos blocos nem as respostas do Breno.
 
-import type { Licao } from "../../lib/modulo-tipos.ts";
+import { versaoDoBloco, type Bloco, type Licao } from "../../lib/modulo-tipos.ts";
 import type { ExplicacaoPedida } from "../../lib/termos-tipos.ts";
 
 export function textoDaLicao(licao: Licao, explicacoes?: readonly ExplicacaoPedida[]): string {
-	void licao;
-	void explicacoes;
-	throw new Error("licao-texto: a implementar no WP6");
+	const partes: string[] = [`# ${licao.titulo}\nObjetivo: ${licao.objetivo}`];
+	for (const bloco of licao.blocos) {
+		partes.push(textoDoBloco(bloco));
+		for (const pedido of explicacoesDoBloco(licao, bloco, explicacoes ?? [])) {
+			partes.push(`Explicação pedida sobre "${pedido.trecho}": ${pedido.explicacao}`);
+		}
+	}
+	return partes.join("\n\n");
+}
+
+// Só as explicações desta lição, deste bloco e da versão atual: as de versões
+// antigas falam de um texto que o Breno já não vê.
+function explicacoesDoBloco(licao: Licao, bloco: Bloco, explicacoes: readonly ExplicacaoPedida[]): (ExplicacaoPedida & { explicacao: string })[] {
+	return explicacoes.filter(
+		(pedido): pedido is ExplicacaoPedida & { explicacao: string } =>
+			pedido.licao === licao.id &&
+			pedido.bloco === bloco.id &&
+			pedido.versao === versaoDoBloco(bloco) &&
+			typeof pedido.explicacao === "string" &&
+			pedido.explicacao.trim() !== "",
+	);
+}
+
+function textoDoBloco(bloco: Bloco): string {
+	switch (bloco.tipo) {
+		case "explicacao":
+			return bloco.complemento ? `${bloco.texto}\n(Complemento: vai além do material.)` : bloco.texto;
+		case "verificacao":
+			return `Pergunta rápida: ${bloco.pergunta}`;
+		case "ideia_central":
+			return `Ideia central: ${bloco.texto}`;
+		case "alternativa": {
+			const alternativas = bloco.alternativas.map((alternativa, indice) => `${String.fromCharCode(97 + indice)}) ${alternativa.texto}`);
+			return `Questão: ${enunciadoComContexto(bloco.contexto, bloco.enunciado)}\n${alternativas.join("\n")}`;
+		}
+		case "dissertativa":
+			return `Questão dissertativa: ${enunciadoComContexto(bloco.contexto, bloco.enunciado)}`;
+	}
+}
+
+function enunciadoComContexto(contexto: string | undefined, enunciado: string): string {
+	return contexto ? `${contexto}\n\n${enunciado}` : enunciado;
 }

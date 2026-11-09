@@ -35,10 +35,11 @@
 import { Button, EmptyState, Icon, NotebookCover, type OrnamentGlyph, pad2 } from "@estudos/design-system";
 import { AvatarAgente, type DadosAvatarAgente, type JanelaPerfilHook, type PropsTelaInicial, semEsperar, semMovimento } from "@estudos/ui";
 import { motion } from "motion/react";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useId, useMemo, useRef, useState } from "react";
 import { type CorMateria, type Materia, pastaMateriaisRelativa } from "../../lib/materia-tipos.ts";
 import { contextoDaMateria, type DadosCaderno, dataCurta, lerAcoes, PAINEL_CADERNOS, prepararConversa, proximaProva, quando, rotuloCapa } from "./comum.ts";
 import { EditorNota } from "./EditorNota.tsx";
+import { MesaEstudo } from "./MesaEstudo.tsx";
 import { ModalMateria } from "./ModalMateria.tsx";
 import { contarMapa } from "../../lib/mapa-tipos.ts";
 import { custoDoMapa, useMapa } from "./mapa-ponte.ts";
@@ -176,9 +177,38 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 
 	// O módulo gerado: a CourseBar faz o papel da aba (TelaModulo desenha as duas linhas da tela).
 	const moduloAberto = props.modulo;
+	const agente = nomeAgente ? { nome: nomeAgente, ...(avatarAgente ? { avatar: avatarAgente } : {}) } : undefined;
+	// A mesa de estudo: a nota aberta e o módulo ficam à esquerda, com o painel do professor à direita (MesaEstudo).
+	const naMesa = (filhos: ReactNode) => (
+		<MesaEstudo
+			janela={props.janela}
+			perfilId={props.perfilId}
+			{...(props.conversa ? { conversa: props.conversa } : {})}
+			{...(materia ? { materia } : {})}
+			{...(agente ? { agente } : {})}
+		>
+			{filhos}
+		</MesaEstudo>
+	);
+	// A nota aberta só vale quando nenhuma das telas acima dela na cadeia (erro, curso, guia) está no lugar.
+	const mostraNota = notaAberta !== undefined && !(erro && !materia) && !(props.curso && !guia) && !guia;
+	const abaDoCaderno = (
+		<AbaCaderno
+			{...(materia ? { materia } : {})}
+			{...(numero ? { numero } : {})}
+			voltar={voltar}
+			{...(lista ? { materias: lista.materias } : {})}
+			editar={() => setEditando(true)}
+			{...(caderno ? { linhaDoTempo: abrirLinhaDoTempo } : {})}
+			conversar={conversar}
+			abrindo={abrindoConversa}
+			{...(agente ? { agente } : {})}
+		/>
+	);
 	return (
 		<div className="tela-caderno">
 			{moduloAberto ? (
+				naMesa(
 				<TelaModulo
 					key={`${moduloAberto.curso}/${moduloAberto.modulo}`}
 					janela={props.janela}
@@ -193,19 +223,39 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 					{...(lista ? { materias: lista.materias } : {})}
 					{...(nomeAgente ? { agente: { nome: nomeAgente, ...(avatarAgente ? { avatar: avatarAgente } : {}) } } : {})}
 				/>
+				)
+			) : mostraNota && notaAberta !== undefined ? (
+				naMesa(
+					<>
+						{abaDoCaderno}
+						{/* A nota aberta ocupa a área toda abaixo da aba, no lugar do painel; "voltar" leva ao painel com a tag Notas. */}
+						<motion.section
+							key="nota"
+							className="painel-caderno__nota"
+							aria-label={`Nota ${notaAberta}`}
+							initial={parado ? false : { opacity: 0, y: 12 }}
+							animate={{ opacity: 1, y: 0 }}
+							transition={{ type: "spring", stiffness: 380, damping: 32 }}
+						>
+							<EditorNota
+								key={materiaId}
+								janela={props.janela}
+								materiaId={materiaId}
+								{...(materia ? { materiaNome: materia.nome } : {})}
+								titulo={notaAberta}
+								voltar={() => props.navegar(rotaDaTag(materiaId, "notas"))}
+								renomeada={abrirNota}
+								{...(titulosNotas ? { titulos: titulosNotas } : {})}
+								abrirNota={abrirNota}
+								{...(arquivosMencao ? { arquivos: arquivosMencao } : {})}
+								abrirMaterial={(nome) => props.navegar(`caderno/${materiaId}/materiais/${nome}`)}
+							/>
+						</motion.section>
+					</>,
+				)
 			) : (
 			<>
-			<AbaCaderno
-				{...(materia ? { materia } : {})}
-				{...(numero ? { numero } : {})}
-				voltar={voltar}
-				{...(lista ? { materias: lista.materias } : {})}
-				editar={() => setEditando(true)}
-				{...(caderno ? { linhaDoTempo: abrirLinhaDoTempo } : {})}
-				conversar={conversar}
-				abrindo={abrindoConversa}
-				{...(nomeAgente ? { agente: { nome: nomeAgente, ...(avatarAgente ? { avatar: avatarAgente } : {}) } } : {})}
-			/>
+			{abaDoCaderno}
 			{erro && !materia ? (
 				<div className="caderno__erro">
 					<EmptyState
@@ -246,30 +296,6 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 					tom={tom}
 					{...(nomeAgente ? { agente: { nome: nomeAgente, ...(avatarAgente ? { avatar: avatarAgente } : {}) } } : {})}
 				/>
-				) : notaAberta ? (
-					// A nota aberta ocupa a área toda abaixo da aba, no lugar do painel; "voltar" leva ao painel com a tag Notas.
-					<motion.section
-						key="nota"
-						className="painel-caderno__nota"
-						aria-label={`Nota ${notaAberta}`}
-						initial={parado ? false : { opacity: 0, y: 12 }}
-						animate={{ opacity: 1, y: 0 }}
-						transition={{ type: "spring", stiffness: 380, damping: 32 }}
-					>
-						<EditorNota
-							key={materiaId}
-							janela={props.janela}
-							materiaId={materiaId}
-							{...(materia ? { materiaNome: materia.nome } : {})}
-							titulo={notaAberta}
-							voltar={() => props.navegar(rotaDaTag(materiaId, "notas"))}
-							renomeada={abrirNota}
-							{...(titulosNotas ? { titulos: titulosNotas } : {})}
-							abrirNota={abrirNota}
-							{...(arquivosMencao ? { arquivos: arquivosMencao } : {})}
-							abrirMaterial={(nome) => props.navegar(`caderno/${materiaId}/materiais/${nome}`)}
-						/>
-					</motion.section>
 				) : (
 					// layoutScroll: o painel só rola se a janela for baixa; a lista de dentro de cada seção (FixoERolagem) também tem layoutScroll, e o arrasto do mapa de conteúdo (Reorder) mede certo com qualquer um rolado.
 					<motion.div className="painel-caderno" layoutScroll>

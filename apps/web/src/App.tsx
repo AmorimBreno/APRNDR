@@ -111,6 +111,7 @@ function TelaInicial({ perfilId, caminho }: { perfilId: string; caminho: string 
 			navegar={(destino) => irPara(hashDoCaminho(perfilId, destino))}
 			abrirConversa={() => irPara(`#/perfil/${encodeURIComponent(perfilId)}/conversa`)}
 			voltar={() => irPara("#/")}
+			conversa={conversaEmbutidaDe(perfilId)}
 		/>
 	);
 }

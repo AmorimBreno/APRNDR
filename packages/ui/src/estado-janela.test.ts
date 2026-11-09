@@ -304,7 +304,56 @@ describe("reduzirJanela", () => {
 
 // Contrato do WP2 (docs/mesa-de-estudo.md, 2.5).
 describe("contexto da tela e custo ao reabrir (WP2)", () => {
-	it.todo("o evento contexto_tela prende o resumo ao último item do usuário da conversa");
-	it.todo("o historico traz o contextoTela de cada item do usuário");
-	it.todo("o historico com uso põe o total em estado.uso, em vez de zerar; sem uso, zera como antes");
+	const contexto = { tipo: "pagina", rotulo: "Lição 1", olho: true } as const;
+
+	it("o evento contexto_tela prende o resumo ao último item do usuário da conversa", () => {
+		let estado = aplicar(estadoInicial(PERFIL), ev({ tipo: "contexto_tela", contexto }));
+		// Sem item do usuário, ignora.
+		expect(estado.conversa).toEqual([]);
+		estado = aplicar(estado, ev({ tipo: "mensagem_usuario", texto: "oi" }), ev({ tipo: "contexto_tela", contexto }));
+		expect(estado.conversa[0]).toMatchObject({ tipo: "usuario", texto: "oi", contextoTela: contexto });
+	});
+
+	it("duas mensagens do usuário, cada uma com o seu contexto_tela, ficam cada uma com o seu chip", () => {
+		const outro = { tipo: "pagina", rotulo: "Lição 2", olho: false } as const;
+		const estado = aplicar(
+			estadoInicial(PERFIL),
+			ev({ tipo: "mensagem_usuario", texto: "a" }),
+			ev({ tipo: "contexto_tela", contexto }),
+			ev({ tipo: "mensagem_usuario", texto: "b" }),
+			ev({ tipo: "contexto_tela", contexto: outro }),
+		);
+		expect(estado.conversa).toMatchObject([
+			{ texto: "a", contextoTela: contexto },
+			{ texto: "b", contextoTela: outro },
+		]);
+	});
+
+	it("o historico traz o contextoTela de cada item do usuário", () => {
+		const estado = aplicar(estadoInicial(PERFIL), {
+			tipo: "historico",
+			perfil: PERFIL,
+			itens: [
+				{ papel: "usuario", texto: "a", contextoTela: contexto },
+				{ papel: "usuario", texto: "b" },
+			],
+		});
+		expect(estado.conversa[0]).toMatchObject({ texto: "a", contextoTela: contexto });
+		expect(estado.conversa[1]).not.toHaveProperty("contextoTela");
+	});
+
+	it("o historico com uso põe o total em estado.uso, em vez de zerar; sem uso, zera como antes", () => {
+		let estado = aplicar(
+			estadoInicial(PERFIL),
+			{ tipo: "historico", perfil: PERFIL, itens: [], uso },
+			// A resposta de abrir o perfil chega depois do historico e não pode zerar o total.
+			{ tipo: "resposta", pedido: "abrir_perfil", ok: true, dados: sessao() },
+		);
+		expect(estado.uso).toMatchObject({ ...uso });
+		// Os eventos "uso" ao vivo somam por cima.
+		estado = aplicar(estado, ev({ tipo: "uso", modelo: "m", ...uso }));
+		expect(estado.uso).toMatchObject({ tokensTotal: 36, custo: 0.02 });
+		estado = aplicar(estado, { tipo: "historico", perfil: PERFIL, itens: [] });
+		expect(estado.uso).toMatchObject({ tokensTotal: 0, custo: 0, respostas: 0 });
+	});
 });

@@ -8,6 +8,7 @@ import type { DadosResposta, MensagemServidor } from "@estudos/core/protocolo";
 export type {
 	DadosPedidoPergunta,
 	ContextoSessao,
+	ContextoTela,
 	DadosResposta,
 	EstadoMaterial,
 	HistoricoPonte,
@@ -17,6 +18,7 @@ export type {
 	OpcaoPergunta,
 	RegistroPonte,
 	RespostaPergunta,
+	ResumoContextoTela,
 	SituacaoMaterial,
 	TipoMensagemCliente,
 } from "@estudos/core/protocolo";
@@ -26,5 +28,6 @@ export type ItemHistorico = Extract<MensagemServidor, { tipo: "historico" }>["it
 export type EstadoSessao = DadosResposta["abrir_perfil"];
 export type Diagnostico = EstadoSessao["diagnosticos"][number];
 export type MotivoCancelamento = Extract<EventoNucleo, { tipo: "pedido_interface_cancelado" }>["motivo"];
+export type UsoModelo = NonNullable<Extract<MensagemServidor, { tipo: "historico" }>["uso"]>;
 export type InfoModelo = DadosResposta["listar_modelos"][number];
 export type ResumoSessao = DadosResposta["listar_sessoes"][number];

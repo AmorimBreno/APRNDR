@@ -19,6 +19,8 @@ import type {
 	ItemHistorico,
 	MensagemServidor,
 	MotivoCancelamento,
+	ResumoContextoTela,
+	UsoModelo,
 	SituacaoMaterial,
 	TipoMensagemCliente,
 } from "./tipos.ts";
@@ -50,7 +52,7 @@ export interface UsoResposta {
 }
 
 export type ItemConversa =
-	| { tipo: "usuario"; chave: string; texto: string; momento?: string }
+	| { tipo: "usuario"; chave: string; texto: string; momento?: string; contextoTela?: ResumoContextoTela }
 	| {
 			tipo: "assistente";
 			chave: string;
@@ -147,6 +149,11 @@ export interface EstadoJanela {
 	registrosPedidos: Record<string, RegistroPedido>;
 	/** A sessão dos registros reconstruídos do histórico (para a resposta do pedido não zerá-los). */
 	sessaoDosPedidos?: string;
+	/**
+	 * true quando o "historico" já pôs o uso total da sessão em `uso`. O historico chega antes
+	 * da resposta que traz o EstadoSessao; sem este aviso, comSessao zeraria o uso recém-posto.
+	 */
+	usoDoHistorico?: boolean;
 	recarregado?: AvisoRecarregado;
 	/** Contador para as chaves dos itens (o reducer continua puro: vem no estado). */
 	contador: number;
@@ -219,7 +226,21 @@ function mesmoDiagnostico(a: Diagnostico, b: Diagnostico): boolean {
 	return a.nivel === b.nivel && a.mensagem === b.mensagem;
 }
 
-/** Troca o estado da sessão. Outra sessão zera o uso e os diagnósticos de execução. */
+/** Converte o uso do núcleo (uma soma) em UsoSomado. */
+function usoSomadoDe(uso: UsoModelo): UsoSomado {
+	return {
+		tokensEntrada: uso.tokensEntrada,
+		tokensSaida: uso.tokensSaida,
+		tokensCacheLeitura: uso.tokensCacheLeitura,
+		tokensCacheEscrita: uso.tokensCacheEscrita,
+		tokensTotal: uso.tokensTotal,
+		custo: uso.custo,
+		// O núcleo manda só a soma, sem a contagem de respostas; a tela mostra o custo e os tokens.
+		respostas: 0,
+	};
+}
+
+/** Troca o estado da sessão. Outra sessão zera o uso (salvo o que o historico acabou de pôr) e os diagnósticos de execução. */
 function comSessao(estado: EstadoJanela, sessao: EstadoSessao): EstadoJanela {
 	const outraSessao = estado.sessao?.sessaoId !== sessao.sessaoId;
 	const extras = outraSessao
@@ -233,7 +254,8 @@ function comSessao(estado: EstadoJanela, sessao: EstadoSessao): EstadoJanela {
 		...estado,
 		sessao,
 		diagnosticos: [...sessao.diagnosticos, ...extras],
-		...(outraSessao ? { uso: usoZerado } : {}),
+		...(outraSessao && !estado.usoDoHistorico ? { uso: usoZerado } : {}),
+		usoDoHistorico: false,
 		// Os registros já reconstruídos do histórico desta sessão ficam (a resposta chega depois dele).
 		...(outraSessao && estado.sessaoDosPedidos !== sessao.sessaoId ? { registrosPedidos: {} } : {}),
 	};
@@ -346,7 +368,10 @@ export function conversaDoHistorico(itens: ItemHistorico[], contadorInicial = 0)
 	const ferramentas = new Map<string, number>();
 	for (const item of itens) {
 		if (item.papel === "usuario") {
-			conversa.push({ tipo: "usuario", chave: `h${++contador}`, texto: item.texto, ...(item.momento ? { momento: item.momento } : {}) });
+			conversa.push({ tipo: "usuario", chave: `h${++contador}`, texto: item.texto,
+				...(item.momento ? { momento: item.momento } : {}),
+				...(item.contextoTela ? { contextoTela: item.contextoTela } : {}),
+			});
 		} else if (item.papel === "assistente") {
 			if (item.texto || item.raciocinio || item.erro) {
 				conversa.push({
@@ -411,9 +436,20 @@ function aplicarEvento(estado: EstadoJanela, evento: EventoNucleo): EstadoJanela
 			return { ...estado, conversa: [...estado.conversa, item], contador };
 		}
 
-		// O contexto da tela da última mensagem (13.19): o WP2 o prende ao último item do usuário.
-		case "contexto_tela":
-			return estado;
+		// O contexto da tela chega logo depois do mensagem_usuario da mesma mensagem (13.19):
+		// prende o resumo ao último item do usuário, para cada mensagem manter o seu chip.
+		case "contexto_tela": {
+			let indice = -1;
+			for (let i = estado.conversa.length - 1; i >= 0; i--) {
+				if (estado.conversa[i]?.tipo === "usuario") {
+					indice = i;
+					break;
+				}
+			}
+			const alvo = estado.conversa[indice];
+			if (alvo?.tipo !== "usuario") return estado;
+			return { ...estado, conversa: substituir(estado.conversa, indice, { ...alvo, contextoTela: evento.contexto }) };
+		}
 
 		case "texto_delta":
 			return acrescentarDelta(estado, "texto", evento.delta);
@@ -578,6 +614,9 @@ export function reduzirJanela(estado: EstadoJanela, acao: AcaoJanela): EstadoJan
 				conversa,
 				contador,
 				...(reconstruido ?? {}),
+				// Com uso, é a soma do ramo inteiro da sessão; sem, zera como antes. Os "uso" ao vivo somam por cima.
+				uso: acao.uso ? usoSomadoDe(acao.uso) : usoZerado,
+				usoDoHistorico: acao.uso !== undefined,
 				pronto: true,
 				carregando: undefined,
 			};

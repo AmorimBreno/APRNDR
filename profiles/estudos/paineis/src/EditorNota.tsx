@@ -25,12 +25,15 @@ import { AlcaBlocos } from "./AlcaBlocos.tsx";
 import { BarraFormatacao } from "./BarraFormatacao.tsx";
 import { EditorFormula } from "./EditorFormula.tsx";
 import { type ArquivoMencionavel, META_TITULOS, materialDoAlvo } from "./mencao.ts";
+import { useTrocaSessao } from "./troca-sessao.tsx";
 
 type TipoFormula = "linha" | "bloco";
 
 import { mesmoTitulo, PAINEL_NOTAS, useNovasRespostas } from "./notas-ponte.ts";
 
 const ESPERA_SALVAR = 1500;
+/** Quanto a troca de sessão espera o salvamento terminar. */
+const PRAZO_ANTES_DE_TROCAR = 5000;
 const hora = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" });
 
 type Situacao =
@@ -130,6 +133,7 @@ function EditorDaNota(props: PropsEditorNota) {
 	const logica = useRef({
 		mudou: () => {},
 		salvarAgora: (_forcar?: boolean) => {},
+		salvarEEsperar: (): Promise<void> => Promise.resolve(),
 		editarFormula: (_tipo: TipoFormula, _latex: string, _posicao: number) => {},
 		abrirFormula: (_tipo: TipoFormula, _posicao: number) => {},
 		abrirMencao: (_alvo: string) => {},
@@ -203,9 +207,25 @@ function EditorDaNota(props: PropsEditorNota) {
 		temporizador.current = setTimeout(() => logica.current.salvarAgora(), ESPERA_SALVAR);
 	}
 
+	/**
+	 * Para a troca de sessão (antes de trocar): salva o que falta, sem esperar o temporizador, e só termina quando
+	 * não há salvamento em voo. Tem prazo: se a resposta não vier, a troca segue (o editor reabre a nota depois).
+	 */
+	const salvarEEsperar = async () => {
+		const prazo = Date.now() + PRAZO_ANTES_DE_TROCAR;
+		while (Date.now() < prazo) {
+			if (!emVoo.current && !renomeando.current) {
+				if (!mudouDoSalvo() || emConflito.current || somenteLeitura) return;
+				salvarAgora();
+			}
+			await new Promise((resolver) => setTimeout(resolver, 50));
+		}
+	};
+
 	logica.current = {
 		mudou,
 		salvarAgora,
+		salvarEEsperar,
 		editarFormula: (tipo, latex, posicao) => {
 			if (editor?.isEditable) setFormula({ tipo, posicao, latex, nova: false });
 		},
@@ -308,6 +328,27 @@ function EditorDaNota(props: PropsEditorNota) {
 		if (editor && sessaoId && !nota) abrir();
 		// Só editor e sessão: abre uma vez por sessão (abrir lê das refs).
 	}, [editor, sessaoId]);
+
+	// A mesa pede o salvamento antes de trocar a sessão da janela (a nota aberta fica aqui).
+	const { registrarAntesDeTrocar } = useTrocaSessao();
+	useEffect(() => registrarAntesDeTrocar(() => logica.current.salvarEEsperar()), [registrarAntesDeTrocar]);
+
+	// A sessão trocou com um salvamento em voo: a resposta dele voltaria pela ponte velha e nunca chegaria, e o
+	// editor ficaria preso em "salvando". Solta o salvamento e abre a nota de novo, que traz a versão do arquivo.
+	const sessaoVista = useRef(sessaoId);
+	useEffect(() => {
+		if (sessaoVista.current === sessaoId) return;
+		const anterior = sessaoVista.current;
+		sessaoVista.current = sessaoId;
+		// Sem nota carregada, o efeito de abrir acima já cuida.
+		if (!anterior || !sessaoId || !nota || (!emVoo.current && !renomeando.current)) return;
+		clearTimeout(temporizador.current);
+		emVoo.current = undefined;
+		renomeando.current = false;
+		renomearDepois.current = undefined;
+		pendente.current = false;
+		abrir();
+	}, [sessaoId]);
 
 	useNovasRespostas(janela.estado.acoesPorPainel[PAINEL_NOTAS], (resposta) => {
 		if (resposta.acao !== "lista" && resposta.dados.materia !== materiaId) return;

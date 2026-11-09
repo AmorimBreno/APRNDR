@@ -107,15 +107,16 @@ export function contextoDaMateria(materia: Materia): ContextoSessao {
  * conversa mais recente daquela matéria (ou uma nova, se ainda não houver);
  * com null, a conversa geral mais recente (sem matéria). Se a sessão aberta
  * já for a certa, não troca. Guarda a sessão na aba, para a janela de
- * conversa abrir nela.
+ * conversa abrir nela. `preferida` (a sessão lembrada da matéria) vale mais
+ * que a mais recente, se ainda estiver na lista.
  */
-export async function prepararConversa(janela: JanelaPerfilHook, perfilId: string, contexto: ContextoSessao | null): Promise<void> {
+export async function prepararConversa(janela: JanelaPerfilHook, perfilId: string, contexto: ContextoSessao | null, preferida?: string): Promise<void> {
 	const { estado, acoes } = janela;
 	const chave = contexto?.chave;
 	const atual = estado.sessao?.contexto;
 	if (estado.sessao && atual?.chave === chave && atual?.rotulo === contexto?.rotulo && atual?.cor === contexto?.cor) return;
 	const sessoes = await acoes.listarSessoes();
-	const ultima = sessoes.find((sessao) => sessao.contexto?.chave === chave);
+	const ultima = (preferida ? sessoes.find((sessao) => sessao.id === preferida) : undefined) ?? sessoes.find((sessao) => sessao.contexto?.chave === chave);
 	// Reabrindo, o contexto vai junto: se a matéria mudou de nome ou de cor, a conversa acompanha.
 	const aberta = ultima ? await acoes.abrirSessao(ultima.id, contexto ?? undefined) : await acoes.novaSessao(undefined, contexto);
 	guardarSessaoDoPerfil(perfilId, aberta.sessaoId);

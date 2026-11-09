@@ -13,6 +13,7 @@ import { Button, Icon, type OrnamentGlyph, pad2, Stat, SubjectWheel, type Subjec
 import { type ControleFaixaMarca, FaixaMarca, type JanelaPerfilHook, type PropsTelaInicial, semEsperar, type SituacaoMaterial } from "@estudos/ui";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { type Materia, pastaMateriaisRelativa } from "../../lib/materia-tipos.ts";
+import { continuarDeOndeParei, lerMemoria } from "./memoria-mesa.ts";
 import { dataCurta, lerAcoes, PAINEL_CADERNOS, prepararConversa, proximaProva, quando, rotuloCapa } from "./comum.ts";
 import { useAjustes } from "./ajustes-ponte.ts";
 import { useEscrita } from "./escrita-ponte.ts";
@@ -105,6 +106,9 @@ export function TelaCadernos(props: PropsTelaCadernos) {
 	// A matéria do meio da roda (a roda começa na primeira; na linha "Nova matéria", nenhuma).
 	const escolhida = props.escolhida ?? materias[0]?.id;
 	const materiaAtual = materias.find((materia) => materia.id === escolhida);
+	// A última matéria lembrada, se ainda existe (a memória é lida a cada render: é barata e muda em outra aba).
+	const continuar = lista ? continuarDeOndeParei(lerMemoria(props.perfilId), materias.map((materia) => materia.id)) : undefined;
+	const nomeContinuar = materias.find((materia) => materia.id === continuar?.materiaId)?.nome;
 	const problemaAoAbrir = !lista && !erro && estado.erros.at(-1)?.mensagem;
 	// A conversa geral (sem matéria): a mais recente, ou uma nova.
 	const conversarGeral = () => {
@@ -197,6 +201,17 @@ export function TelaCadernos(props: PropsTelaCadernos) {
 							<Icon name="book" size={18} strokeWidth={2.25} />
 							Escrita
 						</button>
+						{continuar ? (
+							<button
+								type="button"
+								className="tecla-papel button"
+								title={nomeContinuar ? `Voltar ao caderno de ${nomeContinuar}` : undefined}
+								onClick={() => sairE(() => props.navegar(continuar.caminho))()}
+							>
+								<Icon name="clock" size={18} strokeWidth={2.25} />
+								Continuar de onde parei
+							</button>
+						) : null}
 						<button type="button" className="tecla-papel button" onClick={conversarGeral} disabled={abrindoConversa} aria-busy={abrindoConversa}>
 							{abrindoConversa ? "Abrindo a conversa…" : "Conversa geral"}
 							<Icon name="arrow-right" size={18} strokeWidth={2.25} />

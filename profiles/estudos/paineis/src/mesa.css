@@ -3,20 +3,25 @@
  * estilo.css do perfil. Os pacotes da mesa (WP5a e WP5b) escrevem aqui; o
  * resto do perfil fica no estilo.css. */
 
-/* A grade: a área de estudo (1fr) e o professor (a largura vem da mola do Motion
- * em MesaEstudo.tsx: 0 fechado, ~440 px aberto). Sem gap: o respiro fica dentro do
- * painel, para a coluna fechada não deixar um vão. A mesa ocupa a tela do caderno toda
- * (a aba e o corpo da nota ou do módulo são desenhados dentro da área da esquerda). */
-.mesa { position: relative; grid-row: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) auto; min-width: 0; min-height: 0; height: 100%; overflow: hidden; }
-
-/* A esquerda é um contêiner: a nota e a lição respondem à largura que sobra, não à da janela. */
-.mesa__esquerda { container-type: inline-size; container-name: mesa-esquerda; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-/* Vazia, a faixa não ocupa espaço (o botão do professor só entra nela no módulo). */
-.mesa__faixa { display: flex; flex: none; align-items: center; gap: var(--space-3); min-width: 0; margin-bottom: var(--space-2); }
-.mesa__faixa:empty { display: none; }
+/* A grade da mesa (pedido do Breno, 2026-11-09): a barra do topo (a aba tijolo do
+ * caderno, ou a CourseBar no módulo) ocupa a largura toda; embaixo dela, o corpo da
+ * nota ou da lição à esquerda e o professor à direita, com 40 % da largura (a mola do
+ * Motion em MesaEstudo.tsx anima de 0 a --largura-professor). A esquerda e a área
+ * são display: contents: o primeiro filho da área (a barra) e o segundo (o corpo)
+ * viram itens desta grade, sem mudar a TelaCaderno nem a TelaModulo. A faixa só
+ * existe no módulo (o botão do professor); vazia, a linha dela tem altura zero. */
+.mesa {
+	position: relative; grid-row: 1 / -1; display: grid; min-width: 0; min-height: 0; height: 100%; overflow: hidden;
+	grid-template-columns: minmax(0, 1fr) auto;
+	grid-template-rows: auto auto minmax(0, 1fr);
+	grid-template-areas: "faixa faixa" "topo topo" "corpo professor";
+}
+.mesa__esquerda, .mesa__area { display: contents; }
+.mesa__faixa { grid-area: faixa; display: flex; align-items: center; gap: var(--space-3); min-width: 0; margin-bottom: var(--space-2); }
 .mesa__faixa-espaco { flex: 1; }
-/* Era o grid do .tela-caderno: aba/barra em cima e o corpo embaixo. */
-.mesa__area { flex: 1; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: var(--space-4); min-width: 0; min-height: 0; }
+.mesa__area > :first-child { grid-area: topo; margin-bottom: var(--space-4); min-width: 0; }
+/* O corpo é um contêiner: a nota e a lição respondem à largura que sobra ao lado do professor, não à da janela. */
+.mesa__area > :nth-child(2) { grid-area: corpo; container-type: inline-size; min-width: 0; min-height: 0; }
 
 /* O botão do professor: a foto, como na aba do caderno. */
 .mesa__professor-botao { flex: none; display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--radius-full); background: none; cursor: pointer; }
@@ -30,13 +35,14 @@
 
 /* O painel do professor. Em coluna: a largura anima de 0 ao valor aberto e o miolo tem
  * largura fixa, para a conversa não reflowar durante a mola. */
-.mesa__professor { min-width: 0; min-height: 0; overflow: hidden; }
+.mesa__professor { grid-area: professor; min-width: 0; min-height: 0; overflow: hidden; }
 /* O miolo é o cartão: mesma borda e fundo da nota do caderno; o respiro entre as colunas (o padding da tela do caderno) é a margem à esquerda. */
-.mesa__professor-miolo { box-sizing: border-box; display: flex; flex-direction: column; width: calc(440px - var(--space-4)); height: 100%; min-height: 0; margin-left: var(--space-4); overflow: hidden; border-radius: var(--radius-lg); background: var(--surface-panel); }
+.mesa__professor-miolo { box-sizing: border-box; display: flex; flex-direction: column; width: calc(var(--largura-professor, 440px) - var(--space-4)); height: 100%; min-height: 0; margin-left: var(--space-4); overflow: hidden; border-radius: var(--radius-lg); background: var(--surface-panel); }
 .mesa__professor-miolo > * { flex: 1; min-height: 0; }
 
-/* Gaveta (mesa abaixo de 1100 px): o professor por cima da esquerda, com fundo e sombra. */
-.mesa[data-modo="gaveta"] .mesa__professor, .mesa[data-modo="tela"] .mesa__professor { position: absolute; z-index: 5; top: 0; right: 0; bottom: 0; border-radius: var(--radius-lg); background: var(--surface-panel); box-shadow: var(--sticker-shadow), 0 0 0 var(--border-hair) var(--line-strong); }
+/* Gaveta (mesa abaixo de 1100 px): o professor por cima do corpo, abaixo da barra, com fundo e sombra
+ * (posicionado na linha do corpo: a grade é o bloco de referência do item absoluto). */
+.mesa[data-modo="gaveta"] .mesa__professor, .mesa[data-modo="tela"] .mesa__professor { grid-column: 1 / -1; grid-row: 3; position: absolute; z-index: 5; top: 0; right: 0; bottom: 0; border-radius: var(--radius-lg); background: var(--surface-panel); box-shadow: var(--sticker-shadow), 0 0 0 var(--border-hair) var(--line-strong); }
 .mesa[data-modo="gaveta"] .mesa__professor-miolo, .mesa[data-modo="tela"] .mesa__professor-miolo { width: 100%; margin-left: 0; }
 /* Abaixo de 760 px: um lado por vez; o painel aberto ocupa a tela toda. */
 .mesa[data-modo="tela"] .mesa__professor { left: 0; }

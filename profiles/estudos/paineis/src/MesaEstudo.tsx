@@ -20,14 +20,18 @@
 
 import { AvatarAgente, type DadosAvatarAgente, type PropsConversaEmbutida, semMovimento } from "@estudos/ui";
 import { motion } from "motion/react";
-import { type ComponentType, createContext, type ReactNode, type RefObject, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { type ComponentType, createContext, type CSSProperties, type ReactNode, type RefObject, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import type { Materia } from "../../lib/materia-tipos.ts";
 import { CabecalhoProfessor } from "./CabecalhoProfessor.tsx";
 
 type Modo = "lado" | "gaveta" | "tela";
 
 /** A largura do painel do professor, em px da interface (que roda a 90 %). */
-const LARGURA_PAINEL = 440;
+/** O professor ocupa 40 % da largura da mesa em coluna (pedido do Breno), sem ficar estreito demais para a conversa. */
+const FRACAO_PAINEL = 0.4;
+const LARGURA_MINIMA_PAINEL = 380;
+/** Na gaveta, o painel tem largura fixa por cima da esquerda. */
+const LARGURA_GAVETA = 440;
 const LIMITE_GAVETA = 1100;
 const LIMITE_TELA = 760;
 const MOLA = { type: "spring", stiffness: 420, damping: 40 } as const;
@@ -93,6 +97,7 @@ export function MesaEstudo(props: PropsMesaEstudo) {
 	const [aberto, setAberto] = useState(() => lerAberto(perfilId));
 	const [pendente, setPendente] = useState(false);
 	const [modo, setModo] = useState<Modo>("lado");
+	const [largura, setLargura] = useState(0);
 	const raiz = useRef<HTMLDivElement>(null);
 	const painel = useRef<HTMLElement>(null);
 	const botao = useRef<HTMLButtonElement>(null);
@@ -123,9 +128,13 @@ export function MesaEstudo(props: PropsMesaEstudo) {
 	useLayoutEffect(() => {
 		const elemento = raiz.current;
 		if (!elemento) return;
-		setModo(modoPelaLargura(elemento.clientWidth));
+		const medir = (valor: number) => {
+			setModo(modoPelaLargura(valor));
+			setLargura(valor);
+		};
+		medir(elemento.clientWidth);
 		const observador = new ResizeObserver(([entrada]) => {
-			if (entrada) setModo(modoPelaLargura(entrada.contentRect.width));
+			if (entrada) medir(entrada.contentRect.width);
 		});
 		observador.observe(elemento);
 		return () => observador.disconnect();
@@ -147,15 +156,29 @@ export function MesaEstudo(props: PropsMesaEstudo) {
 	}, [aberto]);
 
 	// Largura do painel por modo: coluna (0 quando fechado), gaveta ou tela inteira.
-	const larguraAberta = modo === "tela" ? "100%" : `min(${LARGURA_PAINEL}px, 100%)`;
-	const animar = modo === "lado" ? { width: aberto ? LARGURA_PAINEL : 0, x: 0 } : { width: larguraAberta, x: aberto ? 0 : "105%" };
+	const larguraColuna = Math.max(LARGURA_MINIMA_PAINEL, Math.round(largura * FRACAO_PAINEL));
+	const larguraAberta = modo === "tela" ? "100%" : `min(${LARGURA_GAVETA}px, 100%)`;
+	const animar = modo === "lado" ? { width: aberto ? larguraColuna : 0, x: 0 } : { width: larguraAberta, x: aberto ? 0 : "105%" };
 	const pulsa = pendente && !aberto && !parado;
+	// Só abrir e fechar animam: a largura que muda com a medida da mesa (ao carregar,
+	// ao redimensionar a janela) entra direto, sem a mola passar por um valor provisório.
+	const abertoAnterior = useRef(aberto);
+	const abrindoOuFechando = abertoAnterior.current !== aberto;
+	useEffect(() => {
+		abertoAnterior.current = aberto;
+	}, [aberto]);
 
 	const contexto: ProfessorDaMesa | undefined = Conversa ? { aberto, pendente, pulsa, alternar, idPainel, botao } : undefined;
 
 	return (
 		<ContextoProfessor.Provider value={contexto}>
-		<div ref={raiz} className="mesa" data-modo={modo} data-aberta={aberto ? "sim" : "nao"}>
+		<div
+			ref={raiz}
+			className="mesa"
+			data-modo={modo}
+			data-aberta={aberto ? "sim" : "nao"}
+			style={{ "--largura-professor": `${modo === "lado" ? larguraColuna : LARGURA_GAVETA}px` } as CSSProperties}
+		>
 			<div className="mesa__esquerda">
 				{Conversa && props.botaoNaFaixa ? (
 					<div className="mesa__faixa">
@@ -184,7 +207,7 @@ export function MesaEstudo(props: PropsMesaEstudo) {
 					aria-label="Professor"
 					initial={false}
 					animate={animar}
-					transition={parado ? { duration: 0 } : MOLA}
+					transition={parado || !abrindoOuFechando ? { duration: 0 } : MOLA}
 				>
 					<div className="mesa__professor-miolo">
 						<Conversa

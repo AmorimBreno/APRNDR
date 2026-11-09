@@ -542,7 +542,15 @@ function LicaoAberta(props: {
 		const alvo = artigo.current?.querySelector<HTMLElement>(`[data-bloco="${CSS.escape(id)}"]`);
 		if (!alvo) return;
 		setAtual(id);
-		alvo.scrollIntoView({ block: "start", behavior: semMovimento() ? "auto" : "smooth" });
+		// O painel do professor fica ao lado: rola só o corpo do módulo (o contêiner), nunca a página.
+		const corpoRolavel = alvo.closest<HTMLElement>(".modulo__corpo");
+		const comportamento = semMovimento() ? "auto" : "smooth";
+		if (corpoRolavel)
+			corpoRolavel.scrollTo({
+				top: alvo.getBoundingClientRect().top - corpoRolavel.getBoundingClientRect().top + corpoRolavel.scrollTop,
+				behavior: comportamento,
+			});
+		else alvo.scrollIntoView({ block: "start", behavior: comportamento });
 	};
 	const fecharAviso = () => {
 		setAviso(false);
@@ -563,7 +571,16 @@ function LicaoAberta(props: {
 	useEffect(() => {
 		if (!irAoRelatorio || !ultima) return;
 		const quadro = requestAnimationFrame(() => {
-			document.getElementById(ID_RELATORIO)?.scrollIntoView({ block: "start", behavior: semMovimento() ? "auto" : "smooth" });
+			// Mesmo caso do índice: o painel do professor fica ao lado, então rola só o corpo do módulo.
+			const secao = document.getElementById(ID_RELATORIO);
+			const corpoRolavel = secao?.closest<HTMLElement>(".modulo__corpo");
+			const comportamento = semMovimento() ? "auto" : "smooth";
+			if (secao && corpoRolavel)
+				corpoRolavel.scrollTo({
+					top: secao.getBoundingClientRect().top - corpoRolavel.getBoundingClientRect().top + corpoRolavel.scrollTop,
+					behavior: comportamento,
+				});
+			else secao?.scrollIntoView({ block: "start", behavior: comportamento });
 			setIrAoRelatorio(false);
 		});
 		return () => cancelAnimationFrame(quadro);

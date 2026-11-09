@@ -155,7 +155,11 @@ export function TermoChave({ termo, acoes, children }: { termo: TermoNaTela; aco
 		const tecla = (evento: KeyboardEvent) => {
 			if (evento.key === "Escape") fechar();
 		};
-		const rolar = () => setAlvo(botao.current?.getBoundingClientRect());
+		const rolar = (evento: Event) => {
+			// O painel do professor rola ao lado: só a rolagem que contém o botão do termo realinha o cartão.
+			if (evento.target instanceof Node && !(evento.target === document || evento.target.contains(botao.current))) return;
+			setAlvo(botao.current?.getBoundingClientRect());
+		};
 		document.addEventListener("pointerdown", fora);
 		document.addEventListener("keydown", tecla);
 		document.addEventListener("scroll", rolar, true);
@@ -255,9 +259,15 @@ export function TextoComTermos({ bloco, licao, children }: { bloco: string; lica
 			setSelecao({ trecho, alvo: range.getBoundingClientRect() });
 		};
 		const tecla = (e: KeyboardEvent) => {
+			// Esc no painel do professor (chat) não apaga a seleção feita no texto da página.
+			if (e.target instanceof Element && e.target.closest(".mesa__professor")) return;
 			if (e.key === "Escape") setSelecao(undefined);
 		};
-		const rolar = () => setSelecao(undefined);
+		const rolar = (evento: Event) => {
+			// A rolagem do painel do professor não pode apagar a seleção: só a que contém o texto da página.
+			if (evento.target instanceof Node && !(evento.target === document || evento.target.contains(raiz.current))) return;
+			setSelecao(undefined);
+		};
 		document.addEventListener("selectionchange", conferir);
 		document.addEventListener("keydown", tecla);
 		document.addEventListener("scroll", rolar, true);
@@ -478,7 +488,17 @@ export function useDestinoTermo(chave: string, modulo: string, licao: string | u
 				if (grupo) grupo.open = true;
 			}
 			const alvo = pedido ?? bloco;
-			alvo.scrollIntoView({ block: "center", behavior: semMovimento() ? "auto" : "smooth" });
+			// O painel do professor fica ao lado: rola só o corpo do módulo, nunca a página nem a coluna do chat.
+			const corpoRolavel = alvo.closest<HTMLElement>(".modulo__corpo");
+			const comportamento = semMovimento() ? "auto" : "smooth";
+			if (corpoRolavel) {
+				const caixa = corpoRolavel.getBoundingClientRect();
+				const posicao = alvo.getBoundingClientRect();
+				corpoRolavel.scrollTo({
+					top: posicao.top - caixa.top + corpoRolavel.scrollTop - corpoRolavel.clientHeight / 2 + posicao.height / 2,
+					behavior: comportamento,
+				});
+			} else alvo.scrollIntoView({ block: "center", behavior: comportamento });
 			alvo.classList.remove("termos-destino");
 			void alvo.offsetWidth;
 			alvo.classList.add("termos-destino");

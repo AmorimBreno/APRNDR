@@ -238,8 +238,11 @@
 .editor-nota__folha { flex: 1; }
 .editor-nota__folha--escondida { display: none; }
 .editor-nota__texto { min-height: 40vh; outline: none; caret-color: var(--amber); }
-@media (max-width: 760px) {
+/* A página responde à largura do corpo da nota (o contêiner), não à da janela: o painel do professor ocupa o lado. */
+@container (max-width: 760px) {
 	.editor-nota__pagina { padding: 0 var(--space-2) 0 40px; }
+}
+@media (max-width: 760px) {
 	.editor-nota__titulo { font-size: 28px; line-height: 36px; }
 }
 .editor-nota__texto h1 { font-size: 26px; line-height: 34px; }
@@ -949,6 +952,7 @@
  * e, embaixo, o índice das lições à esquerda (fixo ao rolar) e a lição à direita, centrada, com a
  * SectionRuler na margem e os blocos na coluna de leitura. No contêiner estreito, o índice vira fichas por cima. ── */
 .aba-modulo .ap-cbar__track { min-width: 0; }
+/* Na mesa, a CourseBar ocupa a largura toda acima do professor (mesa.css): não precisa de um modo compacto. */
 .aba-modulo .ap-cbar__kicker { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .modulo__corpo { container-type: inline-size; }
 .modulo__grade { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: var(--space-6); }

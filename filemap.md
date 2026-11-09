@@ -135,6 +135,7 @@ packages/ui/src/visual/FaixaMarca.tsx — faixa escura da esquerda (Wordmark, le
 apps/web/src/telas/TelaPerfis.tsx — tela inicial: um card por perfil, até 4 numa linha com a altura da tela (1 ou 2 com metade da largura cada) (capa no papel, nome, ideograma, barra que enche no hover, lema, selo), perfis com erro, servidor fora do ar
 apps/web/src/telas/TelaCarregando.tsx — tela enquanto a sessão do perfil é montada: etapa atual, aviso de conexão e erros
 apps/web/src/telas/JanelaPerfil.tsx — janela do perfil: barra tijolo (Perfis, SeletorAgente, SeletorModelo, custo, recarregar, painéis), histórico, conversa como documento com os botões dos pedidos e a barra de pergunta, modal do pedido (abre sozinho, minimiza, revisa), avisos, erros, diagnósticos e área de painéis (abre sozinha quando um painel dela recebe algo)
+apps/web/src/telas/PainelConversa.tsx — o painel da conversa em dois modos: "cheio" (a coluna do meio da JanelaPerfil) e "embutido" (a mesa de estudo; hidden e inert quando fechado): documento, barra de pergunta com citação, modal dos pedidos com o voo, avisos, erros e diagnósticos
 apps/web/src/App.tsx — rotas por hash: #/ = perfis, #/perfil/<id> = tela inicial do perfil (se houver) ou conversa, #/perfil/<id>/conversa = conversa de perfil com tela inicial; as telas de um perfil ficam dentro do ProvedorImagens dele
 apps/web/src/App.test.ts — teste da leitura do hash
 apps/web/src/telas-iniciais.ts — registro das telas iniciais dos perfis (estudos = cadernos)
@@ -259,6 +260,8 @@ profiles/estudos/paineis/src/ModalMateria.tsx — modal de criar ou editar a mat
 profiles/estudos/paineis/src/comum.ts — o painel "cadernos" da ponte, a leitura das ações da extensão, as contas de prova, o contexto da conversa da matéria (com a instrução de ler o mapa com ler_mapa_conteudo e os cursos com ler_curso) e prepararConversa (abre a conversa da matéria ou a geral antes de ir para ela)
 profiles/estudos/paineis/src/abas-mesa.ts — as abas da mesa de estudo, puro: abaDoCaminho (nota pela rota; lição pelo módulo), abrirAba (até LIMITE_ABAS_MESA), fecharAba e guardarRolagem; e o teste
 profiles/estudos/paineis/src/sessao-materia.ts — quando a mesa troca a sessão para a conversa da matéria, puro: decidirSessao (só na entrada, esperando resposta e pedido; fora dela avisa outra aba) e chaveDaMateria; e o teste
+profiles/estudos/paineis/src/troca-sessao.tsx — contexto do React com a situação da troca de sessão da mesa (pronta, trocando, esperando_resposta, outra_aba), voltarParaMateria, registrarAntesDeTrocar e executarAntesDeTrocar; a TelaEstudos fornece
+profiles/estudos/paineis/src/memoria-mesa.ts — memória da mesa no localStorage, por perfil: a última matéria, o último caminho em cada matéria e a última sessão de cada matéria (Continuar de onde parei); e o teste
 profiles/estudos/paineis/src/licao-texto.ts — textoDaLicao, o texto da lição aberta para o professor com o olho aberto, sem gabarito, rubrica, respostas nem versões anteriores; contrato do WP0 e teste pulado até o WP6
 profiles/estudos/paineis/src/vendo.ts — contrato do que está aberto na mesa (FonteVendo, ValorVendo, LIMITE_CONTEUDO_VENDO); o provedor vem no WP5b
 profiles/estudos/paineis/src/mesa.css — estilos da mesa de estudo, importado pelo estilo.css do perfil

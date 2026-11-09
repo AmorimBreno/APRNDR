@@ -7,6 +7,7 @@ import { Icon, pad2, StudentNote, Tag } from "@estudos/design-system";
 import { AnimatePresence, animate, motion } from "motion/react";
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ChamadaFerramenta, ItemConversa } from "../estado-janela.ts";
+import type { ResumoContextoTela } from "../tipos.ts";
 import { AvatarUsuario } from "./Avatares.tsx";
 import { InfoResposta } from "./InfoResposta.tsx";
 import { Markdown } from "./Markdown.tsx";
@@ -344,6 +345,65 @@ function NotaUsuario({ texto, voo, aoPousar }: { texto: string; voo?: Voo; aoPou
 	);
 }
 
+const TRACO_ICONE = { fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "square", strokeLinejoin: "miter" } as const;
+
+/** O olho do chip (o design system ainda não tem): aberto = o conteúdo da tela foi junto; fechado = só o rótulo. */
+function IconeOlho({ aberto }: { aberto: boolean }) {
+	return (
+		<svg className="chip-contexto__icone" viewBox="0 0 24 24" width={14} height={14} aria-hidden="true" {...TRACO_ICONE}>
+			{aberto ? (
+				<>
+					<path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z" />
+					<circle cx="12" cy="12" r="2.75" />
+				</>
+			) : (
+				<>
+					<path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z" />
+					<path d="M4 20L20 4" />
+				</>
+			)}
+		</svg>
+	);
+}
+
+/** Aspas: houve um trecho citado junto da mensagem. */
+function IconeTrecho() {
+	return (
+		<svg className="chip-contexto__icone" viewBox="0 0 24 24" width={14} height={14} aria-hidden="true" {...TRACO_ICONE}>
+			<path d="M4 6h6v6H4zM14 6h6v6h-6zM7 12v4M17 12v4" />
+		</svg>
+	);
+}
+
+/**
+ * O que a tela mostrava quando a mensagem foi mandada (só o resumo, nunca o
+ * conteúdo): o rótulo, o olho, "parcial" se o conteúdo foi cortado e o sinal
+ * do trecho citado (o trecho no title). Genérico: quem decide o que é o
+ * rótulo é o perfil.
+ */
+function ChipContexto({ contexto }: { contexto: ResumoContextoTela }) {
+	const olho = contexto.olho;
+	return (
+		<div className="chip-contexto-linha">
+			<span
+				className="chip-contexto"
+				title={`${contexto.rotulo} · ${olho ? "conteúdo enviado junto" : "só o rótulo foi junto"}`}
+			>
+				<span className="chip-contexto__rotulo">{contexto.rotulo}</span>
+				<span className="chip-contexto__sinal" role="img" aria-label={olho ? "Olho aberto" : "Olho fechado"}>
+					<IconeOlho aberto={olho} />
+				</span>
+				{contexto.parcial ? <span className="chip-contexto__parcial overline">parcial</span> : null}
+				{contexto.selecao ? (
+					<span className="chip-contexto__sinal" role="img" aria-label="Trecho citado" title={contexto.selecao}>
+						<IconeTrecho />
+					</span>
+				) : null}
+			</span>
+		</div>
+	);
+}
+
 /** Invólucro de cada item: os que chegam ao vivo entram subindo com mola. */
 function Item({ chave, tipo, children, entrar = true }: { chave: string; tipo: string; children: ReactNode; entrar?: boolean }) {
 	return (
@@ -358,12 +418,69 @@ function Item({ chave, tipo, children, entrar = true }: { chave: string; tipo: s
 	);
 }
 
-/** Coluna da conversa; rola até o fim quando chega algo novo. */
+/** Perto do fim = a menos disso (px): daí a conversa acompanha o que chega. */
+const PERTO_DO_FIM = 120;
+
+/** O ancestral que rola de verdade (a coluna da janela, o painel da mesa), não a página. */
+function ancestralQueRola(elemento: HTMLElement | null): HTMLElement | undefined {
+	for (let pai = elemento?.parentElement; pai; pai = pai.parentElement) {
+		const rolagem = getComputedStyle(pai).overflowY;
+		if (rolagem === "auto" || rolagem === "scroll") return pai;
+	}
+	return undefined;
+}
+
+/**
+ * Coluna da conversa; acompanha o fim quando chega algo novo, mas só se ela já
+ * estava perto dele. Rola o contêiner (scrollTo), nunca a página: uma coluna ao
+ * lado não se mexe, e quem subiu para ler não é puxado de volta. Mandar uma
+ * mensagem sempre leva ao fim.
+ */
 export function DocumentoConversa({ conversa, vazio, pedidoDaChamada, depois, autorDaResposta, aguardando, voo, aoPousar }: PropsDocumentoConversa) {
 	const fim = useRef<HTMLDivElement>(null);
+	/** Estava perto do fim antes do conteúdo crescer; atualizado a cada rolagem do leitor. */
+	const pertoDoFim = useRef(true);
+	const primeiraChave = conversa[0]?.chave;
+	const ultimo = conversa.at(-1);
+	const ultimaChave = ultimo?.chave;
+	const ultimoEhUsuario = ultimo?.tipo === "usuario";
+	const chaveAnterior = useRef<string | undefined>(undefined);
+	const inicioAnterior = useRef<string | undefined>(undefined);
+
 	useEffect(() => {
-		fim.current?.scrollIntoView({ block: "end" });
-	}, [conversa]);
+		const rolagem = ancestralQueRola(fim.current);
+		if (!rolagem) return;
+		const medir = () => {
+			pertoDoFim.current = rolagem.scrollHeight - rolagem.scrollTop - rolagem.clientHeight < PERTO_DO_FIM;
+		};
+		const irAoFim = () => rolagem.scrollTo({ top: rolagem.scrollHeight });
+		rolagem.addEventListener("scroll", medir, { passive: true });
+		// Um painel escondido (display: none) perde a rolagem; ao reaparecer, volta ao fim se estava lá.
+		let alturaAntes = rolagem.clientHeight;
+		const observador =
+			typeof ResizeObserver === "function"
+				? new ResizeObserver(() => {
+						if (alturaAntes === 0 && rolagem.clientHeight > 0 && pertoDoFim.current) irAoFim();
+						alturaAntes = rolagem.clientHeight;
+					})
+				: undefined;
+		observador?.observe(rolagem);
+		return () => {
+			rolagem.removeEventListener("scroll", medir);
+			observador?.disconnect();
+		};
+	}, []);
+
+	useEffect(() => {
+		const rolagem = ancestralQueRola(fim.current);
+		// Outra conversa (sessão trocada): começa no fim, como uma aberta agora.
+		if (inicioAnterior.current !== primeiraChave) pertoDoFim.current = true;
+		const nova = chaveAnterior.current !== ultimaChave;
+		if (nova && ultimoEhUsuario && chaveAnterior.current !== undefined) pertoDoFim.current = true;
+		inicioAnterior.current = primeiraChave;
+		chaveAnterior.current = ultimaChave;
+		if (rolagem && pertoDoFim.current) rolagem.scrollTo({ top: rolagem.scrollHeight });
+	}, [conversa, primeiraChave, ultimaChave, ultimoEhUsuario]);
 
 	let numero = 0;
 	return (
@@ -382,6 +499,7 @@ export function DocumentoConversa({ conversa, vazio, pedidoDaChamada, depois, au
 					// A nota não entra subindo: quem traz ela é o voo (ou ela já estava lá).
 					return (
 						<div key={item.chave} className="documento__item documento__item--usuario">
+							{item.contextoTela ? <ChipContexto contexto={item.contextoTela} /> : null}
 							<NotaUsuario
 								texto={item.texto}
 								{...(voo && aoVivo(item.chave) ? { voo } : {})}

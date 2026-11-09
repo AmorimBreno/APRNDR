@@ -407,3 +407,17 @@ code.codigo-em-linha, .ap-prose code.codigo-em-linha { padding: .1em .35em; bord
 .estrutura .matriz td { padding: 0; border: 0; vertical-align: middle; }
 .estrutura .matriz th { padding: 0 var(--space-1); border: 0; color: inherit; font-family: var(--font-mono); font-size: 11px; line-height: 14px; font-weight: 500; letter-spacing: 0; text-align: center; vertical-align: middle; opacity: .7; }
 .estrutura .matriz tbody th { text-align: right; }
+
+/* ── Chip do contexto da tela, em cima da mensagem do usuário ── */
+
+.chip-contexto-linha { display: flex; justify-content: flex-end; margin-bottom: var(--space-1); }
+.chip-contexto { display: inline-flex; align-items: center; gap: var(--space-2); max-width: min(100%, 360px); padding: 2px var(--space-2); border: var(--border-hair) solid var(--line-strong); border-radius: var(--radius-full); color: var(--ink-muted); }
+.chip-contexto__rotulo { min-width: 0; overflow: hidden; font-size: 12px; line-height: 18px; white-space: nowrap; text-overflow: ellipsis; }
+.chip-contexto__sinal { flex: none; display: inline-grid; place-items: center; }
+.chip-contexto__parcial { flex: none; color: var(--ink); }
+
+/* ── Citação acima do campo (trecho que vai junto da próxima mensagem) ── */
+
+.barra__citacao { display: flex; align-items: center; gap: var(--space-2); min-width: 0; padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3); border-left: var(--border-strong) solid var(--amber); border-radius: var(--radius-sm); background: var(--amber-tint); color: var(--ink); }
+.barra__citacao > .ap-icon { flex: none; color: var(--ink-muted); }
+.barra__citacao-texto { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }

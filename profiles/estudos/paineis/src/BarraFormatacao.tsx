@@ -54,9 +54,11 @@ export interface PropsBarraFormatacao {
 	editor: Editor;
 	/** Abre o editor de fórmula para a fórmula na linha que está na posição. */
 	editarFormula(latex: string, posicao: number): void;
+	/** Um grupo de ações no fim da mesma linha, depois de um fio (as perguntas ao professor, na mesa). */
+	extra?: ReactNode;
 }
 
-export function BarraFormatacao({ editor, editarFormula }: PropsBarraFormatacao) {
+export function BarraFormatacao({ editor, editarFormula, extra }: PropsBarraFormatacao) {
 	const estado = useEditorState({
 		editor,
 		selector: ({ editor: atual }) => ({
@@ -154,6 +156,12 @@ export function BarraFormatacao({ editor, editarFormula }: PropsBarraFormatacao)
 					<span className="barra-formatacao__elo" aria-hidden="true" />
 				</button>
 				{botao("Limpar a formatação", false, () => editor.chain().focus().unsetAllMarks().run(), <span className="barra-formatacao__limpar">T<sub>x</sub></span>)}
+				{extra ? (
+					<>
+						<span className="barra-formatacao__fio" aria-hidden="true" />
+						{extra}
+					</>
+				) : null}
 			</div>
 			{aberto === "tipo" ? <ListaTipos editor={editor} atual={tipoAtual.id} fechar={() => setAberto(undefined)} /> : null}
 			{aberto === "cor" ? <PaletaCores editor={editor} cor={estado.cor} fundo={estado.fundo} /> : null}

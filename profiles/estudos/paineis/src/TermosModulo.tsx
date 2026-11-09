@@ -3,9 +3,7 @@
 // da rolagem, com coordenadas corrigidas pelo zoom de 90% da interface.
 import { Button, Icon, Modal } from "@estudos/design-system";
 import { Markdown, ProvedorLigacoesMarkdown, semMovimento } from "@estudos/ui";
-import { motion } from "motion/react";
-import { createContext, type ReactNode, type RefObject, useContext, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { createContext, type ReactNode, useContext, useEffect, useId, useRef, useState } from "react";
 import type { Modulo } from "../../lib/modulo-tipos.ts";
 import {
 	explicacoesDoBloco,
@@ -20,7 +18,9 @@ import {
 	type TermoNaTela,
 	type TipoExplicacao,
 } from "../../lib/termos-tipos.ts";
-import { noProprioBloco, posicionarFlutuante, rotuloDoLugar, trechoDaSelecao, type Retangulo } from "./termos-tela.ts";
+import { BarraSelecao, Flutuante, useSelecaoDoDocumento } from "./BarraSelecao.tsx";
+import { valeParaTermos } from "./selecao.ts";
+import { noProprioBloco, rotuloDoLugar, type Retangulo } from "./termos-tela.ts";
 
 export interface AcoesTermos {
 	modulo: string;
@@ -56,69 +56,6 @@ export function ProvedorTermos({ acoes, children }: { acoes: AcoesTermos; childr
 		<Contexto.Provider value={acoes}>
 			<ProvedorLigacoesMarkdown ligacoes={ligacoes}>{children}</ProvedorLigacoesMarkdown>
 		</Contexto.Provider>
-	);
-}
-
-function Flutuante({
-	alvo,
-	children,
-	classe,
-	referencia,
-	tooltipId,
-}: {
-	alvo: Retangulo;
-	children: ReactNode;
-	classe: string;
-	referencia?: RefObject<HTMLDivElement | null>;
-	tooltipId?: string;
-}) {
-	const propria = useRef<HTMLDivElement>(null);
-	const ref = referencia ?? propria;
-	const [medidas, setMedidas] = useState({ largura: 360, altura: 180 });
-	const [tela, setTela] = useState({ largura: window.innerWidth, altura: window.innerHeight });
-	const zoom = Number.parseFloat(getComputedStyle(document.body).zoom) || 1;
-	useLayoutEffect(() => {
-		const elemento = ref.current;
-		if (!elemento) return;
-		const medir = () => {
-			const r = elemento.getBoundingClientRect();
-			setMedidas({ largura: r.width, altura: r.height });
-		};
-		medir();
-		const observer = new ResizeObserver(medir);
-		observer.observe(elemento);
-		const resize = () => setTela({ largura: window.innerWidth, altura: window.innerHeight });
-		window.addEventListener("resize", resize);
-		return () => {
-			observer.disconnect();
-			window.removeEventListener("resize", resize);
-		};
-	}, [ref]);
-	const pos = posicionarFlutuante(alvo, medidas.largura, medidas.altura, tela);
-	return createPortal(
-		<motion.div
-			ref={ref}
-			id={tooltipId}
-			role={tooltipId ? "tooltip" : "toolbar"}
-			aria-label={tooltipId ? undefined : "Pedir explicação"}
-			className={`${classe}${pos.abaixo ? ` ${classe}--abaixo` : ""}`}
-			style={
-				{
-					position: "fixed",
-					left: pos.left / zoom,
-					top: pos.top / zoom,
-					maxWidth: (tela.largura - 24) / zoom,
-					maxHeight: (tela.altura - 24) / zoom,
-					"--termo-seta": `${pos.seta / zoom}px`,
-				} as React.CSSProperties
-			}
-			initial={semMovimento() ? false : { opacity: 0, y: 4, scale: 0.98 }}
-			animate={{ opacity: 1, y: 0, scale: 1 }}
-			transition={{ type: "spring", stiffness: 420, damping: 32 }}
-		>
-			{children}
-		</motion.div>,
-		document.body,
 	);
 }
 
@@ -219,64 +156,42 @@ export function TermoChave({ termo, acoes, children }: { termo: TermoNaTela; aco
 	);
 }
 
-/** Só o conteúdo didático participa da seleção, nunca campos, feedback ou respostas do aluno. */
+/**
+ * Só o conteúdo didático participa da seleção, nunca campos, feedback ou respostas do aluno.
+ * A barra única (BarraSelecao) junta os pedidos dos termos, que ficam com o limite de 300
+ * caracteres do trecho, e as perguntas ao professor (1 a 2000), quando a lição está na mesa.
+ */
 export function TextoComTermos({ bloco, licao, children }: { bloco: string; licao: string; children: ReactNode }) {
 	const acoes = useContext(Contexto);
 	const raiz = useRef<HTMLDivElement>(null);
-	const barra = useRef<HTMLDivElement>(null);
-	const [selecao, setSelecao] = useState<{ trecho: string; alvo: Retangulo }>();
 	const [erro, setErro] = useState<string>();
 	const [enviando, setEnviando] = useState(false);
-	useEffect(() => {
-		if (!acoes) return;
-		const conferir = () => {
-			const s = window.getSelection();
-			if (!s || s.isCollapsed || s.rangeCount !== 1) {
-				setSelecao(undefined);
-				return;
-			}
-			const range = s.getRangeAt(0);
-			const elemento = (no: Node) => (no.nodeType === Node.ELEMENT_NODE ? (no as Element) : no.parentElement);
-			const inicio = elemento(range.startContainer);
-			const fim = elemento(range.endContainer);
-			const primeiro = inicio?.closest<HTMLElement>("[data-texto-estudo]");
-			const ultimo = fim?.closest<HTMLElement>("[data-texto-estudo]");
-			const trecho = trechoDaSelecao(s.toString(), primeiro?.dataset.textoEstudo, ultimo?.dataset.textoEstudo);
-			const proibido =
-				"textarea,input,[contenteditable=true],.diag__sua-resposta,.modulo__campo,.modulo__confianca,.modulo__questao-botoes";
-			const cruzaProibido = raiz.current && [...raiz.current.querySelectorAll(proibido)].some((e) => range.intersectsNode(e));
-			if (
-				!trecho ||
-				primeiro !== raiz.current ||
-				ultimo !== raiz.current ||
-				inicio?.closest(proibido) ||
-				fim?.closest(proibido) ||
-				cruzaProibido
-			) {
-				setSelecao(undefined);
-				return;
-			}
-			setSelecao({ trecho, alvo: range.getBoundingClientRect() });
-		};
-		const tecla = (e: KeyboardEvent) => {
-			// Esc no painel do professor (chat) não apaga a seleção feita no texto da página.
-			if (e.target instanceof Element && e.target.closest(".mesa__professor")) return;
-			if (e.key === "Escape") setSelecao(undefined);
-		};
-		const rolar = (evento: Event) => {
-			// A rolagem do painel do professor não pode apagar a seleção: só a que contém o texto da página.
-			if (evento.target instanceof Node && !(evento.target === document || evento.target.contains(raiz.current))) return;
-			setSelecao(undefined);
-		};
-		document.addEventListener("selectionchange", conferir);
-		document.addEventListener("keydown", tecla);
-		document.addEventListener("scroll", rolar, true);
-		return () => {
-			document.removeEventListener("selectionchange", conferir);
-			document.removeEventListener("keydown", tecla);
-			document.removeEventListener("scroll", rolar, true);
-		};
-	}, [acoes, bloco, licao]);
+	const { selecao, limpar } = useSelecaoDoDocumento(raiz, { ativo: Boolean(acoes) });
+	const termos =
+		acoes && selecao && valeParaTermos(selecao.trecho) ? (
+			<span className="selecao-perguntas" role="group" aria-label="Pedir explicação do trecho">
+				{TIPOS_EXPLICACAO.map((tipo) => (
+					<button
+						key={tipo}
+						type="button"
+						data-selecao-item=""
+						className="selecao-barra__botao"
+						disabled={enviando}
+						onClick={() => {
+							setEnviando(true);
+							setErro(undefined);
+							acoes
+								.explicar(licao, bloco, selecao.trecho, tipo)
+								.then(limpar)
+								.catch((e: unknown) => setErro(e instanceof Error ? e.message : String(e)))
+								.finally(() => setEnviando(false));
+						}}
+					>
+						{NOMES_TIPO_EXPLICACAO[tipo]}
+					</button>
+				))}
+			</span>
+		) : null;
 	return (
 		<div ref={raiz} data-texto-estudo={bloco} data-licao={licao}>
 			{children}
@@ -285,34 +200,7 @@ export function TextoComTermos({ bloco, licao, children }: { bloco: string; lica
 					{erro}
 				</p>
 			) : null}
-			{selecao && acoes ? (
-				<Flutuante alvo={selecao.alvo} classe="termos-selecao" referencia={barra}>
-					<div onMouseDown={(e) => e.preventDefault()}>
-						{TIPOS_EXPLICACAO.map((tipo) => (
-							<Button
-								key={tipo}
-								variant="ghost"
-								size="sm"
-								disabled={enviando}
-								onClick={() => {
-									setEnviando(true);
-									setErro(undefined);
-									acoes
-										.explicar(licao, bloco, selecao.trecho, tipo)
-										.then(() => {
-											setSelecao(undefined);
-											window.getSelection()?.removeAllRanges();
-										})
-										.catch((e: unknown) => setErro(e instanceof Error ? e.message : String(e)))
-										.finally(() => setEnviando(false));
-								}}
-							>
-								{NOMES_TIPO_EXPLICACAO[tipo]}
-							</Button>
-						))}
-					</div>
-				</Flutuante>
-			) : null}
+			<BarraSelecao selecao={selecao} limpar={limpar} extras={termos} />
 		</div>
 	);
 }

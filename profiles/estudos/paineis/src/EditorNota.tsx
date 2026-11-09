@@ -16,22 +16,27 @@
 import { Button, Callout, Icon, Modal } from "@estudos/design-system";
 import type { JanelaPerfilHook } from "@estudos/ui";
 import { TextSelection } from "@tiptap/pm/state";
-import { EditorContent, useEditor } from "@tiptap/react";
+import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import { type KeyboardEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { conferirTitulo, type NotaAberta, TAMANHO_TITULO, temHtmlDesconhecido } from "../../lib/nota-tipos.ts";
 import { carregarNoEditor, extensoesDaNota, markdownDaNota } from "./editor-nota.ts";
 import { AlcaBlocos } from "./AlcaBlocos.tsx";
 import { BarraFormatacao } from "./BarraFormatacao.tsx";
+import { AcoesDePergunta, BarraSelecao, useSelecaoDoDocumento } from "./BarraSelecao.tsx";
 import { EditorFormula } from "./EditorFormula.tsx";
 import { type ArquivoMencionavel, META_TITULOS, materialDoAlvo } from "./mencao.ts";
+import { PROIBIDOS_PADRAO, trechoDaBarra } from "./selecao.ts";
 import { useTrocaSessao } from "./troca-sessao.tsx";
+import { useVendoOpcional } from "./vendo.tsx";
 
 type TipoFormula = "linha" | "bloco";
 
 import { mesmoTitulo, PAINEL_NOTAS, useNovasRespostas } from "./notas-ponte.ts";
 
 const ESPERA_SALVAR = 1500;
+/** Na nota o próprio editor é contenteditable: o que fica de fora da seleção são os campos (o título) e o painel do professor. */
+const PROIBIDOS_NOTA = PROIBIDOS_PADRAO.replace("[contenteditable=true],", "");
 /** Quanto a troca de sessão espera o salvamento terminar. */
 const PRAZO_ANTES_DE_TROCAR = 5000;
 const hora = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -98,6 +103,8 @@ function EditorDaNota(props: PropsEditorNota) {
 	const [situacao, setSituacao] = useState<Situacao>({ tipo: "abrindo" });
 	const [somenteLeitura, setSomenteLeitura] = useState(false);
 	const [tituloCampo, setTituloCampo] = useState(props.titulo);
+	/** O título que vale agora (o do arquivo, não o que está sendo digitado no campo): o rótulo da nota no "Vendo". */
+	const [tituloVigente, setTituloVigente] = useState(props.titulo);
 	const [erroTitulo, setErroTitulo] = useState<string | undefined>(undefined);
 	/** Muda a cada vez que a barra da seleção some: ela volta com os menus fechados. */
 	const [vezBarra, setVezBarra] = useState(0);
@@ -297,6 +304,7 @@ function EditorDaNota(props: PropsEditorNota) {
 		pendente.current = false;
 		tituloAtual.current = aberta.titulo;
 		setTituloCampo(aberta.titulo);
+		setTituloVigente(aberta.titulo);
 		setSomenteLeitura(soLeitura);
 		setNota(aberta);
 		setErroAbrir(undefined);
@@ -400,6 +408,7 @@ function EditorDaNota(props: PropsEditorNota) {
 				renomeando.current = false;
 				tituloAtual.current = resposta.dados.para;
 				setTituloCampo(resposta.dados.para);
+				setTituloVigente(resposta.dados.para);
 				props.renomeada(resposta.dados.para);
 				if (pendente.current) {
 					pendente.current = false;
@@ -465,6 +474,39 @@ function EditorDaNota(props: PropsEditorNota) {
 		};
 		// Liga uma vez: tudo o que lê está nas refs.
 	}, []);
+
+	// A nota aberta se registra no "Vendo" da mesa (vendo.tsx): o professor recebe o markdown do buffer do editor, mesmo antes
+	// de salvar. Fora da mesa não há provedor e nada acontece. A troca de sessão já salva pela registrarAntesDeTrocar acima.
+	const registrarVendo = useVendoOpcional()?.registrar;
+	const notaCarregada = Boolean(nota);
+	useEffect(() => {
+		if (!registrarVendo || !editor || !notaCarregada) return;
+		return registrarVendo({
+			tipo: "nota",
+			rotulo: tituloVigente,
+			origem: `caderno/${materiaId}/notas/${tituloVigente}`,
+			texto: () => (editor.isDestroyed ? undefined : markdownDaNota(editor)),
+		});
+	}, [registrarVendo, editor, notaCarregada, tituloVigente, materiaId]);
+
+	// A seleção e a barra de perguntas. Com a nota em edição e um trecho de texto selecionado, o BubbleMenu da formatação
+	// aparece e o grupo de perguntas entra nele; a BarraSelecao flutuante só aparece quando o BubbleMenu não está
+	// (nota só leitura, ou uma seleção que ele não cobre, como o bloco de código).
+	const folha = useRef<HTMLDivElement>(null);
+	const { bolhaNaSelecao, trechoDoEditor } = useEditorState({
+		editor,
+		selector: ({ editor: atual }) => {
+			if (!atual) return { bolhaNaSelecao: false, trechoDoEditor: undefined };
+			const { selection, doc } = atual.state;
+			const texto = selection instanceof TextSelection && !selection.empty && !atual.isActive("codeBlock");
+			return { bolhaNaSelecao: atual.isEditable && texto, trechoDoEditor: texto ? trechoDaBarra(doc.textBetween(selection.from, selection.to, " ")) : undefined };
+		},
+	});
+	const { selecao, limpar: limparSelecao } = useSelecaoDoDocumento(folha, { proibidos: PROIBIDOS_NOTA, ativo: !bolhaNaSelecao });
+	/** Depois de uma pergunta pelo BubbleMenu: o cursor vai para o fim do trecho, sem apagar o foco do editor. */
+	const soltarSelecaoDoEditor = () => {
+		if (editor && !editor.isDestroyed) editor.commands.setTextSelection(editor.state.selection.to);
+	};
 
 	const teclas = (evento: KeyboardEvent) => {
 		if ((evento.ctrlKey || evento.metaKey) && evento.key.toLowerCase() === "s") {
@@ -563,7 +605,7 @@ function EditorDaNota(props: PropsEditorNota) {
 					</Callout>
 				) : null}
 				{!nota && !erroAbrir ? <p className="body caderno__carregando">Abrindo a nota…</p> : null}
-				<div className={`editor-nota__folha${nota ? "" : " editor-nota__folha--escondida"}`}>
+				<div ref={folha} className={`editor-nota__folha${nota ? "" : " editor-nota__folha--escondida"}`}>
 					<EditorContent editor={editor} />
 				</div>
 				{editor ? (
@@ -588,10 +630,16 @@ function EditorDaNota(props: PropsEditorNota) {
 						}}
 					>
 						<div ref={barraSelecao}>
-							<BarraFormatacao key={vezBarra} editor={editor} editarFormula={(latex, posicao) => logica.current.editarFormula("linha", latex, posicao)} />
+							<BarraFormatacao
+								key={vezBarra}
+								editor={editor}
+								editarFormula={(latex, posicao) => logica.current.editarFormula("linha", latex, posicao)}
+								{...(trechoDoEditor ? { extra: <AcoesDePergunta trecho={trechoDoEditor} depois={soltarSelecaoDoEditor} /> } : {})}
+							/>
 						</div>
 					</BubbleMenu>
 				) : null}
+				<BarraSelecao selecao={selecao} limpar={limparSelecao} />
 				</div>
 			</div>
 			<Modal

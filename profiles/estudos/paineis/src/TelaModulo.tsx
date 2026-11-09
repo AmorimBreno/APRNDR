@@ -182,6 +182,8 @@ import { type AcoesRelatorio, RelatorioMetodo } from "./RelatorioMetodo.tsx";
 import { type DestinoDaEvidencia, ID_RELATORIO, TITULO_RELATORIO } from "./relatorio-tela.ts";
 import { EtiquetaReferencia } from "./SecaoMapa.tsx";
 import { Teclas } from "./Teclas.tsx";
+import { textoDaLicao } from "./licao-texto.ts";
+import { useVendoOpcional } from "./vendo.tsx";
 import { type AcoesTermos, apontarTermo, ExplicacoesDoBloco, MarcarTermos, ProvedorTermos, TextoComTermos, useDestinoTermo } from "./TermosModulo.tsx";
 
 const MOLA = { type: "spring", stiffness: 380, damping: 32 } as const;
@@ -242,6 +244,33 @@ export function TelaModulo(props: PropsTelaModulo) {
 	const aberto = useModuloAberto(props.janela, materiaId, cursoId, moduloId);
 	const doCurso = curso?.esqueleto?.modulos.map((modulo, indice) => ({ id: modulo.id, numero: indice + 1, nome: modulo.nome })) ?? [];
 	const abertura: Abertura = !curso && erroCurso ? { tipo: "ilegivel", mensagem: erroCurso } : aberturaDoModulo(aberto);
+
+	// A lição aberta se registra no "Vendo" da mesa (vendo.tsx): o professor lê o texto dela na hora de mandar. Fora da
+	// mesa não há provedor e nada acontece; módulo sem lição pronta (aguardando material, gerando) não se registra.
+	// texto() lê o módulo mais recente por ref, para as explicações pedidas que chegam depois entrarem sem registrar de novo.
+	const registrarVendo = useVendoOpcional()?.registrar;
+	const moduloDaFonte = abertura.tipo === "pronto" ? abertura.modulo : undefined;
+	const moduloDaFonteRef = useRef(moduloDaFonte);
+	moduloDaFonteRef.current = moduloDaFonte;
+	const indiceDaFonte = moduloDaFonte ? indiceDaLicao(moduloDaFonte.licoes, props.licaoId) : 0;
+	const licaoDaFonte = moduloDaFonte?.licoes[indiceDaFonte];
+	const licaoDaFonteId = licaoDaFonte?.id;
+	const numeroDoModulo = doCurso.find((modulo) => modulo.id === moduloId)?.numero;
+	const rotuloDaFonte = licaoDaFonte ? `Lição ${numeroDoModulo ? `${numeroDoModulo}.` : ""}${indiceDaFonte + 1} · ${licaoDaFonte.titulo}` : undefined;
+	const origemDaFonte = licaoDaFonteId ? caminhoDoModulo(materiaId, cursoId, moduloId, licaoDaFonteId) : undefined;
+	useEffect(() => {
+		if (!registrarVendo || !licaoDaFonteId || !rotuloDaFonte || !origemDaFonte) return;
+		return registrarVendo({
+			tipo: "licao",
+			rotulo: rotuloDaFonte,
+			origem: origemDaFonte,
+			texto: () => {
+				const modulo = moduloDaFonteRef.current;
+				const licao = modulo?.licoes.find((candidata) => candidata.id === licaoDaFonteId);
+				return modulo && licao ? textoDaLicao(licao, modulo.situacao === "gerado" ? modulo.explicacoes : undefined) : undefined;
+			},
+		});
+	}, [registrarVendo, licaoDaFonteId, rotuloDaFonte, origemDaFonte]);
 
 	// "Como o professor escreve": as regras são pedidas quando o modal abre.
 	const [vendoEscrita, setVendoEscrita] = useState(false);

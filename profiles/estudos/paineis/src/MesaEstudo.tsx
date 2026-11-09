@@ -76,6 +76,16 @@ export interface ProfessorDaMesa {
 	pendente: boolean;
 	pulsa: boolean;
 	alternar(): void;
+	/** Abre o painel se estiver fechado (não alterna). */
+	abrir(): void;
+	/** Guarda o trecho como citação acima do campo do professor e abre o painel (Perguntar). */
+	citar(trecho: string): void;
+	/**
+	 * Manda ao professor um pedido pronto sobre o trecho, com o contexto da aba ativa
+	 * e o trecho como selecao (Outro jeito, Me teste nisso), e abre o painel.
+	 * Rejeita se o envio nem saiu (conexão caída).
+	 */
+	perguntar(pedido: string, trecho: string): Promise<void>;
 	idPainel: string;
 	botao: RefObject<HTMLButtonElement | null>;
 }
@@ -129,6 +139,8 @@ function MesaInterna(props: PropsMesaEstudo) {
 	const vendo = useVendo();
 	const [aberto, setAberto] = useState(() => lerAberto(perfilId));
 	const [pendente, setPendente] = useState(false);
+	/** O trecho citado (Perguntar), na mesa e não na barra, porque o painel do professor é que o mostra e o limpa. */
+	const [citacao, setCitacao] = useState<string | undefined>(undefined);
 	const [modo, setModo] = useState<Modo>("lado");
 	const [largura, setLargura] = useState(0);
 	const raiz = useRef<HTMLDivElement>(null);
@@ -239,6 +251,35 @@ function MesaInterna(props: PropsMesaEstudo) {
 		});
 	}, [perfilId]);
 
+	const abrir = useCallback(() => {
+		setAberto((atual) => {
+			if (!atual) guardarAberto(perfilId, true);
+			return true;
+		});
+	}, [perfilId]);
+	const citar = useCallback(
+		(trecho: string) => {
+			setCitacao(trecho);
+			abrir();
+		},
+		[abrir],
+	);
+	const limparCitacao = useCallback(() => setCitacao(undefined), []);
+	// O envio lê a janela e o contexto na hora (refs): a função que a barra guarda não fica velha.
+	const janelaRef = useRef(props.janela);
+	janelaRef.current = props.janela;
+	const obterContexto = vendo.obterContexto;
+	const perguntar = useCallback(
+		async (pedido: string, trecho: string) => {
+			const contexto = obterContexto();
+			abrir();
+			// Sem aba registrada não há onde pendurar o trecho: ele vai no texto, como citação.
+			if (contexto) await janelaRef.current.acoes.enviar(pedido, { ...contexto, selecao: trecho });
+			else await janelaRef.current.acoes.enviar(`${pedido}\n\n> ${trecho}`);
+		},
+		[abrir, obterContexto],
+	);
+
 	// Ctrl+J: na fase de captura e com preventDefault, para o Edge não abrir os Downloads.
 	// Só enquanto a mesa está montada e tem professor.
 	useEffect(() => {
@@ -308,7 +349,7 @@ function MesaInterna(props: PropsMesaEstudo) {
 		abertoAnterior.current = aberto;
 	}, [aberto]);
 
-	const contexto: ProfessorDaMesa | undefined = Conversa ? { aberto, pendente, pulsa, alternar, idPainel, botao } : undefined;
+	const contexto: ProfessorDaMesa | undefined = Conversa ? { aberto, pendente, pulsa, alternar, abrir, citar, perguntar, idPainel, botao } : undefined;
 
 	return (
 		<ContextoProfessor.Provider value={contexto}>

@@ -10,7 +10,7 @@
 // (extensions/materias.ts) pela ponte, no painel "cadernos".
 
 import { Button, Icon, type OrnamentGlyph, pad2, Stat, SubjectWheel, type SubjectItem } from "@estudos/design-system";
-import { type ControleFaixaMarca, FaixaMarca, type JanelaPerfilHook, type PropsTelaInicial, semEsperar, type SituacaoMaterial } from "@estudos/ui";
+import { type ControleFaixaMarca, FaixaMarca, type JanelaPerfilHook, type PropsTelaInicial, semEsperar, type SituacaoMaterial, useValorEstavel } from "@estudos/ui";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { type Materia, pastaMateriaisRelativa } from "../../lib/materia-tipos.ts";
 import { continuarDeOndeParei, lerMemoria } from "./memoria-mesa.ts";
@@ -21,6 +21,7 @@ import { TITULO_ESCRITA } from "./escrita-tela.ts";
 import { ModalEscrita } from "./ModalEscrita.tsx";
 import { ModalMateria } from "./ModalMateria.tsx";
 import { ModalMateriais } from "./ModalMateriais.tsx";
+import { RotuloEstado } from "./RotuloEstado.tsx";
 
 const mesAno = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" });
 
@@ -99,6 +100,8 @@ export function TelaCadernos(props: PropsTelaCadernos) {
 		return () => observador.disconnect();
 	}, []);
 
+	// "Abrindo os cadernos…" só aparece se a lista demorar mais de 1 s (regra 1 de docs/padroes-de-interface.md).
+	const mostraAbrindo = useValorEstavel(!lista, !lista, false) && !lista;
 	const materias = lista?.materias ?? [];
 	const hoje = new Date();
 	const materiaisDe = (id: string): SituacaoMaterial[] | undefined => estado.materiais?.filter((material) => material.pasta === pastaMateriaisRelativa(id));
@@ -122,7 +125,7 @@ export function TelaCadernos(props: PropsTelaCadernos) {
 	return (
 		<div className="tela">
 			<FaixaMarca ref={faixa} bandeira legenda={`${props.perfil?.nome ?? "Estudos"} · ${mesAno.format(new Date())}`} glifo="書">
-				<Stat value={pad2(materias.length)} label="Cadernos" size="lg" accent />
+				<Stat value={lista ? pad2(materias.length) : "––"} label="Cadernos" size="lg" accent />
 				<Button icon="arrow-left" onClick={sairE(props.voltar)}>
 					Perfis
 				</Button>
@@ -134,7 +137,7 @@ export function TelaCadernos(props: PropsTelaCadernos) {
 						Seus cadernos
 					</h1>
 					<span className="data">
-						{pad2(materias.length)} {materias.length === 1 ? "caderno" : "cadernos"}
+						{lista ? `${pad2(materias.length)} ${materias.length === 1 ? "caderno" : "cadernos"}` : " "}
 					</span>
 				</header>
 				<div className="folha__corpo cadernos__corpo" ref={corpo}>
@@ -163,7 +166,9 @@ export function TelaCadernos(props: PropsTelaCadernos) {
 						</div>
 					) : !lista ? (
 						<div className="folha__aviso" aria-live="polite">
-							<p className="body-lg cadernos__abrindo">Abrindo os cadernos…</p>
+							<p className="body-lg cadernos__abrindo" style={{ visibility: mostraAbrindo ? "visible" : "hidden" }} aria-hidden={!mostraAbrindo}>
+								Abrindo os cadernos…
+							</p>
 						</div>
 					) : (
 						<SubjectWheel
@@ -213,7 +218,7 @@ export function TelaCadernos(props: PropsTelaCadernos) {
 							</button>
 						) : null}
 						<button type="button" className="tecla-papel button" onClick={conversarGeral} disabled={abrindoConversa} aria-busy={abrindoConversa}>
-							{abrindoConversa ? "Abrindo a conversa…" : "Conversa geral"}
+							<RotuloEstado ocupado={abrindoConversa} repouso="Conversa geral" passageiro="Abrindo a conversa…" />
 							<Icon name="arrow-right" size={18} strokeWidth={2.25} />
 						</button>
 					</span>

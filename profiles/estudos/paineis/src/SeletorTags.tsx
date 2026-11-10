@@ -71,7 +71,12 @@ export function SeletorAbas<Id extends string>(props: PropsSeletorAbas<Id>) {
 					>
 						<Icon name={aba.icone} size={18} strokeWidth={2.25} />
 						<span className="body-sm painel-caderno__tag-nome">{aba.nome}</span>
-						{quantos === undefined ? null : <span className="data painel-caderno__tag-conta">{pad2(quantos)}</span>}
+						{/* Se a lista de abas tem contagem, o lugar dela é reservado mesmo sem o número (visibility, não display): a aba não muda de largura quando ele chega. */}
+						{props.contagem === undefined ? null : (
+							<span className="data painel-caderno__tag-conta" aria-hidden={quantos === undefined || undefined} style={quantos === undefined ? { visibility: "hidden" } : undefined}>
+								{pad2(quantos ?? 0)}
+							</span>
+						)}
 					</button>
 				);
 			})}

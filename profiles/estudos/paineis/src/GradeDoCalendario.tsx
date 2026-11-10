@@ -20,7 +20,7 @@
 // aparece no hover) abre a tarefa nova com a data do dia.
 
 import { Icon } from "@estudos/design-system";
-import { type CSSProperties, type KeyboardEvent, type MouseEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type KeyboardEvent, type MouseEvent, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ItemCalendario, MateriaDaAgenda } from "../../lib/agenda-tipos.ts";
 import { capacidadeDaCelula, descricaoDoItem, resumoDoDia, teclaDaGrade, textoDoMais, type VisaoCalendario } from "./calendario-cheio.ts";
 import {
@@ -65,7 +65,8 @@ export function GradeDoCalendario(props: PropsGradeDoCalendario) {
 	const [capacidade, setCapacidade] = useState(3);
 
 	// A altura da célula muda com a janela e com o número de semanas (5 ou 6): mede de novo e refaz o "N mais".
-	useEffect(() => {
+	// useLayoutEffect: a medida vale antes do primeiro quadro, sem aparecer um quadro com etiquetas e "N mais" errados.
+	useLayoutEffect(() => {
 		const raiz = corpo.current;
 		if (!raiz || visao !== "mes") return;
 		const medir = () => setCapacidade(capacidadeDaCelula(raiz.querySelector<HTMLElement>(".cal-cheio__celula")?.clientHeight ?? 0));

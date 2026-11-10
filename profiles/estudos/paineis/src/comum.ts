@@ -2,7 +2,7 @@
 // extensão de matérias, a leitura do que ela mandou, as contas de prova e a
 // escolha da conversa (a geral ou a da matéria) antes de ir para ela.
 
-import { type AcaoRecebida, type AparenciaContextos, type ContextoSessao, guardarSessaoDoPerfil, type JanelaPerfilHook, semEsperar } from "@estudos/ui";
+import { type AcaoRecebida, type AparenciaContextos, type ContextoSessao, guardarSessaoDoPerfil, type JanelaPerfilHook, semEsperar, semMovimento } from "@estudos/ui";
 import { useEffect, useMemo, useRef } from "react";
 import type { Evento } from "../../lib/eventos.ts";
 import type { ListaMaterias, Materia } from "../../lib/materia-tipos.ts";
@@ -144,4 +144,23 @@ export function usarAparenciaMaterias(janela: JanelaPerfilHook): AparenciaContex
 	}, [recebidas]);
 	if (aparencia) ultima.current = aparencia;
 	return aparencia ?? ultima.current;
+}
+
+
+/** As listas que já entraram na tela com animação nesta janela (chave: "notas:<matéria>", "cursos:<matéria>"). */
+const listasQueJaEntraram = new Set<string>();
+
+/**
+ * A entrada animada de uma lista só vale na primeira vez que ela aparece com dados naquela chave (regra 7 de
+ * docs/padroes-de-interface.md): voltar para a mesma lista (de uma nota, do guia) não anima de novo, e com movimento
+ * reduzido nunca anima. `pronta` é "os dados da lista já chegaram". A decisão é tomada uma vez por chave, no
+ * primeiro quadro em que a lista tem dados; os itens que aparecem depois entram sem animação.
+ */
+export function useAnimarEntrada(chave: string, pronta: boolean): boolean {
+	const decisao = useRef<{ chave: string; animar: boolean } | undefined>(undefined);
+	if (pronta && decisao.current?.chave !== chave) decisao.current = { chave, animar: !listasQueJaEntraram.has(chave) && !semMovimento() };
+	useEffect(() => {
+		if (pronta) listasQueJaEntraram.add(chave);
+	}, [pronta, chave]);
+	return pronta && decisao.current?.chave === chave ? decisao.current.animar : false;
 }

@@ -16,6 +16,7 @@ import { Button, Modal, Select, TextArea, TextField } from "@estudos/design-syst
 import { type FormEvent, useCallback, useState } from "react";
 import { type Coluna, LIMITE_NOTA, LIMITE_TITULO, type MateriaDaAgenda, type Tarefa } from "../../lib/agenda-tipos.ts";
 import type { AcoesDaAgenda } from "./agenda-ponte.ts";
+import { RotuloEstado } from "./RotuloEstado.tsx";
 import { entradaDoForm, erroDoForm, type FormTarefa, formDaTarefa, type InicialTarefa, mudancasDoForm, semMudancas } from "./agenda-tela.ts";
 
 export interface PropsModalTarefa {
@@ -136,7 +137,7 @@ function ConteudoModalTarefa(props: PropsModalTarefa) {
 							Voltar
 						</Button>
 						<Button variant="danger" icon="close" onClick={apagar} disabled={ocupado}>
-							{ocupado ? "Apagando…" : "Apagar tarefa"}
+							<RotuloEstado ocupado={ocupado} repouso="Apagar tarefa" passageiro="Apagando…" />
 						</Button>
 					</>
 				}
@@ -174,7 +175,7 @@ function ConteudoModalTarefa(props: PropsModalTarefa) {
 						Cancelar
 					</Button>
 					<Button variant="primary" iconRight={editando ? "check" : "arrow-right"} onClick={() => salvar()} disabled={ocupado}>
-						{ocupado ? "Salvando…" : editando ? "Salvar" : "Criar tarefa"}
+						<RotuloEstado ocupado={ocupado} repouso={editando ? "Salvar" : "Criar tarefa"} passageiro="Salvando…" />
 					</Button>
 				</>
 			}

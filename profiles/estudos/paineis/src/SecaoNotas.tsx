@@ -6,10 +6,12 @@
 // (EditorNota) no caminho caderno/<matéria>/notas/<título>.
 
 import { Button, EmptyState, Icon, type Tone, TextField } from "@estudos/design-system";
-import { type JanelaPerfilHook, semEsperar } from "@estudos/ui";
+import { type JanelaPerfilHook, semEsperar, useValorEstavel } from "@estudos/ui";
 import { motion } from "motion/react";
 import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 import { conferirTitulo, type ListaNotas, TAMANHO_TITULO } from "../../lib/nota-tipos.ts";
+import { RotuloEstado } from "./RotuloEstado.tsx";
+import { useAnimarEntrada } from "./comum.ts";
 import { FixoERolagem } from "./FixoERolagem.tsx";
 import { mesmoTitulo, PAINEL_NOTAS, ultimaLista, useNovasRespostas } from "./notas-ponte.ts";
 
@@ -30,6 +32,8 @@ export function editadaHa(iso: string, agora: Date = new Date()): string {
  * extensão quando a sessão abre e de novo quando `vez` muda (o caderno passa
  * a tela aberta: voltar do editor para a lista traz as prévias novas).
  */
+const ultimasListas = new Map<string, ListaNotas>();
+
 export function useListaNotas(janela: JanelaPerfilHook, materiaId: string, vez?: string): ListaNotas | undefined {
 	const { estado, acoes } = janela;
 	const sessaoId = estado.sessao?.sessaoId;
@@ -37,7 +41,11 @@ export function useListaNotas(janela: JanelaPerfilHook, materiaId: string, vez?:
 		if (sessaoId) semEsperar(acoes.acaoDaInterface(PAINEL_NOTAS, "listar", { materia: materiaId }));
 	}, [sessaoId, acoes, materiaId, vez]);
 	const recebidas = estado.acoesPorPainel[PAINEL_NOTAS];
-	return useMemo(() => ultimaLista(recebidas ?? [], materiaId), [recebidas, materiaId]);
+	const lida = useMemo(() => ultimaLista(recebidas ?? [], materiaId), [recebidas, materiaId]);
+	// Guarda a última lista de cada matéria, também para quando a tela é remontada ou a sessão troca (como useCursos):
+	// entrar de novo na matéria mostra a lista que já se conhecia até a nova chegar (regra 2 de docs/padroes-de-interface.md).
+	if (lida) ultimasListas.set(materiaId, lida);
+	return lida ?? ultimasListas.get(materiaId);
 }
 
 export interface PropsSecaoNotas {
@@ -61,6 +69,10 @@ export function SecaoNotas(props: PropsSecaoNotas) {
 	const [erro, setErro] = useState<string | undefined>(undefined);
 	/** O título mandado para criar, esperando a resposta. */
 	const [esperando, setEsperando] = useState<string | undefined>(undefined);
+	// "Abrindo as notas…" só aparece se a lista demorar mais de 1 s; a lista só entra animada na primeira vez que aparece.
+	const semLista = !lista;
+	const mostraAbrindo = useValorEstavel(semLista, semLista, false) && semLista;
+	const animar = useAnimarEntrada(`notas:${materiaId}`, !semLista);
 
 	useNovasRespostas(janela.estado.acoesPorPainel[PAINEL_NOTAS], (resposta) => {
 		if (!esperando) return;
@@ -113,7 +125,7 @@ export function SecaoNotas(props: PropsSecaoNotas) {
 					Cancelar
 				</Button>
 				<Button type="submit" variant="primary" icon="plus" disabled={Boolean(esperando)} aria-busy={Boolean(esperando)}>
-					{esperando ? "Criando…" : "Criar e abrir"}
+					<RotuloEstado ocupado={Boolean(esperando)} repouso="Criar e abrir" passageiro="Criando…" />
 				</Button>
 			</div>
 		</form>
@@ -122,7 +134,9 @@ export function SecaoNotas(props: PropsSecaoNotas) {
 	// Dividido (no caderno), até o aviso e o estado vazio ficam na parte que rola, para a tela baixa não cortar.
 	const envolver = (conteudo: ReactNode) => (props.dividir ? <FixoERolagem classe="notas" dividir fixo={null}>{conteudo}</FixoERolagem> : conteudo);
 
-	if (!lista) return envolver(<p className="body caderno__carregando">Abrindo as notas…</p>);
+	if (!lista) return envolver(<p className="body caderno__carregando" style={{ visibility: mostraAbrindo ? "visible" : "hidden" }} aria-hidden={!mostraAbrindo}>
+				Abrindo as notas…
+			</p>);
 
 	if (lista.notas.length === 0 && !criando) {
 		return envolver(
@@ -139,9 +153,9 @@ export function SecaoNotas(props: PropsSecaoNotas) {
 				{lista.notas.map((nota, indice) => (
 					<motion.li
 						key={nota.titulo}
-						initial={{ opacity: 0, y: 8 }}
+						initial={animar ? { opacity: 0, y: 8 } : false}
 						animate={{ opacity: 1, y: 0 }}
-						transition={{ type: "spring", stiffness: 420, damping: 32, delay: Math.min(indice, 10) * 0.03 }}
+						transition={animar ? { type: "spring", stiffness: 420, damping: 32, delay: Math.min(indice, 10) * 0.03 } : { duration: 0 }}
 					>
 						<button type="button" className="notas__item" onClick={() => props.abrirNota(nota.titulo)}>
 							<Icon name="file" size={20} strokeWidth={2.25} />

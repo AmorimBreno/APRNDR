@@ -7,6 +7,7 @@
 // - ModalLinhaDoTempo: o modal que a mostra, aberto pelo botão da aba do caderno.
 
 import { Button, Icon, type IconName, Modal } from "@estudos/design-system";
+import { semMovimento } from "@estudos/ui";
 import { motion } from "motion/react";
 import type { Evento } from "../../lib/eventos.ts";
 import { dataCurta } from "./comum.ts";
@@ -299,6 +300,8 @@ export function LinhaDoTempo({ eventos, invalidas }: { eventos: Evento[]; invali
 	const grupos = porDia(eventos);
 	if (grupos.length === 0) return <p className="body caderno__carregando">Nada aconteceu neste caderno ainda.</p>;
 	let ordem = 0;
+	// Com movimento reduzido, os eventos aparecem de uma vez, sem deslocar.
+	const parado = semMovimento();
 	return (
 		<div className="tempo">
 			{grupos.map((grupo) => (
@@ -312,9 +315,9 @@ export function LinhaDoTempo({ eventos, invalidas }: { eventos: Evento[]; invali
 								<motion.li
 									key={evento.id}
 									className="tempo__evento"
-									initial={{ opacity: 0, x: -10 }}
+									initial={parado ? false : { opacity: 0, x: -10 }}
 									animate={{ opacity: 1, x: 0 }}
-									transition={{ type: "spring", stiffness: 420, damping: 30, delay: atraso }}
+									transition={parado ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 30, delay: atraso }}
 								>
 									<span className="tempo__marca" aria-hidden="true">
 										<Icon name={icone} size={16} strokeWidth={2.5} />

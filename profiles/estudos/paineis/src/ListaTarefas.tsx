@@ -18,16 +18,20 @@
 import { Checkbox, EmptyState, Icon, Select, Switch, Tag } from "@estudos/design-system";
 import { useId, useMemo, useState } from "react";
 import type { Tarefa } from "../../lib/agenda-tipos.ts";
-import { colunaDaCaixinha, type PropsAbaAgenda, tarefasDaMateria } from "./agenda-tela.ts";
+import { colunaDaCaixinha, FILTROS_INICIAIS, type FiltrosLista, type PropsAbaAgenda, tarefasDaMateria } from "./agenda-tela.ts";
 import { CampoRapido } from "./CampoRapido.tsx";
 import { classeDoTom, nomeDaMateria, prazoDaData, tomDaMateria } from "./calendario-tela.ts";
 import { criacaoRapida, gruposDaLista, type GrupoDaLista, opcoesDeColuna, prazoCurto, totalDosGrupos } from "./lista-tarefas.ts";
 
 export function ListaTarefas(props: PropsAbaAgenda) {
 	const { agenda, materia, hoje, acoes } = props;
-	const [coluna, setColuna] = useState("");
-	const [mostrarFeitas, setMostrarFeitas] = useState(true);
-	const [feitasAbertas, setFeitasAbertas] = useState(false);
+	// Os filtros sobem para a casca quando ela guarda (trocar de aba e voltar não zera).
+	const [filtrosLocais, setFiltrosLocais] = useState<FiltrosLista>(FILTROS_INICIAIS);
+	const { coluna, mostrarFeitas, feitasAbertas } = props.memoria?.filtros ?? filtrosLocais;
+	const definirFiltros = props.memoria?.definirFiltros ?? setFiltrosLocais;
+	const setColuna = (valor: string) => definirFiltros((atuais) => ({ ...atuais, coluna: valor }));
+	const setMostrarFeitas = (valor: boolean) => definirFiltros((atuais) => ({ ...atuais, mostrarFeitas: valor }));
+	const setFeitasAbertas = (mudar: (atual: boolean) => boolean) => definirFiltros((atuais) => ({ ...atuais, feitasAbertas: mudar(atuais.feitasAbertas) }));
 	const idFeitas = useId();
 
 	// Uma coluna apagada depois de escolhida no filtro volta a "Todas".

@@ -125,6 +125,11 @@
  * dentro dela. A nota aberta ocupa a mesma área, no lugar do painel. */
 .painel-caderno { display: flex; flex-direction: column; gap: var(--space-4); min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
 .painel-caderno__bloco { flex: none; min-width: 0; padding: var(--space-5) var(--space-6); border-radius: var(--radius-lg); background: var(--surface-panel); }
+/* O painel fica montado (escondido) enquanto uma nota está aberta; sem caixa própria, o .painel-caderno segue sendo o item da grade. */
+.tela-caderno__painel { display: contents; }
+.tela-caderno__painel[hidden] { display: none; }
+/* O conteúdo da tag que troca com o fade: ocupa o corpo, como a seção que ele leva dentro. */
+.painel-caderno__tag-conteudo { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .painel-caderno__nota { display: flex; flex-direction: column; min-height: 0; overflow: hidden; border-radius: var(--radius-lg); background: var(--surface-panel); }
 /* A lista de baixo: o seletor de tags (e a meta à direita) em cima, o conteúdo da tag escolhida embaixo. */
 /* A lista é um cartão da altura que sobra da janela (--resto, medido pelo BaixoDoCaderno), como as tarefas e o calendário, e fica fixa no topo
@@ -202,6 +207,10 @@
 ::view-transition-new(*.perfil):only-child { animation: folha-sobe .5s .06s cubic-bezier(.65, 0, .25, 1) both; }
 @keyframes folha-desce { to { opacity: 0; transform: translateY(32%); } }
 @keyframes folha-sobe { from { opacity: 0; transform: translateY(24%); } }
+/* Com movimento reduzido, a passagem do card para a folha (e a linha que vira a aba) acontece sem animar. */
+@media (prefers-reduced-motion: reduce) {
+	::view-transition-group(caderno-aba), ::view-transition-old(caderno-aba), ::view-transition-new(caderno-aba), ::view-transition-old(*.perfil), ::view-transition-new(*.perfil) { animation: none !important; animation-duration: 0s !important; }
+}
 
 /* ── Notas do caderno (SecaoNotas.tsx e EditorNota.tsx, item 4.3, parte B) ── */
 .notas { display: flex; flex-direction: column; gap: var(--space-5); max-width: 880px; }
@@ -1683,6 +1692,8 @@ button.relatorio__evidencia:focus-visible { outline: none; box-shadow: var(--foc
 .agenda__erro { margin: 0; }
 .agenda__corpo { min-width: 0; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
 .agenda__carregando { margin: 0; color: var(--ink-muted); }
+/* O conteúdo da aba (o painel .agenda__corpo fica montado; só este troca, com o fade). */
+.agenda__aba { height: 100%; min-width: 0; }
 .agenda__vazio { display: grid; place-items: center; padding: var(--space-8) 0; }
 @media (max-width: 900px) {
 	.agenda__barra { padding: var(--space-3) var(--space-4); }
@@ -1923,3 +1934,16 @@ button.cal-etq:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .rotulo-estado { display: inline-grid; justify-items: center; }
 .rotulo-estado__texto { grid-area: 1 / 1; }
 .rotulo-estado__texto[data-oculto] { visibility: hidden; }
+
+/* ── Rolagem fina e discreta (regra 8 de docs/padroes-de-interface.md): a mesma em todas as áreas que rolam do caderno e da agenda ── */
+.painel-caderno, .painel-caderno__fixo, .painel-caderno__rolagem, .faixa-cursos__trilho, .tarefas-cad__corpo, .agenda__corpo, .cal-cheio__lateral, .cal-cheio__grade--semana .cal-cheio__etiquetas, .quadro, .menu-barra__lista {
+	scrollbar-width: thin;
+	scrollbar-color: var(--line) transparent;
+}
+.painel-caderno:hover, .painel-caderno__fixo:hover, .painel-caderno__rolagem:hover, .faixa-cursos__trilho:hover, .tarefas-cad__corpo:hover, .agenda__corpo:hover, .cal-cheio__lateral:hover, .cal-cheio__grade--semana .cal-cheio__etiquetas:hover, .quadro:hover, .menu-barra__lista:hover {
+	scrollbar-color: var(--line-strong) transparent;
+}
+.painel-caderno::-webkit-scrollbar, .painel-caderno__fixo::-webkit-scrollbar, .painel-caderno__rolagem::-webkit-scrollbar, .faixa-cursos__trilho::-webkit-scrollbar, .tarefas-cad__corpo::-webkit-scrollbar, .agenda__corpo::-webkit-scrollbar, .cal-cheio__lateral::-webkit-scrollbar, .cal-cheio__grade--semana .cal-cheio__etiquetas::-webkit-scrollbar, .quadro::-webkit-scrollbar, .menu-barra__lista::-webkit-scrollbar { width: 6px; height: 6px; }
+.painel-caderno::-webkit-scrollbar-track, .painel-caderno__fixo::-webkit-scrollbar-track, .painel-caderno__rolagem::-webkit-scrollbar-track, .faixa-cursos__trilho::-webkit-scrollbar-track, .tarefas-cad__corpo::-webkit-scrollbar-track, .agenda__corpo::-webkit-scrollbar-track, .cal-cheio__lateral::-webkit-scrollbar-track, .cal-cheio__grade--semana .cal-cheio__etiquetas::-webkit-scrollbar-track, .quadro::-webkit-scrollbar-track, .menu-barra__lista::-webkit-scrollbar-track { background: transparent; }
+.painel-caderno::-webkit-scrollbar-thumb, .painel-caderno__fixo::-webkit-scrollbar-thumb, .painel-caderno__rolagem::-webkit-scrollbar-thumb, .faixa-cursos__trilho::-webkit-scrollbar-thumb, .tarefas-cad__corpo::-webkit-scrollbar-thumb, .agenda__corpo::-webkit-scrollbar-thumb, .cal-cheio__lateral::-webkit-scrollbar-thumb, .cal-cheio__grade--semana .cal-cheio__etiquetas::-webkit-scrollbar-thumb, .quadro::-webkit-scrollbar-thumb, .menu-barra__lista::-webkit-scrollbar-thumb { border-radius: var(--radius-full); background: var(--line); }
+.painel-caderno:hover::-webkit-scrollbar-thumb, .painel-caderno__fixo:hover::-webkit-scrollbar-thumb, .painel-caderno__rolagem:hover::-webkit-scrollbar-thumb, .faixa-cursos__trilho:hover::-webkit-scrollbar-thumb, .tarefas-cad__corpo:hover::-webkit-scrollbar-thumb, .agenda__corpo:hover::-webkit-scrollbar-thumb, .cal-cheio__lateral:hover::-webkit-scrollbar-thumb, .cal-cheio__grade--semana .cal-cheio__etiquetas:hover::-webkit-scrollbar-thumb, .quadro:hover::-webkit-scrollbar-thumb, .menu-barra__lista:hover::-webkit-scrollbar-thumb { background: var(--line-strong); }

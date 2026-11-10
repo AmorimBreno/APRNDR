@@ -309,10 +309,14 @@ describe("a coluna de tarefas", () => {
 		expect(criarTarefaDaPonte).toHaveBeenCalledWith({ titulo: "Revisar a lista 4", coluna: "a-fazer", materia: "calculo" });
 	});
 
-	it("sem agenda ainda, mostra que está abrindo e não tem campo nem contagem", async () => {
+	it("sem agenda ainda, o aviso de abrindo só aparece depois de 1 s e a contagem fica escondida, sem campo", async () => {
 		await renderizarTarefas({ ponte: ponteDeTeste(null as never) });
-		expect(container.textContent).toContain("Abrindo a agenda…");
-		expect(container.querySelector(".tarefas-cad__conta")).toBeNull();
+		// O texto está lá, mas escondido (reserva o lugar); o estado passageiro só aparece se durar mais de 1 s.
+		const abrindo = [...container.querySelectorAll<HTMLElement>(".tarefas-cad__vazio")].find((p) => p.textContent === "Abrindo a agenda…");
+		expect(abrindo?.style.visibility).toBe("hidden");
+		const conta = container.querySelector<HTMLElement>(".tarefas-cad__conta");
+		expect(conta?.style.visibility).toBe("hidden");
+		expect(conta?.getAttribute("aria-hidden")).toBe("true");
 		expect(container.querySelector('input[aria-label="Adicionar tarefa"]')).toBeNull();
 	});
 

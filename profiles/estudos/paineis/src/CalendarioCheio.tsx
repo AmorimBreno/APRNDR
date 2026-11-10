@@ -37,7 +37,10 @@ const LARGURA_ESTREITA = 760;
 
 export function CalendarioCheio(props: PropsAbaAgenda) {
 	const { agenda, provas, materias, materia, hoje, acoes, abrirTarefa, novaTarefa } = props;
-	const [escolhido, setEscolhido] = useState(hoje);
+	// O dia escolhido sobe para a casca quando ela guarda (trocar de aba e voltar não volta a hoje).
+	const [escolhidoLocal, setEscolhidoLocal] = useState(hoje);
+	const escolhido = props.memoria?.escolhido ?? escolhidoLocal;
+	const setEscolhido = props.memoria?.definirEscolhido ?? setEscolhidoLocal;
 	const [visao, setVisao] = useState<VisaoCalendario>(() => visaoGuardada());
 	const base = useId();
 	const parado = semMovimento();

@@ -18,7 +18,7 @@
 //   área de soltar e a lista do serviço de materiais) e Mapa de conteúdo, os
 //   conceitos dos materiais para revisar e aprovar (SecaoMapa, item 4.4). A
 //   tag escolhida vem da rota; trocar de tag navega (para o F5 e o histórico
-//   dizerem a mesma coisa) e a lista entra com uma mola curta. À direita do
+//   dizerem a mesma coisa) e o conteúdo da tag entra com um fade curto. À direita do
 //   seletor ficam as ações da tag aberta: na Notas, o botão "Nova nota".
 // Caminho: caderno/<matéria>[/<tag>] com a tag notas, materiais ou mapa (sem
 // tag, e nas rotas antigas linha-do-tempo e cursos, vale Notas; ver
@@ -48,6 +48,7 @@ import { SecaoMapa } from "./SecaoMapa.tsx";
 import { SecaoNotas, useListaNotas } from "./SecaoNotas.tsx";
 import { useCursos } from "./cursos-ponte.ts";
 import { AgendaDoCaderno } from "./AgendaDoCaderno.tsx";
+import { useAgenda } from "./agenda-ponte.ts";
 import { BaixoDoCaderno } from "./BaixoDoCaderno.tsx";
 import { FaixaCursos } from "./FaixaCursos.tsx";
 import { ModalLinhaDoTempo, NOMES_TIPO } from "./LinhaDoTempo.tsx";
@@ -73,6 +74,9 @@ export interface PropsTelaCaderno extends PropsTelaInicial {
 	/** A visão do módulo gerado: o curso, o módulo e a lição (sem ela, a primeira). */
 	modulo?: { curso: string; modulo: string; licao?: string };
 }
+
+/** O último nome, cor e número de cada caderno visto: entrar de novo no caderno não começa com "…" e sem número (regra 2 de docs/padroes-de-interface.md). */
+const identidadesVistas = new Map<string, { materia: Materia; numero: number | undefined }>();
 
 export function TelaCaderno(props: PropsTelaCaderno) {
 	const { estado, acoes } = props.janela;
@@ -121,6 +125,9 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 	// Os cursos (a faixa e o guia); de novo ao trocar de tela (voltar do guia traz a lista nova).
 	const guia = props.guia;
 	const cursos = useCursos(props.janela, materiaId, `${tag}/${guia ? (guia.curso ?? "novo") : ""}/${props.curso ?? ""}`);
+	// A agenda das colunas de baixo fica aqui, e não em AgendaDoCaderno: a agenda conhecida sobrevive quando as colunas
+	// são remontadas (voltar de uma nota). Pedida de novo ao trocar de tag e depois de editar a matéria (as provas).
+	const ponteAgenda = useAgenda(props.janela, `${tag}/${editando}`);
 	// Os títulos para as menções do editor (o mesmo array enquanto a lista não muda).
 	const titulosNotas = useMemo(() => notas?.notas.map((nota) => nota.titulo), [notas]);
 	// Os arquivos de material para as menções do editor (só os desta matéria).
@@ -136,6 +143,11 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 	const materia = caderno?.materia ?? lista?.materias.find((item) => item.id === materiaId);
 	const indice = lista?.materias.findIndex((item) => item.id === materiaId) ?? -1;
 	const numero = indice >= 0 ? indice + 1 : undefined;
+	// Até a lista chegar, vale o último nome, cor e número vistos deste caderno.
+	const vista = identidadesVistas.get(materiaId);
+	if (materia) identidadesVistas.set(materiaId, { materia, numero: numero ?? vista?.numero });
+	const materiaNaAba = materia ?? vista?.materia;
+	const numeroNaAba = numero ?? vista?.numero;
 	const materiais = estado.materiais?.filter((material) => material.pasta === pastaMateriaisRelativa(materiaId));
 	const contagem = {
 		notas: notas?.notas.length,
@@ -161,7 +173,7 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 		if (sessaoId) semEsperar(acoes.acaoDaInterface(PAINEL_CADERNOS, "abrir", { id: materiaId }));
 		setVerTudo(true);
 	};
-	const tom = materia?.cor === "ink" || !materia ? "brick" : materia.cor;
+	const tom = materiaNaAba?.cor === "ink" || !materiaNaAba ? "brick" : materiaNaAba.cor;
 	// O agente da sessão (ou o padrão do perfil), para a foto no guia de curso.
 	const nomeAgente = estado.sessao?.agente ?? props.perfil?.agentePadrao;
 	const avatarAgente = nomeAgente ? props.perfil?.agentes.find((agente) => agente.nome === nomeAgente)?.avatar : undefined;
@@ -197,10 +209,12 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 	);
 	// A nota aberta só vale quando nenhuma das telas acima dela na cadeia (erro, curso, guia) está no lugar.
 	const mostraNota = notaAberta !== undefined && !(erro && !materia) && !(props.curso && !guia) && !guia;
+	// O painel (cursos, lista e agenda) existe quando nenhuma tela por cima dele (módulo, erro, curso, guia) está no lugar.
+	const mostraPainel = !moduloAberto && !(erro && !materia) && !(props.curso && !guia) && !guia;
 	const abaDoCaderno = (
 		<AbaCaderno
-			{...(materia ? { materia } : {})}
-			{...(numero ? { numero } : {})}
+			{...(materiaNaAba ? { materia: materiaNaAba } : {})}
+			{...(numeroNaAba ? { numero: numeroNaAba } : {})}
 			voltar={voltar}
 			{...(lista ? { materias: lista.materias } : {})}
 			editar={() => setEditando(true)}
@@ -243,9 +257,9 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 							key="nota"
 							className="painel-caderno__nota"
 							aria-label={`Nota ${notaAberta}`}
-							initial={parado ? false : { opacity: 0, y: 12 }}
-							animate={{ opacity: 1, y: 0 }}
-							transition={{ type: "spring", stiffness: 380, damping: 32 }}
+							initial={parado ? false : { opacity: 0 }}
+							animate={{ opacity: 1 }}
+							transition={{ duration: 0.15, ease: "easeOut" }}
 						>
 							<EditorNota
 								key={materiaId}
@@ -308,88 +322,92 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 					tom={tom}
 					{...(nomeAgente ? { agente: { nome: nomeAgente, ...(avatarAgente ? { avatar: avatarAgente } : {}) } } : {})}
 				/>
-				) : (
-					// layoutScroll: o painel só rola se a janela for baixa; a lista de dentro de cada seção (FixoERolagem) também tem layoutScroll, e o arrasto do mapa de conteúdo (Reorder) mede certo com qualquer um rolado.
-					<motion.div className="painel-caderno" layoutScroll>
-						<div className="painel-caderno__bloco">
-							<FaixaCursos
-								cursos={cursos}
-								{...(materia ? { materia } : {})}
-								tom={tom}
-								novoCurso={() => props.navegar(`caderno/${materiaId}/cursos/novo`)}
-								continuar={(curso) => props.navegar(`caderno/${materiaId}/cursos/${curso.id}/guia`)}
-								abrir={(curso) => props.navegar(`caderno/${materiaId}/cursos/${curso.id}`)}
-							/>
-						</div>
-						<BaixoDoCaderno>
-						<section className="painel-caderno__bloco painel-caderno__lista" aria-label="Notas, materiais e mapa de conteúdo">
-							<header className="painel-caderno__seletor">
-								<SeletorTags base={baseIds} atual={tag} contagem={contagem} escolher={escolherTag} />
-								{meta ? <span className="data painel-caderno__meta">{meta}</span> : null}
-								{tag === "notas" && notas ? (
-									<div className="painel-caderno__acoes">
-										<Button variant="primary" icon="plus" disabled={criandoNota} onClick={() => setCriandoNota(true)}>
-											Nova nota
-										</Button>
-									</div>
-								) : null}
-							</header>
-							{/* O corpo não rola: cada seção (dividir) separa a parte de controle e de entrada, fixa em cima, da lista, que é o motion.div com layoutScroll que rola
-								    dentro do cartão (FixoERolagem; o arrasto do mapa mede por ele). A chave faz cada tag abrir no topo. */}
-							<motion.div
-								key={tag}
-								id={idDoPainel(baseIds)}
-								role="tabpanel"
-								aria-labelledby={idDaAba(baseIds, tag)}
-								className="painel-caderno__corpo"
-								initial={parado ? false : { opacity: 0, y: 12 }}
-								animate={{ opacity: 1, y: 0 }}
-								transition={{ type: "spring", stiffness: 380, damping: 32 }}
-							>
-								{tag === "notas" ? (
-									<SecaoNotas
-											janela={props.janela}
-											materiaId={materiaId}
-											{...(notas ? { lista: notas } : {})}
-											tom={tom}
-											abrirNota={abrirNota}
-											criando={criandoNota}
-											definirCriando={setCriandoNota}
-											dividir
-										/>
-								) : tag === "mapa" ? (
-									<SecaoMapa
-										mapa={mapa}
-										tom={tom}
-										dividir
-										irParaMateriais={() => escolherTag("materiais")}
-										abrirMaterial={(arquivo) => props.navegar(`caderno/${materiaId}/materiais/${arquivo}`)}
-									/>
-								) : (
-									<ConteudoMateriais
-										{...(materiais ? { materiais } : {})}
-										pasta={pastaMateriaisRelativa(materiaId)}
-										enviar={(arquivos) => acoes.enviarMateriais(pastaMateriaisRelativa(materiaId), arquivos)}
-										reprocessar={(caminho) => acoes.reprocessarMaterial(caminho)}
-										{...(props.material ? { destaque: props.material } : {})}
-										dividir
-									/>
-								)}
-							</motion.div>
-						</section>
-						<AgendaDoCaderno
-							key={materiaId}
-							janela={props.janela}
-							materiaId={materiaId}
-							{...(materia ? { materia } : {})}
-							navegar={props.navegar}
-							vez={`${tag}/${editando}`}
-						/>
-						</BaixoDoCaderno>
-					</motion.div>
-				)}
+				) : null}
 			</>
 			)}
+			{/* O painel fica montado (escondido) enquanto uma nota está aberta, para voltar sem recarregar a lista, a agenda e os cursos (regra 2 de docs/padroes-de-interface.md). */}
+			{mostraPainel ? (
+				<div className="tela-caderno__painel" hidden={mostraNota}>
+						{/* layoutScroll: o painel só rola se a janela for baixa; a lista de dentro de cada seção (FixoERolagem) também tem layoutScroll, e o arrasto do mapa de conteúdo (Reorder) mede certo com qualquer um rolado. */}
+						<motion.div className="painel-caderno" layoutScroll>
+							<div className="painel-caderno__bloco">
+								<FaixaCursos
+									cursos={cursos}
+									materiaId={materiaId}
+									{...(materiaNaAba ? { materia: materiaNaAba } : {})}
+									tom={tom}
+									novoCurso={() => props.navegar(`caderno/${materiaId}/cursos/novo`)}
+									continuar={(curso) => props.navegar(`caderno/${materiaId}/cursos/${curso.id}/guia`)}
+									abrir={(curso) => props.navegar(`caderno/${materiaId}/cursos/${curso.id}`)}
+								/>
+							</div>
+							<BaixoDoCaderno>
+							<section className="painel-caderno__bloco painel-caderno__lista" aria-label="Notas, materiais e mapa de conteúdo">
+								<header className="painel-caderno__seletor">
+									<SeletorTags base={baseIds} atual={tag} contagem={contagem} escolher={escolherTag} />
+									{meta ? <span className="data painel-caderno__meta">{meta}</span> : null}
+									{tag === "notas" ? (
+										<div className="painel-caderno__acoes">
+											<Button variant="primary" icon="plus" disabled={criandoNota || !notas} onClick={() => setCriandoNota(true)}>
+												Nova nota
+											</Button>
+										</div>
+									) : null}
+								</header>
+								{/* O corpo não rola: cada seção (dividir) separa a parte de controle e de entrada, fixa em cima, da lista, que é o motion.div com layoutScroll que rola
+									    dentro do cartão (FixoERolagem; o arrasto do mapa mede por ele). A chave faz cada tag abrir no topo. */}
+								<div id={idDoPainel(baseIds)} role="tabpanel" aria-labelledby={idDaAba(baseIds, tag)} className="painel-caderno__corpo">
+								{/* O painel não remonta ao trocar de tag; só o conteúdo da tag troca, com um fade curto de opacidade (regra 7 de docs/padroes-de-interface.md). */}
+								<motion.div
+									key={tag}
+									className="painel-caderno__tag-conteudo"
+									initial={parado ? false : { opacity: 0 }}
+									animate={{ opacity: 1 }}
+									transition={{ duration: 0.15, ease: "easeOut" }}
+								>
+									{tag === "notas" ? (
+										<SecaoNotas
+												janela={props.janela}
+												materiaId={materiaId}
+												{...(notas ? { lista: notas } : {})}
+												tom={tom}
+												abrirNota={abrirNota}
+												criando={criandoNota}
+												definirCriando={setCriandoNota}
+												dividir
+											/>
+									) : tag === "mapa" ? (
+										<SecaoMapa
+											mapa={mapa}
+											tom={tom}
+											dividir
+											irParaMateriais={() => escolherTag("materiais")}
+											abrirMaterial={(arquivo) => props.navegar(`caderno/${materiaId}/materiais/${arquivo}`)}
+										/>
+									) : (
+										<ConteudoMateriais
+											{...(materiais ? { materiais } : {})}
+											pasta={pastaMateriaisRelativa(materiaId)}
+											enviar={(arquivos) => acoes.enviarMateriais(pastaMateriaisRelativa(materiaId), arquivos)}
+											reprocessar={(caminho) => acoes.reprocessarMaterial(caminho)}
+											{...(props.material ? { destaque: props.material } : {})}
+											dividir
+										/>
+									)}
+								</motion.div>
+								</div>
+							</section>
+							<AgendaDoCaderno
+							key={materiaId}
+							ponte={ponteAgenda}
+							materiaId={materiaId}
+							{...(materiaNaAba ? { materia: materiaNaAba } : {})}
+							navegar={props.navegar}
+						/>
+							</BaixoDoCaderno>
+						</motion.div>
+				</div>
+			) : null}
 			{caderno ? (
 				<ModalLinhaDoTempo aberto={verTudo} fechar={() => setVerTudo(false)} eventos={caderno.eventos} invalidas={caderno.invalidas} titulo={caderno.materia.nome} />
 			) : null}

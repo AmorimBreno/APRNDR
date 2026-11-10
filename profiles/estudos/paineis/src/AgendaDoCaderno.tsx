@@ -1,38 +1,37 @@
 // As duas colunas da agenda no painel do caderno (docs/agenda.md): as tarefas
 // (TarefasDoCaderno.tsx) e o calendário (CalendarioCompacto.tsx), as duas só com a
 // matéria do caderno. É este componente que guarda o que elas dividem:
-// - a ponte da agenda (useAgenda), pedida de novo quando `vez` muda (as provas
-//   vêm do materia.json: depois de editar a matéria a agenda vem de novo);
+// - a ponte da agenda (useAgenda), que vem pronta da TelaCaderno (ela fica lá
+//   para a agenda conhecida sobreviver quando estas colunas são remontadas) e é
+//   pedida de novo quando `vez` muda (as provas vêm do materia.json: depois de
+//   editar a matéria a agenda vem de novo);
 // - o dia escolhido: o clique no calendário muda a lista do dia na coluna de
 //   tarefas; começa em hoje;
 // - o ModalTarefa, aberto por qualquer uma das duas.
 // Devolve as duas colunas como filhas diretas da grade do BaixoDoCaderno.tsx
 // (um fragmento, sem elemento no meio), cada uma num `painel-caderno__coluna`.
 
-import type { JanelaPerfilHook } from "@estudos/ui";
 import { useMemo, useState } from "react";
 import type { Materia } from "../../lib/materia-tipos.ts";
-import { useAgenda, useHoje } from "./agenda-ponte.ts";
+import { type AgendaAberta, useHoje } from "./agenda-ponte.ts";
 import { itensDoIntervalo } from "./calendario-tela.ts";
 import { CalendarioCompacto } from "./CalendarioCompacto.tsx";
 import { ModalTarefa, useModalTarefa } from "./ModalTarefa.tsx";
 import { TarefasDoCaderno } from "./TarefasDoCaderno.tsx";
 
 export interface PropsAgendaDoCaderno {
-	janela: JanelaPerfilHook;
+	/** A ponte da agenda (useAgenda), guardada por quem monta estas colunas. */
+	ponte: AgendaAberta;
 	/** O id da matéria do caderno. */
 	materiaId: string;
 	/** A matéria (a cor e o nome); sem ela, âmbar. */
 	materia?: Materia;
 	/** Vai a outra subtela do perfil (os botões levam à tela da agenda). */
 	navegar(caminho: string): void;
-	/** Muda quando a matéria pode ter mudado (as provas): a agenda é pedida de novo. */
-	vez?: string;
 }
 
 export function AgendaDoCaderno(props: PropsAgendaDoCaderno) {
-	const { janela, materiaId, materia, navegar } = props;
-	const ponte = useAgenda(janela, props.vez);
+	const { ponte, materiaId, materia, navegar } = props;
 	const { agenda, provas, materias } = ponte;
 	const hoje = useHoje();
 	const modal = useModalTarefa();

@@ -8,6 +8,7 @@ import type { AcaoRecebida } from "@estudos/ui";
 import { type FormEvent, useEffect, useState } from "react";
 import { CORES_MATERIA, type CorMateria, type EntradaMateria, GLIFOS_MATERIA, type Materia } from "../../lib/materia-tipos.ts";
 import { proximaProva, rotuloCapa } from "./comum.ts";
+import { RotuloEstado } from "./RotuloEstado.tsx";
 
 const NOMES_COR: Record<CorMateria, string> = { moss: "Musgo", amber: "Âmbar", steel: "Aço", ink: "Tinta", cream: "Creme", sage: "Sálvia" };
 
@@ -47,8 +48,10 @@ export function ModalMateria(props: PropsModalMateria) {
 	 */
 	const [esperando, setEsperando] = useState<string | null | undefined>(undefined);
 
-	// Ao abrir: do zero para criar; com os valores da matéria para editar.
+	// Ao abrir: do zero para criar; com os valores da matéria para editar. Só reinicia quando o modal abre ou a matéria
+	// muda (o id): a referência de `materia` muda a cada lista nova que chega, e isso apagaria o que está sendo digitado.
 	const { materia } = props;
+	const idDaMateria = materia?.id;
 	useEffect(() => {
 		if (!props.aberto) return;
 		const editada = provaEditada(materia);
@@ -59,7 +62,8 @@ export function ModalMateria(props: PropsModalMateria) {
 		setDataProva(editada?.data ?? "");
 		setErro(undefined);
 		setEsperando(undefined);
-	}, [props.aberto, materia]);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [props.aberto, idDaMateria]);
 
 	// A resposta.
 	const { recebidas, salva } = props;
@@ -69,7 +73,8 @@ export function ModalMateria(props: PropsModalMateria) {
 		const ok = editando ? "alterada" : "criada";
 		for (const acao of recebidas.slice(depois)) {
 			const dados = acao.dados as { id?: string; mensagem?: string; ao?: string } | undefined;
-			if (acao.acao === ok && dados?.id) {
+			// Editando, só vale a resposta desta matéria (regra 4 de docs/padroes-de-interface.md).
+			if (acao.acao === ok && dados?.id && (!editando || dados.id === idDaMateria)) {
 				setEsperando(undefined);
 				salva(dados.id);
 				return;
@@ -80,7 +85,7 @@ export function ModalMateria(props: PropsModalMateria) {
 				return;
 			}
 		}
-	}, [recebidas, esperando, salva, editando]);
+	}, [recebidas, esperando, salva, editando, idDaMateria]);
 
 	const enviando = esperando !== undefined;
 	const enviar = (evento?: FormEvent) => {
@@ -113,7 +118,7 @@ export function ModalMateria(props: PropsModalMateria) {
 						Cancelar
 					</Button>
 					<Button variant="primary" iconRight={editando ? "check" : "arrow-right"} onClick={() => enviar()} disabled={!nome.trim() || enviando}>
-						{enviando ? (editando ? "Salvando…" : "Criando…") : editando ? "Salvar" : "Criar caderno"}
+						<RotuloEstado ocupado={enviando} repouso={editando ? "Salvar" : "Criar caderno"} passageiro={editando ? "Salvando…" : "Criando…"} />
 					</Button>
 				</>
 			}

@@ -12,11 +12,11 @@
 // tela). Um erro de mover ou do abrir aparece num aviso embaixo da barra.
 
 import { Button, EmptyState, Icon, Select } from "@estudos/design-system";
-import { type JanelaPerfilHook, type PropsTelaInicial, semMovimento } from "@estudos/ui";
+import { type JanelaPerfilHook, type PropsTelaInicial, semMovimento, useValorEstavel } from "@estudos/ui";
 import { motion } from "motion/react";
-import { useId } from "react";
+import { useId, useMemo, useState } from "react";
 import { useAgenda, useHoje } from "./agenda-ponte.ts";
-import { ABAS_DA_AGENDA, type AbaAgenda, type InicialTarefa, opcoesDeMateria, type PropsAbaAgenda, rotaDaAgenda, rotaDeVoltarDaAgenda } from "./agenda-tela.ts";
+import { ABAS_DA_AGENDA, type AbaAgenda, FILTROS_INICIAIS, type FiltrosLista, type InicialTarefa, type MemoriaDaAgenda, opcoesDeMateria, type PropsAbaAgenda, rotaDaAgenda, rotaDeVoltarDaAgenda } from "./agenda-tela.ts";
 import { classeDoTom, tomDaMateria } from "./calendario-tela.ts";
 import { CalendarioCheio } from "./CalendarioCheio.tsx";
 import { ListaTarefas } from "./ListaTarefas.tsx";
@@ -40,12 +40,25 @@ export function TelaAgenda(props: PropsTelaAgenda) {
 	const baseIds = useId();
 	const parado = semMovimento();
 
-	const nomeDaMateria = materia ? (materias.find((item) => item.id === materia)?.nome ?? materia) : undefined;
+	// O que as abas dividem e não pode zerar ao trocar de aba: o dia escolhido do calendário e os filtros da lista.
+	const [escolhido, setEscolhido] = useState(hoje);
+	const [filtros, setFiltros] = useState<FiltrosLista>(FILTROS_INICIAIS);
+	const memoria = useMemo<MemoriaDaAgenda>(
+		() => ({ escolhido, definirEscolhido: setEscolhido, filtros, definirFiltros: setFiltros }),
+		[escolhido, filtros],
+	);
+
+	// Enquanto a lista de matérias não chegou, o nome e a cor do filtro esperam (nada do id cru nem a cor neutra por um instante).
+	const aguardandoMaterias = Boolean(materia) && materias.length === 0;
+	const nomeDaMateria = materia ? (aguardandoMaterias ? " " : (materias.find((item) => item.id === materia)?.nome ?? materia)) : undefined;
 	const tomDoFiltro = materia ? tomDaMateria(materia, materias) : "neutro";
+	// "Abrindo a agenda…" só aparece se demorar mais de 1 s (regra 1 de docs/padroes-de-interface.md).
+	const semAgenda = !agenda && !aberta.erro;
+	const mostraAbrindo = useValorEstavel(semAgenda, semAgenda, false) && semAgenda;
 	const novaTarefa = (inicial?: InicialTarefa) => modal.novaTarefa({ ...(materia ? { materia } : {}), ...inicial });
 
 	const abaProps: PropsAbaAgenda | undefined = agenda
-		? { agenda, provas, materias, ...(materia ? { materia } : {}), hoje, acoes: aberta, abrirTarefa: modal.abrirTarefa, novaTarefa }
+		? { agenda, provas, materias, ...(materia ? { materia } : {}), hoje, acoes: aberta, abrirTarefa: modal.abrirTarefa, novaTarefa, memoria }
 		: undefined;
 
 	return (
@@ -64,11 +77,11 @@ export function TelaAgenda(props: PropsTelaAgenda) {
 				<SeletorAbas rotulo="Telas da agenda" abas={ABAS_DA_AGENDA} base={baseIds} atual={aba} escolher={(nova) => navegar(rotaDaAgenda(nova, materia))} />
 				<span className="agenda__espaco" />
 				<div className="agenda__filtro">
-					<span className={`agenda__tom ${classeDoTom(tomDoFiltro)}`} aria-hidden="true" />
+					<span className={`agenda__tom ${classeDoTom(tomDoFiltro)}`} aria-hidden="true" style={aguardandoMaterias ? { visibility: "hidden" } : undefined} />
 					<Select
 						size="sm"
 						aria-label="Filtrar por matéria"
-						options={opcoesDeMateria(materias, materia)}
+						options={aguardandoMaterias && materia ? [{ value: materia, label: " " }] : opcoesDeMateria(materias, materia)}
 						value={materia ?? ""}
 						onChange={(evento) => navegar(rotaDaAgenda(aba, evento.target.value || undefined))}
 					/>
@@ -91,34 +104,36 @@ export function TelaAgenda(props: PropsTelaAgenda) {
 				</p>
 			) : null}
 
-			<motion.main
-				key={aba}
-				id={idDoPainel(baseIds)}
-				role="tabpanel"
-				aria-labelledby={idDaAba(baseIds, aba)}
-				className="agenda__corpo"
-				initial={parado ? false : { opacity: 0, y: 12 }}
-				animate={{ opacity: 1, y: 0 }}
-				transition={{ type: "spring", stiffness: 380, damping: 32 }}
-			>
-				{!abaProps ? (
-					aberta.erro ? (
-						<div className="agenda__vazio">
-							<EmptyState glyph="問" title="A agenda não abriu">
-								Veja o aviso acima e tente de novo.
-							</EmptyState>
-						</div>
+			{/* O painel fica montado ao trocar de aba; só o conteúdo da aba troca, com um fade curto de opacidade (regra 7 de docs/padroes-de-interface.md). */}
+			<main id={idDoPainel(baseIds)} role="tabpanel" aria-labelledby={idDaAba(baseIds, aba)} className="agenda__corpo">
+				<motion.div
+					key={aba}
+					className="agenda__aba"
+					initial={parado ? false : { opacity: 0 }}
+					animate={{ opacity: 1 }}
+					transition={{ duration: 0.15, ease: "easeOut" }}
+				>
+					{!abaProps ? (
+						aberta.erro ? (
+							<div className="agenda__vazio">
+								<EmptyState glyph="問" title="A agenda não abriu">
+									Veja o aviso acima e tente de novo.
+								</EmptyState>
+							</div>
+						) : (
+							<p className="body agenda__carregando" style={{ visibility: mostraAbrindo ? "visible" : "hidden" }} aria-hidden={!mostraAbrindo}>
+								Abrindo a agenda…
+							</p>
+						)
+					) : aba === "tarefas" ? (
+						<ListaTarefas {...abaProps} />
+					) : aba === "quadro" ? (
+						<QuadroTarefas {...abaProps} />
 					) : (
-						<p className="body agenda__carregando">Abrindo a agenda…</p>
-					)
-				) : aba === "tarefas" ? (
-					<ListaTarefas {...abaProps} />
-				) : aba === "quadro" ? (
-					<QuadroTarefas {...abaProps} />
-				) : (
-					<CalendarioCheio {...abaProps} />
-				)}
-			</motion.main>
+						<CalendarioCheio {...abaProps} />
+					)}
+				</motion.div>
+			</main>
 
 			<ModalTarefa
 				aberto={modal.aberto}

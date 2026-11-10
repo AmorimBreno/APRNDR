@@ -9,15 +9,19 @@
 // curso pronto (o que está em andamento) ganha o tom da matéria.
 
 import { Button, Callout, Icon, type Tone } from "@estudos/design-system";
+import { useValorEstavel } from "@estudos/ui";
 import { motion } from "motion/react";
 import type { ResumoCurso } from "../../lib/curso-tipos.ts";
 import type { Materia } from "../../lib/materia-tipos.ts";
+import { useAnimarEntrada } from "./comum.ts";
 import type { CursosDaMateria } from "./cursos-ponte.ts";
 import { type CardCurso, cardsDosCursos, textoContagem } from "./faixa-cursos.ts";
 import { useDescartarCurso } from "./useDescartarCurso.tsx";
 
 export interface PropsFaixaCursos {
 	cursos: CursosDaMateria;
+	/** O id da matéria: a lista só entra animada na primeira vez que aparece para ela. */
+	materiaId: string;
 	materia?: Materia;
 	/** Cor da matéria: o primeiro curso pronto (o que está em andamento) ganha o tom pastel dela. */
 	tom: Tone;
@@ -36,6 +40,11 @@ export function FaixaCursos(props: PropsFaixaCursos) {
 			<p>{erroLista}</p>
 		</Callout>
 	) : null;
+
+	// "Abrindo os cursos…" só aparece se a lista demorar mais de 1 s; os cards só entram animados na primeira vez que a lista aparece.
+	const semLista = !lista;
+	const mostraAbrindo = useValorEstavel(semLista, semLista, false) && semLista;
+	const animar = useAnimarEntrada(`cursos:${props.materiaId}`, !semLista);
 
 	const cards = lista ? cardsDosCursos(lista, props.materia, props.tom) : [];
 	const contagem = textoContagem(cards.length);
@@ -57,9 +66,9 @@ export function FaixaCursos(props: PropsFaixaCursos) {
 			<motion.li
 				key={curso.id}
 				className="faixa-cursos__celula"
-				initial={{ opacity: 0, y: 8 }}
+				initial={animar ? { opacity: 0, y: 8 } : false}
 				animate={{ opacity: 1, y: 0 }}
-				transition={{ type: "spring", stiffness: 420, damping: 32, delay: Math.min(indice, 10) * 0.03 }}
+				transition={animar ? { type: "spring", stiffness: 420, damping: 32, delay: Math.min(indice, 10) * 0.03 } : { duration: 0 }}
 			>
 				<div className={`faixa-cursos__item faixa-cursos__item--${tom}`}>
 					<button
@@ -102,7 +111,9 @@ export function FaixaCursos(props: PropsFaixaCursos) {
 				{contagem ? <span className="overline faixa-cursos__contagem">{contagem}</span> : null}
 			</header>
 			{!lista ? (
-				<p className="body caderno__carregando">Abrindo os cursos…</p>
+				<p className="body caderno__carregando" style={{ visibility: mostraAbrindo ? "visible" : "hidden" }} aria-hidden={!mostraAbrindo}>
+					Abrindo os cursos…
+				</p>
 			) : (
 				<ul className="faixa-cursos__trilho">
 					{cards.map(cardDoCurso)}

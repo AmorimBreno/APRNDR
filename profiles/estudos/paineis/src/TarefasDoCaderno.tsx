@@ -16,6 +16,7 @@
 // O dia escolhido, a agenda e o modal vêm de AgendaDoCaderno.tsx.
 
 import { Button, Checkbox, Icon, Tag } from "@estudos/design-system";
+import { useValorEstavel } from "@estudos/ui";
 import { useMemo } from "react";
 import type { Agenda, ItemCalendario, Tarefa } from "../../lib/agenda-tipos.ts";
 import type { AgendaAberta } from "./agenda-ponte.ts";
@@ -54,6 +55,9 @@ export function TarefasDoCaderno(props: PropsTarefasDoCaderno) {
 	const { agenda } = ponte;
 	const grupos = useMemo(() => (agenda ? proximasDaMateria(agenda, hoje, materiaId) : []), [agenda, hoje, materiaId]);
 	const abertas = totalDosGrupos(grupos);
+	// "Abrindo a agenda…" só aparece se a agenda demorar mais de 1 s (regra 1 de docs/padroes-de-interface.md).
+	const semAgenda = !agenda && !ponte.erro;
+	const mostraAbrindo = useValorEstavel(semAgenda, semAgenda, false) && semAgenda;
 
 	const marcar = (tarefa: Tarefa) => {
 		if (!agenda) return;
@@ -73,7 +77,10 @@ export function TarefasDoCaderno(props: PropsTarefasDoCaderno) {
 			<header className="tarefas-cad__topo">
 				<div className="tarefas-cad__titulos">
 					<h3 className="heading tarefas-cad__titulo">Tarefas</h3>
-					{agenda ? <span className="data tarefas-cad__conta">{contagemDeAbertas(abertas)}</span> : null}
+					{/* O lugar da contagem é reservado até a agenda chegar (visibility), para o título não mudar de altura. */}
+					<span className="data tarefas-cad__conta" aria-hidden={!agenda || undefined} style={agenda ? undefined : { visibility: "hidden" }}>
+						{contagemDeAbertas(abertas)}
+					</span>
 				</div>
 				<div className="tarefas-cad__atalhos">
 					<Button
@@ -115,7 +122,9 @@ export function TarefasDoCaderno(props: PropsTarefasDoCaderno) {
 						</Button>
 					</div>
 					{!agenda ? (
-						<p className="body-sm tarefas-cad__vazio">{ponte.erro ? "A agenda não abriu." : "Abrindo a agenda…"}</p>
+						<p className="body-sm tarefas-cad__vazio" style={!ponte.erro && !mostraAbrindo ? { visibility: "hidden" } : undefined} aria-hidden={(!ponte.erro && !mostraAbrindo) || undefined}>
+							{ponte.erro ? "A agenda não abriu." : "Abrindo a agenda…"}
+						</p>
 					) : itensDoDia.length === 0 ? (
 						<p className="body-sm tarefas-cad__vazio">Nada marcado para este dia.</p>
 					) : (
@@ -159,6 +168,13 @@ export function TarefasDoCaderno(props: PropsTarefasDoCaderno) {
 					)}
 				</section>
 
+				{!agenda ? (
+					// O lugar das próximas é reservado (invisível) até a agenda chegar: a altura não salta.
+					<section className="tarefas-cad__proximas" aria-hidden="true" style={{ visibility: "hidden" }}>
+						<h4 className="overline tarefas-cad__proximas-titulo">Próximas</h4>
+						<p className="body-sm tarefas-cad__vazio">Nenhuma tarefa aberta.</p>
+					</section>
+				) : null}
 				{agenda ? (
 					<section className="tarefas-cad__proximas" aria-label="Próximas tarefas abertas">
 						<h4 className="overline tarefas-cad__proximas-titulo">Próximas</h4>

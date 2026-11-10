@@ -18,7 +18,7 @@
 // também: a etapa Esqueleto edita com ele o nome e o objetivo dos módulos.
 
 import { Button, Callout, Checkbox, EmptyState, Icon, Modal, pad2, Tag, type Tone } from "@estudos/design-system";
-import { MenuSuspenso } from "@estudos/ui";
+import { MenuSuspenso, semMovimento, useValorEstavel } from "@estudos/ui";
 import { AnimatePresence, motion, Reorder, useDragControls } from "motion/react";
 import { type KeyboardEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { type Conceito, contarMapa, novoIdConceito, type Operacao, type Prioridade, semFonte } from "../../lib/mapa-tipos.ts";
@@ -38,6 +38,9 @@ import { FixoERolagem } from "./FixoERolagem.tsx";
 import { formatarDolar } from "./ModalMateriais.tsx";
 
 const MOLA = { type: "spring", stiffness: 420, damping: 34 } as const;
+/** A mesma transição sem movimento, para quem reduziu o movimento no Windows (regra 7 de docs/padroes-de-interface.md). */
+const SEM_MOLA = { duration: 0 } as const;
+const mola = <T,>(transicao: T): T | typeof SEM_MOLA => (semMovimento() ? SEM_MOLA : transicao);
 
 const OPCOES_PRIORIDADE = [
 	{ id: "alta", titulo: "Alta" },
@@ -93,7 +96,7 @@ export function ProgressoMapa({ mapa, tema }: { mapa: MapaDaMateria; tema?: stri
 					{fila ? <span className="mapa__fila"> {fila}</span> : null}
 				</p>
 				<span className="mapa__barra" aria-hidden="true">
-					<motion.span initial={false} animate={{ width: `${Math.round(progressoAndamento(andamento) * 100)}%` }} transition={{ type: "spring", stiffness: 200, damping: 30 }} />
+					<motion.span initial={false} animate={{ width: `${Math.round(progressoAndamento(andamento) * 100)}%` }} transition={mola({ type: "spring", stiffness: 200, damping: 30 })} />
 				</span>
 				<div className="mapa__botoes">
 					<Button variant="ghost" size="sm" icon="stop" onClick={mapa.cancelar}>
@@ -126,11 +129,16 @@ export function SecaoMapa(props: PropsSecaoMapa) {
 
 	const avisos = <AvisosMapa mapa={props.mapa} />;
 	const dividir = props.dividir ? { dividir: true } : {};
+	// "Abrindo o mapa…" só aparece se demorar mais de 1 s (regra 1 de docs/padroes-de-interface.md).
+	const abrindo = !estado || !mapa;
+	const mostraAbrindo = useValorEstavel(abrindo, abrindo, false) && abrindo;
 
 	if (!estado || !mapa) {
 		return (
 			<FixoERolagem classe="mapa" {...dividir} fixo={avisos}>
-				<p className="body caderno__carregando">Abrindo o mapa…</p>
+				<p className="body caderno__carregando" style={{ visibility: mostraAbrindo ? "visible" : "hidden" }} aria-hidden={!mostraAbrindo}>
+					Abrindo o mapa…
+				</p>
 			</FixoERolagem>
 		);
 	}
@@ -238,7 +246,7 @@ export function AvisosMapa({ mapa }: { mapa: MapaDaMateria }) {
 		<div className="mapa__erros">
 			<AnimatePresence initial={false}>
 				{mapa.erros.map((erro) => (
-					<motion.div key={erro.chave} initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }} transition={MOLA}>
+					<motion.div key={erro.chave} initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }} transition={mola(MOLA)}>
 						<Callout tone="amber" label="Não deu certo" icon="alert">
 							<p>
 								{erro.mensagem}
@@ -266,7 +274,7 @@ export function ForaDoMapa(props: { conceitos: Conceito[]; operar(operacoes: Ope
 		<section className="mapa__fora">
 			<button type="button" className="mapa__fora-cabeca" aria-expanded={verFora} onClick={() => setVerFora((valor) => !valor)}>
 				<span className="overline">Fora do mapa ({fora.length})</span>
-				<motion.span className="mapa__seta" animate={{ rotate: verFora ? 90 : 0 }} transition={{ type: "spring", stiffness: 500, damping: 30 }}>
+				<motion.span className="mapa__seta" animate={{ rotate: verFora ? 90 : 0 }} transition={mola({ type: "spring", stiffness: 500, damping: 30 })}>
 					<Icon name="chevron-right" size={16} strokeWidth={2.5} />
 				</motion.span>
 			</button>
@@ -278,7 +286,7 @@ export function ForaDoMapa(props: { conceitos: Conceito[]; operar(operacoes: Ope
 						initial={{ height: 0, opacity: 0 }}
 						animate={{ height: "auto", opacity: 1 }}
 						exit={{ height: 0, opacity: 0 }}
-						transition={{ type: "spring", stiffness: 420, damping: 38 }}
+						transition={mola({ type: "spring", stiffness: 420, damping: 38 })}
 					>
 						<ul className="mapa__fora-lista">
 							{fora.map((conceito) => (
@@ -484,7 +492,7 @@ function LinhaConceito(props: PropsLinha) {
 				setArrastando(false);
 				props.soltar();
 			}}
-			transition={MOLA}
+			transition={mola(MOLA)}
 			className={`mapa__conceito${selecao ? " mapa__conceito--selecao" : ""}${arrastando ? " mapa__conceito--arrastando" : ""}`}
 		>
 			<span
@@ -708,7 +716,7 @@ export function ConceitoNovo(props: { adicionar(nome: string, descricao: string)
 		);
 	}
 	return (
-		<motion.div className="mapa__novo" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={MOLA}>
+		<motion.div className="mapa__novo" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={mola(MOLA)}>
 			<Icon name="plus" size={18} strokeWidth={2.5} />
 			<div className="mapa__novo-campos">
 				<input

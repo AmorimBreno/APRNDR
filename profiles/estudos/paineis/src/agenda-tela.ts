@@ -186,4 +186,26 @@ export interface PropsAbaAgenda {
 	abrirTarefa(tarefa: Tarefa): void;
 	/** Abre o modal para uma tarefa nova, com valores iniciais (a data do dia, a coluna…). A matéria do filtro já vem preenchida. */
 	novaTarefa(inicial?: InicialTarefa): void;
+	/** O que a casca guarda entre as abas (o dia escolhido do calendário, os filtros da lista); sem ela, cada aba guarda o seu. */
+	memoria?: MemoriaDaAgenda;
+}
+
+/** Os filtros da aba Tarefas. */
+export interface FiltrosLista {
+	/** A coluna do filtro; vazio = todas. */
+	coluna: string;
+	mostrarFeitas: boolean;
+	/** O grupo das feitas está aberto. */
+	feitasAbertas: boolean;
+}
+
+export const FILTROS_INICIAIS: FiltrosLista = { coluna: "", mostrarFeitas: true, feitasAbertas: false };
+
+/** O estado das abas que sobe para a casca (TelaAgenda), para não zerar ao trocar de aba e voltar. */
+export interface MemoriaDaAgenda {
+	/** O dia escolhido no calendário (AAAA-MM-DD). */
+	escolhido: string;
+	definirEscolhido(data: string): void;
+	filtros: FiltrosLista;
+	definirFiltros(mudar: (atuais: FiltrosLista) => FiltrosLista): void;
 }

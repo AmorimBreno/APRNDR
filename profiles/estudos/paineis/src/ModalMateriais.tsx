@@ -7,7 +7,7 @@
 // Quando o caderno existir (4.3), este conteúdo vira a seção Materiais dele.
 
 import { Button, FileDrop, formatBytes, Icon, type IconName, Modal, Tag, type TagProps } from "@estudos/design-system";
-import type { SituacaoMaterial } from "@estudos/ui";
+import { semMovimento, type SituacaoMaterial, useValorEstavel } from "@estudos/ui";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import type { Materia } from "../../lib/materia-tipos.ts";
@@ -77,7 +77,13 @@ export function ModalMateriais(props: PropsModalMateriais) {
 			open={props.aberto}
 			onClose={props.fechar}
 			title="Materiais"
-			kicker={props.materia ? `${props.materia.nome} · ${materiais.length} ${materiais.length === 1 ? "arquivo" : "arquivos"}` : undefined}
+			kicker={
+				props.materia
+					? props.materiais
+						? `${props.materia.nome} · ${materiais.length} ${materiais.length === 1 ? "arquivo" : "arquivos"}`
+						: props.materia.nome
+					: undefined
+			}
 			size="lg"
 			footer={
 				<>
@@ -111,6 +117,9 @@ export function ConteudoMateriais(props: PropsConteudoMateriais) {
 	const [erro, setErro] = useState<string | undefined>(undefined);
 	const [aviso, setAviso] = useState<string | undefined>(undefined);
 	const materiais = props.materiais ?? [];
+	// "Carregando a lista…" só aparece se a lista demorar mais de 1 s (regra 1 de docs/padroes-de-interface.md).
+	const carregando = props.materiais === undefined;
+	const mostraCarregando = useValorEstavel(carregando, carregando, false) && carregando;
 
 	const receber = (arquivos: File[]) => {
 		if (arquivos.length === 0) return;
@@ -148,7 +157,9 @@ export function ConteudoMateriais(props: PropsConteudoMateriais) {
 			}
 		>
 			{props.materiais === undefined ? (
-				<p className="materiais__vazio body-sm">Carregando a lista…</p>
+				<p className="materiais__vazio body-sm" style={{ visibility: mostraCarregando ? "visible" : "hidden" }} aria-hidden={!mostraCarregando}>
+					Carregando a lista…
+				</p>
 			) : materiais.length === 0 ? (
 				<p className="materiais__vazio body-sm">
 					Nenhum material ainda. Os slides e as listas da matéria viram texto pesquisável: o professor busca neles e cita a página.
@@ -177,6 +188,8 @@ function LinhaMaterial({
 	destacado = false,
 }: { material: SituacaoMaterial; reprocessar(caminho: string): Promise<void>; destacado?: boolean }) {
 	const [pedindo, setPedindo] = useState(false);
+	// Com movimento reduzido, a linha entra, sai e muda de lugar sem animar.
+	const parado = semMovimento();
 	const linha = useRef<HTMLLIElement>(null);
 	useEffect(() => {
 		if (destacado) linha.current?.scrollIntoView({ block: "center", behavior: "smooth" });
@@ -186,11 +199,11 @@ function LinhaMaterial({
 	const podeReprocessar = (material.estado === "pronto" || material.estado === "erro") && material.tipo;
 	return (
 		<motion.li
-			layout
-			initial={{ opacity: 0, y: 8, scale: 0.98 }}
+			layout={!parado}
+			initial={parado ? false : { opacity: 0, y: 8, scale: 0.98 }}
 			animate={{ opacity: 1, y: 0, scale: 1 }}
-			exit={{ opacity: 0, x: -16, transition: { duration: 0.16 } }}
-			transition={{ type: "spring", stiffness: 420, damping: 30 }}
+			exit={parado ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, x: -16, transition: { duration: 0.16 } }}
+			transition={parado ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 30 }}
 			ref={linha}
 			className={`ap-file material${material.estado === "erro" ? " ap-file--error" : ""}${destacado ? " material--destacado" : ""}`}
 		>
@@ -239,7 +252,7 @@ function LinhaMaterial({
 			</span>
 			{progresso !== undefined ? (
 				<span className="ap-file__bar material__barra" aria-hidden="true">
-					<motion.span initial={false} animate={{ width: `${Math.round(progresso * 100)}%` }} transition={{ type: "spring", stiffness: 200, damping: 30 }} />
+					<motion.span initial={false} animate={{ width: `${Math.round(progresso * 100)}%` }} transition={parado ? { duration: 0 } : { type: "spring", stiffness: 200, damping: 30 }} />
 				</span>
 			) : null}
 		</motion.li>

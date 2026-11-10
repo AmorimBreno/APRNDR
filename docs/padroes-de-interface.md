@@ -59,7 +59,11 @@ Como: ResizeObserver no elemento medido. Exemplo: o título da nota (EditorNota.
 
 ## 7. Transições curtas e discretas
 
-Trocas de conteúdo usam um fade curto (por volta de 150 ms, só opacidade). O que não muda (o painel ao lado, a barra do topo) não anima na troca: nada de View Transition da página inteira entre abas do mesmo lugar (EntradaTelaInicial.semTransicao). Com "reduzir movimento" no Windows, nada anima (semMovimento de @estudos/ui).
+Trocar um conteúdo por outro do mesmo lugar (outra nota, outra lição, outra tag, outra aba da agenda, outra etapa do guia) usa um fade curto (por volta de 150 ms, só opacidade), sem deslocamento e sem remontar o que não mudou. O que não muda (o painel ao lado, a barra do topo) não anima na troca: nada de View Transition da página inteira entre abas do mesmo lugar (EntradaTelaInicial.semTransicao).
+
+Isto não vale para as animações de entrada e de interação com física da decisão 13.12 (a mensagem voando, o texto aparecendo, os cards inclinando, o carimbo do quiz, o modal nascendo do botão, a passagem do card do perfil para a folha): elas ficam, pedidas pelo Breno. O cuidado é elas não se repetirem a cada volta à mesma tela (uma lista que já estava na tela não entra de novo) e pararem com movimento reduzido.
+
+Com "reduzir movimento" no Windows, nada anima (semMovimento de @estudos/ui, inclusive em animações feitas com animate, useAnimate, useSpring e CSS: o MotionConfig não cobre todas).
 
 
 ## 8. Detalhes visuais que se repetem

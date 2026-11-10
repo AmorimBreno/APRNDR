@@ -1,0 +1,31 @@
+import { describe, expect, it } from "vitest";
+import { trocaSemTransicao } from "./transicoes.ts";
+
+describe("trocaSemTransicao", () => {
+	it("tags do painel do mesmo caderno não animam a página", () => {
+		expect(trocaSemTransicao("caderno/calc/notas", "caderno/calc/materiais")).toBe(true);
+		expect(trocaSemTransicao("caderno/calc/materiais", "caderno/calc/mapa")).toBe(true);
+		expect(trocaSemTransicao("caderno/calc", "caderno/calc/mapa")).toBe(true);
+	});
+
+	it("abas da mesa da mesma matéria não animam", () => {
+		expect(trocaSemTransicao("caderno/calc/notas/A", "caderno/calc/notas/B")).toBe(true);
+		expect(trocaSemTransicao("caderno/calc/notas/A", "caderno/calc/cursos/c1/modulos/m1/l2")).toBe(true);
+	});
+
+	it("abas da agenda não animam, com ou sem filtro", () => {
+		expect(trocaSemTransicao("agenda/calendario", "agenda/tarefas")).toBe(true);
+		expect(trocaSemTransicao("agenda/quadro/calc", "agenda/calendario/calc")).toBe(true);
+		expect(trocaSemTransicao("agenda/tarefas", "agenda/tarefas/calc")).toBe(true);
+	});
+
+	it("o resto anima como antes", () => {
+		expect(trocaSemTransicao("", "caderno/calc")).toBe(false);
+		expect(trocaSemTransicao("caderno/calc/notas", "caderno/fisica/notas")).toBe(false);
+		expect(trocaSemTransicao("caderno/calc/notas", "caderno/calc/notas/A")).toBe(false);
+		expect(trocaSemTransicao("caderno/calc/notas/A", "caderno/calc/notas")).toBe(false);
+		expect(trocaSemTransicao("caderno/calc/notas", "agenda/calendario")).toBe(false);
+		expect(trocaSemTransicao("caderno/calc/cursos/c1", "caderno/calc/notas")).toBe(false);
+		expect(trocaSemTransicao("caderno/calc/notas", "caderno/calc/notas")).toBe(false);
+	});
+});

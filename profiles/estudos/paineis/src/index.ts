@@ -4,7 +4,7 @@
 
 import type { EntradaTelaInicial, RegistroPaineis } from "@estudos/ui";
 import { ehPergunta, PainelQuiz } from "./PainelQuiz.tsx";
-import { abaDoCaminho } from "./abas-mesa.ts";
+import { trocaSemTransicao } from "./transicoes.ts";
 import { PAINEL_AGENDA } from "./agenda-ponte.ts";
 import { PAINEL_CADERNOS, usarAparenciaMaterias } from "./comum.ts";
 import { PAINEL_CURSOS } from "./cursos-ponte.ts";
@@ -26,8 +26,9 @@ export const telaInicialEstudos: EntradaTelaInicial = {
 	rotuloDoCaminho: (caminho) => (caminho.startsWith("caderno/") ? "Caderno" : caminho.startsWith("agenda") ? "Agenda" : undefined),
 	// O nome e a cor de agora de cada matéria, para a pílula do histórico da conversa.
 	usarAparenciaContextos: usarAparenciaMaterias,
-	// Trocar de aba da mesa (duas notas ou lições da mesma matéria) não anima a página: o professor ao lado não pisca.
-	semTransicao: (de, para) => abaDoCaminho(de) !== undefined && abaDoCaminho(para) !== undefined && de.split("/")[1] === para.split("/")[1],
+	// Trocas dentro do mesmo lugar (tags do caderno, abas da mesa, abas da agenda) não animam a página inteira:
+	// só a parte que muda é refeita (transicoes.ts).
+	semTransicao: trocaSemTransicao,
 };
 
 export const paineisEstudos: RegistroPaineis = {

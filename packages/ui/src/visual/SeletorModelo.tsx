@@ -20,6 +20,13 @@ export interface PropsSeletorModelo {
 	desabilitado?: boolean;
 	/** Linha acima do título do modal ("Perfil · Estudos"). */
 	legenda?: string;
+	/** "pill": a pill compacta com o nome curto, para a caixa da conversa embutida. Padrão: a tecla do topo. */
+	variante?: "tecla" | "pill";
+}
+
+/** "openai/gpt-6.1-sol" -> "gpt-6.1-sol". */
+export function nomeCurtoDoModelo(modelo: string): string {
+	return modelo.slice(modelo.lastIndexOf("/") + 1);
 }
 
 function detalhes(info: InfoModelo | undefined): string {
@@ -83,18 +90,33 @@ export function SeletorModelo(props: PropsSeletorModelo) {
 	return (
 		<>
 			{/* Tecla, não campo: abre um modal (o agente, que escolhe ali mesmo, é o campo com contorno). */}
-			<button
-				type="button"
-				className="topo__tecla"
-				aria-haspopup="dialog"
-				aria-label={`Modelo: ${props.atual ?? "nenhum"}. Abrir a escolha de modelo`}
-				onClick={() => setAberto(true)}
-				disabled={props.desabilitado}
-			>
-				<span className="overline">Modelo</span>
-				<span className="topo__valor data">{props.atual ?? "Nenhum"}</span>
-				<Icon name="arrow-up-right" size={16} strokeWidth={2.5} />
-			</button>
+			{props.variante === "pill" ? (
+				<button
+					type="button"
+					className="modelo-pill"
+					aria-haspopup="dialog"
+					aria-label={`Modelo: ${props.atual ?? "nenhum"}. Abrir a escolha de modelo`}
+					{...(props.atual ? { title: props.atual } : {})}
+					onClick={() => setAberto(true)}
+					disabled={props.desabilitado}
+				>
+					<span className="modelo-pill__nome data">{props.atual ? nomeCurtoDoModelo(props.atual) : "Modelo"}</span>
+					<Icon name="chevron-down" size={12} strokeWidth={2.75} />
+				</button>
+			) : (
+				<button
+					type="button"
+					className="topo__tecla"
+					aria-haspopup="dialog"
+					aria-label={`Modelo: ${props.atual ?? "nenhum"}. Abrir a escolha de modelo`}
+					onClick={() => setAberto(true)}
+					disabled={props.desabilitado}
+				>
+					<span className="overline">Modelo</span>
+					<span className="topo__valor data">{props.atual ?? "Nenhum"}</span>
+					<Icon name="arrow-up-right" size={16} strokeWidth={2.5} />
+				</button>
+			)}
 			<Modal
 				open={aberto}
 				onClose={() => setAberto(false)}

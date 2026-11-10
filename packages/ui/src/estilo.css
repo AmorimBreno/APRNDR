@@ -178,10 +178,13 @@ a.linha:hover .linha__texto .overline, a.linha:focus-visible .linha__texto .over
 .ferramentas { display: flex; flex-direction: column; color: var(--ink-muted); }
 .documento__item--resposta + .documento__item--ferramentas, .documento__item--usuario + .documento__item--ferramentas { margin-top: -24px; }
 .documento__item--ferramentas + .documento__item--pedido, .documento__item--pedido + .documento__item--ferramentas { margin-top: -24px; }
-.ferramentas__resumo { display: inline-flex; align-self: flex-start; align-items: center; gap: var(--space-2); max-width: 100%; padding: 4px var(--space-2); margin-left: calc(-1 * var(--space-2)); border: 0; border-radius: var(--radius-sm); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background-color .16s ease-out, color .16s ease-out; }
+.ferramentas__resumo { display: flex; width: 100%; align-items: center; gap: var(--space-2); min-width: 0; padding: 4px var(--space-2); margin-left: calc(-1 * var(--space-2)); border: 0; border-radius: var(--radius-sm); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background-color .16s ease-out, color .16s ease-out; }
+.ferramentas__texto { flex: 0 1 auto; }
+.ferramentas__fim { flex: none; margin-left: auto; color: var(--ink-subtle); }
+.ferramenta__tipo { flex: none; color: var(--ink-subtle); }
 .ferramentas__resumo:hover { background: var(--surface-hover); color: var(--ink); }
 .ferramentas__resumo:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-.ferramentas__texto { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ferramentas__texto { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .ferramentas__seta, .ferramenta__seta { flex: none; transition: transform .2s var(--mola); }
 .ferramentas--aberto .ferramentas__seta, .ferramenta--aberta > .ferramenta__linha .ferramenta__seta { transform: rotate(90deg); }
 .ferramentas__lista { display: flex; flex-direction: column; gap: 2px; overflow: hidden; margin: var(--space-1) 0 0 7px; padding-left: var(--space-3); border-left: var(--border-control) solid var(--line); }
@@ -421,3 +424,34 @@ code.codigo-em-linha, .ap-prose code.codigo-em-linha { padding: .1em .35em; bord
 .barra__citacao { display: flex; align-items: center; gap: var(--space-2); min-width: 0; padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3); border-left: var(--border-strong) solid var(--amber); border-radius: var(--radius-sm); background: var(--amber-tint); color: var(--ink); }
 .barra__citacao > .ap-icon { flex: none; color: var(--ink-muted); }
 .barra__citacao-texto { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+/* ── Painel embutido: a caixa do campo com as pills acima e a linha do modelo dentro ── */
+.barra__embutida { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.barra__pills { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); min-width: 0; }
+.barra__pill { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; max-width: 100%; height: var(--control-sm); padding: 0 var(--space-3); border-radius: var(--radius-full); background: var(--surface-raised); box-shadow: inset 0 0 0 var(--border-hair) var(--line); color: var(--ink); }
+.barra__pill > .ap-icon { flex: none; color: var(--ink-muted); }
+.barra__pill-texto { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.barra__pill-x { flex: none; display: inline-grid; place-items: center; width: 20px; height: 20px; margin-right: -6px; padding: 0; border: 0; border-radius: var(--radius-full); background: none; color: var(--ink-muted); cursor: pointer; transition: background-color .12s ease-out, color .12s ease-out; }
+.barra__pill-x:hover { background: var(--surface-hover); color: var(--ink); }
+.barra__pill-x:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.barra__caixa { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3); border: var(--border-control) solid var(--line-strong); border-radius: var(--radius-lg); background: var(--surface-raised); transition: border-color .12s ease-out, box-shadow .12s ease-out; }
+.barra__caixa:focus-within { border-color: var(--focus); box-shadow: 0 0 0 1px var(--focus); }
+.barra__caixa--desabilitada { opacity: var(--opacity-disabled); }
+.barra__campo { display: block; width: 100%; min-height: 28px; margin: 0; padding: 4px 0; border: 0; outline: 0; resize: none; background: transparent; color: var(--ink); }
+.barra__campo::placeholder { color: var(--ink-subtle); opacity: 1; }
+.barra__rodape { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.barra__rodape-fim { margin-left: auto; flex: none; }
+.barra__conexao { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; color: var(--ink-muted); white-space: nowrap; }
+.barra__conexao-ponto { flex: none; width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--brick-text); }
+.barra__conexao--aberta .barra__conexao-ponto { background: var(--sage-text); }
+.barra__conexao--reconectando .barra__conexao-ponto { background: var(--amber); animation: ponto-pulsa 1.1s ease-in-out infinite; }
+.barra__dica { margin: 0; padding-left: var(--space-1); color: var(--ink-subtle); }
+.modelo-pill { display: inline-flex; align-items: center; gap: var(--space-1); min-width: 0; max-width: 60%; height: var(--control-sm); padding: 0 var(--space-3); border: 0; border-radius: var(--radius-full); background: var(--surface-hover); box-shadow: inset 0 0 0 var(--border-hair) var(--line); color: var(--ink); cursor: pointer; transition: background-color .12s ease-out; }
+.modelo-pill:hover { background: var(--surface-well); }
+.modelo-pill:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.modelo-pill:disabled { cursor: default; opacity: var(--opacity-disabled); }
+.modelo-pill__nome { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+@media (prefers-reduced-motion: reduce) {
+	.barra__conexao--reconectando .barra__conexao-ponto { animation: none; }
+	.barra__caixa, .barra__pill-x, .modelo-pill { transition: none; }
+}

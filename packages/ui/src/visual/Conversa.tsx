@@ -51,6 +51,48 @@ const ROTULO_STATUS: Record<ChamadaFerramenta["status"], string> = {
 	sem_resultado: "Sem resultado",
 };
 
+type TipoFerramenta = "busca" | "leitura" | "web" | "subagente" | "comando";
+
+/** O tipo da ferramenta pelo nome, quando dá para inferir; o resto é comando. */
+export function tipoDaFerramenta(nome: string): TipoFerramenta {
+	const n = nome.toLowerCase();
+	if (/web|tavily|http|url|fetch|navega|internet/.test(n)) return "web";
+	if (/subagent|sub_agent|agente|delega|task|equipe/.test(n)) return "subagente";
+	if (/busca|buscar|search|grep|procura|pesquis|glob/.test(n)) return "busca";
+	if (/(ler|leia|read|abrir|abre|ver|cat)|^ler_|^read_|leitura|^get_|^obter_/.test(n)) return "leitura";
+	return "comando";
+}
+
+/** Desenhos que o design system ainda não tem (mesma grade 24, traço quadrado). */
+const DESENHOS: Record<"busca" | "web" | "subagente" | "comando", string> = {
+	busca: "M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13zM15.5 15.5L20 20",
+	web: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3c2.5 2.5 3.5 5.5 3.5 9s-1 6.5-3.5 9c-2.5-2.5-3.5-5.5-3.5-9S9.5 5.5 12 3z",
+	subagente: "M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM3 19c0-3 2.5-5 6-5s6 2 6 5M16 5.2a3 3 0 0 1 0 5.6M18 14.3c1.8.7 3 2.2 3 4.7",
+	comando: "M4 5h16v14H4zM7.5 9.5l3 2.5-3 2.5M12.5 15h4",
+};
+
+/** O ícone pelo tipo da ferramenta. */
+function IconeFerramenta({ tipo }: { tipo: TipoFerramenta }) {
+	if (tipo === "leitura") return <Icon name="file" size={14} strokeWidth={2.5} className="ferramenta__tipo" />;
+	return (
+		<svg
+			viewBox="0 0 24 24"
+			width={14}
+			height={14}
+			fill="none"
+			stroke="currentColor"
+			strokeWidth={2.5}
+			strokeLinecap="square"
+			strokeLinejoin="miter"
+			className="ap-icon ferramenta__tipo"
+			aria-hidden="true"
+			focusable="false"
+		>
+			<path d={DESENHOS[tipo]} />
+		</svg>
+	);
+}
+
 /** O sinal pequeno do status: ponto âmbar pulsando, visto, alerta ou traço. */
 function SinalStatus({ chamada }: { chamada: ChamadaFerramenta }) {
 	return (
@@ -106,7 +148,8 @@ export function LinhaFerramenta({ chamada, vivo = false }: { chamada: ChamadaFer
 		>
 			<button type="button" className="ferramenta__linha" aria-expanded={aberta} onClick={() => setAberta((valor) => !valor)}>
 				<Icon name="chevron-right" size={14} strokeWidth={2.5} className="ferramenta__seta" />
-				<span className="ferramenta__nome data">{chamada.nome}</span>
+				<IconeFerramenta tipo={tipoDaFerramenta(chamada.nome)} />
+					<span className="ferramenta__nome data">{chamada.nome}</span>
 				{argumentos ? <span className="ferramenta__args code">{argumentos}</span> : <span className="ferramenta__args" />}
 				<span className="ferramenta__fim">
 					{chamada.duracaoMs !== undefined ? <span className="data">{decimal.format(chamada.duracaoMs / 1000)} s</span> : null}
@@ -168,17 +211,26 @@ function GrupoFerramentas({ chamadas, vivo }: { chamadas: ChamadaFerramenta[]; v
 	const [aberto, setAberto] = useState(false);
 	const { texto, erros } = rotuloGrupo(chamadas);
 	const rodando = chamadas.some((chamada) => chamada.status === "executando");
+	// O tipo do grupo: o das chamadas, se todas são do mesmo tipo; senão, comando.
+	const tipos = new Set(chamadas.map((chamada) => tipoDaFerramenta(chamada.nome)));
+	const tipo = tipos.size === 1 ? [...tipos][0]! : "comando";
+	const unica = chamadas.length === 1 ? chamadas[0] : undefined;
 	return (
 		<div className={`ferramentas${aberto ? " ferramentas--aberto" : ""}`}>
 			<button type="button" className="ferramentas__resumo" aria-expanded={aberto} onClick={() => setAberto((valor) => !valor)}>
-				{rodando ? <span className="ferramenta__ponto" aria-hidden="true" /> : <Icon name="code" size={14} strokeWidth={2.5} />}
+				<Icon name="chevron-right" size={14} strokeWidth={2.5} className="ferramentas__seta" />
+				{rodando ? <span className="ferramenta__ponto" aria-hidden="true" /> : <IconeFerramenta tipo={tipo} />}
 				<span className="body-sm ferramentas__texto">{texto}</span>
 				{erros > 0 ? (
 					<Tag tone="brick" size="sm" icon="alert">
 						{erros === 1 ? "1 com erro" : `${erros} com erro`}
 					</Tag>
 				) : null}
-				<Icon name="chevron-right" size={14} strokeWidth={2.5} className="ferramentas__seta" />
+				{unica?.duracaoMs !== undefined ? (
+					<span className="ferramentas__fim data">{decimal.format(unica.duracaoMs / 1000)} s</span>
+				) : chamadas.length > 1 ? (
+					<span className="ferramentas__fim data">{chamadas.length}</span>
+				) : null}
 			</button>
 			<AnimatePresence initial={false}>
 				{aberto ? (

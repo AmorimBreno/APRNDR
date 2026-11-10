@@ -7,7 +7,8 @@
 // - "embutido": um painel que preenche o contêiner do pai (a mesa de estudo
 //   do perfil, PropsConversaEmbutida em @estudos/ui). Escondido é hidden e
 //   inert, nunca desmontado, para o rascunho, a citação, a resposta em
-//   andamento e os pedidos continuarem. Sem seletor de modelo e de agente.
+//   andamento e os pedidos continuarem. O campo vira uma caixa com as pills
+//   acima e o modelo, a conexão e o enviar dentro; sem seletor de agente.
 //
 // Nada daqui conhece nota, lição ou matéria: o perfil entrega o contexto da
 // tela, o cabeçalho e a citação pela PropsConversaEmbutida.
@@ -25,6 +26,7 @@ import {
 	type ErroJanela,
 	idsDosPaineis,
 	iniciarVoo,
+	type InfoModelo,
 	type ItemAssistente,
 	type JanelaPerfilHook,
 	ModalPedido,
@@ -34,6 +36,7 @@ import {
 	resumoDoPedido,
 	ROTULOS_ATIVIDADE,
 	type ResumoPerfil,
+	SeletorModelo,
 	type Voo,
 } from "@estudos/ui";
 import { type Dispatch, type ReactNode, type SetStateAction, useEffect, useMemo, useRef, useState } from "react";
@@ -65,6 +68,8 @@ export interface PropsPainelConversa {
 	obterContexto?: PropsConversaEmbutida["obterContexto"];
 	cabecalho?: ReactNode;
 	citacao?: PropsConversaEmbutida["citacao"];
+	acimaDoCampo?: ReactNode;
+	placeholder?: string;
 	aoPedidoPendente?: PropsConversaEmbutida["aoPedidoPendente"];
 	/** Só no embutido: o link "Abrir na tela cheia" (a rota da conversa do perfil). */
 	hrefTelaCheia?: string;
@@ -131,6 +136,8 @@ export function PainelConversa({
 	obterContexto,
 	cabecalho,
 	citacao,
+	acimaDoCampo,
+	placeholder,
 	aoPedidoPendente,
 	hrefTelaCheia,
 }: PropsPainelConversa) {
@@ -146,6 +153,19 @@ export function PainelConversa({
 	const painelVisivel = !embutido || abertaProp;
 	const painelVisivelRef = useRef(painelVisivel);
 	painelVisivelRef.current = painelVisivel;
+
+	// O catálogo de modelos, para o seletor da caixa do campo (só o embutido mostra).
+	const [modelos, setModelos] = useState<InfoModelo[]>([]);
+	const listarModelos = acoes.listarModelos;
+	const pronto = estado.pronto;
+	useEffect(() => {
+		if (!embutido || !conectada || !pronto) return;
+		listarModelos().then(setModelos, () => {});
+	}, [embutido, conectada, pronto, listarModelos]);
+	const modelosDoPerfil = useMemo(
+		() => (perfil?.agentes ?? []).map((agente) => agente.modelo).filter((modelo): modelo is string => Boolean(modelo)),
+		[perfil],
+	);
 
 	// O perfil recarregado pode ter mudado os agentes: relê a lista.
 	const avisoRecarregado = estado.recarregado?.chave;
@@ -332,6 +352,28 @@ export function PainelConversa({
 			parar={parar}
 			campoRef={campo}
 			{...(embutido && citacao ? { citacao } : {})}
+			{...(embutido
+				? {
+						embutida: {
+							...(acimaDoCampo ? { acima: acimaDoCampo } : {}),
+							...(placeholder ? { placeholder } : {}),
+							conexao,
+							modelo: (
+								<SeletorModelo
+									variante="pill"
+									{...(estado.sessao?.modelo ? { atual: estado.sessao.modelo } : {})}
+									doPerfil={modelosDoPerfil}
+									modelos={modelos}
+									trocar={(modelo) => {
+										acoes.trocarModelo(modelo).catch(() => {});
+									}}
+									desabilitado={!conectada || estado.executando}
+									legenda={`Perfil · ${perfil?.nome ?? ""}`}
+								/>
+							),
+						},
+					}
+				: {})}
 		/>
 	);
 

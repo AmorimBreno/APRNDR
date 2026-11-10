@@ -83,10 +83,17 @@ export function EditorNota(props: PropsEditorNota) {
 		setNoCaminho(props.titulo);
 		if (!mesmoTitulo(props.titulo, aberta.titulo)) setAberta({ titulo: props.titulo, vez: aberta.vez + 1 });
 	}
+	// O último rótulo de situação mostrado ("Salva às 10:02"): passa para a nota seguinte, que o mantém na tela
+	// até o estado dela durar o bastante (rotuloEstavel), em vez de piscar "Abrindo…" na troca.
+	const ultimoRotulo = useRef<string | undefined>(undefined);
 	return (
 		<EditorDaNota
 			key={aberta.vez}
 			{...props}
+			rotuloInicial={ultimoRotulo.current}
+			aoMostrarRotulo={(rotulo) => {
+				ultimoRotulo.current = rotulo;
+			}}
 			titulo={aberta.titulo}
 			renomeada={(para) => {
 				// Mesma vez: o editor continua montado, só o título (e o caminho) mudam.
@@ -97,7 +104,28 @@ export function EditorNota(props: PropsEditorNota) {
 	);
 }
 
-function EditorDaNota(props: PropsEditorNota) {
+/** Quanto um estado passageiro (abrindo, mudanças por salvar, salvando) precisa durar para aparecer. */
+const ESPERA_ESTADO_PASSAGEIRO = 1000;
+
+/**
+ * O rótulo de situação que fica na tela: os estados finais (salva, erro, conflito, só leitura) aparecem na
+ * hora; os passageiros só se durarem mais de ESPERA_ESTADO_PASSAGEIRO. Assim trocar de nota ou salvar
+ * rápido não pisca "Abrindo…" ou "Salvando…" (pedido do Breno em 2026-11-10).
+ */
+function useRotuloEstavel(rotulo: string, passageiro: boolean, inicial: string | undefined): string {
+	const [visivel, setVisivel] = useState(() => (passageiro && inicial !== undefined ? inicial : rotulo));
+	useEffect(() => {
+		if (!passageiro) {
+			setVisivel(rotulo);
+			return;
+		}
+		const espera = setTimeout(() => setVisivel(rotulo), ESPERA_ESTADO_PASSAGEIRO);
+		return () => clearTimeout(espera);
+	}, [rotulo, passageiro]);
+	return visivel;
+}
+
+function EditorDaNota(props: PropsEditorNota & { rotuloInicial?: string | undefined; aoMostrarRotulo?(rotulo: string): void }) {
 	const { janela, materiaId } = props;
 	const { acoes } = janela;
 	const [nota, setNota] = useState<NotaAberta | undefined>(undefined);
@@ -584,6 +612,13 @@ function EditorDaNota(props: PropsEditorNota) {
 		salvarAgora(true);
 	};
 
+	const passageiro = !somenteLeitura && (situacao.tipo === "abrindo" || situacao.tipo === "suja" || situacao.tipo === "salvando");
+	const rotuloVisivel = useRotuloEstavel(rotuloSituacao(situacao, somenteLeitura), passageiro, props.rotuloInicial);
+	const aoMostrarRotulo = props.aoMostrarRotulo;
+	useEffect(() => {
+		aoMostrarRotulo?.(rotuloVisivel);
+	}, [rotuloVisivel, aoMostrarRotulo]);
+
 	return (
 		<>
 			{/* A faixa de cima: voltar e a situação do salvamento. O título fica na página. */}
@@ -593,7 +628,7 @@ function EditorDaNota(props: PropsEditorNota) {
 					Notas{props.materiaNome ? ` · ${props.materiaNome}` : ""}
 				</button>
 				<span className="data editor-nota__situacao" aria-live="polite">
-					{rotuloSituacao(situacao, somenteLeitura)}
+					{rotuloVisivel}
 				</span>
 			</header>
 			{/* Na mesa de estudo, as abas das notas e lições abertas ficam aqui, dentro do cartão e abaixo do voltar. */}

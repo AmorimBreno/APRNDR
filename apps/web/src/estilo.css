@@ -132,7 +132,9 @@ a.cartao:hover .cartao__carregar .overline, a.cartao:focus-visible .cartao__carr
 .topo__tecla:disabled { cursor: default; opacity: var(--opacity-disabled); transform: none; box-shadow: var(--key-lip); }
 .topo__painel { display: inline-flex; align-items: center; gap: var(--space-2); height: var(--control-md); padding: 0 var(--space-4) 2px; border: 0; border-radius: var(--radius-md); background: var(--paper); color: var(--on-paper); box-shadow: var(--key-lip); cursor: pointer; }
 .topo__painel:active { transform: translateY(1px); box-shadow: var(--key-lip-pressed); }
-.topo__painel--aberto { background: var(--surface-ground); color: var(--ink); }
+/* Aberto é o estado ativo: âmbar com texto escuro (docs/padroes-de-interface.md, regra 8). */
+.topo__painel--aberto { background: var(--amber); color: var(--on-amber); }
+.topo__painel--aberto .topo__contador { background: var(--on-amber); color: var(--amber); }
 .topo__contador { padding: 0 6px; border-radius: var(--radius-full); background: var(--amber); color: var(--on-amber); }
 .topo button:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .topo button:disabled { cursor: default; opacity: var(--opacity-disabled); }

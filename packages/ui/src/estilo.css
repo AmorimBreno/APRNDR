@@ -247,7 +247,11 @@ a.linha:hover .linha__texto .overline, a.linha:focus-visible .linha__texto .over
 .historico__item:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .historico__item:disabled { cursor: default; opacity: var(--opacity-disabled); }
 .historico__item--atual, .historico__item--atual:hover { background: transparent; cursor: default; }
-.historico__marca { position: absolute; inset: calc(var(--border-control) * -1); z-index: 0; border: var(--border-control) solid var(--amber); border-radius: var(--radius-md); background: var(--amber-tint); }
+.historico__marca { position: absolute; inset: calc(var(--border-control) * -1); z-index: 0; border: var(--border-control) solid var(--amber); border-radius: var(--radius-md); background: var(--amber); }
+/* O item ativo em âmbar com texto escuro (docs/padroes-de-interface.md, regra 8). */
+.historico__item--atual .historico__titulo { color: var(--on-amber); }
+/* A etiqueta da matéria tem fundo e cor próprios e fica como está. */
+.historico__item--atual .historico__meta { color: color-mix(in srgb, var(--on-amber) 72%, transparent); }
 .historico__titulo, .historico__meta, .historico__etiqueta { position: relative; z-index: 1; }
 /* O contexto da conversa (a matéria), em cima do título: a pílula no fundo da cor do caderno. */
 .historico__etiqueta { align-self: flex-start; max-width: 100%; margin-bottom: 4px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -282,7 +286,8 @@ a.linha:hover .linha__texto .overline, a.linha:focus-visible .linha__texto .over
 .menu-agente__item:focus { outline: none; }
 .menu-agente__item:hover, .menu-agente__item:focus-visible { background: var(--surface-hover); }
 .menu-agente__item:focus-visible { box-shadow: inset 0 0 0 2px var(--focus); }
-.menu-agente__item--atual { background: var(--amber-tint); }
+.menu-agente__item--atual, .menu-agente__item--atual:hover { background: var(--amber); color: var(--on-amber); }
+.menu-agente__item--atual * { color: inherit; }
 .menu-agente__check { flex: none; display: inline-flex; margin-left: auto; color: var(--amber); }
 .menu-agente__check--oculto { visibility: hidden; }
 .menu-agente__texto { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -296,7 +301,8 @@ a.linha:hover .linha__texto .overline, a.linha:focus-visible .linha__texto .over
 .modelo { display: flex; align-items: center; gap: var(--space-3); width: 100%; padding: 10px var(--space-3); border: var(--border-control) solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised); color: var(--ink); text-align: left; cursor: pointer; }
 .modelo:hover { background: var(--surface-hover); }
 .modelo:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-.modelo--atual, .modelo--atual:hover { border-color: var(--amber); background: var(--amber-tint); }
+.modelo--atual, .modelo--atual:hover { border-color: var(--amber); background: var(--amber); color: var(--on-amber); }
+.modelo--atual * { color: inherit; }
 .modelo__texto { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .modelo__nome, .modelo__detalhes { overflow-wrap: anywhere; color: var(--ink-muted); }
 

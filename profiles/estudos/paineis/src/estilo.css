@@ -1607,9 +1607,12 @@ button.relatorio__evidencia:focus-visible { outline: none; box-shadow: var(--foc
 .cal-dia--fora:hover { background: var(--surface-hover); }
 .cal-dia__numero { display: grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: var(--radius-full); }
 .cal-dia--hoje .cal-dia__numero { background: var(--tom, var(--amber)); color: var(--tom-tinta, var(--on-amber)); }
-.cal-dia--escolhido { box-shadow: inset 0 0 0 var(--border-strong) var(--ink); }
+/* O dia escolhido em âmbar com texto escuro (docs/padroes-de-interface.md, regra 8); o hoje dentro dele inverte. */
+.cal-dia--escolhido, .cal-dia--escolhido:hover { background: var(--amber); color: var(--on-amber); }
+.cal-dia--escolhido.cal-dia--hoje .cal-dia__numero { background: var(--on-amber); color: var(--amber); }
+.cal-dia--escolhido .cal-ponto { box-shadow: 0 0 0 1px var(--on-amber); }
 .cal-dia:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-.cal-dia--escolhido:focus-visible { box-shadow: inset 0 0 0 var(--border-strong) var(--ink), var(--focus-ring); }
+.cal-dia--escolhido:focus-visible { box-shadow: var(--focus-ring); }
 .cal-dia__pontos { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 3px; min-height: 6px; }
 .cal-dia__mais { color: var(--ink-muted); letter-spacing: 0; }
 .cal-ponto { width: 6px; height: 6px; border-radius: var(--radius-full); background: var(--tom, var(--line-strong)); }
@@ -1723,9 +1726,9 @@ button.relatorio__evidencia:focus-visible { outline: none; box-shadow: var(--foc
 .cal-cheio__mini-numero { display: grid; place-items: center; width: 28px; height: 28px; border: var(--border-strong) solid transparent; border-radius: var(--radius-full); transition: background-color .12s ease-out, border-color .12s ease-out; }
 .cal-cheio__mini-dia:hover .cal-cheio__mini-numero { background: var(--surface-hover); }
 .cal-cheio__mini-dia--fora { color: var(--ink-subtle); }
-.cal-cheio__mini-dia--hoje .cal-cheio__mini-numero { background: var(--amber); color: var(--on-amber); }
-.cal-cheio__mini-dia--hoje:hover .cal-cheio__mini-numero { background: var(--amber); filter: brightness(1.08); }
-.cal-cheio__mini-dia--escolhido .cal-cheio__mini-numero { border-color: var(--ink); }
+/* Hoje é um anel âmbar; o dia escolhido é cheio, em âmbar com texto escuro (docs/padroes-de-interface.md, regra 8). */
+.cal-cheio__mini-dia--hoje .cal-cheio__mini-numero { border-color: var(--amber); color: var(--ink); }
+.cal-cheio__mini-dia--escolhido .cal-cheio__mini-numero, .cal-cheio__mini-dia--escolhido:hover .cal-cheio__mini-numero { border-color: var(--amber); background: var(--amber); color: var(--on-amber); }
 .cal-cheio__mini-dia:focus-visible { outline: none; }
 .cal-cheio__mini-dia:focus-visible .cal-cheio__mini-numero { box-shadow: var(--focus-ring); }
 .cal-cheio__mini-pontos { position: absolute; left: 0; right: 0; bottom: 2px; display: flex; justify-content: center; gap: 3px; height: 6px; }
@@ -1759,12 +1762,14 @@ button.relatorio__evidencia:focus-visible { outline: none; box-shadow: var(--foc
 .cal-cheio__celula:hover { background: var(--surface-raised); }
 .cal-cheio__celula--fora { background: var(--surface-ground); color: var(--ink-subtle); }
 .cal-cheio__celula--fora:hover { background: var(--surface-panel); }
-.cal-cheio__celula--escolhida { box-shadow: inset 0 0 0 var(--border-strong) var(--ink); }
+/* A célula escolhida: contorno âmbar e o número do dia em âmbar com texto escuro (a célula toda em âmbar apagaria as etiquetas). */
+.cal-cheio__celula--escolhida { box-shadow: inset 0 0 0 var(--border-strong) var(--amber); }
 .cal-cheio__cabeca { flex: none; display: flex; align-items: flex-start; justify-content: space-between; height: 28px; margin-bottom: 2px; }
 .cal-cheio__dia { display: flex; align-items: center; gap: var(--space-2); height: 28px; padding: 0; border: 0; background: none; color: inherit; cursor: pointer; }
 .cal-cheio__dia-nome { color: var(--ink-muted); }
 .cal-cheio__numero { display: grid; place-items: center; min-width: 28px; height: 28px; border-radius: var(--radius-full); }
-.cal-cheio__celula--hoje .cal-cheio__numero { background: var(--amber); color: var(--on-amber); }
+.cal-cheio__celula--hoje .cal-cheio__numero { box-shadow: inset 0 0 0 var(--border-strong) var(--amber); }
+.cal-cheio__celula--escolhida .cal-cheio__numero { background: var(--amber); color: var(--on-amber); }
 .cal-cheio__dia:focus-visible { outline: none; }
 .cal-cheio__dia:focus-visible .cal-cheio__numero { box-shadow: var(--focus-ring); }
 /* O "+" só aparece com o mouse em cima (ou o foco dentro do dia). */

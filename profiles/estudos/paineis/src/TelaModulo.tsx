@@ -79,7 +79,7 @@ import {
 	TextArea,
 	type Tone,
 } from "@estudos/design-system";
-import { AgenteAnimado, type DadosAvatarAgente, type JanelaPerfilHook, Markdown, MenuSuspenso, semMovimento } from "@estudos/ui";
+import { AgenteAnimado, type DadosAvatarAgente, type JanelaPerfilHook, Markdown, MenuSuspenso, semMovimento, useValorEstavel } from "@estudos/ui";
 import { AnimatePresence, motion } from "motion/react";
 import { type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { AVALIACOES_BLOCO, MOTIVOS_RETORNO, NOMES_AVALIACAO, NOMES_MOTIVO, TEXTO_REGRA_MAXIMO, TEXTO_RETORNO_MAXIMO } from "../../lib/escrita-tipos.ts";
@@ -176,6 +176,7 @@ import {
 } from "./modulo-tela.ts";
 import { type ErroVistoModulo, reescrevendoNoModulo, useModuloAberto, useModulos } from "./modulos-ponte.ts";
 import { PerguntaSlider } from "./PerguntaSlider.tsx";
+import { RotuloEstado } from "./RotuloEstado.tsx";
 import { type AcoesQuestoes, QuestaoModulo, QuestaoParaLer } from "./QuestaoModulo.tsx";
 import { placarDoModulo, TEXTO_TODAS_FEITAS, textoDoProgresso, todasFeitas } from "./questao-modulo-tela.ts";
 import { type AcoesRelatorio, RelatorioMetodo } from "./RelatorioMetodo.tsx";
@@ -411,10 +412,19 @@ export interface PropsVisaoModulo {
 
 /** A CourseBar e o corpo da visão, pelos dados (sem ponte: dá para desenhar no servidor). */
 export function VisaoModulo(props: PropsVisaoModulo) {
-	const { materia, abertura, moduloId } = props;
+	const { materia } = props;
+	// "Abrindo o módulo…" é um estado passageiro (docs/padroes-de-interface.md, regras 1 e 2): até durar 1 s, fica o módulo
+	// que já estava na tela (com a rota e a lição dele) ou, na primeira abertura, um espaço da mesma altura da linha.
+	const carregandoAgora = props.abertura.tipo === "carregando";
+	const textoPronto = useValorEstavel(carregandoAgora, carregandoAgora, false) && carregandoAgora;
+	const ultimaVista = useRef<{ abertura: Abertura; moduloId: string; licaoId: string | undefined } | undefined>(undefined);
+	const vistaAtual = { abertura: props.abertura, moduloId: props.moduloId, licaoId: props.licaoId };
+	if (!carregandoAgora) ultimaVista.current = vistaAtual;
+	const vista = carregandoAgora && !textoPronto && ultimaVista.current ? ultimaVista.current : vistaAtual;
+	const { abertura, moduloId, licaoId } = vista;
 	const doEsqueleto = props.modulosDoCurso.find((modulo) => modulo.id === moduloId);
 	const modulo = abertura.tipo === "pronto" ? abertura.modulo : undefined;
-	const indice = modulo ? indiceDaLicao(modulo.licoes, props.licaoId) : 0;
+	const indice = modulo ? indiceDaLicao(modulo.licoes, licaoId) : 0;
 	const licao = modulo?.licoes[indice];
 	const total = modulo?.licoes.length ?? 0;
 	const proximo = modulo ? proximoDaBarra(indice, total) : undefined;
@@ -426,7 +436,13 @@ export function VisaoModulo(props: PropsVisaoModulo) {
 
 	let conteudo: ReactNode;
 	if (abertura.tipo === "carregando") {
-		conteudo = <p className="body caderno__carregando">Abrindo o módulo…</p>;
+		conteudo = textoPronto ? (
+			<p className="body caderno__carregando">Abrindo o módulo…</p>
+		) : (
+			<p className="body caderno__carregando" aria-hidden="true">
+				&nbsp;
+			</p>
+		);
 	} else if (abertura.tipo === "nao_gerado" || abertura.tipo === "ilegivel") {
 		const naoGerado = abertura.tipo === "nao_gerado";
 		conteudo = (
@@ -492,9 +508,9 @@ export function VisaoModulo(props: PropsVisaoModulo) {
 							},
 						}
 					: {})}
-				steps={passosDaTrilha(props.modulosDoCurso, props.estados, moduloId)}
+				steps={passosDaTrilha(props.modulosDoCurso, props.estados, props.moduloId)}
 				onStepClick={(id) => {
-					if (id !== moduloId && id !== ID_AVALIACAO_GERAL) props.abrirModulo(id);
+					if (id !== props.moduloId && id !== ID_AVALIACAO_GERAL) props.abrirModulo(id);
 				}}
 				onBack={props.voltarAoCurso}
 				backLabel="Curso"
@@ -555,17 +571,45 @@ function LicaoAberta(props: {
 		corpo.current?.scrollTo({ top: 0 });
 	}, [licao.id]);
 
-	// Outra lição: o texto entra com um fade rápido de opacidade (sem animação com movimento reduzido).
-	const primeiraDoFade = useRef(true);
-	useLayoutEffect(() => {
-		if (primeiraDoFade.current) {
-			primeiraDoFade.current = false;
-			return;
-		}
-		const elemento = corpo.current;
-		if (!elemento || semMovimento() || typeof elemento.animate !== "function") return;
-		elemento.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 150, easing: "ease-out" });
+	// A lição só aparece desenhada (regra 3): o artigo fica com visibility hidden, ocupando o espaço, até as imagens
+	// terem tamanho e um quadro ter passado, com prazo de 400 ms. Aí entra com um fade de 150 ms só de opacidade (sem
+	// animação com movimento reduzido). O artigo não é remontado na troca; só os blocos (a chave leva a lição).
+	const [prontaDe, setProntaDe] = useState<string | undefined>(undefined);
+	const pronta = prontaDe === licao.id;
+	useEffect(() => {
+		const elemento = artigo.current;
+		if (!elemento) return;
+		let cancelado = false;
+		const inicio = performance.now();
+		const proximoQuadro = (fazer: () => void) => {
+			let feito = false;
+			const uma = () => {
+				if (feito || cancelado) return;
+				feito = true;
+				fazer();
+			};
+			requestAnimationFrame(uma);
+			setTimeout(uma, 32);
+		};
+		const conferir = () => {
+			const desenhado = [...elemento.querySelectorAll("img")].every((imagem) => imagem.complete);
+			if (desenhado || performance.now() - inicio > 400) proximoQuadro(() => setProntaDe(licao.id));
+			else proximoQuadro(conferir);
+		};
+		proximoQuadro(conferir);
+		return () => {
+			cancelado = true;
+		};
 	}, [licao.id]);
+	const fadeDe = useRef<string | undefined>(undefined);
+	useLayoutEffect(() => {
+		if (!pronta || fadeDe.current === licao.id) return;
+		const primeiraVez = fadeDe.current === undefined;
+		fadeDe.current = licao.id;
+		const elemento = artigo.current;
+		if (primeiraVez || !elemento || semMovimento() || typeof elemento.animate !== "function") return;
+		elemento.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 150, easing: "ease-out" });
+	}, [pronta, licao.id]);
 
 	// O bloco atual da régua: o que cruza a linha do meio da área que rola.
 	useEffect(() => {
@@ -709,15 +753,7 @@ function LicaoAberta(props: {
 				</nav>
 				<div className="modulo__leitura">
 					<SectionRuler className="modulo__regua" label="Blocos da lição" items={itensDaRegua(licao)} {...(atual ? { current: atual } : {})} onSelect={irParaBloco} />
-					<motion.article
-						ref={artigo}
-						key={licao.id}
-						className="modulo__licao"
-						aria-labelledby="modulo-licao-titulo"
-						initial={semMovimento() ? false : { opacity: 0, y: 12 }}
-						animate={{ opacity: 1, y: 0 }}
-						transition={MOLA}
-					>
+					<article ref={artigo} className={`modulo__licao${pronta ? "" : " modulo__licao--carregando"}`} aria-labelledby="modulo-licao-titulo">
 						<AnimatePresence initial={false}>
 							{aviso ? (
 								<motion.div
@@ -745,7 +781,7 @@ function LicaoAberta(props: {
 						<div className="modulo__blocos">
 							{licao.blocos.map((bloco, posicao) => (
 								<BlocoDaLicao
-									key={bloco.id}
+									key={`${licao.id}/${bloco.id}`}
 									bloco={bloco}
 									modulo={modulo}
 									numero={posicao + 1}
@@ -792,7 +828,7 @@ function LicaoAberta(props: {
 								) : null}
 							</span>
 						</footer>
-					</motion.article>
+					</article>
 				</div>
 			</div>
 			<Modal
@@ -808,7 +844,7 @@ function LicaoAberta(props: {
 							Ainda não
 						</Button>
 						<Button variant="primary" icon="check" onClick={concluir} disabled={concluindo} aria-busy={concluindo}>
-							{concluindo ? "Concluindo…" : "Concluir"}
+							<RotuloEstado ocupado={concluindo} repouso="Concluir" passageiro="Concluindo…" />
 						</Button>
 					</>
 				}
@@ -1073,7 +1109,7 @@ export function BlocoDaLicao(props: {
 						) : null}
 						<TextoComTermos bloco={bloco.id} licao={licao}>
 							{ehQuestao(bloco) ? (
-								<QuestaoModulo key={versao} bloco={bloco} resposta={props.resposta} {...(props.questoes ? { acoes: props.questoes } : {})} />
+								<QuestaoModulo key={`${licao}/${bloco.id}/${versao}`} bloco={bloco} resposta={props.resposta} {...(props.questoes ? { acoes: props.questoes } : {})} />
 							) : (
 								<ConteudoDoBloco bloco={bloco} />
 							)}
@@ -1297,11 +1333,11 @@ function BalaoDeRetorno(props: {
 				{tentou && problema ? <span className="body-sm retorno__falta">{problema}</span> : null}
 				<span className="retorno__botoes">
 					<Button variant={melhorar ? "secondary" : "primary"} size="sm" onClick={() => enviar(false)} disabled={Boolean(enviando)} aria-busy={enviando === "salvar"}>
-						{enviando === "salvar" ? "Salvando…" : "Salvar retorno"}
+						<RotuloEstado ocupado={enviando === "salvar"} repouso="Salvar retorno" passageiro="Salvando…" />
 					</Button>
 					{melhorar ? (
 						<Button variant="primary" size="sm" icon="refresh" onClick={() => enviar(true)} disabled={Boolean(enviando)} aria-busy={enviando === "reescrever"}>
-							{enviando === "reescrever" ? "Salvando…" : "Salvar e reescrever o bloco"}
+							<RotuloEstado ocupado={enviando === "reescrever"} repouso="Salvar e reescrever o bloco" passageiro="Salvando…" />
 						</Button>
 					) : null}
 				</span>
@@ -1320,6 +1356,24 @@ function VersaoAnterior(props: { bloco: Bloco; anteriores: BlocoAnterior[] }) {
 	const [indice, setIndice] = useState(() => anteriorInicial(anteriores));
 	const atual = Math.min(indice, anteriores.length - 1);
 	const anterior = anteriores[atual]!;
+	// Trocar de versão: o corpo guarda a altura que tinha (min-height) para a altura não saltar, e a versão nova entra com
+	// um fade de 150 ms só de opacidade.
+	const corpo = useRef<HTMLDivElement>(null);
+	const [alturaMinima, setAlturaMinima] = useState<number | undefined>(undefined);
+	const irPara = (novo: number) => {
+		setAlturaMinima(corpo.current?.offsetHeight);
+		setIndice(novo);
+	};
+	const primeiraVersao = useRef(true);
+	useLayoutEffect(() => {
+		if (primeiraVersao.current) {
+			primeiraVersao.current = false;
+			return;
+		}
+		const elemento = corpo.current;
+		if (!elemento || semMovimento() || typeof elemento.animate !== "function") return;
+		elemento.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 150, easing: "ease-out" });
+	}, [atual]);
 	const data = dataDaVersao(anterior);
 	return (
 		<section className="retorno__anterior" aria-label="Versão anterior do bloco">
@@ -1328,7 +1382,7 @@ function VersaoAnterior(props: { bloco: Bloco; anteriores: BlocoAnterior[] }) {
 				{data ? <span className="data retorno__anterior-data">{data}</span> : null}
 				{anteriores.length > 1 ? (
 					<span className="retorno__setas">
-						<Button variant="ghost" size="sm" iconOnly icon="arrow-left" aria-label="Versão mais antiga" disabled={atual === 0} onClick={() => setIndice(atual - 1)} />
+						<Button variant="ghost" size="sm" iconOnly icon="arrow-left" aria-label="Versão mais antiga" disabled={atual === 0} onClick={() => irPara(atual - 1)} />
 						<Button
 							variant="ghost"
 							size="sm"
@@ -1336,12 +1390,12 @@ function VersaoAnterior(props: { bloco: Bloco; anteriores: BlocoAnterior[] }) {
 							icon="arrow-right"
 							aria-label="Versão mais nova"
 							disabled={atual >= anteriores.length - 1}
-							onClick={() => setIndice(atual + 1)}
+							onClick={() => irPara(atual + 1)}
 						/>
 					</span>
 				) : null}
 			</div>
-			<div className="ap-prose lesson-body retorno__anterior-corpo">
+			<div ref={corpo} className="ap-prose lesson-body retorno__anterior-corpo" style={alturaMinima ? { minHeight: alturaMinima } : undefined}>
 				<ConteudoDoBloco key={atual} bloco={anterior} />
 			</div>
 		</section>
@@ -1462,7 +1516,7 @@ function QuestionarioDaLicao(props: { enviado: QuestionarioLicao | undefined; en
 					</Button>
 				) : null}
 				<Button variant="primary" size="sm" icon="send" onClick={enviar} disabled={Boolean(problema) || enviando} aria-busy={enviando}>
-					{enviando ? "Enviando…" : "Enviar"}
+					<RotuloEstado ocupado={enviando} repouso="Enviar" passageiro="Enviando…" />
 				</Button>
 			</div>
 		</section>

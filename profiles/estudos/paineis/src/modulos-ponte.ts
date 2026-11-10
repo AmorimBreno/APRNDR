@@ -209,10 +209,11 @@ export function useModuloAberto(janela: JanelaPerfilHook, materia: string, curso
 	}, [sessaoId, abrir]);
 	const recebidas = estadoJanela.acoesPorPainel[PAINEL_MODULOS];
 	const lido = useMemo(() => lerModuloAberto(recebidas ?? [], materia, curso, modulo), [recebidas, materia, curso, modulo]);
-	const ultimo = useRef<{ chave: string; lido: LidoModuloAberto } | undefined>(undefined);
+	// Um por módulo (poucos): ir do A para o B e voltar ao A não mostra "Abrindo o módulo…" de novo.
+	const ultimos = useRef<Map<string, LidoModuloAberto>>(new Map());
 	const chave = `${materia}/${curso}/${modulo}`;
-	if (lido.modulo || lido.erro !== undefined) ultimo.current = { chave, lido };
-	const valendo = lido.modulo || lido.erro !== undefined ? lido : ultimo.current?.chave === chave ? ultimo.current.lido : {};
+	if (lido.modulo || lido.erro !== undefined) ultimos.current.set(chave, lido);
+	const valendo = lido.modulo || lido.erro !== undefined ? lido : (ultimos.current.get(chave) ?? {});
 	return { ...valendo, abrirDeNovo: abrir };
 }
 

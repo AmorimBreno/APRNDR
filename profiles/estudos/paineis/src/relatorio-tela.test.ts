@@ -488,7 +488,10 @@ describe("os experimentos em Como o professor escreve", () => {
 
 	it("sem nada, a frase do vazio; antes da lista, abrindo; com erro de lista, o erro", () => {
 		expect(renderToString(createElement(SecaoExperimentos, { ajustes: ajustesDe({ arquivos: [], aprendizados: { itens: [] } }) }))).toContain("Nenhum experimento ainda.");
-		expect(renderToString(createElement(SecaoExperimentos, { ajustes: ajustesDe() }))).toContain("Abrindo os experimentos…");
+		// "Abrindo os experimentos…" é passageiro: só aparece depois de 1 s; no primeiro quadro, a linha vazia (aria-hidden) guarda o espaço.
+		const abrindo = renderToString(createElement(SecaoExperimentos, { ajustes: ajustesDe() }));
+		expect(abrindo).not.toContain("Abrindo os experimentos…");
+		expect(abrindo).toContain('class="body ajustes__texto" aria-hidden="true"');
 		const comErro = renderToString(createElement(SecaoExperimentos, { ajustes: ajustesDe({ erro: { chave: "1", mensagem: "Não listou." } }) }));
 		expect(comErro).toContain("Não listou.");
 		expect(comErro).toContain("Tentar de novo");

@@ -9,7 +9,7 @@
 // aparece logo depois do enunciado, na pergunta e na revisão.
 
 import { Button, cx, Icon, letter, QuizFeedback, QuizQuestion, Tag, TextArea } from "@estudos/design-system";
-import { Fala, ImagemDoPerfil, Markdown, type PedidoPendente, type PropsPainel, type RegistroPedido } from "@estudos/ui";
+import { Fala, ImagemDoPerfil, Markdown, type PedidoPendente, type PropsPainel, type RegistroPedido, useValorEstavel } from "@estudos/ui";
 import type { ReactNode } from "react";
 import { motion } from "motion/react";
 import { useRef, useState } from "react";
@@ -274,6 +274,10 @@ function Resultado({ dados, quem, aoVivo = false }: { dados: DadosResultado; que
 /** Revisão no modal: o resultado da correção, ou o que aconteceu com a questão. */
 function Revisao({ registro, acoes, quem, aoVivo = false }: { registro: RegistroPedido; acoes: PropsPainel["acoes"]; quem?: ReactNode; aoVivo?: boolean }) {
 	const resultado = acoes.find((acao) => acao.acao === "resultado" && ehResultado(acao.dados) && acao.dados.id === registro.id);
+	// "Corrigindo a sua resposta…" é um estado passageiro: só aparece se durar 1 s (regra 1); até lá a linha fica vazia,
+	// na mesma altura, para a correção não empurrar nada quando chega.
+	const corrigindo = !resultado && registro.estado === "respondido";
+	const textoCorrigindo = useValorEstavel(corrigindo, corrigindo, false) && corrigindo;
 	if (resultado) return <Resultado dados={resultado.dados as DadosResultado} {...(quem ? { quem } : {})} aoVivo={aoVivo} />;
 	const dados = ehPergunta(registro) ? registro.dados : undefined;
 	return (
@@ -286,9 +290,11 @@ function Revisao({ registro, acoes, quem, aoVivo = false }: { registro: Registro
 				</Fala>
 			) : null}
 			<Figura imagem={dados?.image} />
-			<p className="body quiz__vazio">
+			<p className="body quiz__vazio" {...(corrigindo && !textoCorrigindo ? { "aria-hidden": true } : {})}>
 				{registro.estado === "respondido"
-					? "Corrigindo a sua resposta…"
+					? textoCorrigindo
+						? "Corrigindo a sua resposta…"
+						: " "
 					: registro.motivo === "usuario"
 						? "Você pulou esta questão."
 						: "A questão foi cancelada antes da resposta."}

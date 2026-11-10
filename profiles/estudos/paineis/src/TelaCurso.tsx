@@ -25,7 +25,7 @@
 // etiqueta "Próximo". Nenhum card fica bloqueado.
 
 import { Button, Callout, EmptyState, Modal, ModuleCard, Readout, SpecBox, Tag, type Tone } from "@estudos/design-system";
-import { AgenteAnimado, type DadosAvatarAgente, type JanelaPerfilHook } from "@estudos/ui";
+import { AgenteAnimado, type DadosAvatarAgente, type JanelaPerfilHook, useValorEstavel } from "@estudos/ui";
 import { AnimatePresence, motion } from "motion/react";
 import { type CSSProperties, type ReactNode, useState } from "react";
 import { hojeLocal } from "../../lib/curso-tipos.ts";
@@ -133,6 +133,10 @@ export function TelaCurso(props: PropsTelaCurso) {
 			.finally(() => setParando((atuais) => atuais.filter((id) => id !== modulo)));
 	};
 
+	// "Abrindo o curso…" é um estado passageiro: só aparece se durar 1 s (regra 1); até lá, uma linha vazia da mesma altura.
+	const abrindo = !curso && !erro;
+	const textoAbrindo = useValorEstavel(abrindo, abrindo, false) && abrindo;
+
 	let resumo: ResumoEsqueleto | undefined;
 	if (curso?.esqueleto) {
 		try {
@@ -164,7 +168,9 @@ export function TelaCurso(props: PropsTelaCurso) {
 				{erro}
 			</EmptyState>
 		) : (
-			<p className="body caderno__carregando">Abrindo o curso…</p>
+			<p className="body caderno__carregando" aria-hidden={textoAbrindo ? undefined : true}>
+				{textoAbrindo ? "Abrindo o curso…" : " "}
+			</p>
 		);
 	} else if (curso.situacao !== "pronto" || !curso.esqueleto || !resumo) {
 		conteudo = (

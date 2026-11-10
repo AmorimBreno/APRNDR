@@ -23,7 +23,7 @@
 // mostra o erro; sem nada, "Nenhum experimento ainda.".
 
 import { Button, Callout, EmptyState, Icon, Modal, Switch, Tag } from "@estudos/design-system";
-import { MenuSuspenso, semMovimento } from "@estudos/ui";
+import { MenuSuspenso, semMovimento, useValorEstavel } from "@estudos/ui";
 import { AnimatePresence, motion } from "motion/react";
 import { type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
 import { type EntradaRegra, type RegraEscrita, TEXTO_REGRA_MAXIMO } from "../../lib/escrita-tipos.ts";
@@ -100,6 +100,9 @@ export function ConteudoEscrita(props: { escrita: EscritaDoProfessor; ajustes: A
 	// O erro do listar que o Breno já fechou (pela chave da ação recebida).
 	const [dispensado, setDispensado] = useState<string | undefined>(undefined);
 	const erroLista = escrita.erro && escrita.erro.chave !== dispensado ? escrita.erro : undefined;
+	// "Abrindo as regras…" é um estado passageiro: só aparece se durar 1 s (regra 1); até lá fica o espaço da linha.
+	const abrindoRegras = !regras && !erroLista;
+	const textoAbrindoRegras = useValorEstavel(abrindoRegras, abrindoRegras, false) && abrindoRegras;
 
 	/** Salvar ou apagar: a promessa da ponte; o erro vai para o Callout, e a rejeição volta para quem chamou. */
 	const fazer = (acao: () => Promise<unknown>) => {
@@ -112,7 +115,9 @@ export function ConteudoEscrita(props: { escrita: EscritaDoProfessor; ajustes: A
 
 	let lista;
 	if (!regras) {
-		lista = erroLista ? null : <p className="body escrita__carregando">Abrindo as regras…</p>;
+		lista = erroLista ? null : <p className="body escrita__carregando" aria-hidden={textoAbrindoRegras ? undefined : true}>
+				{textoAbrindoRegras ? "Abrindo as regras…" : " "}
+			</p>;
 	} else if (regras.length === 0 && !novaAberta) {
 		lista = (
 			<EmptyState
@@ -291,6 +296,7 @@ function LinhaRegra(props: { regra: RegraEscrita; numero: number; materias: Mate
 function RegraNova(props: { aberta: boolean; abrir(): void; fechar(): void; salvar(texto: string): Promise<unknown> }) {
 	const [texto, setTexto] = useState("");
 	const [salvando, setSalvando] = useState(false);
+	const salvandoVisivel = useValorEstavel(salvando, salvando, false) && salvando;
 	const campo = useRef<HTMLTextAreaElement>(null);
 	useEffect(() => {
 		if (props.aberta) campo.current?.focus();
@@ -348,7 +354,7 @@ function RegraNova(props: { aberta: boolean; abrir(): void; fechar(): void; salv
 					onChange={(evento) => setTexto(evento.target.value)}
 					onKeyDown={tecla}
 				/>
-				<span className="body-sm mapa__novo-ajuda">{salvando ? "Salvando…" : "Enter salva · Esc fecha · vale para todas as matérias (dá para mudar depois)"}</span>
+				<span className="body-sm mapa__novo-ajuda">{salvandoVisivel ? "Salvando…" : "Enter salva · Esc fecha · vale para todas as matérias (dá para mudar depois)"}</span>
 			</div>
 			<Button variant="ghost" size="sm" iconOnly icon="close" aria-label="Fechar a regra nova" onClick={fechar} />
 		</motion.div>
@@ -367,10 +373,15 @@ export function SecaoExperimentos({ ajustes }: { ajustes: AjustesDoMetodo }) {
 	const erroLista = ajustes.erro && ajustes.erro.chave !== dispensado ? ajustes.erro : undefined;
 	const temAprendizados = Boolean(aprendizados && (aprendizados.itens.length > 0 || aprendizados.erro));
 	const vazio = grupos.length === 0 && comErro.length === 0 && !temAprendizados;
+	// "Abrindo os experimentos…" também só aparece se durar 1 s; até lá fica o espaço da linha.
+	const abrindoExperimentos = !arquivos && !erroLista;
+	const textoAbrindoExperimentos = useValorEstavel(abrindoExperimentos, abrindoExperimentos, false) && abrindoExperimentos;
 
 	let conteudo;
 	if (!arquivos) {
-		conteudo = erroLista ? null : <p className="body ajustes__texto">Abrindo os experimentos…</p>;
+		conteudo = erroLista ? null : <p className="body ajustes__texto" aria-hidden={textoAbrindoExperimentos ? undefined : true}>
+				{textoAbrindoExperimentos ? "Abrindo os experimentos…" : " "}
+			</p>;
 	} else {
 		conteudo = (
 			<div className="ajustes__arquivos">

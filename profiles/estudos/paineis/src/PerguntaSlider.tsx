@@ -21,7 +21,8 @@
 // toque ou tecla já dá um valor. Com reduzir movimento, o encaixe é direto e as
 // chamas e a lava ficam paradas.
 
-import { animate, type AnimationPlaybackControls, useReducedMotion } from "motion/react";
+import { semMovimento } from "@estudos/ui";
+import { animate, type AnimationPlaybackControls } from "motion/react";
 import { type CSSProperties, type KeyboardEvent, useCallback, useEffect, useId, useRef, useState } from "react";
 import {
 	corComPresenca,
@@ -48,7 +49,7 @@ const MOLA_ENCAIXE = { type: "spring" as const, stiffness: 520, damping: 26 };
 
 export function PerguntaSlider({ pergunta, valor, aoMudar, desligado = false }: PropsPerguntaSlider) {
 	const id = useId();
-	const reduzir = useReducedMotion() ?? false;
+	const reduzir = semMovimento();
 	// O valor contínuo do slider (null = sem resposta).
 	const [posicao, setPosicaoEstado] = useState<number | null>(valor);
 	const posicaoAtual = useRef(posicao);

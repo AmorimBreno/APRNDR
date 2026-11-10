@@ -399,7 +399,7 @@
 .campo-link { padding: 6px; }
 .campo-link__linha { display: flex; align-items: center; gap: 4px; }
 .campo-link__entrada { flex: 1; min-width: 0; height: 30px; padding: 0 8px; border: 0; border-radius: var(--radius-sm); background: var(--surface-well); color: var(--ink); box-shadow: inset 0 0 0 var(--border-hair) var(--line); }
-.campo-link__entrada:focus { outline: none; box-shadow: var(--focus-ring); }
+.campo-link__entrada:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .campo-link .menu-barra__item { margin-top: 4px; }
 
 /* ── A prévia dos blocos (PreviaBloco.tsx): um cartão ao lado do menu, na altura do item ativo ── */
@@ -459,7 +459,7 @@
 .mapa__editavel--vazio { color: var(--ink-subtle); }
 .mapa__campo { display: block; width: 100%; box-sizing: border-box; margin: 0; padding: 1px 5px; border: var(--border-control) solid var(--amber); border-radius: var(--radius-sm); background: var(--surface-panel); color: var(--ink); resize: none; }
 .mapa__texto .mapa__campo { width: calc(100% + 12px); margin: 0 -6px; }
-.mapa__campo:focus { outline: none; box-shadow: var(--focus-ring); }
+.mapa__campo:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .mapa__campo[aria-invalid="true"] { border-color: var(--brick); }
 .mapa__campo::placeholder { color: var(--ink-subtle); }
 .mapa__marcas { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: var(--space-2); }
@@ -991,6 +991,8 @@
 /* A régua no começo da área de leitura, perto do índice (pedido do Breno: no meio da tela, ela disputava com o texto). */
 .modulo__regua { position: sticky; top: 35%; grid-row: 1; grid-column: 1; justify-self: start; margin-left: calc(-1 * var(--space-3)); }
 .modulo__licao { display: flex; flex-direction: column; gap: var(--space-6); grid-row: 1; grid-column: 2; min-width: 0; padding-bottom: var(--space-8); }
+/* A lição só aparece desenhada (TelaModulo.tsx): escondida ocupando o espaço, nunca display: none. */
+.modulo__licao--carregando { visibility: hidden; }
 .modulo__aviso { position: relative; }
 .modulo__aviso .ap-callout p { margin: 0; }
 .modulo__aviso-fechar { position: absolute; top: -4px; right: 0; }
@@ -1429,6 +1431,13 @@
 .termo-cartao__cabeca span:last-child { color: var(--ink-muted); }
 .termo-cartao__cabeca span { display: inline-flex; align-items: center; gap: var(--space-1); }
 .termo-cartao__corpo { padding: var(--space-5) var(--space-5) var(--space-6); overflow-wrap: anywhere; overflow-y: auto; max-height: 60vh; color: var(--on-amber); }
+/* Rolagem fina e discreta, como as outras áreas que rolam (o polegar sobre o âmbar usa o texto escuro). */
+.termo-cartao__corpo { scrollbar-width: thin; scrollbar-color: color-mix(in oklab, var(--on-amber) 35%, transparent) transparent; }
+.termo-cartao__corpo:hover { scrollbar-color: color-mix(in oklab, var(--on-amber) 60%, transparent) transparent; }
+.termo-cartao__corpo::-webkit-scrollbar { width: 6px; height: 6px; }
+.termo-cartao__corpo::-webkit-scrollbar-track { background: transparent; }
+.termo-cartao__corpo::-webkit-scrollbar-thumb { border-radius: var(--radius-full); background: color-mix(in oklab, var(--on-amber) 35%, transparent); }
+.termo-cartao__corpo:hover::-webkit-scrollbar-thumb { background: color-mix(in oklab, var(--on-amber) 60%, transparent); }
 .termo-cartao__corpo .ap-prose, .termo-cartao__corpo .ap-prose * { color: inherit; }
 .termo-cartao__corpo .ap-prose code { background: var(--amber-pastel); color: var(--on-amber); }
 .termo-cartao__titulo { display: block; margin-bottom: var(--space-3); color: var(--on-amber); font-size: 34px; font-weight: 800; line-height: 1.1; letter-spacing: -0.01em; text-transform: none; }
@@ -1909,3 +1918,8 @@ button.cal-etq:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 	.lista-grupo__seta, .lista-linha__abrir, .quadro-cartao, .quadro-coluna__menu-botao, .quadro-item__mover-botao { transition: none; }
 	.quadro-cartao--fantasma { transform: none; }
 }
+
+/* RotuloEstado.tsx: os dois textos no mesmo lugar (a largura é a do maior); só o que vale fica visível. */
+.rotulo-estado { display: inline-grid; justify-items: center; }
+.rotulo-estado__texto { grid-area: 1 / 1; }
+.rotulo-estado__texto[data-oculto] { visibility: hidden; }

@@ -11,7 +11,7 @@
 // guia (TelaGuiaCurso.tsx), e o modal de "Gerar de novo".
 
 import { Button, Callout, EssayAnswer, Icon, Modal, pad2, QuizFeedback, QuizProgress, QuizQuestion, StudentNote, Tag } from "@estudos/design-system";
-import { AgenteAnimado, type DadosAvatarAgente, Markdown, semMovimento } from "@estudos/ui";
+import { AgenteAnimado, type DadosAvatarAgente, Markdown, semMovimento, useValorEstavel } from "@estudos/ui";
 import { motion } from "motion/react";
 import { type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Curso } from "../../lib/curso-tipos.ts";
@@ -62,6 +62,7 @@ import {
 	vizinhasNaOrdem,
 } from "./diagnostico-tela.ts";
 import type { MapaDaMateria } from "./mapa-ponte.ts";
+import { RotuloEstado } from "./RotuloEstado.tsx";
 import { ConfiancaAntes, Teclas } from "./Teclas.tsx";
 
 /** A troca de questão no resultado: uma mola curta (fade e um leve deslocamento). */
@@ -396,6 +397,7 @@ function QuestaoAtual(props: {
 	const [escolha, setEscolha] = useState<number | undefined>(undefined);
 	const [texto, setTexto] = useState("");
 	const [enviando, setEnviando] = useState(false);
+	const enviandoVisivel = useValorEstavel(enviando, enviando, false) && enviando;
 	const ativa = confianca !== undefined && !enviando;
 	const enviar = (resposta: { escolha: number } | { texto: string }) => {
 		if (confianca === undefined) return;
@@ -425,7 +427,7 @@ function QuestaoAtual(props: {
 					>
 						<div className="diag__botoes">
 							<Button variant="primary" iconRight="arrow-right" disabled={!ativa || escolha === undefined} aria-busy={enviando} onClick={() => escolha !== undefined && enviar({ escolha })}>
-								{enviando ? "Enviando…" : "Responder"}
+								<RotuloEstado ocupado={enviando} repouso="Responder" passageiro="Enviando…" />
 							</Button>
 						</div>
 					</QuizQuestion>
@@ -437,7 +439,7 @@ function QuestaoAtual(props: {
 						onChange={setTexto}
 						minLength={MINIMO_DISSERTATIVA}
 						disabled={!ativa}
-						submitLabel={enviando ? "Enviando…" : "Enviar resposta"}
+						submitLabel={enviandoVisivel ? "Enviando…" : "Enviar resposta"}
 						hint="A correção sai no resultado, depois da última questão."
 						onSubmit={(valor) => enviar({ texto: valor })}
 					/>
@@ -720,6 +722,9 @@ function CartaoDaQuestao(props: {
 	proxima?: () => void;
 }) {
 	const { questao, resposta, resultado } = props;
+	// "Corrigindo…" é um estado passageiro: só aparece se durar 1 s (regra 1); até lá a linha fica vazia, na mesma altura.
+	const corrigindo = props.situacao === "corrigindo";
+	const textoCorrigindo = useValorEstavel(corrigindo, corrigindo, false) && corrigindo;
 	const tom = tomDoResultado(resultado);
 	const partes = partesDaQuestao(questao);
 	const enunciado = <Markdown texto={partes.pergunta} emLinha />;
@@ -826,7 +831,9 @@ function CartaoDaQuestao(props: {
 						</ul>
 					</div>
 				) : props.situacao === "corrigindo" ? (
-					<p className="body guia__texto">Corrigindo…</p>
+					<p className="body guia__texto" {...(textoCorrigindo ? { role: "status" } : { "aria-hidden": true })}>
+						{textoCorrigindo ? "Corrigindo…" : " "}
+					</p>
 				) : null}
 			</>
 		);

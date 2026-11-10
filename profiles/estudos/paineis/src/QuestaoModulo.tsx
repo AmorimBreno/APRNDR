@@ -26,7 +26,7 @@
 // ponte "modulos" (modulos-ponte.ts, useModulos).
 
 import { Button, Callout, QuizQuestion, StudentNote, Tag, TextArea } from "@estudos/design-system";
-import { Markdown, semMovimento } from "@estudos/ui";
+import { Markdown, semMovimento, useValorEstavel } from "@estudos/ui";
 import { AnimatePresence, motion } from "motion/react";
 import { type ReactNode, useRef, useState } from "react";
 import type { Correcao } from "../../lib/diagnostico-tipos.ts";
@@ -45,6 +45,7 @@ import type { BlocoAlternativa, BlocoDissertativa, BlocoVerificacao } from "../.
 import { numeroCurto, partesDaQuestao } from "./diagnostico-tela.ts";
 import { fraseDaConfusao } from "./modulo-tela.ts";
 import type { ErroVistoModulo } from "./modulos-ponte.ts";
+import { RotuloEstado } from "./RotuloEstado.tsx";
 import { conferenciaDaQuestao, etiquetaDaAvaliacao, etiquetaDaMarca, fraseDaPista, textoConferindo, textoDoPlacar, vistaDoQuiz } from "./questao-modulo-tela.ts";
 import { ConfiancaAntes } from "./Teclas.tsx";
 
@@ -164,7 +165,7 @@ function Botoes(props: { comum: PropsComum; children?: ReactNode }) {
 		<div className="diag__botoes modulo__questao-botoes">
 			{comum.situacao.aceitaNaoSei ? (
 				<Button variant="ghost" onClick={comum.naoSei} disabled={comum.desligado} aria-busy={comum.pedido === "nao_sei"}>
-					{comum.pedido === "nao_sei" ? "Enviando…" : "Não sei"}
+					<RotuloEstado ocupado={comum.pedido === "nao_sei"} repouso="Não sei" passageiro="Enviando…" />
 				</Button>
 			) : null}
 			{props.children}
@@ -178,7 +179,7 @@ function BotaoResponder(props: { comum: PropsComum; pronto: boolean; responder()
 	const enviando = comum.pedido === "responder";
 	return (
 		<Button variant="primary" iconRight="arrow-right" disabled={comum.desligado || !props.pronto || comum.confianca === undefined} aria-busy={enviando} onClick={props.responder}>
-			{enviando ? "Enviando…" : "Responder"}
+			<RotuloEstado ocupado={enviando} repouso="Responder" passageiro="Enviando…" />
 		</Button>
 	);
 }
@@ -204,11 +205,19 @@ function Depois(props: { children: ReactNode }) {
 /** A conferência da tentativa que espera o modelo: "Conferindo…" (ou "Corrigindo…"), ou a falha com "Tentar de novo". */
 function Conferencia(props: { tipo: BlocoQuestao["tipo"]; comum: PropsComum }) {
 	const { conferencia, pedido, desligado } = props.comum;
+	// "Conferindo…" é um estado passageiro: só aparece se durar 1 s (regra 1); até lá a linha fica vazia, na mesma altura,
+	// para o que vem abaixo não ser empurrado.
+	const conferindo = conferencia?.tipo === "conferindo";
+	const textoPronto = useValorEstavel(conferindo, conferindo, false) && conferindo;
 	if (!conferencia) return null;
 	if (conferencia.tipo === "conferindo") {
-		return (
+		return textoPronto ? (
 			<p className="body modulo__conferindo" role="status">
 				{textoConferindo(props.tipo)}
+			</p>
+		) : (
+			<p className="body modulo__conferindo" aria-hidden="true">
+				&nbsp;
 			</p>
 		);
 	}
@@ -460,7 +469,7 @@ function Dissertativa(props: { bloco: BlocoDissertativa; resposta: RespostaModul
 						) : null}
 						{situacao.aceitaEncerrar ? (
 							<Button variant="primary" icon="book" disabled={comum.desligado} aria-busy={comum.pedido === "encerrar"} onClick={props.encerrar}>
-								{comum.pedido === "encerrar" ? "Abrindo…" : "Ver a resposta-modelo"}
+								<RotuloEstado ocupado={comum.pedido === "encerrar"} repouso="Ver a resposta-modelo" passageiro="Abrindo…" />
 							</Button>
 						) : null}
 					</div>

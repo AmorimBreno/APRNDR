@@ -18,7 +18,7 @@
 // caminho para a visão do curso (TelaCurso.tsx); "Sair" volta para ela.
 
 import { Button, Callout, EmptyState, Icon, Modal, pad2, RadioGroup, TextArea, TextField, type Tone } from "@estudos/design-system";
-import type { DadosAvatarAgente, JanelaPerfilHook, SituacaoMaterial } from "@estudos/ui";
+import { type DadosAvatarAgente, type JanelaPerfilHook, type SituacaoMaterial, semMovimento, useValorEstavel } from "@estudos/ui";
 import { motion } from "motion/react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -64,6 +64,7 @@ import type { MapaDaMateria } from "./mapa-ponte.ts";
 import { useEtapaDiagnostico } from "./EtapaDiagnostico.tsx";
 import { useEtapaEsqueleto } from "./EtapaEsqueleto.tsx";
 import { ConteudoMateriais } from "./ModalMateriais.tsx";
+import { RotuloEstado } from "./RotuloEstado.tsx";
 import { AvisosMapa, ConceitoNovo, ForaDoMapa, ListaConceitos, ProgressoMapa, useOperarMapa } from "./SecaoMapa.tsx";
 
 const MOLA = { type: "spring", stiffness: 380, damping: 32 } as const;
@@ -166,12 +167,24 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 		setMexido(false);
 		setErrosBasico({});
 	};
-	const chave = `${vista}|${curso?.id ?? ""}|${curso?.alteradoEm ?? ""}`;
-	// Só a chave importa: reverter lê o curso, as provas e o mapa de agora.
-	useEffect(() => {
+	// Trocou a etapa ou o curso: os campos voltam ao salvo já neste render (estado derivado de uma chave, sem esperar
+	// um efeito: a etapa nova nunca mostra os campos da anterior, nem por um quadro). Salvar o curso não entra na chave:
+	// o que o Breno está digitando não é apagado.
+	const chave = `${vista}|${curso?.id ?? ""}`;
+	const [chaveVista, setChaveVista] = useState(chave);
+	if (chaveVista !== chave) {
+		setChaveVista(chave);
 		reverter();
 		setErro(undefined);
-	}, [chave]);
+	}
+	// O curso mudou fora daqui (outra aba, o professor) na mesma etapa: acompanha só se nada foi mexido,
+	// para não apagar o que o Breno está digitando.
+	const alterado = curso?.alteradoEm;
+	const [alteradoVisto, setAlteradoVisto] = useState(alterado);
+	if (alteradoVisto !== alterado) {
+		setAlteradoVisto(alterado);
+		if (!mexido) reverter();
+	}
 	// A matéria (e as provas) pode chegar depois: o padrão do prazo acompanha enquanto nada foi mexido.
 	const chaveProvas = provas.map(valorDaProva).join("\n");
 	useEffect(() => {
@@ -208,6 +221,13 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 	const mapaVisto = mapa.mapa;
 	const marcadosIds = useMemo(() => (mapaVisto ? idsMarcados(mapaVisto, desmarcados) : []), [mapaVisto, desmarcados]);
 	const marcadosSet = useMemo(() => new Set(marcadosIds), [marcadosIds]);
+
+	// "Abrindo o curso…" e "Abrindo o mapa…" são estados passageiros: só aparecem se durarem 1 s (regra 1); até lá a linha
+	// fica vazia, com a mesma altura.
+	const abrindoCurso = Boolean(props.cursoId && !curso && !erroAbrir);
+	const abrindoMapa = vista === "mapa" && Boolean(curso) && !(mapa.estado && mapaVisto);
+	const textoCurso = useValorEstavel(abrindoCurso, abrindoCurso, false) && abrindoCurso;
+	const textoMapa = useValorEstavel(abrindoMapa, abrindoMapa, false) && abrindoMapa;
 
 	const entrada = entradaBasico(basico, provas);
 	const sujo = (() => {
@@ -313,7 +333,9 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 				{erroAbrir}
 			</EmptyState>
 		) : (
-			<p className="body caderno__carregando">Abrindo o curso…</p>
+			<p className="body caderno__carregando" aria-hidden={textoCurso ? undefined : true}>
+					{textoCurso ? "Abrindo o curso…" : "\u00a0"}
+				</p>
 		);
 	} else if (vista === "basico") {
 		const mudar = (mudanca: Partial<FormBasico>) => {
@@ -339,7 +361,7 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 				<div className="guia__grupo">
 					<RadioGroup legend="Prazo" options={opcoes} value={basico.escolha} onChange={(valor) => mudar({ escolha: valor })} />
 					{basico.escolha === "outra" ? (
-						<motion.div className="guia__data" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={MOLA}>
+						<motion.div className="guia__data" initial={semMovimento() ? false : { opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={MOLA}>
 							<TextField
 								type="date"
 								label="Data"
@@ -416,7 +438,9 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 			corpo = (
 				<>
 					<AvisosMapa mapa={mapa} />
-					<p className="body caderno__carregando">Abrindo o mapa…</p>
+					<p className="body caderno__carregando" aria-hidden={textoMapa ? undefined : true}>
+						{textoMapa ? "Abrindo o mapa…" : "\u00a0"}
+					</p>
 				</>
 			);
 			primario = { texto: "Continuar", desligado: "Esperando o mapa abrir." };
@@ -550,7 +574,7 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 
 	return (
 		<div className="guia">
-			<motion.section className="guia__folha" aria-labelledby="guia-titulo" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={MOLA}>
+			<motion.section className="guia__folha" aria-labelledby="guia-titulo" initial={semMovimento() ? false : { opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={MOLA}>
 				<header className="guia__cabeca">
 					<div className="guia__titulos">
 						<span className="overline">{overline}</span>
@@ -564,7 +588,13 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 				</header>
 				<TrilhoGuia curso={curso} vista={vista} abrir={(etapa) => sairPara(() => irPara(etapa))} />
 				<div className="guia__corpo">
-					<motion.div key={`${vista}|${curso?.id ?? "novo"}`} className={`guia__coluna${vista === "mapa" || vista === "diagnostico" || vista === "esqueleto" ? " guia__coluna--larga" : ""}`} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} transition={MOLA}>
+					<motion.div
+							key={vista}
+							className={`guia__coluna${vista === "mapa" || vista === "diagnostico" || vista === "esqueleto" ? " guia__coluna--larga" : ""}`}
+							initial={semMovimento() ? false : { opacity: 0 }}
+							animate={{ opacity: 1 }}
+							transition={{ duration: semMovimento() ? 0 : 0.15, ease: "easeOut" }}
+						>
 						{erro ? (
 							<Callout tone="amber" label="Não deu certo" icon="alert" quote={false}>
 								<p>{erro}</p>
@@ -596,7 +626,7 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 								disabled={salvando || Boolean(primario.ocupado) || Boolean(primario.desligado)}
 								aria-busy={salvando || Boolean(primario.ocupado)}
 							>
-								{salvando || primario.ocupado ? "Salvando…" : primario.texto}
+								<RotuloEstado ocupado={salvando || Boolean(primario.ocupado)} repouso={primario.texto} passageiro="Salvando…" />
 							</Button>
 						</span>
 					) : null}

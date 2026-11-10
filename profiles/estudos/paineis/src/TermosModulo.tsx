@@ -97,10 +97,24 @@ export function TermoChave({ termo, acoes, children }: { termo: TermoNaTela; aco
 			if (evento.target instanceof Node && !(evento.target === document || evento.target.contains(botao.current))) return;
 			setAlvo(botao.current?.getBoundingClientRect());
 		};
+		// Medidas acompanham a largura (regra 6): o botão muda de lugar quando o contêiner muda de tamanho (o professor
+		// abre ou fecha ao lado), e o cartão muda de tamanho quando a definição chega ou a janela encolhe.
+		const remedir = () => {
+			const novo = botao.current?.getBoundingClientRect();
+			setAlvo((atual) => (atual && novo && atual.left === novo.left && atual.top === novo.top && atual.right === novo.right && atual.bottom === novo.bottom ? atual : novo));
+		};
+		const observador = typeof ResizeObserver === "function" ? new ResizeObserver(remedir) : undefined;
+		if (observador) {
+			if (botao.current) observador.observe(botao.current);
+			const conteiner = botao.current?.closest<HTMLElement>("[data-texto-estudo]");
+			if (conteiner) observador.observe(conteiner);
+			if (cartao.current) observador.observe(cartao.current);
+		}
 		document.addEventListener("pointerdown", fora);
 		document.addEventListener("keydown", tecla);
 		document.addEventListener("scroll", rolar, true);
 		return () => {
+			observador?.disconnect();
 			document.removeEventListener("pointerdown", fora);
 			document.removeEventListener("keydown", tecla);
 			document.removeEventListener("scroll", rolar, true);

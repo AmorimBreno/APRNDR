@@ -33,7 +33,7 @@ import { CabecalhoProfessor } from "./CabecalhoProfessor.tsx";
 import { ChipVendo } from "./ChipVendo.tsx";
 import { mesmoTitulo, PAINEL_NOTAS } from "./notas-ponte.ts";
 import { alternarEscolha, chavesSelecionadas, escolhasVigentes, type EscolhasBancada, SEM_ESCOLHAS } from "./selecao-bancada.ts";
-import { type AbaDaBancada, ProvedorVendo, useVendo } from "./vendo.tsx";
+import { type AbaDaBancada, chaveDaFonte, ProvedorVendo, useVendo } from "./vendo.tsx";
 
 type Modo = "lado" | "gaveta" | "tela";
 
@@ -168,8 +168,11 @@ function MesaInterna(props: PropsMesaEstudo) {
 	const abaAtiva = caminho.split("/")[1] === materiaId ? abaDoCaminho(caminho) : undefined;
 	const chaveAtiva = abaAtiva?.chave;
 	const fonte = vendo.ativa();
-	// O rótulo que a aba ativa registrou (o título de agora da nota, "Lição 2.3 · …") vale mais que o da rota.
-	const rotuloDaFonte = fonte && abaAtiva && fonte.tipo === abaAtiva.tipo ? fonte.rotulo : undefined;
+	// O rótulo que a aba ativa registrou (o título de agora da nota, "Lição 2.3 · …") vale mais que o da rota,
+	// mas só se a fonte for a desta aba. Ao trocar de aba, o foco muda antes de a nota nova montar: a fonte
+	// registrada ainda é a da aba anterior, e usar o rótulo dela trocava o nome (e a largura) da aba e da pill
+	// por um instante (bug visto pelo Breno em 2026-11-10).
+	const rotuloDaFonte = fonte && chaveAtiva && chaveDaFonte(fonte) === chaveAtiva ? fonte.rotulo : undefined;
 
 	// abaAtiva é derivada do caminho: as dependências são o caminho e o que sai dele.
 	useLayoutEffect(() => {

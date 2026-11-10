@@ -66,7 +66,8 @@ export function ChipVendo({ abas, chaveFoco, selecionadas, alternar }: PropsChip
 						<span className="mesa-vendo__olho">
 							<IconeOlho aberto={marcada} />
 						</span>
-						{foco ? <span className="mesa-vendo__ponto" aria-hidden="true" /> : null}
+						{/* O ponto existe em todas as pills (só aparece na em foco): trocar o foco não muda a largura de nenhuma. */}
+						<span className="mesa-vendo__ponto" aria-hidden="true" />
 						<span className="mesa-vendo__rotulo body-sm">{aba.rotulo}</span>
 						{semConteudo ? <span className="mesa-vendo__aviso">abra a aba para o professor ver o conteúdo</span> : null}
 						{foco && vendo.falhou ? (

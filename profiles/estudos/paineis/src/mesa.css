@@ -53,11 +53,13 @@
 .mesa-vendo:focus-visible { outline: none; box-shadow: var(--focus-ring); opacity: 1; }
 .mesa-vendo--aberto { opacity: 1; color: var(--ink); box-shadow: inset 0 0 0 var(--border-control) var(--amber), var(--sticker-shadow); }
 .mesa-vendo--aberto:focus-visible { box-shadow: var(--focus-ring); }
-.mesa-vendo--foco .mesa-vendo__rotulo { font-weight: 700; }
+/* A em foco se distingue pelo ponto e pela cor, sem negrito: o negrito mudaria a largura da pill ao trocar o foco. */
+.mesa-vendo--foco .mesa-vendo__rotulo { color: var(--ink); }
 .mesa-vendo__olho { flex: none; display: grid; place-items: center; color: inherit; }
 .mesa-vendo--aberto .mesa-vendo__olho { color: var(--amber); }
 /* O ponto da aba em foco: distingue a aba de agora das outras, selecionadas ou não. */
-.mesa-vendo__ponto { flex: none; width: 6px; height: 6px; border-radius: var(--radius-full); background: var(--amber); }
+.mesa-vendo__ponto { flex: none; width: 6px; height: 6px; border-radius: var(--radius-full); background: var(--amber); opacity: 0; transition: opacity .12s ease-out; }
+.mesa-vendo--foco .mesa-vendo__ponto { opacity: 1; }
 .mesa-vendo__rotulo { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mesa-vendo__aviso { flex: none; color: var(--ink-muted); font-size: 12px; line-height: 1.2; white-space: nowrap; }
 .mesa-vendo__alerta { flex: none; display: grid; place-items: center; color: var(--brick-text); }

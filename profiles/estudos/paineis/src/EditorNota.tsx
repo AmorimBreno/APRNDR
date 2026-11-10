@@ -127,6 +127,21 @@ function EditorDaNota(props: PropsEditorNota) {
 		campo.style.height = "auto";
 		campo.style.height = `${campo.scrollHeight}px`;
 	}, [tituloCampo]);
+	// A altura do título depende da largura: na mesa, ela muda quando o painel do professor abre ou fecha e
+	// quando a nota monta antes de a grade ter largura. Mede de novo a cada mudança de largura do campo.
+	useEffect(() => {
+		const campo = campoTitulo.current;
+		if (!campo) return;
+		let largura = campo.clientWidth;
+		const observador = new ResizeObserver(() => {
+			if (campo.clientWidth === largura) return;
+			largura = campo.clientWidth;
+			campo.style.height = "auto";
+			campo.style.height = `${campo.scrollHeight}px`;
+		});
+		observador.observe(campo);
+		return () => observador.disconnect();
+	}, []);
 
 	useLayoutEffect(() => {
 		if (!nota || !pagina || fadeFeito.current) return;

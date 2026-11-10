@@ -170,6 +170,26 @@ Regras dos pacotes: um commit por pacote, feito pelo orquestrador depois de ler 
 5. Duas abas do navegador dividem a mesma conversa, com o aviso e "Voltar para <matéria>" (recomendação aceita).
 6. O WP1 é feito no Opus.
 
+## 5b. A bancada (2026-11-10)
+
+Pedido do Breno depois da parada 2: as pills acima do campo mostram todas as abas abertas da mesa, não só a ativa. Muda o contrato do contexto da tela: uma mensagem leva uma lista de contextos.
+
+Regra das pills:
+- uma pill por aba aberta, na ordem das abas; o olho dentro da pill mostra se ela está selecionada;
+- padrão: a aba em foco selecionada, as outras não; um clique alterna a seleção de qualquer pill, e as escolhas valem até a aba em foco mudar, quando volta o padrão;
+- selecionada: vai o conteúdo inteiro (como o olho aberto de antes); não selecionada: vai só o nome, para o professor saber o que está na bancada;
+- a aba em foco vai marcada com foco, e o trecho citado vai nela.
+
+Conteúdo das abas fora de foco: a aba que perde o foco deixa uma cópia do texto no provedor Vendo (a nota, o buffer do editor; a lição, o textoDaLicao). Uma aba restaurada do localStorage que ainda não foi aberta nesta sessão não tem cópia: na nota, o conteúdo é pedido pela ponte de notas quando a pill é selecionada; na lição, vai só o nome, e a pill avisa "abra a aba para o professor ver".
+
+Contrato novo (substitui o contextoTela único):
+- ContextoTela ganha foco?: boolean; o pedido "enviar" leva contextosTela?: ContextoTela[] (até 8; a soma dos conteúdos até 200 mil caracteres) no lugar de contextoTela;
+- o evento contexto_tela leva contextos: ResumoContextoTela[]; o item do usuário do histórico leva contextosTela?: ResumoContextoTela[]; as sessões antigas, com details de um contexto só, são lidas como uma lista de um;
+- a mensagem custom nucleo.contexto-tela leva details.contextos (cada um com o hash, se foi conteúdo) e o texto para o modelo lista as abas: as selecionadas com o conteúdo (ou "o mesmo conteúdo de antes", se o hash ainda estiver visível) e as outras só com o nome;
+- PropsConversaEmbutida.obterContexto vira obterContextos?(): ContextoTela[] | Promise<ContextoTela[]>, e a citação vai no contexto com foco.
+
+Também nesta rodada: sai o texto "Enter envia · Shift + Enter quebra a linha" da conversa embutida, e as barras de rolagem da nota, da lição e do chat ficam finas e discretas.
+
 ## 6. Estado (2026-11-09)
 
 Partes A e B implementadas, um commit por pacote: WP0 b9e0296, WP6 8f6ad5d, WP1 60c39fc, WP2 4dd1f35, WP4 1dda0ab, WP3 909d0be, WP5a 98105cc, WP7a 0ab3ef1, WP5b 0e942fd, WP7b df7ff3d. pnpm typecheck limpo e pnpm test verde (92 arquivos, 1712 testes).

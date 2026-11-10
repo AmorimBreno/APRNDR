@@ -393,9 +393,11 @@ A mesa. É a tela de estudo de uma matéria, dividida ao meio. À esquerda, abas
 
 Conversas. Uma por matéria: abrir a mesa retoma a mais recente. "Nova" começa uma conversa do zero, sem resumo da anterior, para limpar o contexto e baratear. Um seletor mostra o histórico das conversas daquela matéria, e qualquer uma pode ser reaberta. O custo da conversa atual fica visível no topo do painel, somado das informações que cada resposta já grava.
 
-Contexto da tela. Um chip "Vendo: <arquivo>" no topo do professor mostra a aba aberta na esquerda e tem um botão de olho, que alterna entre dois estados (decisão do Breno em 2026-11-09):
-- olho aberto: o professor vê o arquivo, e a mensagem vai com o arquivo inteiro, junto do texto e da seleção, se houver;
-- olho fechado: o professor não vê o arquivo, e a mensagem vai só com o texto, o nome do arquivo e o que o Breno selecionou nele.
+Contexto da tela (bancada). Acima do campo do professor, uma pill para cada aba aberta na mesa (a bancada), com um olho dentro (decisões do Breno em 2026-11-09 e 2026-11-10):
+- pill selecionada (olho aberto): o professor vê o arquivo, e a mensagem vai com ele inteiro;
+- pill não selecionada (olho fechado): a mensagem vai só com o nome do arquivo, para o professor saber o que está aberto na bancada;
+- por padrão, a aba em foco fica selecionada e as outras não; um clique numa pill seleciona ou tira a seleção, e isso vale até o foco mudar de aba, quando volta o padrão;
+- o trecho citado (Perguntar) vai junto da aba em foco.
 No núcleo isso é genérico (a tela informa um tipo, um rótulo, o conteúdo e a seleção), e serve também ao perfil de programação (arquivo aberto e linhas selecionadas); os nomes nota e lição ficam no perfil.
 
 Seleção. Uma barra só, igual em todas as abas: Perguntar (o trecho entra como citação no campo do professor), Outro jeito (analogia, caso real, passo a passo ou visual, como na seção 8.4) e Me teste nisso. Ela reúne a barra dos termos do módulo (docs/termos.md), cujos pedidos continuam existindo.

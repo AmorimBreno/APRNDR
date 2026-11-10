@@ -25,3 +25,4 @@ Stack: TypeScript, monorepo pnpm, Node 24 com o SDK do pi (@earendil-works/pi-co
 - Arquivos vindos do learn (profiles/estudos: skills, agents e extensions): as mudanças devem ser mínimas, marcadas com o comentário [estudos-ia] e listadas em profiles/estudos/ORIGEM.md.
 - Não chute a API do pi. A documentação está em github.com/earendil-works/pi, em packages/coding-agent/docs, e os tipos estão no pacote instalado.
 - Ao adicionar ou mover arquivos, atualize o filemap.md.
+- Mudança de interface: siga docs/padroes-de-interface.md e confira a lista "Como conferir" dele antes de dar como pronta, inclusive no navegador (registrar o estado da tela a cada 15 ms durante uma troca). Para estados passageiros, use useValorEstavel de @estudos/ui.

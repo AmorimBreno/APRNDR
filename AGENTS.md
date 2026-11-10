@@ -18,4 +18,6 @@ Toda hipótese do perfil do aprendiz precisa citar ids de eventos. Nada no perfi
 
 O app deve continuar abrindo pelo atalho único e recarregando ao vivo depois de qualquer mudança.
 
+Toda tela segue docs/padroes-de-interface.md: estado passageiro só aparece se durar mais de 1 segundo, o que está na tela não some durante uma troca (só se a troca falhar ou passar do prazo), conteúdo novo só aparece pronto, dado de um item não vaza para outro, elementos não mudam de tamanho ao mudar de estado, medidas acompanham a largura e transições são curtas. Toda revisão de mudança de interface (a revisão por diff, o /code-review e os roteiros de teste) passa pela lista "Como conferir" daquele arquivo, e os briefs de pacotes de interface a citam nos critérios de aceite.
+
 Siga as fases da especificação em ordem. Antes de tarefas grandes, explique o plano e peça aprovação.

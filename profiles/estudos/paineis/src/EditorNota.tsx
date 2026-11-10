@@ -14,7 +14,7 @@
 // salvamento em andamento, e os salvamentos esperam a troca terminar.
 
 import { Button, Callout, Icon, Modal } from "@estudos/design-system";
-import { type JanelaPerfilHook, semMovimento } from "@estudos/ui";
+import { type JanelaPerfilHook, semMovimento, useValorEstavel } from "@estudos/ui";
 import { TextSelection } from "@tiptap/pm/state";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
@@ -102,27 +102,6 @@ export function EditorNota(props: PropsEditorNota) {
 			}}
 		/>
 	);
-}
-
-/** Quanto um estado passageiro (abrindo, mudanças por salvar, salvando) precisa durar para aparecer. */
-const ESPERA_ESTADO_PASSAGEIRO = 1000;
-
-/**
- * O rótulo de situação que fica na tela: os estados finais (salva, erro, conflito, só leitura) aparecem na
- * hora; os passageiros só se durarem mais de ESPERA_ESTADO_PASSAGEIRO. Assim trocar de nota ou salvar
- * rápido não pisca "Abrindo…" ou "Salvando…" (pedido do Breno em 2026-11-10).
- */
-function useRotuloEstavel(rotulo: string, passageiro: boolean, inicial: string | undefined): string {
-	const [visivel, setVisivel] = useState(() => (passageiro && inicial !== undefined ? inicial : rotulo));
-	useEffect(() => {
-		if (!passageiro) {
-			setVisivel(rotulo);
-			return;
-		}
-		const espera = setTimeout(() => setVisivel(rotulo), ESPERA_ESTADO_PASSAGEIRO);
-		return () => clearTimeout(espera);
-	}, [rotulo, passageiro]);
-	return visivel;
 }
 
 function EditorDaNota(props: PropsEditorNota & { rotuloInicial?: string | undefined; aoMostrarRotulo?(rotulo: string): void }) {
@@ -613,7 +592,8 @@ function EditorDaNota(props: PropsEditorNota & { rotuloInicial?: string | undefi
 	};
 
 	const passageiro = !somenteLeitura && (situacao.tipo === "abrindo" || situacao.tipo === "suja" || situacao.tipo === "salvando");
-	const rotuloVisivel = useRotuloEstavel(rotuloSituacao(situacao, somenteLeitura), passageiro, props.rotuloInicial);
+	// Estados passageiros só depois de 1 s; o último rótulo da nota anterior fica até lá (docs/padroes-de-interface.md).
+	const rotuloVisivel = useValorEstavel(rotuloSituacao(situacao, somenteLeitura), passageiro, props.rotuloInicial);
 	const aoMostrarRotulo = props.aoMostrarRotulo;
 	useEffect(() => {
 		aoMostrarRotulo?.(rotuloVisivel);

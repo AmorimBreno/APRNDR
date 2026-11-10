@@ -23,6 +23,7 @@ docs/teste-painel-caderno.md — roteiro do painel do caderno: o leque e a capa,
 docs/markdown-da-conversa.md — o que o Markdown da conversa desenha (respostas, enunciados, alternativas e explicações): GFM, LaTeX, código com destaque e números de linha, código em linha, os blocos vetor e matriz e o embed de imagem; para quem escreve prompt e skill
 docs/mapa-conteudo.md — contrato do mapa de conteúdo (item 4.4): o mapa-conteudo.json, as regras de fusão do resultado do modelo, as operações da revisão, a aprovação, os eventos, a ponte "mapa", o modelo e quando o mapeamento roda
 docs/mesa-de-estudo.md — plano e contrato da mesa de estudo (item 7, decisão 13.19): a tela dividida com o professor ao lado, a sessão por matéria, o contexto da tela com o olho, a seleção, os requisitos R1 a R17, os pacotes e as paradas de teste
+docs/padroes-de-interface.md — padrões de acabamento de toda tela (estado passageiro só depois de 1 s, nada some numa troca, conteúdo só aparece pronto, dado não vaza entre itens, tamanho estável, medidas que acompanham a largura, transições curtas) e a lista "Como conferir" das revisões
 docs/cursos.md — contrato dos cursos e do guia de criação (item 5): o curso.json, confirmar uma etapa e o que ela invalida, os eventos, a ponte "cursos", o mapa a partir do tema e a tela
 docs/modulos.md — contrato dos módulos gerados sob demanda (item 6): o modulos/<m>.json (lições, blocos, formatos das explicações, referências), qual módulo pode ser gerado, o nível de cada conceito, a geração (espera dos materiais, plano, uma chamada por lição, validação), os eventos, a ponte "modulos" e a tela da parte A; a escrita dos blocos (regras, retorno e reescrita) fica em docs/escrita.md
 docs/escrita.md — contrato da escrita dos módulos: as regras de escrita do Breno em aprendiz/escrita.json (instruções fixas), onde valem, o retorno em cada bloco (avaliou_bloco), a reescrita de um bloco pelo prompts/modulo-bloco.md com as versões anteriores (reescreveu_bloco), a ponte "escrita", as ações retorno e reescrever_bloco e a tela
@@ -74,6 +75,7 @@ packages/core/src/materiais/servico.ts — ServicoMateriais: varredura (ao abrir
 packages/core/src/materiais/extensao.ts — extensão inline: buscar_material, ler_material, listar_arquivos_de_material e os avisos materiais:pronto e materiais:removido no barramento da sessão
 packages/core/src/*.test.ts — testes vitest do núcleo (sem rede; janela-perfil.test.ts usa perfil e pasta do pi temporários)
 packages/ui/ — @estudos/ui: lógica e peças do front comuns a todos os perfis, com o visual do design system; importa do núcleo só tipos de @estudos/core/protocolo
+packages/ui/src/valor-estavel.ts — useValorEstavel: o valor que fica na tela enquanto um estado passageiro não dura 1 s (docs/padroes-de-interface.md)
 packages/ui/src/index.ts — exporta tudo do pacote
 packages/ui/src/tipos.ts — tipos do núcleo derivados do protocolo (EventoNucleo, EstadoSessao, ItemHistorico, InfoModelo, ResumoSessao)
 packages/ui/src/cliente.ts — ClienteConexao: WebSocket em /ws, reconexão com espera crescente, pedir() com pedidoId e promessa da resposta, estado da conexão; obterCliente() = cliente único da página

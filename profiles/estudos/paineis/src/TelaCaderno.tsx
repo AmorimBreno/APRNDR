@@ -186,6 +186,7 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 			materiaId={materiaId}
 			caminho={props.caminho}
 			navegar={props.navegar}
+			abrirConversa={props.abrirConversa}
 			{...(props.conversa ? { conversa: props.conversa } : {})}
 			{...(materia ? { materia } : {})}
 			{...(agente ? { agente } : {})}

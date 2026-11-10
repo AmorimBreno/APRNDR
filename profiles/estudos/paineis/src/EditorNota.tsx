@@ -544,6 +544,8 @@ function EditorDaNota(props: PropsEditorNota) {
 					{rotuloSituacao(situacao, somenteLeitura)}
 				</span>
 			</header>
+			{/* Na mesa de estudo, as abas das notas e lições abertas ficam aqui, dentro do cartão e abaixo do voltar. */}
+			{props.abaixoDoCabecalho}
 			<div ref={setCorpo} className="editor-nota__corpo" onKeyDown={teclas}>
 				{/* A página, como no Notion: uma coluna de leitura no meio, com o título grande no topo. */}
 				<div ref={setPagina} className="editor-nota__pagina">

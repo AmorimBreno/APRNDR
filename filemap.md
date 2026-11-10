@@ -268,6 +268,7 @@ profiles/estudos/paineis/src/vendo.tsx — o provedor do que está aberto na mes
 profiles/estudos/paineis/src/ChipVendo.tsx — o chip "Vendo: <arquivo>" no topo do professor, com o botão do olho (aberto manda o arquivo inteiro; fechado, só o nome e o trecho)
 profiles/estudos/paineis/src/AbasMesa.tsx — a faixa de abas da mesa (notas e lições abertas da matéria, role tablist), lembradas por matéria, com a rolagem de cada aba
 profiles/estudos/paineis/src/selecao.ts — regras puras da seleção de texto na nota e na lição (juntar espaços, limites, seletores proibidos, quando a barra aparece); e o teste
+profiles/estudos/paineis/src/selecao-bancada.ts — quais abas da bancada vão com o conteúdo ao professor, puro: a em foco por padrão, as escolhas manuais valendo até o foco mudar; e o teste
 profiles/estudos/paineis/src/BarraSelecao.tsx — useSelecaoDoDocumento e a barra de seleção única: Perguntar (citação acima do campo do professor), Outro jeito (analogia, caso real, passo a passo, visual), Me teste nisso e, na lição, Não sei o que é isso e Explique melhor; Alt+F10 leva o foco a ela
 profiles/estudos/paineis/src/mesa.css — estilos da mesa de estudo, importado pelo estilo.css do perfil
 profiles/estudos/paineis/src/MesaEstudo.tsx — a mesa de estudo: a nota ou a lição à esquerda e a conversa embutida do professor à direita, que abre e fecha (botão e Ctrl+J, lembrado no localStorage; gaveta em telas estreitas)

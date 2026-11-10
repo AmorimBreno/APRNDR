@@ -7,7 +7,7 @@
 // é a aba ativa, e a rolagem de cada aba é guardada e devolvida. O provedor do
 // Vendo (vendo.tsx) envolve tudo: a aba ativa se registra nele, o chip do
 // professor mostra o que está aberto e o contexto da tela vai junto da mensagem
-// (obterContexto). O botão do professor é a foto da aba
+// (obterContextos). O botão do professor é a foto da aba
 // do caderno (useProfessorDaMesa); no módulo, que não tem aba, é um botão na faixa.
 //
 // O painel é a conversa embutida do app (props.conversa) e fica sempre
@@ -31,7 +31,9 @@ import { abaDoCaminho, abrirAba, fecharAba, guardarRolagem, type TipoAbaMesa } f
 import { AbasMesa, useAbasGuardadas } from "./AbasMesa.tsx";
 import { CabecalhoProfessor } from "./CabecalhoProfessor.tsx";
 import { ChipVendo } from "./ChipVendo.tsx";
-import { ProvedorVendo, useVendo } from "./vendo.tsx";
+import { mesmoTitulo, PAINEL_NOTAS } from "./notas-ponte.ts";
+import { alternarEscolha, chavesSelecionadas, escolhasVigentes, type EscolhasBancada, SEM_ESCOLHAS } from "./selecao-bancada.ts";
+import { type AbaDaBancada, ProvedorVendo, useVendo } from "./vendo.tsx";
 
 type Modo = "lado" | "gaveta" | "tela";
 
@@ -81,8 +83,8 @@ export interface ProfessorDaMesa {
 	/** Guarda o trecho como citação acima do campo do professor e abre o painel (Perguntar). */
 	citar(trecho: string): void;
 	/**
-	 * Manda ao professor um pedido pronto sobre o trecho, com o contexto da aba ativa
-	 * e o trecho como selecao (Outro jeito, Me teste nisso), e abre o painel.
+	 * Manda ao professor um pedido pronto sobre o trecho, com os contextos da bancada
+	 * e o trecho como selecao do contexto em foco (Outro jeito, Me teste nisso), e abre o painel.
 	 * Rejeita se o envio nem saiu (conexão caída).
 	 */
 	perguntar(pedido: string, trecho: string): Promise<void>;
@@ -101,6 +103,9 @@ export function useProfessorDaMesa(): ProfessorDaMesa | undefined {
 const ELEMENTO_QUE_ROLA = ".editor-nota__corpo, .modulo__corpo";
 /** Quantos quadros esperar o conteúdo da aba ficar alto o bastante para devolver a rolagem (a nota carrega do servidor). */
 const QUADROS_PARA_ROLAR = 45;
+/** Quanto esperar a nota pedida pela ponte (nota restaurada que ainda não abriu nesta sessão). */
+const PRAZO_NOTA_MS = 1500;
+const PASSO_NOTA_MS = 50;
 
 /** O rótulo inicial de uma aba, pela rota: o título da nota; "Lição" no módulo (a lição registrada troca por um melhor). */
 function rotuloDaRota(caminho: string, tipo: TipoAbaMesa): string {
@@ -275,16 +280,54 @@ function MesaInterna(props: PropsMesaEstudo) {
 	// O envio lê a janela e o contexto na hora (refs): a função que a barra guarda não fica velha.
 	const janelaRef = useRef(props.janela);
 	janelaRef.current = props.janela;
-	const obterContexto = vendo.obterContexto;
+	// A bancada: uma pill por aba aberta. A seleção padrão é a aba em foco; os cliques valem até o foco mudar (selecao-bancada.ts).
+	const [escolhas, setEscolhas] = useState<EscolhasBancada>(SEM_ESCOLHAS);
+	const chavesDasAbas = abas.map((aba) => aba.chave);
+	const vigentes = escolhasVigentes(escolhas, chavesDasAbas, chaveAtiva);
+	// O estado guarda só o que ainda vale: o foco mudou ou a aba fechou, as escolhas somem de verdade.
+	useEffect(() => {
+		if (vigentes !== escolhas) setEscolhas(vigentes);
+	}, [vigentes, escolhas]);
+	const selecionadas = new Set(chavesSelecionadas(chavesDasAbas, chaveAtiva, vigentes));
+	const alternarSelecao = (chave: string) => setEscolhas(alternarEscolha(escolhas, chavesDasAbas, chaveAtiva, chave));
+	const pilulas = abas.map((aba) => ({ chave: aba.chave, tipo: aba.tipo, rotulo: aba.chave === chaveAtiva && rotuloDaFonte ? rotuloDaFonte : aba.rotulo }));
+	// Na hora de mandar tudo vem da ref: a função que a barra guarda não fica velha.
+	const bancadaRef = useRef<{ abas: AbaDaBancada[]; chaveFoco: string | undefined; selecionadas: ReadonlySet<string> }>({ abas: [], chaveFoco: undefined, selecionadas });
+	bancadaRef.current = { abas: abas.map((aba, i) => ({ chave: aba.chave, tipo: aba.tipo, rotulo: pilulas[i]?.rotulo ?? aba.rotulo, caminho: aba.caminho })), chaveFoco: chaveAtiva, selecionadas };
+	// Pede o conteúdo de uma nota sem cópia pela ponte de notas e espera a resposta "nota" (com prazo); sem ela, só o nome.
+	const pedirNota = useCallback(async (aba: AbaDaBancada): Promise<string | undefined> => {
+		const partes = aba.chave.split("/");
+		const materia = partes[1];
+		const titulo = partes.slice(3).join("/");
+		if (!materia || !titulo) return undefined;
+		const vistas = new Set((janelaRef.current.estado.acoesPorPainel[PAINEL_NOTAS] ?? []).map((recebida) => recebida.chave));
+		await janelaRef.current.acoes.acaoDaInterface(PAINEL_NOTAS, "abrir", { materia, titulo });
+		const limite = Date.now() + PRAZO_NOTA_MS;
+		while (Date.now() < limite) {
+			for (const recebida of janelaRef.current.estado.acoesPorPainel[PAINEL_NOTAS] ?? []) {
+				if (vistas.has(recebida.chave) || recebida.acao !== "nota") continue;
+				const dados = recebida.dados as { materia?: string; titulo?: string; conteudo?: unknown };
+				if (dados.materia === materia && mesmoTitulo(dados.titulo, titulo) && typeof dados.conteudo === "string") return dados.conteudo;
+			}
+			await new Promise((resolver) => setTimeout(resolver, PASSO_NOTA_MS));
+		}
+		return undefined;
+	}, []);
+	const obterContextosDoVendo = vendo.obterContextos;
+	const obterContextos = useCallback(() => obterContextosDoVendo({ ...bancadaRef.current, pedirNota }), [obterContextosDoVendo, pedirNota]);
 	const perguntar = useCallback(
 		async (pedido: string, trecho: string) => {
-			const contexto = obterContexto();
+			const contextos = await obterContextos();
 			abrir();
-			// Sem aba registrada não há onde pendurar o trecho: ele vai no texto, como citação.
-			if (contexto) await janelaRef.current.acoes.enviar(pedido, { ...contexto, selecao: trecho });
-			else await janelaRef.current.acoes.enviar(`${pedido}\n\n> ${trecho}`);
+			// O trecho vai no contexto com foco (ou no primeiro). Sem nenhuma aba na bancada não há onde pendurá-lo: vai no texto, como citação.
+			if (contextos.length === 0) {
+				await janelaRef.current.acoes.enviar(`${pedido}\n\n> ${trecho}`);
+				return;
+			}
+			const alvo = Math.max(0, contextos.findIndex((contexto) => contexto.foco));
+			await janelaRef.current.acoes.enviar(pedido, contextos.map((contexto, indice) => (indice === alvo ? { ...contexto, selecao: trecho } : contexto)));
 		},
-		[abrir, obterContexto],
+		[abrir, obterContextos],
 	);
 
 	// Ctrl+J: na fase de captura e com preventDefault, para o Edge não abrir os Downloads.
@@ -403,9 +446,9 @@ function MesaInterna(props: PropsMesaEstudo) {
 							janela={props.janela}
 							aberta={aberto}
 							aoPedidoPendente={setPendente}
-							obterContexto={vendo.obterContexto}
+							obterContextos={obterContextos}
 							cabecalho={<CabecalhoProfessor janela={props.janela} perfilId={perfilId} {...(props.materia ? { materia: props.materia } : {})} {...(props.abrirConversa ? { abrirConversa: props.abrirConversa } : {})} />}
-							acimaDoCampo={<ChipVendo haAba={abaAtiva !== undefined} />}
+							acimaDoCampo={<ChipVendo abas={pilulas} chaveFoco={chaveAtiva} selecionadas={selecionadas} alternar={alternarSelecao} />}
 							{...(rotuloDoCampo ? { placeholder: `Pergunte sobre ${rotuloDoCampo}…` } : {})}
 						/>
 					</div>

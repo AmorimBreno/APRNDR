@@ -1,20 +1,18 @@
-// A pill do arquivo que o professor está vendo (docs/mesa-de-estudo.md, 2.6): vai
-// em acimaDoCampo da conversa embutida, flutuando logo acima do campo. Um olho à
-// esquerda e o nome do arquivo (o rótulo da aba ativa); a pill inteira é o botão
-// do olho. Olho aberto: o professor recebe o arquivo inteiro junto da mensagem
-// (ícone e borda âmbar); fechado: só o nome e o trecho que o Breno citar (ícone
-// riscado, pill apagada). A pill não desmonta ao trocar de aba: fica com o nome
-// antigo até a fonte nova se registrar, e só então o texto troca, num crossfade
-// curto. Sem aba na mesa (haAba falso) ela não aparece.
+// A bancada (docs/mesa-de-estudo.md, 5b): as pills em acimaDoCampo da conversa,
+// flutuando logo acima do campo. Uma pill por aba aberta da mesa, na ordem das
+// abas. Dentro de cada uma, o olho à esquerda e o nome da aba; a pill inteira é
+// o botão que alterna a seleção. Selecionada: o professor recebe a aba inteira
+// junto da mensagem (ícone e borda âmbar); não selecionada: só o nome (ícone
+// riscado, pill apagada). A aba em foco leva um ponto e o nome em negrito. As
+// pills não desmontam ao trocar de foco (a chave é a da aba): só mudam de
+// estado. A fileira quebra linha se não couber (são no máximo 6 abas). Quem
+// escolhe as chaves selecionadas é a mesa (selecao-bancada.ts).
 
 import { Icon } from "@estudos/design-system";
-import { semMovimento } from "@estudos/ui";
-import { useEffect, useRef, useState } from "react";
-import { useVendo } from "./vendo.tsx";
+import type { TipoAbaMesa } from "./abas-mesa.ts";
+import { chaveDaFonte, useVendo } from "./vendo.tsx";
 
 const TRACO_ICONE = { fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "square", strokeLinejoin: "miter" } as const;
-/** Metade do crossfade do texto: some em 75 ms, o nome novo volta em outros 75. */
-const MEIO_CROSSFADE_MS = 75;
 
 /** O mesmo desenho do olho do chip da mensagem (packages/ui/src/visual/Conversa.tsx), que não o exporta. */
 function IconeOlho({ aberto }: { aberto: boolean }) {
@@ -26,63 +24,59 @@ function IconeOlho({ aberto }: { aberto: boolean }) {
 	);
 }
 
-export interface PropsChipVendo {
-	/** A rota de agora é uma aba (nota ou lição). Sem aba a pill some; com aba e sem fonte ainda, guarda o nome antigo. */
-	haAba: boolean;
+export interface PilulaBancada {
+	chave: string;
+	tipo: TipoAbaMesa;
+	rotulo: string;
 }
 
-export function ChipVendo({ haAba }: PropsChipVendo) {
+export interface PropsChipVendo {
+	/** As abas abertas, na ordem das abas. Vazio = nada a mostrar. */
+	abas: readonly PilulaBancada[];
+	/** A aba em foco (a rota de agora), se for uma aba. */
+	chaveFoco: string | undefined;
+	/** As chaves selecionadas (vão com o conteúdo). */
+	selecionadas: ReadonlySet<string>;
+	alternar(chave: string): void;
+}
+
+export function ChipVendo({ abas, chaveFoco, selecionadas, alternar }: PropsChipVendo) {
 	const vendo = useVendo();
-	const rotuloAtual = vendo.ativa()?.rotulo;
-	const [texto, setTexto] = useState<string | undefined>(rotuloAtual);
-	const [visivel, setVisivel] = useState(true);
-	const parado = semMovimento();
-	const textoRef = useRef(texto);
-	textoRef.current = texto;
-
-	useEffect(() => {
-		if (!haAba) {
-			setTexto(undefined);
-			setVisivel(true);
-			return;
-		}
-		// Troca de aba em andamento (a fonte antiga saiu, a nova ainda não se registrou): fica com o nome antigo.
-		if (rotuloAtual === undefined || rotuloAtual === textoRef.current) return;
-		if (textoRef.current === undefined || parado) {
-			setTexto(rotuloAtual);
-			return;
-		}
-		setVisivel(false);
-		const tempo = setTimeout(() => {
-			setTexto(rotuloAtual);
-			setVisivel(true);
-		}, MEIO_CROSSFADE_MS);
-		return () => {
-			clearTimeout(tempo);
-			setVisivel(true);
-		};
-	}, [haAba, rotuloAtual, parado]);
-
-	if (!haAba || texto === undefined) return null;
+	if (abas.length === 0) return null;
 	const aviso = "Não consegui ler o arquivo; a última mensagem foi só com o nome.";
+	const fonteAtiva = vendo.ativa();
+	const chaveAtiva = fonteAtiva ? chaveDaFonte(fonteAtiva) : undefined;
 	return (
-		<button
-			type="button"
-			className={`mesa-vendo${vendo.olho ? " mesa-vendo--aberto" : ""}`}
-			aria-pressed={vendo.olho}
-			aria-label={`Mostrar o arquivo inteiro ao professor: ${texto}`}
-			title={vendo.olho ? "O professor vê o arquivo inteiro" : "O professor vê só o nome e o trecho que você citar"}
-			onClick={vendo.alternarOlho}
-		>
-			<span className="mesa-vendo__olho">
-				<IconeOlho aberto={vendo.olho} />
-			</span>
-			<span className={`mesa-vendo__rotulo body-sm${visivel ? "" : " mesa-vendo__rotulo--saindo"}`}>{texto}</span>
-			{vendo.falhou ? (
-				<span className="mesa-vendo__alerta" role="img" aria-label={aviso} title={aviso}>
-					<Icon name="alert" size={14} strokeWidth={2.5} />
-				</span>
-			) : null}
-		</button>
+		<div className="mesa-bancada" role="group" aria-label="O que o professor vê">
+			{abas.map((aba) => {
+				const marcada = selecionadas.has(aba.chave);
+				const foco = aba.chave === chaveFoco;
+				// Lição que nunca abriu nesta sessão (restaurada do localStorage) não tem texto para mandar.
+				const semConteudo = marcada && aba.tipo === "licao" && aba.chave !== chaveAtiva && vendo.copia(aba.chave) === undefined;
+				return (
+					<button
+						key={aba.chave}
+						type="button"
+						className={`mesa-vendo${marcada ? " mesa-vendo--aberto" : ""}${foco ? " mesa-vendo--foco" : ""}`}
+						aria-pressed={marcada}
+						aria-label={`${marcada ? "Tirar da" : "Pôr na"} bancada do professor: ${aba.rotulo}${foco ? " (aba em foco)" : ""}`}
+						title={marcada ? "O professor vê o arquivo inteiro" : "O professor vê só o nome"}
+						onClick={() => alternar(aba.chave)}
+					>
+						<span className="mesa-vendo__olho">
+							<IconeOlho aberto={marcada} />
+						</span>
+						{foco ? <span className="mesa-vendo__ponto" aria-hidden="true" /> : null}
+						<span className="mesa-vendo__rotulo body-sm">{aba.rotulo}</span>
+						{semConteudo ? <span className="mesa-vendo__aviso">abra a aba para o professor ver o conteúdo</span> : null}
+						{foco && vendo.falhou ? (
+							<span className="mesa-vendo__alerta" role="img" aria-label={aviso} title={aviso}>
+								<Icon name="alert" size={14} strokeWidth={2.5} />
+							</span>
+						) : null}
+					</button>
+				);
+			})}
+		</div>
 	);
 }

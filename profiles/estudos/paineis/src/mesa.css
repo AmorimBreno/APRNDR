@@ -45,16 +45,21 @@
 .mesa-aba__fechar { flex: none; display: grid; place-items: center; width: 24px; height: 24px; margin-right: var(--space-1); padding: 0; border: 0; border-radius: var(--radius-sm); background: none; color: var(--ink-muted); cursor: pointer; }
 .mesa-aba__fechar:hover { background: var(--surface-well); color: var(--ink); }
 
-/* A pill do arquivo (ChipVendo.tsx), em acimaDoCampo da conversa: o olho à esquerda e o nome; a pill toda é o botão do olho. */
+/* A bancada (ChipVendo.tsx), em acimaDoCampo da conversa: uma pill por aba aberta, na ordem das abas. O olho dentro mostra
+ * se a aba vai inteira ao professor (âmbar) ou só pelo nome (riscado, apagada); a pill toda é o botão que alterna. */
+.mesa-bancada { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); min-width: 0; }
 .mesa-vendo { display: inline-flex; align-items: center; gap: var(--space-2); box-sizing: border-box; max-width: 100%; min-width: 0; min-height: var(--control-sm); padding: 0 var(--space-3) 0 var(--space-2); border: 0; border-radius: var(--radius-full); background: var(--surface-raised); color: var(--ink-muted); font: inherit; cursor: pointer; box-shadow: inset 0 0 0 var(--border-control) var(--line-strong), var(--sticker-shadow); opacity: .72; transition: opacity .12s ease-out, background-color .12s ease-out, box-shadow .12s ease-out, color .12s ease-out; }
 .mesa-vendo:hover { background: var(--surface-hover); opacity: 1; }
 .mesa-vendo:focus-visible { outline: none; box-shadow: var(--focus-ring); opacity: 1; }
 .mesa-vendo--aberto { opacity: 1; color: var(--ink); box-shadow: inset 0 0 0 var(--border-control) var(--amber), var(--sticker-shadow); }
 .mesa-vendo--aberto:focus-visible { box-shadow: var(--focus-ring); }
+.mesa-vendo--foco .mesa-vendo__rotulo { font-weight: 700; }
 .mesa-vendo__olho { flex: none; display: grid; place-items: center; color: inherit; }
 .mesa-vendo--aberto .mesa-vendo__olho { color: var(--amber); }
-.mesa-vendo__rotulo { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: opacity .075s linear; }
-.mesa-vendo__rotulo--saindo { opacity: 0; }
+/* O ponto da aba em foco: distingue a aba de agora das outras, selecionadas ou não. */
+.mesa-vendo__ponto { flex: none; width: 6px; height: 6px; border-radius: var(--radius-full); background: var(--amber); }
+.mesa-vendo__rotulo { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mesa-vendo__aviso { flex: none; color: var(--ink-muted); font-size: 12px; line-height: 1.2; white-space: nowrap; }
 .mesa-vendo__alerta { flex: none; display: grid; place-items: center; color: var(--brick-text); }
 
 /* O botão do professor: a foto, como na aba do caderno. */
@@ -112,7 +117,7 @@
 .aba-caderno__professor--pulsa .avatar { animation: professor-pula 1.4s cubic-bezier(.3, .7, .4, 1) infinite; box-shadow: 0 0 0 3px var(--amber), var(--sticker-shadow); }
 
 @media (prefers-reduced-motion: reduce) {
-	.mesa-aba, .mesa-vendo, .mesa-vendo__rotulo { transition: none; }
+	.mesa-aba, .mesa-vendo { transition: none; }
 	.aba-caderno__professor--pulsa .avatar { animation: none; }
 	.mesa__professor-botao .avatar, .mesa__professor-botao--pulsa .avatar { animation: none; }
 }

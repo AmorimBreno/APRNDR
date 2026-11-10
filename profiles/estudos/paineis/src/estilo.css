@@ -225,7 +225,7 @@
 .editor-nota__voltar:hover { color: var(--amber); }
 .editor-nota__voltar:focus-visible { outline: none; border-radius: 2px; box-shadow: var(--focus-ring); }
 .editor-nota__situacao { color: var(--ink-muted); white-space: nowrap; }
-.editor-nota__corpo { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-8) var(--space-4) 30vh; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+.editor-nota__corpo { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-8) var(--space-4) 30vh; }
 .editor-nota__pagina { position: relative; display: flex; flex-direction: column; gap: var(--space-4); box-sizing: content-box; max-width: var(--largura-leitura-estudos); margin: 0 auto; padding: 0 var(--space-6) 0 56px; }
 .editor-nota__titulo { display: block; width: 100%; margin: 0 0 var(--space-2); padding: 0; overflow: hidden; border: 0; background: none; color: var(--ink); font-family: var(--font-sans); font-size: 36px; line-height: 44px; font-weight: 750; letter-spacing: -.01em; resize: none; }
 .editor-nota__titulo::placeholder { color: var(--ink-subtle); }
@@ -955,6 +955,14 @@
 /* Na mesa, a CourseBar ocupa a largura toda acima do professor (mesa.css): não precisa de um modo compacto. */
 .aba-modulo .ap-cbar__kicker { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .modulo__corpo { container-type: inline-size; }
+/* Rolagem discreta do corpo da nota, do corpo da lição e do índice: a mesma do chat (.rolagem em apps/web/src/estilo.css),
+ * fina, e mais visível só com o mouse em cima. */
+.editor-nota__corpo, .modulo__corpo, .modulo__indice { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.editor-nota__corpo:hover, .modulo__corpo:hover, .modulo__indice:hover { scrollbar-color: var(--line-strong) transparent; }
+.editor-nota__corpo::-webkit-scrollbar, .modulo__corpo::-webkit-scrollbar, .modulo__indice::-webkit-scrollbar { width: 6px; height: 6px; }
+.editor-nota__corpo::-webkit-scrollbar-track, .modulo__corpo::-webkit-scrollbar-track, .modulo__indice::-webkit-scrollbar-track { background: transparent; }
+.editor-nota__corpo::-webkit-scrollbar-thumb, .modulo__corpo::-webkit-scrollbar-thumb, .modulo__indice::-webkit-scrollbar-thumb { border-radius: var(--radius-full); background: var(--line); }
+.editor-nota__corpo:hover::-webkit-scrollbar-thumb, .modulo__corpo:hover::-webkit-scrollbar-thumb, .modulo__indice:hover::-webkit-scrollbar-thumb { background: var(--line-strong); }
 .modulo__grade { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: var(--space-6); }
 
 /* O índice. */

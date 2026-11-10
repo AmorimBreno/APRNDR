@@ -120,9 +120,6 @@ function CaixaEmbutida({ props, embutida }: { props: PropsBarraPergunta; embutid
 					</span>
 				</div>
 			</div>
-			<p className="barra__dica overline">
-				{props.executando ? "Enter põe a mensagem na fila · Shift + Enter quebra a linha" : "Enter envia · Shift + Enter quebra a linha"}
-			</p>
 		</div>
 	);
 }

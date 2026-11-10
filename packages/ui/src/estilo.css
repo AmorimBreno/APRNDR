@@ -413,9 +413,10 @@ code.codigo-em-linha, .ap-prose code.codigo-em-linha { padding: .1em .35em; bord
 
 /* ── Chip do contexto da tela, em cima da mensagem do usuário ── */
 
-.chip-contexto-linha { display: flex; justify-content: flex-end; margin-bottom: var(--space-1); }
-.chip-contexto { display: inline-flex; align-items: center; gap: var(--space-2); max-width: min(100%, 360px); padding: 2px var(--space-2); border: var(--border-hair) solid var(--line-strong); border-radius: var(--radius-full); color: var(--ink-muted); }
+.chip-contexto-linha { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-1); margin-bottom: var(--space-1); }
+.chip-contexto { display: inline-flex; align-items: center; gap: var(--space-2); max-width: min(100%, 200px); padding: 0 var(--space-2); border: var(--border-hair) solid var(--line-strong); border-radius: var(--radius-full); color: var(--ink-muted); }
 .chip-contexto__rotulo { min-width: 0; overflow: hidden; font-size: 12px; line-height: 18px; white-space: nowrap; text-overflow: ellipsis; }
+.chip-contexto--foco { color: var(--ink); border-color: var(--ink-muted); }
 .chip-contexto__sinal { flex: none; display: inline-grid; place-items: center; }
 .chip-contexto__parcial { flex: none; color: var(--ink); }
 
@@ -445,7 +446,6 @@ code.codigo-em-linha, .ap-prose code.codigo-em-linha { padding: .1em .35em; bord
 .barra__conexao-ponto { flex: none; width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--brick-text); }
 .barra__conexao--aberta .barra__conexao-ponto { background: var(--sage-text); }
 .barra__conexao--reconectando .barra__conexao-ponto { background: var(--amber); animation: ponto-pulsa 1.1s ease-in-out infinite; }
-.barra__dica { margin: 0; padding-left: var(--space-1); color: var(--ink-subtle); }
 .modelo-pill { display: inline-flex; align-items: center; gap: var(--space-1); min-width: 0; max-width: 60%; height: var(--control-sm); padding: 0 var(--space-3); border: 0; border-radius: var(--radius-full); background: var(--surface-hover); box-shadow: inset 0 0 0 var(--border-hair) var(--line); color: var(--ink); cursor: pointer; transition: background-color .12s ease-out; }
 .modelo-pill:hover { background: var(--surface-well); }
 .modelo-pill:focus-visible { outline: none; box-shadow: var(--focus-ring); }

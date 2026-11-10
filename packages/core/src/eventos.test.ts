@@ -218,7 +218,7 @@ describe("contexto da tela nos eventos (WP1)", () => {
 		content: `# ${rotulo}
 conteúdo inteiro da nota`,
 		display: false,
-		details: { tipo: "nota", rotulo, olho: true, selecao: "um trecho", hash: "a".repeat(64), ...extra },
+		details: { contextos: [{ tipo: "nota", rotulo, olho: true, selecao: "um trecho", hash: "a".repeat(64), ...extra }] },
 		timestamp: 2,
 	});
 
@@ -235,10 +235,10 @@ conteúdo inteiro da nota`,
 			]),
 		);
 		const usuarios = historico.filter((item) => item.papel === "usuario");
-		expect(usuarios.map((item) => [item.texto, item.contextoTela])).toEqual([
-			["primeira", { tipo: "nota", rotulo: "Nota A", origem: "caderno/a", olho: true, parcial: true, selecao: "um trecho" }],
+		expect(usuarios.map((item) => [item.texto, item.contextosTela])).toEqual([
+			["primeira", [{ tipo: "nota", rotulo: "Nota A", origem: "caderno/a", olho: true, parcial: true, selecao: "um trecho" }]],
 			["segunda", undefined],
-			["terceira (sem contexto)", { tipo: "nota", rotulo: "Nota B", olho: false, selecao: "um trecho" }],
+			["terceira (sem contexto)", [{ tipo: "nota", rotulo: "Nota B", olho: false, selecao: "um trecho" }]],
 		]);
 		// A mensagem custom não vira item, e nada do conteúdo (nem o hash) chega ao histórico.
 		expect(historico).toHaveLength(5);
@@ -261,7 +261,13 @@ conteúdo inteiro da nota`,
 			]),
 		);
 		expect(historico.map((item) => item.papel)).toEqual(["usuario", "assistente", "usuario"]);
-		for (const item of historico) if (item.papel === "usuario") expect(item.contextoTela).toBeUndefined();
+		for (const item of historico) if (item.papel === "usuario") expect(item.contextosTela).toBeUndefined();
+	});
+
+	it("converterHistorico lê o formato antigo (details de um contexto só) como uma lista de um", () => {
+		const antiga = { ...contextoCustom("Nota A"), details: { tipo: "nota", rotulo: "Nota A", olho: true, hash: "b".repeat(64) } };
+		const historico = converterHistorico(mensagens([{ role: "user", content: "oi", timestamp: 1 }, antiga]));
+		expect(historico).toEqual([{ papel: "usuario", texto: "oi", momento: new Date(1).toISOString(), contextosTela: [{ tipo: "nota", rotulo: "Nota A", olho: true }] }]);
 	});
 
 	it("o tradutor emite contexto_tela (só o resumo) quando a mensagem custom do contexto termina", () => {
@@ -275,7 +281,7 @@ conteúdo inteiro da nota`,
 		];
 		expect(saida).toEqual([
 			{ tipo: "mensagem_usuario", texto: "oi", momento: new Date(1).toISOString() },
-			{ tipo: "contexto_tela", contexto: { tipo: "nota", rotulo: "Nota A", olho: true, selecao: "um trecho" } },
+			{ tipo: "contexto_tela", contextos: [{ tipo: "nota", rotulo: "Nota A", olho: true, selecao: "um trecho" }] },
 		]);
 	});
 });

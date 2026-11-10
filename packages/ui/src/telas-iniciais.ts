@@ -35,11 +35,15 @@ export interface PropsConversaEmbutida {
 	janela: JanelaPerfilHook;
 	/** false = escondida (hidden e inert), nunca desmontada: o rascunho, a citação e a resposta em andamento continuam. */
 	aberta: boolean;
-	/** O contexto da tela na hora de mandar (lido a cada envio); undefined = a mensagem vai sem contexto. */
-	obterContexto?(): ContextoTela | undefined;
+	/**
+	 * Os contextos da tela na hora de mandar (lidos a cada envio), um por aba
+	 * aberta; ausente ou lista vazia = a mensagem vai sem contexto. Pode ser
+	 * assíncrono (um perfil pode precisar buscar o conteúdo de uma aba).
+	 */
+	obterContextos?(): ContextoTela[] | Promise<ContextoTela[]>;
 	/** O topo, desenhado pelo perfil (na mesa: o custo, o seletor de conversas, Nova e abrir na tela cheia). */
 	cabecalho?: ReactNode;
-	/** O trecho citado (Perguntar): aparece acima do campo com um X; vai junto da próxima mensagem e é limpo depois. */
+	/** O trecho citado (Perguntar): aparece acima do campo com um X; vai como selecao no contexto com foco (ou no primeiro, se nenhum tiver foco) da próxima mensagem e é limpo depois. */
 	citacao?: { texto: string; limpar(): void };
 	/**
 	 * As pills de contexto do perfil, flutuando logo acima do campo, na mesma

@@ -45,8 +45,8 @@ async function criarPerfil(pastaPerfis: string, pasta: string, id: string, pasta
 class JanelaFalsa implements JanelaDoServidor {
 	estado: EstadoSessao | undefined;
 	readonly chamadas: string[] = [];
-	/** O contextoTela de cada enviar, na ordem. */
-	readonly contextos: Array<ContextoTela | undefined> = [];
+	/** Os contextosTela de cada enviar, na ordem. */
+	readonly contextos: Array<ContextoTela[] | undefined> = [];
 	/** O que usoDoRamo devolve. */
 	uso: UsoModelo | undefined;
 	private readonly ouvintes = new Set<(evento: EventoNucleo) => void>();
@@ -72,9 +72,9 @@ class JanelaFalsa implements JanelaDoServidor {
 		if (opcoes.sessaoId === "nao-existe") throw new Error("Sessão nao-existe não encontrada");
 		return this.novoEstado(opcoes.sessaoId ?? `s${++this.sessao}`, opcoes.agente ?? this.perfil.agentePadrao);
 	}
-	async enviar(texto: string, contextoTela?: ContextoTela) {
+	async enviar(texto: string, contextosTela?: ContextoTela[]) {
 		this.chamadas.push(`enviar ${texto}`);
-		this.contextos.push(contextoTela);
+		this.contextos.push(contextosTela);
 		this.conversa.push(texto);
 		this.emitir({ tipo: "execucao_inicio" });
 		return "iniciada" as const;
@@ -515,31 +515,31 @@ describe("contexto da tela no servidor (WP1)", () => {
 		};
 	}
 
-	it("enviar repassa o contextoTela à janela do perfil", async () => {
+	it("enviar repassa os contextosTela à janela do perfil", async () => {
 		const conexao = new ConexaoFalsa(1);
 		await tratarMensagem(janelas, conexao, JSON.stringify({ tipo: "abrir_perfil", perfil: "teste" }), logMudo);
-		await tratarMensagem(janelas, conexao, JSON.stringify({ tipo: "enviar", pedidoId: "e1", perfil: "teste", texto: "explica", contextoTela: contexto }), logMudo);
+		await tratarMensagem(janelas, conexao, JSON.stringify({ tipo: "enviar", pedidoId: "e1", perfil: "teste", texto: "explica", contextosTela: [contexto] }), logMudo);
 		expect(conexao.ultima()).toMatchObject({ tipo: "resposta", pedidoId: "e1", ok: true, dados: "iniciada" });
 		await tratarMensagem(janelas, conexao, JSON.stringify({ tipo: "enviar", pedidoId: "e2", perfil: "teste", texto: "sem contexto" }), logMudo);
-		expect(falsas[0]?.contextos).toEqual([contexto, undefined]);
+		expect(falsas[0]?.contextos).toEqual([[contexto], undefined]);
 	});
 
-	it("o log do pedido enviar registra só o tipo e os tamanhos do contextoTela, nunca o conteúdo nem a seleção", async () => {
-		expect(resumirMensagem({ tipo: "enviar", perfil: "teste", texto: "oi", contextoTela: contexto })).toBe(
-			"enviar perfil=teste texto=2 car. contexto=nota olho=aberto conteudo=24 car. selecao=14 car.",
+	it("o log do pedido enviar registra só a quantidade e, de cada contexto, o tipo, o olho e os tamanhos, nunca o conteúdo, a seleção nem o rótulo", async () => {
+		expect(resumirMensagem({ tipo: "enviar", perfil: "teste", texto: "oi", contextosTela: [contexto] })).toBe(
+			"enviar perfil=teste texto=2 car. contextos=1 (nota olho=aberto conteudo=24 car. selecao=14 car.)",
 		);
 		const { conteudo: _conteudo, selecao: _selecao, ...semConteudo } = contexto;
-		expect(resumirMensagem({ tipo: "enviar", perfil: "teste", texto: "oi", contextoTela: { ...semConteudo, olho: false } })).toBe(
-			"enviar perfil=teste texto=2 car. contexto=nota olho=fechado conteudo=0 car. selecao=0 car.",
+		expect(resumirMensagem({ tipo: "enviar", perfil: "teste", texto: "oi", contextosTela: [{ ...semConteudo, olho: false }, contexto] })).toBe(
+			"enviar perfil=teste texto=2 car. contextos=2 (nota olho=fechado conteudo=0 car. selecao=0 car.; nota olho=aberto conteudo=24 car. selecao=14 car.)",
 		);
 
 		// O caminho inteiro: o que o tratarMensagem manda para o log.
 		const { log, linhas } = logGuardado();
 		const conexao = new ConexaoFalsa(1);
 		await tratarMensagem(janelas, conexao, JSON.stringify({ tipo: "abrir_perfil", perfil: "teste" }), log);
-		await tratarMensagem(janelas, conexao, JSON.stringify({ tipo: "enviar", perfil: "teste", texto: "pergunta secreta", contextoTela: contexto }), log);
+		await tratarMensagem(janelas, conexao, JSON.stringify({ tipo: "enviar", perfil: "teste", texto: "pergunta secreta", contextosTela: [contexto] }), log);
 		const texto = linhas.join("\n");
-		expect(texto).toContain("contexto=nota");
+		expect(texto).toContain("contextos=1 (nota olho=aberto");
 		for (const segredo of ["secreto", "secreta"]) expect(texto).not.toContain(segredo);
 	});
 

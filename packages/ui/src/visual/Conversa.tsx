@@ -428,30 +428,38 @@ function IconeTrecho() {
 }
 
 /**
- * O que a tela mostrava quando a mensagem foi mandada (só o resumo, nunca o
- * conteúdo): o rótulo, o olho, "parcial" se o conteúdo foi cortado e o sinal
- * do trecho citado (o trecho no title). Genérico: quem decide o que é o
- * rótulo é o perfil.
+ * O que a tela mostrava quando a mensagem foi mandada (só os resumos, nunca o
+ * conteúdo): uma pill compacta por aba, em linha, a em foco primeiro. Cada
+ * uma tem o rótulo, o olho (aberto = o conteúdo foi junto), "parcial" se o
+ * conteúdo foi cortado e o sinal do trecho citado (o trecho no title).
+ * Genérico: quem decide o que é o rótulo é o perfil.
  */
-function ChipContexto({ contexto }: { contexto: ResumoContextoTela }) {
-	const olho = contexto.olho;
+function ChipsContexto({ contextos }: { contextos: ResumoContextoTela[] }) {
+	// Foco primeiro; o resto na ordem recebida (sort é estável).
+	const ordenados = [...contextos].sort((a, b) => Number(b.foco === true) - Number(a.foco === true));
 	return (
 		<div className="chip-contexto-linha">
-			<span
-				className="chip-contexto"
-				title={`${contexto.rotulo} · ${olho ? "conteúdo enviado junto" : "só o rótulo foi junto"}`}
-			>
-				<span className="chip-contexto__rotulo">{contexto.rotulo}</span>
-				<span className="chip-contexto__sinal" role="img" aria-label={olho ? "Olho aberto" : "Olho fechado"}>
-					<IconeOlho aberto={olho} />
-				</span>
-				{contexto.parcial ? <span className="chip-contexto__parcial overline">parcial</span> : null}
-				{contexto.selecao ? (
-					<span className="chip-contexto__sinal" role="img" aria-label="Trecho citado" title={contexto.selecao}>
-						<IconeTrecho />
+			{ordenados.map((contexto, indice) => {
+				const olho = contexto.olho;
+				return (
+					<span
+						key={`${indice}-${contexto.rotulo}`}
+						className={`chip-contexto${contexto.foco ? " chip-contexto--foco" : ""}`}
+						title={`${contexto.rotulo} · ${olho ? "conteúdo enviado junto" : "só o rótulo foi junto"}`}
+					>
+						<span className="chip-contexto__rotulo">{contexto.rotulo}</span>
+						<span className="chip-contexto__sinal" role="img" aria-label={olho ? "Olho aberto" : "Olho fechado"}>
+							<IconeOlho aberto={olho} />
+						</span>
+						{contexto.parcial ? <span className="chip-contexto__parcial overline">parcial</span> : null}
+						{contexto.selecao ? (
+							<span className="chip-contexto__sinal" role="img" aria-label="Trecho citado" title={contexto.selecao}>
+								<IconeTrecho />
+							</span>
+						) : null}
 					</span>
-				) : null}
-			</span>
+				);
+			})}
 		</div>
 	);
 }
@@ -551,7 +559,7 @@ export function DocumentoConversa({ conversa, vazio, pedidoDaChamada, depois, au
 					// A nota não entra subindo: quem traz ela é o voo (ou ela já estava lá).
 					return (
 						<div key={item.chave} className="documento__item documento__item--usuario">
-							{item.contextoTela ? <ChipContexto contexto={item.contextoTela} /> : null}
+							{item.contextosTela && item.contextosTela.length > 0 ? <ChipsContexto contextos={item.contextosTela} /> : null}
 							<NotaUsuario
 								texto={item.texto}
 								{...(voo && aoVivo(item.chave) ? { voo } : {})}

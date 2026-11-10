@@ -12,8 +12,8 @@ import type { ContextoSessao, ContextoTela, DadosResposta, EstadoSessao, InfoMod
 
 export interface AcoesJanela {
 	/** "iniciada" ou "enfileirada" (a sessão estava respondendo). */
-	/** contextoTela: o que a tela mostra agora; o núcleo o junta à mensagem (com o olho fechado, o conteúdo não vai). */
-	enviar(texto: string, contextoTela?: ContextoTela): Promise<"iniciada" | "enfileirada">;
+	/** contextosTela: o que cada aba da tela mostra agora; o núcleo os junta à mensagem (com o olho fechado, o conteúdo não vai). */
+	enviar(texto: string, contextosTela?: ContextoTela[]): Promise<"iniciada" | "enfileirada">;
 	/** Devolve as mensagens que estavam na fila, para voltarem ao campo de texto. */
 	abortar(): Promise<string[]>;
 	/** modelo no formato provedor/id. */
@@ -157,7 +157,7 @@ export function useJanelaPerfil(perfilId: string, cliente: ClienteConexao = obte
 	const acoes = useMemo<AcoesJanela>(() => {
 		const perfil = perfilId;
 		return {
-			enviar: (texto, contextoTela) => pedir({ tipo: "enviar", perfil, texto, ...(contextoTela ? { contextoTela } : {}) }),
+			enviar: (texto, contextosTela) => pedir({ tipo: "enviar", perfil, texto, ...(contextosTela && contextosTela.length > 0 ? { contextosTela } : {}) }),
 			abortar: () => pedir({ tipo: "abortar", perfil }),
 			trocarModelo: (modelo) => pedir({ tipo: "trocar_modelo", perfil, modelo }),
 			trocarAgente: (agente) => pedir({ tipo: "trocar_agente", perfil, agente }),

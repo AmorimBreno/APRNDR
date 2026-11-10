@@ -89,7 +89,9 @@ describe("isolamento do pi", () => {
 });
 
 describe("contexto da tela no enviar (13.19)", () => {
-	const enviar = (contextoTela: unknown) => validarMensagemCliente({ tipo: "enviar", perfil: "estudos", texto: "Por quê?", contextoTela });
+	const enviarLista = (contextosTela: unknown) => validarMensagemCliente({ tipo: "enviar", perfil: "estudos", texto: "Por quê?", contextosTela });
+	// Um contexto só, dentro da lista: as regras de cada item são as de antes.
+	const enviar = (contexto: unknown) => enviarLista([contexto]);
 
 	it("aceita o contexto com o olho aberto e o conteúdo, e com o olho fechado sem ele", () => {
 		expect(enviar({ tipo: "nota", rotulo: "Séries", olho: true, conteudo: "# Séries", selecao: "L = 1", origem: "caderno/calc/notas/Séries" }).ok).toBe(true);
@@ -116,5 +118,30 @@ describe("contexto da tela no enviar (13.19)", () => {
 		expect(enviar({ tipo: "nota", rotulo: "Séries", olho: true, conteudo: "x".repeat(LIMITES_CONTEXTO_TELA.conteudo + 1) }).ok).toBe(false);
 		expect(enviar({ tipo: "nota", rotulo: "Séries", olho: true, selecao: "x".repeat(LIMITES_CONTEXTO_TELA.selecao + 1) }).ok).toBe(false);
 		expect(enviar({ tipo: "nota", rotulo: "Séries", olho: true, origem: "x".repeat(LIMITES_CONTEXTO_TELA.origem + 1) }).ok).toBe(false);
+	});
+
+	it("aceita a lista das abas, com o foco, e a lista vazia", () => {
+		expect(
+			enviarLista([
+				{ tipo: "nota", rotulo: "A", olho: true, conteudo: "a", foco: true, selecao: "t" },
+				{ tipo: "licao", rotulo: "B", olho: false },
+			]).ok,
+		).toBe(true);
+		expect(enviarLista([]).ok).toBe(true);
+		expect(enviar({ tipo: "nota", rotulo: "A", olho: false, foco: "sim" }).ok).toBe(false);
+	});
+
+	it("recusa mais de 8 contextos e o contextoTela antigo", () => {
+		const um = { tipo: "nota", rotulo: "A", olho: false };
+		expect(enviarLista(Array.from({ length: 8 }, () => um)).ok).toBe(true);
+		expect(enviarLista(Array.from({ length: 9 }, () => um)).ok).toBe(false);
+		expect(validarMensagemCliente({ tipo: "enviar", perfil: "estudos", texto: "x", contextoTela: um }).ok).toBe(false);
+	});
+
+	it("limita a soma dos conteúdos", () => {
+		const metade = "x".repeat(LIMITES_CONTEXTO_TELA.conteudo / 2);
+		const com = (conteudo: string) => ({ tipo: "nota", rotulo: "A", olho: true, conteudo });
+		expect(enviarLista([com(metade), com(metade)]).ok).toBe(true);
+		expect(enviarLista([com(metade), com(metade + "y")]).ok).toBe(false);
 	});
 });

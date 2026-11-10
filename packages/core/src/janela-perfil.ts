@@ -178,11 +178,11 @@ export class JanelaPerfil {
 	 * before_agent_start e só aceita texto, então o contexto da tela de cada
 	 * mensagem se perderia. Cada item sai com prompt() quando a execução termina.
 	 */
-	private filaPropria: Array<{ texto: string; contextoTela?: ContextoTela }> = [];
+	private filaPropria: Array<{ texto: string; contextosTela?: ContextoTela[] }> = [];
 	/** O que está na fila do pi (steer e followUp de extensões), para o evento "fila" juntar as duas. */
 	private filaPi: string[] = [];
 	/** O contexto da tela do prompt() que está começando; o before_agent_start o consome. */
-	private proximoContexto?: ContextoTela;
+	private proximoContexto?: ContextoTela[];
 	/** A última execução terminou abortada (evento execucao_fim). */
 	private ultimaAbortada = false;
 
@@ -258,10 +258,11 @@ export class JanelaPerfil {
 	 * espera a resposta: ela chega pelos eventos. Erros também viram eventos
 	 * ("erro"), nunca uma promessa rejeitada solta.
 	 */
-	enviar(texto: string, contextoTela?: ContextoTela): Promise<"iniciada" | "enfileirada"> {
+	enviar(texto: string, contextosTela?: ContextoTela[]): Promise<"iniciada" | "enfileirada"> {
 		return this.emOrdem(async () => {
 			const sessao = this.exigirSessao();
-			const item = { texto, ...(contextoTela ? { contextoTela } : {}) };
+			// Lista vazia = sem contexto (a mensagem custom não é gravada).
+			const item = { texto, ...(contextosTela && contextosTela.length > 0 ? { contextosTela } : {}) };
 			// this.execucao cobre o intervalo entre o fim da execução no pi e o
 			// finally do prompt(), que manda o próximo da fila.
 			if (this.execucao || this.iniciando || sessao.isStreaming) {
@@ -436,7 +437,7 @@ export class JanelaPerfil {
 
 	/**
 	 * Conversa da sessão aberta (ramo ativo), no formato genérico. O contexto da
-	 * tela de cada mensagem vem como resumo no item do usuário (contextoTela).
+	 * tela de cada mensagem vem como resumo no item do usuário (contextosTela).
 	 */
 	historico(): ItemHistorico[] {
 		if (!this.sessao) return [];
@@ -561,10 +562,10 @@ export class JanelaPerfil {
 	 * (o pi resolve depois do agent_settled), manda o próximo da fila, a menos que
 	 * a execução tenha sido abortada ou a sessão trocada.
 	 */
-	private comecar(sessao: AgentSession, item: { texto: string; contextoTela?: ContextoTela }): void {
+	private comecar(sessao: AgentSession, item: { texto: string; contextosTela?: ContextoTela[] }): void {
 		this.iniciando = true;
 		this.ultimaAbortada = false;
-		this.proximoContexto = item.contextoTela;
+		this.proximoContexto = item.contextosTela;
 		const execucao: Promise<void> = sessao
 			.prompt(item.texto)
 			.catch((erro: unknown) => {
@@ -626,10 +627,10 @@ export class JanelaPerfil {
 	 */
 	private contextoParaModelo(ponte: PonteSessao, evento: BeforeAgentStartEvent): BeforeAgentStartEventResult | undefined {
 		if (evento.messageType !== "user" || this.ponte !== ponte || !this.sessao) return undefined;
-		const contexto = this.proximoContexto;
+		const contextos = this.proximoContexto;
 		this.proximoContexto = undefined;
-		if (!contexto) return undefined;
-		return { message: mensagemDoContexto(contexto, this.sessao.messages) };
+		if (!contextos || contextos.length === 0) return undefined;
+		return { message: mensagemDoContexto(contextos, this.sessao.messages) };
 	}
 
 	// ---------------------------------------------------------------------------

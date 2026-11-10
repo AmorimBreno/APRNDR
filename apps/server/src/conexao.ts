@@ -25,16 +25,16 @@ export function resumirMensagem(mensagem: MensagemCliente): string {
 	switch (mensagem.tipo) {
 		case "enviar":
 			partes.push(`texto=${mensagem.texto.length} car.`);
-			// O contexto da tela leva o arquivo aberto e o trecho citado: no log, só
-			// o tipo e os tamanhos (nem o rótulo, que pode ser o título de uma nota).
-			if (mensagem.contextoTela) {
-				const contexto = mensagem.contextoTela;
-				partes.push(
-					`contexto=${contexto.tipo}`,
-					`olho=${contexto.olho ? "aberto" : "fechado"}`,
-					`conteudo=${contexto.conteudo?.length ?? 0} car.`,
-					`selecao=${contexto.selecao?.length ?? 0} car.`,
+			// Os contextos da tela levam os arquivos abertos e o trecho citado: no
+			// log, só a quantidade e, de cada um, o tipo, o olho e os tamanhos (nem
+			// o rótulo, que pode ser o título de uma nota, nem a seleção).
+			if (mensagem.contextosTela) {
+				const itens = mensagem.contextosTela.map(
+					(contexto) =>
+						`${contexto.tipo} olho=${contexto.olho ? "aberto" : "fechado"} conteudo=${contexto.conteudo?.length ?? 0} car. selecao=${contexto.selecao?.length ?? 0} car.`,
 				);
+				partes.push(`contextos=${itens.length}`);
+				if (itens.length > 0) partes.push(`(${itens.join("; ")})`);
 			}
 			break;
 		case "abrir_perfil":
@@ -76,7 +76,7 @@ async function executar(janelas: Janelas, conexao: Conexao, mensagem: MensagemCl
 		case "abrir_perfil":
 			return janelas.abrirPerfil(conexao, mensagem);
 		case "enviar":
-			return janelas.janela(mensagem.perfil).enviar(mensagem.texto, mensagem.contextoTela);
+			return janelas.janela(mensagem.perfil).enviar(mensagem.texto, mensagem.contextosTela);
 		case "abortar":
 			return janelas.janela(mensagem.perfil).abortar();
 		case "trocar_modelo":

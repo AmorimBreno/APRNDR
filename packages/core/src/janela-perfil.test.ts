@@ -455,7 +455,8 @@ async function conversaGravada(arquivo: string): Promise<Array<[string, unknown]
 }
 
 async function contextosGravados(arquivo: string): Promise<unknown[]> {
-	return (await conversaGravada(arquivo)).filter(([tipo]) => tipo === "contexto").map(([, dados]) => dados);
+	// Os itens de todas as mensagens custom, em sequência (cada uma tem details.contextos).
+	return (await conversaGravada(arquivo)).filter(([tipo]) => tipo === "contexto").flatMap(([, dados]) => (dados as { contextos?: unknown[] }).contextos ?? []);
 }
 
 describe("contexto da tela e fila própria (WP1)", () => {
@@ -524,12 +525,12 @@ describe("contexto da tela e fila própria (WP1)", () => {
 
 	it("enviar com contextoTela grava a mensagem custom nucleo.contexto-tela (display false) logo depois da mensagem do usuário, pelo before_agent_start", async () => {
 		const aberta = await abrirJanela();
-		expect(await aberta.enviar("O que é o critério da razão?", notaA)).toBe("iniciada");
+		expect(await aberta.enviar("O que é o critério da razão?", [notaA])).toBe("iniciada");
 		await aberta.aguardarOcioso();
 
 		expect(await conversaGravada(arquivoDaSessao(aberta))).toEqual([
 			["usuario", "O que é o critério da razão?"],
-			["contexto", { tipo: "nota", rotulo: "Nota A", origem: "caderno/x/notas/Nota A", olho: true, selecao: "trecho de A", hash: hashConteudo(conteudoA) }],
+			["contexto", { contextos: [{ tipo: "nota", rotulo: "Nota A", origem: "caderno/x/notas/Nota A", olho: true, selecao: "trecho de A", hash: hashConteudo(conteudoA) }] }],
 			["assistente", "Resposta 1."],
 		]);
 		// O modelo viu a mensagem do usuário e, logo depois, o contexto com o conteúdo inteiro.
@@ -548,9 +549,9 @@ describe("contexto da tela e fila própria (WP1)", () => {
 	it("enviar durante uma resposta guarda {texto, contextoTela} na fila própria, emite o evento fila e manda com prompt() quando a execução termina sem abortar", async () => {
 		const aberta = await abrirJanela();
 		modelo.segurar();
-		expect(await aberta.enviar("primeira", notaA)).toBe("iniciada");
+		expect(await aberta.enviar("primeira", [notaA])).toBe("iniciada");
 		await modelo.esperarPedidos(1);
-		expect(await aberta.enviar("segunda", notaB)).toBe("enfileirada");
+		expect(await aberta.enviar("segunda", [notaB])).toBe("enfileirada");
 		expect(ultimaFila()).toEqual({ tipo: "fila", mensagens: ["segunda"] });
 		// Nada foi para a fila do pi: a segunda só sai quando a primeira terminar.
 		expect(aberta.sessaoPi?.pendingMessageCount).toBe(0);
@@ -559,7 +560,7 @@ describe("contexto da tela e fila própria (WP1)", () => {
 		modelo.soltar();
 		await aberta.aguardarOcioso();
 		expect(modelo.pedidos).toHaveLength(2);
-		expect(modelo.contextoDoPedido(1)).toContain("Rótulo: Nota B");
+		expect(modelo.contextoDoPedido(1)).toContain('"Nota B"');
 		expect(ultimaFila()).toEqual({ tipo: "fila", mensagens: [] });
 		// Cada mensagem foi uma execução própria.
 		expect(eventos.filter((evento) => evento.tipo === "execucao_fim")).toEqual([
@@ -571,14 +572,14 @@ describe("contexto da tela e fila própria (WP1)", () => {
 	it("dois envios seguidos, um durante a resposta, deixam dois contextos na sessão, cada um com o seu texto", async () => {
 		const aberta = await abrirJanela();
 		modelo.segurar();
-		const envios = await Promise.all([aberta.enviar("sobre a nota A", notaA), aberta.enviar("e a nota B?", notaB)]);
+		const envios = await Promise.all([aberta.enviar("sobre a nota A", [notaA]), aberta.enviar("e a nota B?", [notaB])]);
 		expect(envios).toEqual(["iniciada", "enfileirada"]);
 		await modelo.esperarPedidos(1);
 		modelo.soltar();
 		await aberta.aguardarOcioso();
 
 		const conversa = await conversaGravada(arquivoDaSessao(aberta));
-		expect(conversa.map(([tipo, dados]) => (tipo === "contexto" ? `contexto ${(dados as { rotulo: string }).rotulo}` : `${tipo} ${String(dados)}`))).toEqual([
+		expect(conversa.map(([tipo, dados]) => (tipo === "contexto" ? `contexto ${(dados as { contextos: Array<{ rotulo: string }> }).contextos.map((contexto) => contexto.rotulo).join("+")}` : `${tipo} ${String(dados)}`))).toEqual([
 			"usuario sobre a nota A",
 			"contexto Nota A",
 			"assistente Resposta 1.",
@@ -587,7 +588,7 @@ describe("contexto da tela e fila própria (WP1)", () => {
 			"assistente Resposta 2.",
 		]);
 		// E o histórico prende cada resumo ao seu texto.
-		expect(aberta.historico().flatMap((item) => (item.papel === "usuario" ? [[item.texto, item.contextoTela?.rotulo]] : []))).toEqual([
+		expect(aberta.historico().flatMap((item) => (item.papel === "usuario" ? [[item.texto, item.contextosTela?.map((contexto) => contexto.rotulo).join("+")]] : []))).toEqual([
 			["sobre a nota A", "Nota A"],
 			["e a nota B?", "Nota B"],
 		]);
@@ -596,9 +597,9 @@ describe("contexto da tela e fila própria (WP1)", () => {
 	it("abortar e trocar de sessão esvaziam a fila própria; abortar devolve os textos da fila", async () => {
 		const aberta = await abrirJanela();
 		modelo.segurar();
-		await aberta.enviar("primeira", notaA);
+		await aberta.enviar("primeira", [notaA]);
 		await modelo.esperarPedidos(1);
-		await aberta.enviar("segunda", notaB);
+		await aberta.enviar("segunda", [notaB]);
 		await aberta.enviar("terceira");
 		expect(await aberta.abortar()).toEqual(["segunda", "terceira"]);
 		expect(ultimaFila()).toEqual({ tipo: "fila", mensagens: [] });
@@ -608,9 +609,9 @@ describe("contexto da tela e fila própria (WP1)", () => {
 
 		// Trocar de sessão: a fila da conversa que sai não vai para a nova.
 		modelo.segurar();
-		await aberta.enviar("quarta", notaA);
+		await aberta.enviar("quarta", [notaA]);
 		await modelo.esperarPedidos(2);
-		expect(await aberta.enviar("quinta", notaB)).toBe("enfileirada");
+		expect(await aberta.enviar("quinta", [notaB])).toBe("enfileirada");
 		await aberta.novaSessao();
 		expect(ultimaFila()).toEqual({ tipo: "fila", mensagens: [] });
 		modelo.soltar();
@@ -632,7 +633,7 @@ describe("contexto da tela e fila própria (WP1)", () => {
 
 		// Um modelo sem credencial: o prompt() lança antes de começar a execução.
 		sessao.agent.state.model = semChave;
-		expect(await aberta.enviar("vai falhar", notaA)).toBe("iniciada");
+		expect(await aberta.enviar("vai falhar", [notaA])).toBe("iniciada");
 		await aberta.aguardarOcioso();
 		expect(eventos.filter((evento) => evento.tipo === "erro").at(-1)).toMatchObject({ tipo: "erro", origem: "nucleo" });
 		expect(modelo.pedidos).toHaveLength(0);
@@ -649,12 +650,12 @@ describe("contexto da tela e fila própria (WP1)", () => {
 		const aberta = await abrirJanela();
 		const hashA = hashConteudo(conteudoA);
 
-		await aberta.enviar("um", notaA);
+		await aberta.enviar("um", [notaA]);
 		await aberta.aguardarOcioso();
 		expect(modelo.contextoDoPedido(0)).toContain("<conteudo>");
 
 		// Mesmo conteúdo: só a frase, e a mensagem não grava hash (o conteúdo não foi nela).
-		await aberta.enviar("dois", { ...notaA, selecao: "outro trecho" });
+		await aberta.enviar("dois", [{ ...notaA, selecao: "outro trecho" }]);
 		await aberta.aguardarOcioso();
 		expect(modelo.contextoDoPedido(1)).not.toContain("<conteudo>");
 		expect(modelo.contextoDoPedido(1)).toMatch(/mesmo conteúdo de "Nota A"/);
@@ -663,7 +664,7 @@ describe("contexto da tela e fila própria (WP1)", () => {
 
 		// Trocar de agente remonta a sessão: o hash vem das mensagens, não da memória.
 		await aberta.trocarAgente("outro");
-		await aberta.enviar("três", notaA);
+		await aberta.enviar("três", [notaA]);
 		await aberta.aguardarOcioso();
 		expect(modelo.contextoDoPedido(2)).toMatch(/mesmo conteúdo/);
 
@@ -671,13 +672,13 @@ describe("contexto da tela e fila própria (WP1)", () => {
 		const id = aberta.estado?.sessaoId ?? "";
 		await aberta.descartar();
 		const reaberta = await abrirJanela(id);
-		await reaberta.enviar("quatro", notaA);
+		await reaberta.enviar("quatro", [notaA]);
 		await reaberta.aguardarOcioso();
 		expect(modelo.contextoDoPedido(3)).toMatch(/mesmo conteúdo/);
 
 		// O conteúdo mudou: vai inteiro de novo, com o hash novo.
 		const mudada = `${conteudoA}\nUma linha nova.`;
-		await reaberta.enviar("cinco", { ...notaA, conteudo: mudada });
+		await reaberta.enviar("cinco", [{ ...notaA, conteudo: mudada }]);
 		await reaberta.aguardarOcioso();
 		expect(modelo.contextoDoPedido(4)).toContain("Uma linha nova.");
 		expect((await contextosGravados(arquivoDaSessao(reaberta))).at(-1)).toMatchObject({ hash: hashConteudo(mudada) });
@@ -686,7 +687,7 @@ describe("contexto da tela e fila própria (WP1)", () => {
 		const compactada = "01a10000-0000-7000-8000-0000000000cc";
 		await gravarSessaoCompactada(compactada, hashA);
 		await reaberta.abrirSessao(compactada);
-		await reaberta.enviar("seis", notaA);
+		await reaberta.enviar("seis", [notaA]);
 		await reaberta.aguardarOcioso();
 		expect(modelo.contextoDoPedido(5)).toContain("<conteudo>");
 		expect((await contextosGravados(arquivoDaSessao(reaberta))).at(-1)).toMatchObject({ hash: hashA });
@@ -694,10 +695,10 @@ describe("contexto da tela e fila própria (WP1)", () => {
 
 	it("olho fechado nunca leva conteúdo nem hash", async () => {
 		const aberta = await abrirJanela();
-		await aberta.enviar("olho fechado", { ...notaA, olho: false });
+		await aberta.enviar("olho fechado", [{ ...notaA, olho: false }]);
 		await aberta.aguardarOcioso();
 		const texto = modelo.contextoDoPedido(0) ?? "";
-		expect(texto).toContain("Rótulo: Nota A");
+		expect(texto).toContain('"Nota A"');
 		expect(texto).toContain("trecho de A");
 		expect(texto).not.toContain("Conteúdo da nota A");
 		const gravado = await readFile(arquivoDaSessao(aberta), "utf8");
@@ -708,22 +709,49 @@ describe("contexto da tela e fila própria (WP1)", () => {
 		]);
 
 		// Depois de um olho fechado, o mesmo conteúdo com o olho aberto vai inteiro (não há hash visível).
-		await aberta.enviar("agora aberto", notaA);
+		await aberta.enviar("agora aberto", [notaA]);
 		await aberta.aguardarOcioso();
 		expect(modelo.contextoDoPedido(1)).toContain("<conteudo>");
 	});
 
 	it("o evento contexto_tela sai depois do mensagem_usuario, com o resumo sem o conteúdo", async () => {
 		const aberta = await abrirJanela();
-		await aberta.enviar("pergunta", { ...notaA, parcial: true });
+		await aberta.enviar("pergunta", [{ ...notaA, parcial: true }]);
 		await aberta.aguardarOcioso();
 		const tipos = new Set(["mensagem_usuario", "contexto_tela", "mensagem_assistente"]);
 		expect(eventos.filter((evento) => tipos.has(evento.tipo)).map((evento) => evento.tipo)).toEqual(["mensagem_usuario", "contexto_tela", "mensagem_assistente"]);
 		expect(eventos.find((evento) => evento.tipo === "contexto_tela")).toEqual({
 			tipo: "contexto_tela",
-			contexto: { tipo: "nota", rotulo: "Nota A", origem: "caderno/x/notas/Nota A", olho: true, parcial: true, selecao: "trecho de A" },
+			contextos: [{ tipo: "nota", rotulo: "Nota A", origem: "caderno/x/notas/Nota A", olho: true, parcial: true, selecao: "trecho de A" }],
 		});
 		expect(JSON.stringify(eventos)).not.toContain("Conteúdo da nota A");
+	});
+
+	it("duas abas, uma selecionada e outra não: o texto leva o conteúdo de uma e só o nome da outra, e o resumo traz as duas", async () => {
+		const aberta = await abrirJanela();
+		const licao: ContextoTela = { tipo: "licao", rotulo: "Lição 2.3", olho: false };
+		await aberta.enviar("compare", [licao, { ...notaA, foco: true }]);
+		await aberta.aguardarOcioso();
+
+		const texto = modelo.contextoDoPedido(0) ?? "";
+		expect(texto).toContain(`<conteudo>\n${conteudoA}\n</conteudo>`);
+		expect(texto).toContain('"Lição 2.3"');
+		expect(texto).toMatch(/conteúdo não mandado/);
+		// A em foco vem primeiro, mesmo estando depois na lista.
+		expect(texto.indexOf('"Nota A"')).toBeLessThan(texto.indexOf('"Lição 2.3"'));
+		expect(await contextosGravados(arquivoDaSessao(aberta))).toEqual([
+			// A não selecionada não leva conteúdo nem hash; a ordem gravada é a das abas.
+			{ tipo: "licao", rotulo: "Lição 2.3", olho: false },
+			{ tipo: "nota", rotulo: "Nota A", origem: "caderno/x/notas/Nota A", olho: true, selecao: "trecho de A", foco: true, hash: hashConteudo(conteudoA) },
+		]);
+		expect(aberta.historico()).toMatchObject([{ papel: "usuario", contextosTela: [{ rotulo: "Lição 2.3" }, { rotulo: "Nota A", foco: true }] }, { papel: "assistente" }]);
+		expect(JSON.stringify(aberta.historico())).not.toContain("Conteúdo da nota A");
+
+		// O mesmo conteúdo de novo, com outra aba junto: a frase de repetido só na selecionada.
+		await aberta.enviar("de novo", [licao, { ...notaA, foco: true }]);
+		await aberta.aguardarOcioso();
+		expect(modelo.contextoDoPedido(1)).toMatch(/mesmo conteúdo de "Nota A"/);
+		expect(modelo.contextoDoPedido(1)).not.toContain("<conteudo>");
 	});
 
 	it("historico() prende o resumo do contexto ao item do usuário anterior e o estado do historico traz o uso somado do ramo inteiro, com os subagentes", async () => {
@@ -731,8 +759,9 @@ describe("contexto da tela e fila própria (WP1)", () => {
 		await gravarSessaoComUso(id);
 		const aberta = await abrirJanela(id);
 		// A primeira pergunta foi compactada: o histórico começa na segunda, com o contexto dela.
+		// A sessão é do formato antigo (details de um contexto só): vira uma lista de um.
 		expect(aberta.historico()).toMatchObject([
-			{ papel: "usuario", texto: "Pergunta 2", contextoTela: { tipo: "nota", rotulo: "Nota B", olho: true } },
+			{ papel: "usuario", texto: "Pergunta 2", contextosTela: [{ tipo: "nota", rotulo: "Nota B", olho: true }] },
 			{ papel: "assistente", ferramentas: [{ nome: "subagent" }] },
 			{ papel: "ferramenta", nome: "subagent" },
 			{ papel: "assistente", texto: "Resposta 2" },

@@ -49,6 +49,8 @@ export interface ContextoTela {
 	parcial?: boolean;
 	/** O trecho citado pelo usuário (a citação de "Perguntar"). */
 	selecao?: string;
+	/** A aba em foco (docs/mesa-de-estudo.md, 5b): vai primeiro no texto do modelo e leva o trecho citado. */
+	foco?: boolean;
 }
 
 /** O contexto como volta à interface (evento e histórico): sem o conteúdo, que só o modelo vê. */
@@ -93,7 +95,7 @@ export type EventoNucleo =
 	 * Chega depois do mensagem_usuario: a interface o prende ao último item do
 	 * usuário. Nunca traz o conteúdo.
 	 */
-	| { tipo: "contexto_tela"; contexto: ResumoContextoTela }
+	| { tipo: "contexto_tela"; contextos: ResumoContextoTela[] }
 	| { tipo: "texto_delta"; delta: string }
 	| { tipo: "raciocinio_delta"; delta: string }
 	/** Mensagem do assistente concluída. `erro` vem quando o provedor falhou. */
@@ -137,7 +139,7 @@ export type EventoNucleo =
 
 /** Item do histórico de uma sessão, para mostrar a conversa ao reabrir. */
 export type ItemHistorico =
-	| { papel: "usuario"; texto: string; momento?: string; contextoTela?: ResumoContextoTela }
+	| { papel: "usuario"; texto: string; momento?: string; contextosTela?: ResumoContextoTela[] }
 	| {
 			papel: "assistente";
 			texto: string;
@@ -259,8 +261,8 @@ export function criarTradutorEventos(): (evento: AgentSessionEvent) => EventoNuc
 				// no arquivo nesse momento), logo depois do mensagem_usuario da mesma
 				// execução: o agent-loop emite as mensagens iniciais em ordem (a do
 				// usuário e depois as do before_agent_start). Só o resumo dos details.
-				const contexto = resumoDaMensagemContexto(mensagem);
-				if (contexto) return [{ tipo: "contexto_tela", contexto }];
+				const contextos = resumoDaMensagemContexto(mensagem);
+				if (contextos) return [{ tipo: "contexto_tela", contextos }];
 				if (mensagem.role === "user") {
 					const momento = momentoDe((mensagem as { timestamp?: unknown }).timestamp);
 					return [{ tipo: "mensagem_usuario", texto: juntarBlocos(mensagem.content, "text"), ...(momento ? { momento } : {}) }];
@@ -369,13 +371,13 @@ function dadosDaResposta(mensagem: { timestamp?: unknown; durationMs?: unknown }
 export function converterHistorico(mensagens: readonly MensagemPi[], agentes?: ReadonlyMap<number, string>): ItemHistorico[] {
 	const historico: ItemHistorico[] = [];
 	for (const mensagem of mensagens) {
-		const contexto = resumoDaMensagemContexto(mensagem);
-		if (contexto) {
+		const contextos = resumoDaMensagemContexto(mensagem);
+		if (contextos) {
 			// O before_agent_start grava o contexto logo depois da mensagem do
 			// usuário: ele vai como resumo no item do usuário que vem antes. Sem
 			// esse item (o histórico começou depois dele), o contexto fica de fora.
 			const anterior = historico.at(-1);
-			if (anterior?.papel === "usuario") anterior.contextoTela = contexto;
+			if (anterior?.papel === "usuario") anterior.contextosTela = contextos;
 		} else if (mensagem.role === "user") {
 			const momento = momentoDe((mensagem as { timestamp?: unknown }).timestamp);
 			historico.push({ papel: "usuario", texto: juntarBlocos(mensagem.content, "text"), ...(momento ? { momento } : {}) });

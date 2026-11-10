@@ -52,7 +52,7 @@ export interface UsoResposta {
 }
 
 export type ItemConversa =
-	| { tipo: "usuario"; chave: string; texto: string; momento?: string; contextoTela?: ResumoContextoTela }
+	| { tipo: "usuario"; chave: string; texto: string; momento?: string; contextosTela?: ResumoContextoTela[] }
 	| {
 			tipo: "assistente";
 			chave: string;
@@ -370,7 +370,7 @@ export function conversaDoHistorico(itens: ItemHistorico[], contadorInicial = 0)
 		if (item.papel === "usuario") {
 			conversa.push({ tipo: "usuario", chave: `h${++contador}`, texto: item.texto,
 				...(item.momento ? { momento: item.momento } : {}),
-				...(item.contextoTela ? { contextoTela: item.contextoTela } : {}),
+				...(item.contextosTela ? { contextosTela: item.contextosTela } : {}),
 			});
 		} else if (item.papel === "assistente") {
 			if (item.texto || item.raciocinio || item.erro) {
@@ -448,7 +448,7 @@ function aplicarEvento(estado: EstadoJanela, evento: EventoNucleo): EstadoJanela
 			}
 			const alvo = estado.conversa[indice];
 			if (alvo?.tipo !== "usuario") return estado;
-			return { ...estado, conversa: substituir(estado.conversa, indice, { ...alvo, contextoTela: evento.contexto }) };
+			return { ...estado, conversa: substituir(estado.conversa, indice, { ...alvo, contextosTela: evento.contextos }) };
 		}
 
 		case "texto_delta":

@@ -307,11 +307,11 @@ describe("contexto da tela e custo ao reabrir (WP2)", () => {
 	const contexto = { tipo: "pagina", rotulo: "Lição 1", olho: true } as const;
 
 	it("o evento contexto_tela prende o resumo ao último item do usuário da conversa", () => {
-		let estado = aplicar(estadoInicial(PERFIL), ev({ tipo: "contexto_tela", contexto }));
+		let estado = aplicar(estadoInicial(PERFIL), ev({ tipo: "contexto_tela", contextos: [contexto] }));
 		// Sem item do usuário, ignora.
 		expect(estado.conversa).toEqual([]);
-		estado = aplicar(estado, ev({ tipo: "mensagem_usuario", texto: "oi" }), ev({ tipo: "contexto_tela", contexto }));
-		expect(estado.conversa[0]).toMatchObject({ tipo: "usuario", texto: "oi", contextoTela: contexto });
+		estado = aplicar(estado, ev({ tipo: "mensagem_usuario", texto: "oi" }), ev({ tipo: "contexto_tela", contextos: [contexto] }));
+		expect(estado.conversa[0]).toMatchObject({ tipo: "usuario", texto: "oi", contextosTela: [contexto] });
 	});
 
 	it("duas mensagens do usuário, cada uma com o seu contexto_tela, ficam cada uma com o seu chip", () => {
@@ -319,27 +319,27 @@ describe("contexto da tela e custo ao reabrir (WP2)", () => {
 		const estado = aplicar(
 			estadoInicial(PERFIL),
 			ev({ tipo: "mensagem_usuario", texto: "a" }),
-			ev({ tipo: "contexto_tela", contexto }),
+			ev({ tipo: "contexto_tela", contextos: [contexto] }),
 			ev({ tipo: "mensagem_usuario", texto: "b" }),
-			ev({ tipo: "contexto_tela", contexto: outro }),
+			ev({ tipo: "contexto_tela", contextos: [outro, contexto] }),
 		);
 		expect(estado.conversa).toMatchObject([
-			{ texto: "a", contextoTela: contexto },
-			{ texto: "b", contextoTela: outro },
+			{ texto: "a", contextosTela: [contexto] },
+			{ texto: "b", contextosTela: [outro, contexto] },
 		]);
 	});
 
-	it("o historico traz o contextoTela de cada item do usuário", () => {
+	it("o historico traz os contextosTela de cada item do usuário", () => {
 		const estado = aplicar(estadoInicial(PERFIL), {
 			tipo: "historico",
 			perfil: PERFIL,
 			itens: [
-				{ papel: "usuario", texto: "a", contextoTela: contexto },
+				{ papel: "usuario", texto: "a", contextosTela: [contexto] },
 				{ papel: "usuario", texto: "b" },
 			],
 		});
-		expect(estado.conversa[0]).toMatchObject({ texto: "a", contextoTela: contexto });
-		expect(estado.conversa[1]).not.toHaveProperty("contextoTela");
+		expect(estado.conversa[0]).toMatchObject({ texto: "a", contextosTela: [contexto] });
+		expect(estado.conversa[1]).not.toHaveProperty("contextosTela");
 	});
 
 	it("o historico com uso põe o total em estado.uso, em vez de zerar; sem uso, zera como antes", () => {

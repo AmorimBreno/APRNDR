@@ -149,6 +149,13 @@ a.cartao:hover .cartao__carregar .overline, a.cartao:focus-visible .cartao__carr
 /* Espaço na margem para o número dos blocos (ap-block__num fica fora da coluna);
  * o scrollbar-gutter dos dois deixa a barra alinhada com a coluna. */
 .rolagem, .centro__pe { padding-left: 72px; padding-right: 32px; }
+/* A barra de rolagem da conversa: fina e discreta, mais visível só com o mouse em cima. */
+.rolagem { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.rolagem:hover { scrollbar-color: var(--line-strong) transparent; }
+.rolagem::-webkit-scrollbar { width: 6px; height: 6px; }
+.rolagem::-webkit-scrollbar-track { background: transparent; }
+.rolagem::-webkit-scrollbar-thumb { border-radius: var(--radius-full); background: var(--line); }
+.rolagem:hover::-webkit-scrollbar-thumb { background: var(--line-strong); }
 
 .aviso-recarregado { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-left: var(--border-strong) solid var(--amber); border-radius: var(--radius-sm); background: var(--amber-tint); color: var(--ink); }
 .aviso-recarregado p { margin: 0; }

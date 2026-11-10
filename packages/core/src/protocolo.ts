@@ -70,6 +70,7 @@ const esquemaContextoTela = z
 		conteudo: z.string().max(LIMITES_CONTEXTO_TELA.conteudo).optional(),
 		parcial: z.boolean().optional(),
 		selecao: z.string().min(1).max(LIMITES_CONTEXTO_TELA.selecao).optional(),
+		foco: z.boolean().optional(),
 	})
 	.refine((contexto) => contexto.olho || contexto.conteudo === undefined, "com o olho fechado o conteúdo não vai");
 
@@ -78,12 +79,27 @@ type _ContextoTelaConfere = [z.infer<typeof esquemaContextoTela>] extends [Conte
 const _contextoTelaConfere: _ContextoTelaConfere = true;
 void _contextoTelaConfere;
 
+/** Máximo de abas (contextos) numa mensagem: a bancada da mesa tem até 6 abas, com folga. */
+export const MAXIMO_CONTEXTOS_TELA = 8;
+
+/**
+ * A lista de contextos de uma mensagem (um por aba aberta). A soma dos
+ * conteúdos tem o mesmo teto de um conteúdo só, para a lista não furar a trava.
+ */
+const esquemaContextosTela = z
+	.array(esquemaContextoTela)
+	.max(MAXIMO_CONTEXTOS_TELA)
+	.refine(
+		(contextos) => contextos.reduce((soma, contexto) => soma + (contexto.conteudo?.length ?? 0), 0) <= LIMITES_CONTEXTO_TELA.conteudo,
+		"a soma dos conteúdos passa do limite",
+	);
+
 export const esquemaMensagemCliente = z.discriminatedUnion("tipo", [
 	z.strictObject({ tipo: z.literal("ping"), pedidoId }),
 	/** Abre a janela do perfil (ou entra na que já está aberta). Com sessaoId, continua essa sessão. */
 	z.strictObject({ tipo: z.literal("abrir_perfil"), ...comPerfil, sessaoId: texto.optional(), agente: texto.optional() }),
-	/** contextoTela: o que estava aberto na tela (13.19); o modelo o vê, a conversa mostra só o resumo. */
-	z.strictObject({ tipo: z.literal("enviar"), ...comPerfil, texto, contextoTela: esquemaContextoTela.optional() }),
+	/** contextosTela: o que estava aberto na tela, uma por aba (13.19, 5b); o modelo o vê, a conversa mostra só o resumo. */
+	z.strictObject({ tipo: z.literal("enviar"), ...comPerfil, texto, contextosTela: esquemaContextosTela.optional() }),
 	z.strictObject({ tipo: z.literal("abortar"), ...comPerfil }),
 	/** modelo no formato provedor/id. */
 	z.strictObject({ tipo: z.literal("trocar_modelo"), ...comPerfil, modelo: texto }),

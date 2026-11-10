@@ -65,7 +65,7 @@ export interface PropsPainelConversa {
 	rascunho?: [string, Dispatch<SetStateAction<string>>];
 	/** Só no embutido: false = escondido (hidden e inert), nunca desmontado. Padrão true. */
 	aberta?: boolean;
-	obterContexto?: PropsConversaEmbutida["obterContexto"];
+	obterContextos?: PropsConversaEmbutida["obterContextos"];
 	cabecalho?: ReactNode;
 	citacao?: PropsConversaEmbutida["citacao"];
 	acimaDoCampo?: ReactNode;
@@ -133,7 +133,7 @@ export function PainelConversa({
 	relerPerfis,
 	rascunho,
 	aberta: abertaProp = true,
-	obterContexto,
+	obterContextos,
 	cabecalho,
 	citacao,
 	acimaDoCampo,
@@ -233,23 +233,38 @@ export function PainelConversa({
 	const idsDaArea = idsDosPaineis(perfil?.paineis ?? [], estado.acoesPorPainel, registroPaineis);
 	const chegadas = idsDaArea.reduce((soma, id) => soma + (estado.acoesPorPainel[id]?.length ?? 0), 0);
 
-	const enviar = () => {
+	// Trava contra o Enter duplo enquanto os contextos das abas são pedidos (pode ser assíncrono).
+	const enviando = useRef(false);
+	const enviar = async () => {
 		const mensagem = texto.trim();
-		if (!mensagem) return;
-		// No embutido a mensagem leva o que a tela mostra agora e o trecho citado.
-		let contexto: ContextoTela | undefined;
-		if (embutido) {
-			contexto = obterContexto?.();
-			if (contexto && citacao) contexto = { ...contexto, selecao: citacao.texto };
+		if (!mensagem || enviando.current) return;
+		// No embutido a mensagem leva o que cada aba mostra agora e o trecho citado.
+		let contextos: ContextoTela[] = [];
+		if (embutido && obterContextos) {
+			enviando.current = true;
+			try {
+				contextos = [...(await obterContextos())];
+			} catch {
+				// Se o perfil falhar ao ler as abas, a mensagem vai sem contexto.
+				contextos = [];
+			} finally {
+				enviando.current = false;
+			}
+			// A citação vai no contexto em foco (ou no primeiro, se nenhum tiver foco).
+			if (citacao && contextos.length > 0) {
+				const indice = Math.max(0, contextos.findIndex((contexto) => contexto.foco));
+				contextos = contextos.map((contexto, i) => (i === indice ? { ...contexto, selecao: citacao.texto } : contexto));
+			}
 		}
+		const citacaoViaja = contextos.some((contexto) => contexto.selecao !== undefined && contexto.selecao === citacao?.texto);
 		// O fantasma sai do campo agora e pousa na nota quando o eco do servidor chegar.
 		const novo = campo.current ? iniciarVoo(mensagem, campo.current.getBoundingClientRect()) : undefined;
 		setVoo(novo);
 		setTexto("");
-		acoes.enviar(mensagem, contexto).then(
+		acoes.enviar(mensagem, contextos.length > 0 ? contextos : undefined).then(
 			(resultado) => {
 				// A citação viajou com a mensagem (a fila do núcleo também a guarda): sai do campo.
-				if (contexto?.selecao) citacao?.limpar();
+				if (citacaoViaja) citacao?.limpar();
 				// Na fila, não há nota para pousar agora: a mensagem aparece na lista da fila.
 				if (resultado === "enfileirada") {
 					novo?.cancelar();

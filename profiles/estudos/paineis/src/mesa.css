@@ -13,8 +13,8 @@
 .mesa {
 	position: relative; grid-row: 1 / -1; display: grid; min-width: 0; min-height: 0; height: 100%; overflow: hidden;
 	grid-template-columns: minmax(0, 1fr) auto;
-	grid-template-rows: auto auto auto minmax(0, 1fr);
-	grid-template-areas: "faixa faixa" "topo topo" "abas professor" "corpo professor";
+	grid-template-rows: auto auto minmax(0, 1fr);
+	grid-template-areas: "faixa faixa" "topo topo" "corpo professor";
 }
 .mesa__esquerda, .mesa__area { display: contents; }
 .mesa__faixa { grid-area: faixa; display: flex; align-items: center; gap: var(--space-3); min-width: 0; margin-bottom: var(--space-2); }
@@ -23,9 +23,14 @@
 /* O corpo é um contêiner: a nota e a lição respondem à largura que sobra ao lado do professor, não à da janela. */
 .mesa__area > :nth-child(2) { grid-area: corpo; container-type: inline-size; min-width: 0; min-height: 0; }
 
-/* As abas da mesa (AbasMesa.tsx): só na coluna da esquerda, entre a barra e o corpo; o professor ocupa as duas linhas. */
-.mesa-abas { grid-area: abas; display: flex; align-items: flex-end; gap: var(--space-1); min-width: 0; margin-bottom: var(--space-2); overflow-x: auto; scrollbar-width: thin; }
-.mesa-aba { flex: 0 1 220px; min-width: 96px; display: flex; align-items: center; border-radius: var(--radius-sm); color: var(--ink-muted); box-shadow: inset 0 0 0 var(--border-hair) var(--line); transition: background-color .12s ease-out, color .12s ease-out; }
+/* As abas da mesa (AbasMesa.tsx): dentro do cartão da nota ou da lição, logo abaixo do cabeçalho. Rolam na horizontal
+ * quando não cabem; onde há mais para o lado a borda esmaece (data-esq e data-dir, postos pelo AbasMesa). */
+.mesa-abas { --abas-fade: 28px; flex: none; display: flex; align-items: center; gap: var(--space-1); min-width: 0; padding: var(--space-2) var(--space-6); overflow-x: auto; scrollbar-width: none; }
+.mesa-abas::-webkit-scrollbar { display: none; }
+.mesa-abas[data-esq="sim"] { mask-image: linear-gradient(to right, transparent 0, #000 var(--abas-fade)); }
+.mesa-abas[data-dir="sim"] { mask-image: linear-gradient(to left, transparent 0, #000 var(--abas-fade)); }
+.mesa-abas[data-esq="sim"][data-dir="sim"] { mask-image: linear-gradient(to right, transparent 0, #000 var(--abas-fade), #000 calc(100% - var(--abas-fade)), transparent 100%); }
+.mesa-aba { flex: 0 0 auto; min-width: 120px; max-width: 220px; display: flex; align-items: center; border-radius: var(--radius-sm); color: var(--ink-muted); box-shadow: inset 0 0 0 var(--border-hair) var(--line); transition: background-color .12s ease-out, color .12s ease-out; }
 .mesa-aba:hover { background: var(--surface-hover); color: var(--ink); }
 /* A aba aberta: fundo âmbar e texto escuro, como a tag escolhida do caderno (pedido do Breno). */
 .mesa-aba--ativa, .mesa-aba--ativa:hover { background: var(--amber); color: var(--on-amber); box-shadow: none; }
@@ -33,24 +38,24 @@
 .mesa-aba--ativa .mesa-aba__fechar:hover { background: color-mix(in srgb, var(--on-amber) 14%, transparent); color: var(--on-amber); }
 /* O anel só no foco pelo teclado: um clique na aba não deixa contorno. */
 .mesa-aba:has(:focus-visible) { box-shadow: var(--focus-ring); }
-.mesa-aba__botao { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-2); min-height: var(--control-md); padding: 0 var(--space-1) 0 var(--space-3); border: 0; background: none; color: inherit; font: inherit; cursor: pointer; text-align: left; }
+.mesa-aba__botao { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-2); min-height: var(--control-sm); padding: 0 var(--space-1) 0 var(--space-3); border: 0; background: none; color: inherit; font: inherit; cursor: pointer; text-align: left; }
 .mesa-aba__botao:focus-visible, .mesa-aba__fechar:focus-visible { outline: none; }
 .mesa-aba__botao > .ap-icon { flex: none; }
 .mesa-aba__rotulo { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mesa-aba__fechar { flex: none; display: grid; place-items: center; width: 24px; height: 24px; margin-right: var(--space-1); padding: 0; border: 0; border-radius: var(--radius-sm); background: none; color: var(--ink-muted); cursor: pointer; }
 .mesa-aba__fechar:hover { background: var(--surface-well); color: var(--ink); }
 
-/* O chip "Vendo: <arquivo>" (ChipVendo.tsx), logo abaixo do topo do professor. */
-.mesa-vendo { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; padding: 0 var(--space-4) var(--space-2); }
-.mesa-vendo__linha { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
-.mesa-vendo__chip { flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: var(--space-2); box-sizing: border-box; min-height: var(--control-sm, 28px); padding: 0 var(--space-3); border-radius: var(--radius-sm); background: var(--surface-well); color: var(--ink-muted); box-shadow: inset 0 0 0 var(--border-hair) var(--line); }
-.mesa-vendo__chip > .ap-icon { flex: none; }
-.mesa-vendo__rotulo { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
-.mesa-vendo__olho { flex: none; display: grid; place-items: center; width: var(--control-md); height: var(--control-md); padding: 0; border: 0; border-radius: var(--radius-sm); background: var(--surface-well); color: var(--ink-muted); cursor: pointer; box-shadow: inset 0 0 0 var(--border-hair) var(--line); transition: background-color .12s ease-out, color .12s ease-out; }
-.mesa-vendo__olho:hover { background: var(--surface-hover); color: var(--ink); }
-.mesa-vendo__olho[aria-pressed="true"] { color: var(--ink); box-shadow: inset 0 0 0 var(--border-hair) var(--line-strong); }
-.mesa-vendo__olho:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-.mesa-vendo__aviso { margin: 0; color: var(--ink-muted); }
+/* A pill do arquivo (ChipVendo.tsx), em acimaDoCampo da conversa: o olho à esquerda e o nome; a pill toda é o botão do olho. */
+.mesa-vendo { display: inline-flex; align-items: center; gap: var(--space-2); box-sizing: border-box; max-width: 100%; min-width: 0; min-height: var(--control-sm); padding: 0 var(--space-3) 0 var(--space-2); border: 0; border-radius: var(--radius-full); background: var(--surface-raised); color: var(--ink-muted); font: inherit; cursor: pointer; box-shadow: inset 0 0 0 var(--border-control) var(--line-strong), var(--sticker-shadow); opacity: .72; transition: opacity .12s ease-out, background-color .12s ease-out, box-shadow .12s ease-out, color .12s ease-out; }
+.mesa-vendo:hover { background: var(--surface-hover); opacity: 1; }
+.mesa-vendo:focus-visible { outline: none; box-shadow: var(--focus-ring); opacity: 1; }
+.mesa-vendo--aberto { opacity: 1; color: var(--ink); box-shadow: inset 0 0 0 var(--border-control) var(--amber), var(--sticker-shadow); }
+.mesa-vendo--aberto:focus-visible { box-shadow: var(--focus-ring); }
+.mesa-vendo__olho { flex: none; display: grid; place-items: center; color: inherit; }
+.mesa-vendo--aberto .mesa-vendo__olho { color: var(--amber); }
+.mesa-vendo__rotulo { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: opacity .075s linear; }
+.mesa-vendo__rotulo--saindo { opacity: 0; }
+.mesa-vendo__alerta { flex: none; display: grid; place-items: center; color: var(--brick-text); }
 
 /* O botão do professor: a foto, como na aba do caderno. */
 .mesa__professor-botao { flex: none; display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--radius-full); background: none; cursor: pointer; }
@@ -79,8 +84,12 @@
 /* O topo do painel: seletor de conversas, custo e Nova numa linha; avisos embaixo. */
 /* A altura é a da aba tijolo do caderno (--course-bar), para as duas colunas terem o topo igual. */
 .mesa-cab { box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; gap: var(--space-2); min-width: 0; min-height: var(--course-bar); padding: var(--space-3) var(--space-4); }
-.mesa-cab__linha { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-width: 0; }
-.mesa-cab__seletor { flex: 1; min-width: 0; }
+.mesa-cab__linha { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.mesa-cab__espaco { flex: 1 1 0; min-width: 0; }
+.mesa-cab__seletor { flex: 0 1 auto; min-width: 0; }
+/* A pill do custo: monoespaçada; o title traz os tokens. */
+.mesa-cab__custo { flex: none; display: inline-flex; align-items: center; box-sizing: border-box; min-height: var(--control-sm); padding: 0 var(--space-3); border-radius: var(--radius-full); background: var(--surface-well); color: var(--ink-muted); font: 500 13px/1 var(--font-mono); white-space: nowrap; box-shadow: inset 0 0 0 var(--border-hair) var(--line); cursor: default; }
+.mesa-cab__custo:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .mesa-cab__menu { max-width: 100%; }
 /* O botão do seletor (MenuSuspenso): no estilo dos controles do tema, com a conversa atual, a data e o chevron. */
 .mesa-cab__botao { display: inline-flex; align-items: center; gap: var(--space-2); box-sizing: border-box; max-width: 100%; min-height: var(--control-md); padding: 0 var(--space-3); border: 0; border-radius: var(--radius-sm); background: var(--surface-well); color: var(--ink); cursor: pointer; box-shadow: inset 0 0 0 var(--border-hair) var(--line); transition: background-color .12s ease-out; }
@@ -88,7 +97,8 @@
 .mesa-cab__botao:hover, .mesa-cab__botao[aria-expanded="true"] { background: var(--surface-hover); }
 .mesa-cab__botao:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .mesa-cab__botao:disabled { opacity: var(--opacity-disabled); cursor: not-allowed; }
-.mesa-cab__atual { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; }
+.mesa-cab__atual { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.mesa-cab__atual > .ap-icon { flex: none; color: var(--ink-muted); }
 .mesa-cab__atual-titulo { min-width: 0; max-width: 20ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mesa-cab__atual-data { flex: none; color: var(--ink-muted); }
 .mesa-cab__seletor .menu-agente { min-width: 260px; max-width: min(340px, calc(100vw - 32px)); max-height: 50vh; overflow-y: auto; }
@@ -102,7 +112,7 @@
 .aba-caderno__professor--pulsa .avatar { animation: professor-pula 1.4s cubic-bezier(.3, .7, .4, 1) infinite; box-shadow: 0 0 0 3px var(--amber), var(--sticker-shadow); }
 
 @media (prefers-reduced-motion: reduce) {
-	.mesa-aba, .mesa-vendo__olho { transition: none; }
+	.mesa-aba, .mesa-vendo, .mesa-vendo__rotulo { transition: none; }
 	.aba-caderno__professor--pulsa .avatar { animation: none; }
 	.mesa__professor-botao .avatar, .mesa__professor-botao--pulsa .avatar { animation: none; }
 }
@@ -113,10 +123,14 @@
 .selecao-barra__linha { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); }
 .selecao-perguntas { position: relative; display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px; }
 .selecao-perguntas__menu-caixa { position: relative; display: inline-flex; }
-.selecao-barra__botao { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-height: 30px; padding: 0 var(--space-3); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink); font: 600 14px/1 var(--font-sans); white-space: nowrap; cursor: pointer; }
+/* A barra é uma pill flutuante com a sombra do sistema; Perguntar em destaque âmbar, os outros botões de pill sem fundo. */
+.termos-selecao.selecao-barra { border: 0; border-radius: var(--radius-full); padding: var(--space-1); box-shadow: var(--sticker-shadow), 0 0 0 var(--border-hair) var(--line-strong); }
+.selecao-barra__botao { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-height: 30px; padding: 0 var(--space-3); border: 0; border-radius: var(--radius-full); background: transparent; color: var(--ink); font: 600 14px/1 var(--font-sans); white-space: nowrap; cursor: pointer; }
 .selecao-barra__botao:hover { background: var(--surface-hover); }
+.selecao-barra__botao--primario, .selecao-barra__botao--primario:hover { background: var(--amber); color: var(--on-amber); }
+.selecao-barra__botao--primario:hover { filter: brightness(1.06); }
 .selecao-barra__botao[aria-expanded="true"] { background: var(--surface-hover); color: var(--amber); }
-.selecao-barra__botao:disabled { color: var(--ink-subtle); background: transparent; cursor: default; }
+.selecao-barra__botao:disabled, .selecao-barra__botao--primario:disabled { color: var(--ink-subtle); background: transparent; filter: none; cursor: default; }
 .selecao-barra__botao:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .selecao-barra__fio { flex: none; width: var(--border-hair); height: 18px; margin: 0 var(--space-1); background: var(--line); }
 .selecao-barra__erro { flex-basis: 100%; padding: 0 var(--space-2); color: var(--brick-text); }
@@ -125,3 +139,7 @@
 @media (prefers-reduced-motion: no-preference) {
 	.selecao-barra__botao { transition: background-color .12s ease-out, color .12s ease-out; }
 }
+
+/* O trecho selecionado marcado enquanto a barra está aberta (CSS Custom Highlight API; BarraSelecao.tsx): a seleção do
+ * navegador some quando o foco vai para o chat. Sem suporte, nada é marcado. */
+::highlight(selecao-pergunta) { background-color: color-mix(in srgb, var(--amber) 32%, transparent); color: inherit; }

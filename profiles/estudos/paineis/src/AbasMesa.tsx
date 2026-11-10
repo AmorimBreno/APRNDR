@@ -2,11 +2,14 @@
 // notas e lições abertas da matéria, lembradas por matéria no localStorage. As
 // regras (abrir, fechar, limite, rolagem) estão em abas-mesa.ts; aqui ficam a
 // gravação e o desenho. Cada aba é role="tab" dentro de um tablist, com o
-// teclado do SeletorAbas (setas, Home, End; Delete fecha). O X é um botão
-// vizinho da aba, não filho dela (botão dentro de botão não vale).
+// teclado do SeletorAbas (setas, Home, End; Delete fecha); o botão do meio do
+// mouse também fecha. O X é um botão vizinho da aba, não filho dela (botão dentro
+// de botão não vale). A faixa mora dentro do cartão da nota ou da lição (logo
+// abaixo do cabeçalho) e rola na horizontal quando as abas não cabem, com as
+// bordas esmaecidas (data-esq e data-dir, lidos pelo mesa.css) onde há mais.
 
 import { Icon } from "@estudos/design-system";
-import { type KeyboardEvent, useCallback, useId, useRef, useState } from "react";
+import { type KeyboardEvent, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { type AbaMesa, abaDoCaminho } from "./abas-mesa.ts";
 import { abaVizinha } from "./painel-caderno.ts";
 
@@ -76,7 +79,31 @@ export interface PropsAbasMesa {
 export function AbasMesa({ abas, ativa, rotuloDaAtiva, escolher, fechar }: PropsAbasMesa) {
 	const base = useId();
 	const botoes = useRef<Record<string, HTMLButtonElement | null>>({});
-	if (abas.length === 0) return null;
+	const faixa = useRef<HTMLDivElement>(null);
+	const [bordas, setBordas] = useState({ esq: false, dir: false });
+	const temAbas = abas.length > 0;
+	const medir = useCallback(() => {
+		const elemento = faixa.current;
+		if (!elemento) return;
+		const esq = elemento.scrollLeft > 1;
+		const dir = elemento.scrollLeft + elemento.clientWidth < elemento.scrollWidth - 1;
+		setBordas((atual) => (atual.esq === esq && atual.dir === dir ? atual : { esq, dir }));
+	}, []);
+	// Mede ao mudar a lista e a largura; a ativa entra na parte visível da faixa.
+	useLayoutEffect(() => {
+		const elemento = faixa.current;
+		if (!elemento) return;
+		medir();
+		if (typeof ResizeObserver !== "function") return;
+		const observador = new ResizeObserver(medir);
+		observador.observe(elemento);
+		return () => observador.disconnect();
+	}, [temAbas, abas.length, medir]);
+	useEffect(() => {
+		if (!ativa) return;
+		botoes.current[ativa]?.scrollIntoView?.({ inline: "nearest", block: "nearest" });
+	}, [ativa]);
+	if (!temAbas) return null;
 
 	const chaves = abas.map((aba) => aba.chave);
 	// Só uma aba entra na ordem do Tab: a ativa (ou a primeira, se a rota de agora não é uma aba).
@@ -97,12 +124,25 @@ export function AbasMesa({ abas, ativa, rotuloDaAtiva, escolher, fechar }: Props
 	};
 
 	return (
-		<div className="mesa-abas" role="tablist" aria-label="Notas e lições abertas">
+		<div ref={faixa} className="mesa-abas" role="tablist" aria-label="Notas e lições abertas" data-esq={bordas.esq ? "sim" : undefined} data-dir={bordas.dir ? "sim" : undefined} onScroll={medir}>
 			{abas.map((aba) => {
 				const escolhida = aba.chave === ativa;
 				const rotulo = escolhida && rotuloDaAtiva ? rotuloDaAtiva : aba.rotulo;
 				return (
-					<div key={aba.chave} role="presentation" className={`mesa-aba${escolhida ? " mesa-aba--ativa" : ""}`}>
+					<div
+							key={aba.chave}
+							role="presentation"
+							className={`mesa-aba${escolhida ? " mesa-aba--ativa" : ""}`}
+							// O botão do meio fecha a aba; o mousedown dele não pode abrir o rolar automático do navegador.
+							onMouseDown={(evento) => {
+								if (evento.button === 1) evento.preventDefault();
+							}}
+							onAuxClick={(evento) => {
+								if (evento.button !== 1) return;
+								evento.preventDefault();
+								fechar(aba);
+							}}
+						>
 						<button
 							ref={(elemento) => {
 								botoes.current[aba.chave] = elemento;

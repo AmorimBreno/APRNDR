@@ -193,6 +193,29 @@ export function useMesaPodePerguntar(): boolean {
 	return useProfessorDaMesa() !== undefined;
 }
 
+const NOME_MARCA = "selecao-pergunta";
+
+/**
+ * Marca em âmbar suave (CSS Custom Highlight API, ::highlight no mesa.css) o trecho
+ * selecionado enquanto a barra está aberta: a seleção do navegador some quando o
+ * foco vai para o chat. Sem suporte à API, não marca. A marca sai quando a barra fecha.
+ */
+function useMarcaDaSelecao(trecho: string): void {
+	useEffect(() => {
+		const api = globalThis as unknown as { CSS?: { highlights?: Map<string, unknown> }; Highlight?: new (...ranges: Range[]) => unknown };
+		const registro = api.CSS?.highlights;
+		const Marca = api.Highlight;
+		if (!registro || !Marca) return;
+		const selecao = window.getSelection();
+		if (!selecao || selecao.isCollapsed || selecao.rangeCount !== 1) return;
+		const marca = new Marca(selecao.getRangeAt(0).cloneRange());
+		registro.set(NOME_MARCA, marca);
+		return () => {
+			if (registro.get(NOME_MARCA) === marca) registro.delete(NOME_MARCA);
+		};
+	}, [trecho]);
+}
+
 export interface PropsAcoesDePergunta {
 	/** O trecho já limpo (selecao.ts) em que as ações agem. */
 	trecho: string;
@@ -213,6 +236,7 @@ export function AcoesDePergunta({ trecho, depois }: PropsAcoesDePergunta) {
 	const [enviando, setEnviando] = useState(false);
 	const gatilho = useRef<HTMLButtonElement>(null);
 	const caixa = useRef<HTMLSpanElement>(null);
+	useMarcaDaSelecao(trecho);
 	// Clicar fora do menu (ou o foco sair da barra) fecha.
 	useEffect(() => {
 		if (!menu) return;
@@ -257,7 +281,7 @@ export function AcoesDePergunta({ trecho, depois }: PropsAcoesDePergunta) {
 			<button
 				type="button"
 				data-selecao-item=""
-				className="selecao-barra__botao"
+				className="selecao-barra__botao selecao-barra__botao--primario"
 				disabled={enviando}
 				title="Citar este trecho acima do campo do professor"
 				onClick={() => {

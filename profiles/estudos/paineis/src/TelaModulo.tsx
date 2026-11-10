@@ -81,7 +81,7 @@ import {
 } from "@estudos/design-system";
 import { AgenteAnimado, type DadosAvatarAgente, type JanelaPerfilHook, Markdown, MenuSuspenso, semMovimento } from "@estudos/ui";
 import { AnimatePresence, motion } from "motion/react";
-import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { AVALIACOES_BLOCO, MOTIVOS_RETORNO, NOMES_AVALIACAO, NOMES_MOTIVO, TEXTO_REGRA_MAXIMO, TEXTO_RETORNO_MAXIMO } from "../../lib/escrita-tipos.ts";
 import type { Materia } from "../../lib/materia-tipos.ts";
 import {
@@ -207,6 +207,8 @@ export interface PropsTelaModulo {
 	materias?: ReadonlyArray<{ id: string; nome: string }>;
 	/** O agente da sessão (a foto enquanto um bloco é reescrito). */
 	agente?: { nome: string; avatar?: DadosAvatarAgente };
+	/** Um nó no topo do cartão da lição, antes do corpo (na mesa: a faixa de abas). */
+	noTopo?: ReactNode;
 }
 
 /** O retorno por bloco e a reescrita (docs/escrita.md): o que os blocos da lição recebem da ponte. */
@@ -356,6 +358,7 @@ export function TelaModulo(props: PropsTelaModulo) {
 				moduloId={moduloId}
 				abertura={abertura}
 				{...(props.licaoId ? { licaoId: props.licaoId } : {})}
+				{...(props.noTopo ? { noTopo: props.noTopo } : {})}
 				voltarAoCurso={() => props.navegar(`caderno/${materiaId}/cursos/${cursoId}`)}
 				abrirModulo={(id) => props.navegar(caminhoDoModulo(materiaId, cursoId, id))}
 				abrirLicao={(id) => props.navegar(caminhoDoModulo(materiaId, cursoId, moduloId, id))}
@@ -385,6 +388,8 @@ export interface PropsVisaoModulo {
 	moduloId: string;
 	abertura: Abertura;
 	licaoId?: string;
+	/** Um nó no topo do cartão (section .curso.modulo), antes do corpo. */
+	noTopo?: ReactNode;
 	voltarAoCurso(): void;
 	abrirModulo(id: string): void;
 	abrirLicao(id: string): void;
@@ -502,6 +507,7 @@ export function VisaoModulo(props: PropsVisaoModulo) {
 				animate={{ opacity: 1, y: 0 }}
 				transition={MOLA}
 			>
+				{props.noTopo}
 				{abertura.tipo === "pronto" ? conteudo : <div className="curso__corpo">{conteudo}</div>}
 			</motion.section>
 		</>
@@ -547,6 +553,18 @@ function LicaoAberta(props: {
 			return;
 		}
 		corpo.current?.scrollTo({ top: 0 });
+	}, [licao.id]);
+
+	// Outra lição: o texto entra com um fade rápido de opacidade (sem animação com movimento reduzido).
+	const primeiraDoFade = useRef(true);
+	useLayoutEffect(() => {
+		if (primeiraDoFade.current) {
+			primeiraDoFade.current = false;
+			return;
+		}
+		const elemento = corpo.current;
+		if (!elemento || semMovimento() || typeof elemento.animate !== "function") return;
+		elemento.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 150, easing: "ease-out" });
 	}, [licao.id]);
 
 	// O bloco atual da régua: o que cruza a linha do meio da área que rola.

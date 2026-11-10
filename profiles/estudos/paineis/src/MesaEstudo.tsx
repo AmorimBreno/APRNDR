@@ -122,8 +122,13 @@ export interface PropsMesaEstudo {
 	agente?: { nome: string; avatar?: DadosAvatarAgente };
 	/** O botão do professor na faixa do topo: só onde a aba do caderno não existe (o módulo). */
 	botaoNaFaixa?: boolean;
-	/** A área de estudo: o que a tela do caderno mostrava (aba e nota, ou o módulo). */
-	children: ReactNode;
+	/** Abre a conversa do perfil na tela cheia (o botão de expandir do topo do professor). */
+	abrirConversa?(): void;
+	/**
+	 * A área de estudo: o que a tela do caderno mostrava (aba e nota, ou o módulo).
+	 * Uma função recebe o nó das abas (undefined sem nenhuma) para pô-lo dentro do cartão.
+	 */
+	children: ReactNode | ((abas: ReactNode) => ReactNode);
 }
 
 export function MesaEstudo(props: PropsMesaEstudo) {
@@ -244,6 +249,8 @@ function MesaInterna(props: PropsMesaEstudo) {
 		if (aba.chave === chaveAtiva) navegar(resultado.ativar ?? `caderno/${materiaId}/notas`);
 	};
 
+	const nodeAbas = <AbasMesa abas={abas} {...(chaveAtiva ? { ativa: chaveAtiva } : {})} {...(rotuloDaFonte ? { rotuloDaAtiva: rotuloDaFonte } : {})} escolher={escolherAba} fechar={fecharUmaAba} />;
+
 	const alternar = useCallback(() => {
 		setAberto((atual) => {
 			guardarAberto(perfilId, !atual);
@@ -349,6 +356,7 @@ function MesaInterna(props: PropsMesaEstudo) {
 		abertoAnterior.current = aberto;
 	}, [aberto]);
 
+	const rotuloDoCampo = fonte?.rotulo;
 	const contexto: ProfessorDaMesa | undefined = Conversa ? { aberto, pendente, pulsa, alternar, abrir, citar, perguntar, idPainel, botao } : undefined;
 
 	return (
@@ -378,8 +386,7 @@ function MesaInterna(props: PropsMesaEstudo) {
 						</button>
 					</div>
 				) : null}
-				<div className="mesa__area">{props.children}</div>
-				<AbasMesa abas={abas} {...(chaveAtiva ? { ativa: chaveAtiva } : {})} {...(rotuloDaFonte ? { rotuloDaAtiva: rotuloDaFonte } : {})} escolher={escolherAba} fechar={fecharUmaAba} />
+				<div className="mesa__area">{typeof props.children === "function" ? props.children(nodeAbas) : props.children}</div>
 			</div>
 			{Conversa ? (
 				<motion.aside
@@ -397,12 +404,9 @@ function MesaInterna(props: PropsMesaEstudo) {
 							aberta={aberto}
 							aoPedidoPendente={setPendente}
 							obterContexto={vendo.obterContexto}
-							cabecalho={
-								<>
-									<CabecalhoProfessor janela={props.janela} perfilId={perfilId} {...(props.materia ? { materia: props.materia } : {})} />
-									<ChipVendo />
-								</>
-							}
+							cabecalho={<CabecalhoProfessor janela={props.janela} perfilId={perfilId} {...(props.materia ? { materia: props.materia } : {})} {...(props.abrirConversa ? { abrirConversa: props.abrirConversa } : {})} />}
+							acimaDoCampo={<ChipVendo haAba={abaAtiva !== undefined} />}
+							{...(rotuloDoCampo ? { placeholder: `Pergunte sobre ${rotuloDoCampo}…` } : {})}
 						/>
 					</div>
 				</motion.aside>

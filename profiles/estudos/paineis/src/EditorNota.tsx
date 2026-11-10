@@ -14,11 +14,11 @@
 // salvamento em andamento, e os salvamentos esperam a troca terminar.
 
 import { Button, Callout, Icon, Modal } from "@estudos/design-system";
-import type { JanelaPerfilHook } from "@estudos/ui";
+import { type JanelaPerfilHook, semMovimento } from "@estudos/ui";
 import { TextSelection } from "@tiptap/pm/state";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
-import { type KeyboardEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { conferirTitulo, type NotaAberta, TAMANHO_TITULO, temHtmlDesconhecido } from "../../lib/nota-tipos.ts";
 import { carregarNoEditor, extensoesDaNota, markdownDaNota } from "./editor-nota.ts";
 import { AlcaBlocos } from "./AlcaBlocos.tsx";
@@ -66,6 +66,8 @@ export interface PropsEditorNota {
 	arquivos?: readonly ArquivoMencionavel[];
 	/** Abre a seção Materiais com o arquivo em destaque (o clique numa menção a material). */
 	abrirMaterial(nome: string): void;
+	/** Um nó logo abaixo do cabeçalho "← Notas · matéria … Salva às", dentro do cartão (na mesa: a faixa de abas). */
+	abaixoDoCabecalho?: ReactNode;
 }
 
 /**
@@ -116,12 +118,22 @@ function EditorDaNota(props: PropsEditorNota) {
 	const [pagina, setPagina] = useState<HTMLDivElement | null>(null);
 	/** O título grande da página: cresce com o texto (um título longo quebra a linha, como no Notion). */
 	const campoTitulo = useRef<HTMLTextAreaElement>(null);
+	// Outra nota (o editor é remontado por nota): o texto entra com um fade rápido, só de opacidade,
+	// assim que o conteúdo chega, para a troca não parecer travada. Sem animação com movimento reduzido.
+	const fadeFeito = useRef(false);
 	useLayoutEffect(() => {
 		const campo = campoTitulo.current;
 		if (!campo) return;
 		campo.style.height = "auto";
 		campo.style.height = `${campo.scrollHeight}px`;
 	}, [tituloCampo]);
+
+	useLayoutEffect(() => {
+		if (!nota || !pagina || fadeFeito.current) return;
+		fadeFeito.current = true;
+		if (semMovimento() || typeof pagina.animate !== "function") return;
+		pagina.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 150, easing: "ease-out" });
+	}, [nota, pagina]);
 
 	// O que vale entre as respostas da extensão (refs: as respostas chegam fora do render).
 	const tituloAtual = useRef(props.titulo);

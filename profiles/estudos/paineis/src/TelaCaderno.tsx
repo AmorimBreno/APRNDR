@@ -179,7 +179,7 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 	const moduloAberto = props.modulo;
 	const agente = nomeAgente ? { nome: nomeAgente, ...(avatarAgente ? { avatar: avatarAgente } : {}) } : undefined;
 	// A mesa de estudo: a nota aberta e o módulo ficam à esquerda, com o painel do professor à direita (MesaEstudo).
-	const naMesa = (filhos: ReactNode, noModulo = false) => (
+	const naMesa = (filhos: ReactNode | ((abas: ReactNode) => ReactNode), noModulo = false) => (
 		<MesaEstudo
 			janela={props.janela}
 			perfilId={props.perfilId}
@@ -213,8 +213,10 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 		<div className="tela-caderno">
 			{moduloAberto ? (
 				naMesa(
+				(abas) => (
 				<TelaModulo
 					key={`${moduloAberto.curso}/${moduloAberto.modulo}`}
+					noTopo={abas}
 					janela={props.janela}
 					materiaId={materiaId}
 					{...(materia ? { materia } : {})}
@@ -226,11 +228,13 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 					tom={tom}
 					{...(lista ? { materias: lista.materias } : {})}
 					{...(nomeAgente ? { agente: { nome: nomeAgente, ...(avatarAgente ? { avatar: avatarAgente } : {}) } } : {})}
-				/>,
+				/>
+				),
 					true,
 				)
 			) : mostraNota && notaAberta !== undefined ? (
 				naMesa(
+					(abas) => (
 					<>
 						{abaDoCaderno}
 						{/* A nota aberta ocupa a área toda abaixo da aba, no lugar do painel; "voltar" leva ao painel com a tag Notas. */}
@@ -254,9 +258,11 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 								abrirNota={abrirNota}
 								{...(arquivosMencao ? { arquivos: arquivosMencao } : {})}
 								abrirMaterial={(nome) => props.navegar(`caderno/${materiaId}/materiais/${nome}`)}
+								abaixoDoCabecalho={abas}
 							/>
 						</motion.section>
-					</>,
+					</>
+					),
 				)
 			) : (
 			<>

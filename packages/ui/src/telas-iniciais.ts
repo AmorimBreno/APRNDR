@@ -37,10 +37,17 @@ export interface PropsConversaEmbutida {
 	aberta: boolean;
 	/** O contexto da tela na hora de mandar (lido a cada envio); undefined = a mensagem vai sem contexto. */
 	obterContexto?(): ContextoTela | undefined;
-	/** O topo, desenhado pelo perfil (na mesa: a matéria, o seletor de conversas, Nova, o custo e o chip do olho). */
+	/** O topo, desenhado pelo perfil (na mesa: o custo, o seletor de conversas, Nova e abrir na tela cheia). */
 	cabecalho?: ReactNode;
 	/** O trecho citado (Perguntar): aparece acima do campo com um X; vai junto da próxima mensagem e é limpo depois. */
 	citacao?: { texto: string; limpar(): void };
+	/**
+	 * As pills de contexto do perfil, flutuando logo acima do campo, na mesma
+	 * fileira da pill da citação (na mesa: a aba ativa com o olho). Ausente = só a citação.
+	 */
+	acimaDoCampo?: ReactNode;
+	/** O texto de exemplo do campo ("Pergunte sobre Árvores de Decisão…"); sem ele, o padrão da conversa. */
+	placeholder?: string;
 	/** Avisa se há pedido esperando resposta, para a tela mostrar isso com a conversa fechada (a foto pulsa). */
 	aoPedidoPendente?(pendente: boolean): void;
 }

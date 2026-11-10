@@ -283,7 +283,8 @@ a.linha:hover .linha__texto .overline, a.linha:focus-visible .linha__texto .over
 .menu-agente__item:hover, .menu-agente__item:focus-visible { background: var(--surface-hover); }
 .menu-agente__item:focus-visible { box-shadow: inset 0 0 0 2px var(--focus); }
 .menu-agente__item--atual { background: var(--amber-tint); }
-.menu-agente__item > .ap-icon { flex: none; margin-left: auto; color: var(--amber); }
+.menu-agente__check { flex: none; display: inline-flex; margin-left: auto; color: var(--amber); }
+.menu-agente__check--oculto { visibility: hidden; }
 .menu-agente__texto { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .menu-agente__papel { color: var(--ink-muted); }
 
@@ -436,7 +437,8 @@ code.codigo-em-linha, .ap-prose code.codigo-em-linha { padding: .1em .35em; bord
 .barra__pill-x:hover { background: var(--surface-hover); color: var(--ink); }
 .barra__pill-x:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .barra__caixa { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3); border: var(--border-control) solid var(--line-strong); border-radius: var(--radius-lg); background: var(--surface-raised); transition: border-color .12s ease-out, box-shadow .12s ease-out; }
-.barra__caixa:focus-within { border-color: var(--focus); box-shadow: 0 0 0 1px var(--focus); }
+/* Anel só no foco pelo teclado (:focus-visible), nunca depois de um clique. */
+.barra__caixa:has(:focus-visible) { border-color: var(--focus); box-shadow: 0 0 0 1px var(--focus); }
 .barra__caixa--desabilitada { opacity: var(--opacity-disabled); }
 .barra__campo { display: block; width: 100%; min-height: 28px; margin: 0; padding: 4px 0; border: 0; outline: 0; resize: none; background: transparent; color: var(--ink); }
 .barra__campo::placeholder { color: var(--ink-subtle); opacity: 1; }
@@ -455,3 +457,11 @@ code.codigo-em-linha, .ap-prose code.codigo-em-linha { padding: .1em .35em; bord
 	.barra__conexao--reconectando .barra__conexao-ponto { animation: none; }
 	.barra__caixa, .barra__pill-x, .modelo-pill { transition: none; }
 }
+
+/* Rolagem fina e discreta, igual à .rolagem do app (padrões de interface, regra 8). */
+.folha__corpo, .seletor__lista, .ap-prose .katex-display { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.folha__corpo:hover, .seletor__lista:hover, .ap-prose .katex-display:hover { scrollbar-color: var(--line-strong) transparent; }
+.folha__corpo::-webkit-scrollbar, .seletor__lista::-webkit-scrollbar, .ap-prose .katex-display::-webkit-scrollbar { width: 6px; height: 6px; }
+.folha__corpo::-webkit-scrollbar-track, .seletor__lista::-webkit-scrollbar-track, .ap-prose .katex-display::-webkit-scrollbar-track { background: transparent; }
+.folha__corpo::-webkit-scrollbar-thumb, .seletor__lista::-webkit-scrollbar-thumb, .ap-prose .katex-display::-webkit-scrollbar-thumb { border-radius: var(--radius-full); background: var(--line); }
+.folha__corpo:hover::-webkit-scrollbar-thumb, .seletor__lista:hover::-webkit-scrollbar-thumb, .ap-prose .katex-display:hover::-webkit-scrollbar-thumb { background: var(--line-strong); }

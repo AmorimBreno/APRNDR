@@ -20,6 +20,7 @@ import {
 	semEsperar,
 	useJanelaPerfil,
 	usePerfis,
+	useValorEstavel,
 } from "@estudos/ui";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -50,22 +51,53 @@ export function JanelaPerfil({ perfilId, voltar, usarAparenciaContextos }: Props
 
 	// O rascunho fica aqui: o PainelConversa some enquanto o perfil recarrega (tela de carregando).
 	const rascunho = useState("");
-	const [sessoes, setSessoes] = useState<ResumoSessao[]>([]);
+	// undefined até a primeira listagem chegar: o histórico não mostra "vazio" nem contador antes disso.
+	const [sessoes, setSessoes] = useState<ResumoSessao[]>();
 	const [modelos, setModelos] = useState<InfoModelo[]>([]);
 	const [paineisAbertos, setPaineisAbertos] = useState(false);
+	/**
+	 * A grade do corpo fica com as 3 colunas até a aside terminar de sair: se voltasse a 2 colunas
+	 * na hora, a coluna do meio mudaria de largura de uma vez enquanto a aside ainda está saindo.
+	 */
+	const [colunaPaineis, setColunaPaineis] = useState(false);
+	useEffect(() => {
+		if (paineisAbertos) setColunaPaineis(true);
+	}, [paineisAbertos]);
 	const aberta = conexao === "aberta";
 	const sessaoId = estado.sessao?.sessaoId;
+	// Pronta = o histórico chegou E o estado da sessão também (o historico vem antes e sozinho
+	// deixaria o topo com agente vazio e modelo "Nenhum" por um instante).
+	const pronto = estado.pronto && Boolean(estado.sessao);
 
 	// Sessões: ao abrir, ao trocar de sessão e no fim de cada resposta (título novo).
+	// Uma resposta que chega depois de o efeito ser refeito é ignorada.
 	useEffect(() => {
-		if (!aberta || !estado.pronto || estado.executando) return;
-		acoes.listarSessoes().then(setSessoes, () => {});
-	}, [acoes, aberta, estado.pronto, estado.executando, sessaoId]);
+		if (!aberta || !pronto || estado.executando) return;
+		let cancelado = false;
+		acoes.listarSessoes().then(
+			(lista) => {
+				if (!cancelado) setSessoes(lista);
+			},
+			() => {},
+		);
+		return () => {
+			cancelado = true;
+		};
+	}, [acoes, aberta, pronto, estado.executando, sessaoId]);
 
 	useEffect(() => {
-		if (!aberta || !estado.pronto) return;
-		acoes.listarModelos().then(setModelos, () => {});
-	}, [acoes, aberta, estado.pronto]);
+		if (!aberta || !pronto) return;
+		let cancelado = false;
+		acoes.listarModelos().then(
+			(lista) => {
+				if (!cancelado) setModelos(lista);
+			},
+			() => {},
+		);
+		return () => {
+			cancelado = true;
+		};
+	}, [acoes, aberta, pronto]);
 
 	// A área de painéis abre sozinha quando um painel dela recebe uma ação nova
 	// (os pedidos vão para o modal, não para a área).
@@ -85,7 +117,13 @@ export function JanelaPerfil({ perfilId, voltar, usarAparenciaContextos }: Props
 	const nomePerfil = perfil?.nome ?? perfilId;
 	const avisoConexao = conexao === "reconectando" ? "Reconectando ao servidor" : conexao === "conectando" ? "Conectando ao servidor" : undefined;
 
-	if (!estado.pronto) {
+	// "Abrindo o perfil" e o aviso de conexão do topo são estados passageiros: só aparecem se durarem mais de 1 s.
+	// Um erro é estado final e aparece na hora.
+	const temErro = estado.erros.length > 0;
+	const telaCarregando = useValorEstavel(!pronto, !pronto && !temErro, false);
+	const mostrarAviso = useValorEstavel(Boolean(avisoConexao), Boolean(avisoConexao), false);
+
+	if (telaCarregando) {
 		return (
 			<TelaCarregando
 				nomePerfil={nomePerfil}
@@ -100,8 +138,10 @@ export function JanelaPerfil({ perfilId, voltar, usarAparenciaContextos }: Props
 
 	const agentes = perfil?.agentes ?? [];
 	const agenteAtual = estado.sessao?.agente ?? "";
-	const ocupado = !aberta || estado.executando;
+	const ocupado = !aberta || estado.executando || !pronto;
 	const uso = estado.uso;
+	// Outra sessão: o custo e os tokens pulam ao valor novo; só os incrementos ao vivo rolam.
+	const chaveUso = `${sessaoId ?? ""}:${estado.historicoPendente ? 1 : 0}`;
 
 	return (
 		<div className="janela">
@@ -126,6 +166,7 @@ export function JanelaPerfil({ perfilId, voltar, usarAparenciaContextos }: Props
 						desabilitado={ocupado}
 					/>
 					<SeletorModelo
+						{...(pronto ? {} : { carregando: true })}
 						{...(estado.sessao?.modelo ? { atual: estado.sessao.modelo } : {})}
 						doPerfil={modelosDoPerfil}
 						modelos={modelos}
@@ -138,17 +179,21 @@ export function JanelaPerfil({ perfilId, voltar, usarAparenciaContextos }: Props
 				<div className="topo__uso" title={`Sessão ${sessaoId ?? "?"} · raciocínio ${estado.sessao?.raciocinio ?? "?"}`}>
 					<span className="overline">Custo da sessão</span>
 					<span className="data">
-						US$ <Contador valor={uso.custo} formatar={(valor) => dolar.format(valor)} /> ·{" "}
-						<Contador valor={uso.tokensTotal} formatar={(valor) => inteiro.format(Math.round(valor))} /> tokens
+						US$ <Contador valor={uso.custo} chave={chaveUso} formatar={(valor) => dolar.format(valor)} /> ·{" "}
+						<Contador valor={uso.tokensTotal} chave={chaveUso} formatar={(valor) => inteiro.format(Math.round(valor))} /> tokens
 					</span>
 				</div>
 
-				<div className="topo__acoes">
-					{avisoConexao ? (
+				{/* Fora do fluxo: o aviso entra sem estreitar o topo. */}
+				{mostrarAviso && avisoConexao ? (
+					<div className="topo__aviso">
 						<Tag tone="amber" dot role="status">
 							{avisoConexao}
 						</Tag>
-					) : null}
+					</div>
+				) : null}
+
+				<div className="topo__acoes">
 					<button
 						type="button"
 						className="topo__icone"
@@ -170,10 +215,11 @@ export function JanelaPerfil({ perfilId, voltar, usarAparenciaContextos }: Props
 				</div>
 			</header>
 
-			<div className={`corpo${paineisAbertos ? " corpo--paineis" : ""}`}>
+			<div className={`corpo${paineisAbertos || colunaPaineis ? " corpo--paineis" : ""}`}>
 				<aside className="coluna coluna--historico">
 					<Historico
-						sessoes={sessoes}
+						sessoes={sessoes ?? []}
+						{...(sessoes ? {} : { carregando: true })}
 						{...(sessaoId ? { atual: sessaoId } : {})}
 						{...(estado.sessao?.contexto ? { contexto: estado.sessao.contexto } : {})}
 						aparencia={aparencia}
@@ -191,7 +237,7 @@ export function JanelaPerfil({ perfilId, voltar, usarAparenciaContextos }: Props
 					rascunho={rascunho}
 				/>
 
-				<AnimatePresence>
+				<AnimatePresence onExitComplete={() => setColunaPaineis(false)}>
 				{paineisAbertos ? (
 					<motion.aside
 						className="coluna coluna--paineis"

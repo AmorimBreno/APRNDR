@@ -19,9 +19,11 @@ export interface PropsSeletorAgente {
 
 export function SeletorAgente(props: PropsSeletorAgente) {
 	// O atual sempre aparece, mesmo se o perfil recarregado não o tiver mais.
-	const opcoes = props.agentes.some((agente) => agente.nome === props.atual)
-		? props.agentes
-		: [{ nome: props.atual, papel: "fora do perfil" }, ...props.agentes];
+	// Só vale com a lista de agentes já carregada: sem ela, "fora do perfil" seria um valor passageiro.
+	const opcoes =
+		!props.atual || props.agentes.length === 0 || props.agentes.some((agente) => agente.nome === props.atual)
+			? props.agentes
+			: [{ nome: props.atual, papel: "fora do perfil" }, ...props.agentes];
 	const papelAtual = opcoes.find((agente) => agente.nome === props.atual)?.papel;
 	return (
 		<MenuSuspenso
@@ -29,14 +31,14 @@ export function SeletorAgente(props: PropsSeletorAgente) {
 			atual={props.atual}
 			escolher={props.trocar}
 			classeBotao="topo__controle"
-			rotulo={`Agente: ${props.atual}${papelAtual ? ` (${papelAtual})` : ""}`}
+			rotulo={`Agente: ${props.atual || "carregando"}${papelAtual ? ` (${papelAtual})` : ""}`}
 			rotuloMenu="Escolher agente"
 			{...(props.desabilitado ? { desabilitado: true } : {})}
 			conteudoBotao={
 				<>
 					<span className="overline">Agente</span>
 					<span className="topo__valor data">
-						{props.atual}
+						{props.atual || "—"}
 						{papelAtual ? ` (${papelAtual})` : ""}
 					</span>
 				</>

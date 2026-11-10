@@ -7,10 +7,11 @@
 // no App), as transformações param e sobram as bolhas e os selos.
 
 import { AnimatePresence, motion, useAnimate } from "motion/react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { EstadoJanela } from "../estado-janela.ts";
 import type { DadosAvatarAgente } from "../use-perfis.ts";
 import { AvatarAgente } from "./Avatares.tsx";
+import { semMovimento } from "./movimento.ts";
 
 export type AtividadeAgente = "parado" | "pensando" | "escrevendo" | "pesquisando" | "perguntando";
 
@@ -118,7 +119,13 @@ export interface PropsAgenteAnimado {
 export function AgenteAnimado({ nome, avatar, atividade, tamanho = 36 }: PropsAgenteAnimado) {
 	const [escopo, animate] = useAnimate<HTMLSpanElement>();
 
+	// Parado desde o início não anima nada (as respostas antigas da conversa são todas assim).
+	const atividadeAntes = useRef<AtividadeAgente>("parado");
 	useEffect(() => {
+		const antes = atividadeAntes.current;
+		atividadeAntes.current = atividade;
+		// Reduzir movimento: o MotionConfig não cobre o useAnimate; fica só o selo.
+		if (semMovimento() || (atividade === "parado" && antes === "parado")) return;
 		let ativo = true;
 		void animar(atividade, escopo.current, animate, () => ativo).catch(() => {});
 		return () => {

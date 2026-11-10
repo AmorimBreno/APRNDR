@@ -31,6 +31,11 @@ export interface PropsHistorico {
 	/** Rótulo e cor de agora de cada contexto (o perfil sabe); valem mais que os gravados na sessão. */
 	aparencia?: AparenciaContextos;
 	desabilitado?: boolean;
+	/**
+	 * true até a primeira listagem chegar: sem o aviso de vazio e sem o contador
+	 * (o espaço do contador fica reservado). Padrão false.
+	 */
+	carregando?: boolean;
 	novaSessao(): void;
 	abrirSessao(id: string): void;
 }
@@ -86,7 +91,9 @@ function SecaoHistorico(props: PropsSecao) {
 		<section className="historico__secao-grupo">
 			<button type="button" className="historico__cabeca" aria-expanded={props.aberta} onClick={props.alternar}>
 				<span className="overline">{props.titulo}</span>
-				<span className="historico__conta data">{props.sessoes.length}</span>
+				<span className="historico__conta data" {...(props.carregando ? { style: { visibility: "hidden" as const } } : {})}>
+					{props.sessoes.length}
+				</span>
 				<motion.span className="historico__seta" animate={{ rotate: props.aberta ? 90 : 0 }} transition={{ type: "spring", stiffness: 500, damping: 30 }}>
 					<Icon name="chevron-right" size={16} strokeWidth={2.5} />
 				</motion.span>
@@ -102,7 +109,7 @@ function SecaoHistorico(props: PropsSecao) {
 						transition={{ type: "spring", stiffness: 420, damping: 38 }}
 					>
 						{props.sessoes.length === 0 ? (
-							props.vazio ? <p className="historico__vazio body-sm">{props.vazio}</p> : null
+							props.vazio && !props.carregando ? <p className="historico__vazio body-sm">{props.vazio}</p> : null
 						) : (
 							<ul className="historico__lista">
 								{props.sessoes.map((sessao, indice) => (

@@ -11,7 +11,7 @@ import type { ResumoContextoTela } from "../tipos.ts";
 import { AvatarUsuario } from "./Avatares.tsx";
 import { InfoResposta } from "./InfoResposta.tsx";
 import { Markdown } from "./Markdown.tsx";
-import type { Voo } from "./movimento.ts";
+import { semMovimento, type Voo } from "./movimento.ts";
 
 /** Itens do histórico (chave "h…") já estavam lá: só os que chegam ao vivo entram animados. */
 const aoVivo = (chave: string) => !chave.startsWith("h");
@@ -135,7 +135,7 @@ export function LinhaFerramenta({ chamada, vivo = false }: { chamada: ChamadaFer
 	const statusAntes = useRef(chamada.status);
 	// Erro ao vivo: um tremido curto.
 	useEffect(() => {
-		if (chamada.status === "erro" && statusAntes.current !== "erro" && linha.current) {
+		if (chamada.status === "erro" && statusAntes.current !== "erro" && linha.current && !semMovimento()) {
 			void animate(linha.current, { x: [0, -7, 7, -5, 5, -2, 0] }, { duration: 0.45, ease: "easeOut" });
 		}
 		statusAntes.current = chamada.status;
@@ -297,50 +297,41 @@ function semConteudo(item: ItemAssistente): boolean {
  * (a foto e o nome do agente) e o texto. Sem etiqueta: é óbvio que é uma
  * resposta; tipos diferentes (Explicação, Exemplo…) virão com etiqueta.
  */
-function BlocoResposta({ item, numero, autor }: { item: ItemAssistente; numero: number; autor?: ReactNode }) {
+function BlocoResposta({ item, numero, autor }: { item?: ItemAssistente; numero: number; autor?: ReactNode }) {
+	// Sem item = o lugar da próxima resposta, enquanto o agente pensa, pesquisa ou
+	// pergunta e ainda não há texto (o número e o cabeçalho com a foto animada).
+	// É o mesmo componente da resposta, com a mesma estrutura: quando o texto
+	// chega, a foto do cabeçalho não remonta (padrões de interface, regra 2).
+	const andamento = item ? item.emAndamento : true;
 	return (
-		<section className={`ap-block bloco${item.emAndamento ? " ap-block--writing" : ""}`} aria-busy={item.emAndamento || undefined}>
+		<section
+			className={`ap-block bloco${andamento ? " ap-block--writing" : ""}${item ? "" : " bloco--esperando"}`}
+			aria-busy={andamento || undefined}
+		>
 			<span className="bloco__margem">
 				<span className="data" aria-hidden="true">
 					{pad2(numero)}
 				</span>
-				<InfoResposta item={item} numero={numero} />
+				{item ? <InfoResposta item={item} numero={numero} /> : null}
 			</span>
 			{autor ? <header className="bloco__autor">{autor}</header> : null}
-			<div className="ap-block__body ap-prose lesson-body">
-				{item.raciocinio ? (
-					<details className="bloco__raciocinio" open={item.emAndamento && !item.texto}>
-						<summary className="overline">Raciocínio</summary>
-						<p className="body-sm">{item.raciocinio}</p>
-					</details>
-				) : null}
-				{item.texto ? <Markdown texto={item.texto} aparecendo={aoVivo(item.chave)} /> : null}
-				{item.erro ? (
-					<div className="aviso-erro" role="alert">
-						<span className="overline">Erro do modelo</span>
-						<p className="body">{item.erro}</p>
-					</div>
-				) : null}
-			</div>
-		</section>
-	);
-}
-
-/**
- * O lugar da próxima resposta, enquanto o agente pensa, pesquisa ou pergunta e
- * ainda não há texto: o número e o cabeçalho (a foto animada) exatamente onde
- * o bloco da resposta vai começar. Quando o texto chega, o bloco real entra no
- * mesmo lugar, com o mesmo cabeçalho.
- */
-function BlocoEsperando({ numero, autor }: { numero: number; autor: ReactNode }) {
-	return (
-		<section className="ap-block bloco bloco--esperando" aria-busy="true">
-			<span className="bloco__margem">
-				<span className="data" aria-hidden="true">
-					{pad2(numero)}
-				</span>
-			</span>
-			<header className="bloco__autor">{autor}</header>
+			{item ? (
+				<div className="ap-block__body ap-prose lesson-body">
+					{item.raciocinio ? (
+						<details className="bloco__raciocinio" open={item.emAndamento && !item.texto}>
+							<summary className="overline">Raciocínio</summary>
+							<p className="body-sm">{item.raciocinio}</p>
+						</details>
+					) : null}
+					{item.texto ? <Markdown texto={item.texto} aparecendo={aoVivo(item.chave)} /> : null}
+					{item.erro ? (
+						<div className="aviso-erro" role="alert">
+							<span className="overline">Erro do modelo</span>
+							<p className="body">{item.erro}</p>
+						</div>
+					) : null}
+				</div>
+			) : null}
 		</section>
 	);
 }
@@ -505,6 +496,12 @@ export function DocumentoConversa({ conversa, vazio, pedidoDaChamada, depois, au
 	const ultimaChave = ultimo?.chave;
 	const ultimoEhUsuario = ultimo?.tipo === "usuario";
 	const chaveAnterior = useRef<string | undefined>(undefined);
+	/**
+	 * A resposta que começa onde o bloco "esperando" estava herda a key dele:
+	 * assim o React mantém o cabeçalho (a foto) em vez de remontá-lo.
+	 */
+	const chavesVisuais = useRef(new Map<string, string>());
+	const esperandoNumero = useRef<number | undefined>(undefined);
 	const inicioAnterior = useRef<string | undefined>(undefined);
 
 	useEffect(() => {
@@ -531,7 +528,7 @@ export function DocumentoConversa({ conversa, vazio, pedidoDaChamada, depois, au
 		};
 	}, []);
 
-	useEffect(() => {
+	useLayoutEffect(() => {
 		const rolagem = ancestralQueRola(fim.current);
 		// Outra conversa (sessão trocada): começa no fim, como uma aberta agora.
 		if (inicioAnterior.current !== primeiraChave) pertoDoFim.current = true;
@@ -543,51 +540,61 @@ export function DocumentoConversa({ conversa, vazio, pedidoDaChamada, depois, au
 	}, [conversa, primeiraChave, ultimaChave, ultimoEhUsuario]);
 
 	let numero = 0;
+	if (!aguardando) esperandoNumero.current = undefined;
+	const itens = agruparConversa(conversa, (id) => Boolean(pedidoDaChamada?.(id))).map((trecho) => {
+		if (trecho.tipo === "ferramentas") {
+			return (
+				<Item key={trecho.chave} chave={trecho.chave} tipo="ferramentas">
+					<GrupoFerramentas chamadas={trecho.chamadas} vivo={aoVivo(trecho.chave)} />
+				</Item>
+			);
+		}
+		const { item } = trecho;
+		if (item.tipo === "usuario") {
+			// A nota não entra subindo: quem traz ela é o voo (ou ela já estava lá).
+			return (
+				<div key={item.chave} className="documento__item documento__item--usuario">
+					{item.contextosTela && item.contextosTela.length > 0 ? <ChipsContexto contextos={item.contextosTela} /> : null}
+					<NotaUsuario
+						texto={item.texto}
+						{...(voo && aoVivo(item.chave) ? { voo } : {})}
+						{...(aoPousar ? { aoPousar } : {})}
+					/>
+				</div>
+			);
+		}
+		if (item.tipo === "ferramenta") {
+			// Só chega aqui a chamada que virou botão de pedido (agruparConversa).
+			return (
+				<Item key={item.chave} chave={item.chave} tipo="pedido">
+					<div className="documento__pedido">{pedidoDaChamada?.(item.chamada.id)}</div>
+				</Item>
+			);
+		}
+		numero += 1;
+		let chaveVisual = chavesVisuais.current.get(item.chave);
+		if (!chaveVisual && esperandoNumero.current === numero) {
+			chaveVisual = `esperando-${numero}`;
+			chavesVisuais.current.set(item.chave, chaveVisual);
+			esperandoNumero.current = undefined;
+		}
+		const autor = autorDaResposta ? autorDaResposta(item) : item.agente ? <span className="bloco__nome body-strong">{item.agente}</span> : undefined;
+		return (
+			// Sem entrada: o bloco esperando já estava neste lugar, com o mesmo cabeçalho.
+			<Item key={chaveVisual ?? item.chave} chave={item.chave} tipo="resposta" entrar={false}>
+				<BlocoResposta item={item} numero={numero} autor={autor} />
+			</Item>
+		);
+	});
+	const esperando = aguardando && !respostaChegando(conversa);
+	if (esperando) esperandoNumero.current = numero + 1;
 	return (
 		<div className="documento">
 			{conversa.length === 0 ? vazio : null}
-			{agruparConversa(conversa, (id) => Boolean(pedidoDaChamada?.(id))).map((trecho) => {
-				if (trecho.tipo === "ferramentas") {
-					return (
-						<Item key={trecho.chave} chave={trecho.chave} tipo="ferramentas">
-							<GrupoFerramentas chamadas={trecho.chamadas} vivo={aoVivo(trecho.chave)} />
-						</Item>
-					);
-				}
-				const { item } = trecho;
-				if (item.tipo === "usuario") {
-					// A nota não entra subindo: quem traz ela é o voo (ou ela já estava lá).
-					return (
-						<div key={item.chave} className="documento__item documento__item--usuario">
-							{item.contextosTela && item.contextosTela.length > 0 ? <ChipsContexto contextos={item.contextosTela} /> : null}
-							<NotaUsuario
-								texto={item.texto}
-								{...(voo && aoVivo(item.chave) ? { voo } : {})}
-								{...(aoPousar ? { aoPousar } : {})}
-							/>
-						</div>
-					);
-				}
-				if (item.tipo === "ferramenta") {
-					// Só chega aqui a chamada que virou botão de pedido (agruparConversa).
-					return (
-						<Item key={item.chave} chave={item.chave} tipo="pedido">
-							<div className="documento__pedido">{pedidoDaChamada?.(item.chamada.id)}</div>
-						</Item>
-					);
-				}
-				numero += 1;
-				const autor = autorDaResposta ? autorDaResposta(item) : item.agente ? <span className="bloco__nome body-strong">{item.agente}</span> : undefined;
-				return (
-					// Sem entrada: o bloco esperando já estava neste lugar, com o mesmo cabeçalho.
-					<Item key={item.chave} chave={item.chave} tipo="resposta" entrar={false}>
-						<BlocoResposta item={item} numero={numero} autor={autor} />
-					</Item>
-				);
-			})}
-			{aguardando && !respostaChegando(conversa) ? (
+			{itens}
+			{esperando ? (
 				<Item chave={`esperando-${numero + 1}`} tipo="resposta">
-					<BlocoEsperando numero={numero + 1} autor={aguardando} />
+					<BlocoResposta numero={numero + 1} autor={aguardando} />
 				</Item>
 			) : null}
 			{depois}

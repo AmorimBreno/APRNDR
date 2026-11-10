@@ -17,7 +17,6 @@ import { Button, EmptyState, pad2 } from "@estudos/design-system";
 import {
 	AgenteAnimado,
 	atividadeDoAgente,
-	AvatarAgente,
 	BarraPergunta,
 	BotaoPedido,
 	type ContextoTela,
@@ -37,6 +36,7 @@ import {
 	ROTULOS_ATIVIDADE,
 	type ResumoPerfil,
 	SeletorModelo,
+	useValorEstavel,
 	type Voo,
 } from "@estudos/ui";
 import { type Dispatch, type ReactNode, type SetStateAction, useEffect, useMemo, useRef, useState } from "react";
@@ -157,10 +157,21 @@ export function PainelConversa({
 	// O catálogo de modelos, para o seletor da caixa do campo (só o embutido mostra).
 	const [modelos, setModelos] = useState<InfoModelo[]>([]);
 	const listarModelos = acoes.listarModelos;
-	const pronto = estado.pronto;
+	// Pronta = o histórico e o estado da sessão chegaram (o historico vem antes e sozinho
+	// mostraria a conversa nova com o agente e o modelo da sessão anterior).
+	const pronto = estado.pronto && Boolean(estado.sessao);
 	useEffect(() => {
 		if (!embutido || !conectada || !pronto) return;
-		listarModelos().then(setModelos, () => {});
+		let cancelado = false;
+		listarModelos().then(
+			(lista) => {
+				if (!cancelado) setModelos(lista);
+			},
+			() => {},
+		);
+		return () => {
+			cancelado = true;
+		};
 	}, [embutido, conectada, pronto, listarModelos]);
 	const modelosDoPerfil = useMemo(
 		() => (perfil?.agentes ?? []).map((agente) => agente.modelo).filter((modelo): modelo is string => Boolean(modelo)),
@@ -235,9 +246,18 @@ export function PainelConversa({
 
 	// Trava contra o Enter duplo enquanto os contextos das abas são pedidos (pode ser assíncrono).
 	const enviando = useRef(false);
+	// O campo só fica desabilitado se o bloqueio durar mais de 1 s (desabilitar apaga o foco a cada
+	// recarga ou troca de sessão); enquanto isso, enviar espera.
+	const bloqueado = !conectada || Boolean(estado.carregando) || !pronto;
+	const campoDesabilitado = useValorEstavel(bloqueado, bloqueado, false);
+	const bloqueadoRef = useRef(bloqueado);
+	bloqueadoRef.current = bloqueado;
+	// A citação de agora: um envio que demora não pode apagar uma citação nova feita durante ele.
+	const citacaoRef = useRef(citacao);
+	citacaoRef.current = citacao;
 	const enviar = async () => {
 		const mensagem = texto.trim();
-		if (!mensagem || enviando.current) return;
+		if (!mensagem || enviando.current || bloqueadoRef.current) return;
 		// No embutido a mensagem leva o que cada aba mostra agora e o trecho citado.
 		let contextos: ContextoTela[] = [];
 		if (embutido && obterContextos) {
@@ -257,6 +277,7 @@ export function PainelConversa({
 			}
 		}
 		const citacaoViaja = contextos.some((contexto) => contexto.selecao !== undefined && contexto.selecao === citacao?.texto);
+		const textoCitado = citacao?.texto;
 		// O fantasma sai do campo agora e pousa na nota quando o eco do servidor chegar.
 		const novo = campo.current ? iniciarVoo(mensagem, campo.current.getBoundingClientRect()) : undefined;
 		setVoo(novo);
@@ -264,7 +285,8 @@ export function PainelConversa({
 		acoes.enviar(mensagem, contextos.length > 0 ? contextos : undefined).then(
 			(resultado) => {
 				// A citação viajou com a mensagem (a fila do núcleo também a guarda): sai do campo.
-				if (citacaoViaja) citacao?.limpar();
+				// Só se a citação de agora ainda for a que viajou.
+				if (citacaoViaja && citacaoRef.current?.texto === textoCitado) citacaoRef.current?.limpar();
 				// Na fila, não há nota para pousar agora: a mensagem aparece na lista da fila.
 				if (resultado === "enfileirada") {
 					novo?.cancelar();
@@ -287,7 +309,8 @@ export function PainelConversa({
 	};
 
 	const agentes = perfil?.agentes ?? [];
-	const agenteAtual = estado.sessao?.agente ?? "";
+	// Entre o historico e o estado da sessão nova, o agente da sessão é o da anterior: não vale.
+	const agenteAtual = estado.historicoPendente ? "" : (estado.sessao?.agente ?? "");
 
 	// O cabeçalho de cada resposta: a foto e o nome do agente que respondeu. Na
 	// resposta que está chegando, a foto reage ao que ele faz.
@@ -298,13 +321,10 @@ export function PainelConversa({
 		if (!nome) return undefined;
 		const avatar = avatarDe(nome);
 		const vivo = item.emAndamento && atividade !== "parado";
+		// Sempre o mesmo componente (parado = quieto): a foto não remonta quando a resposta começa ou termina.
 		return (
 			<>
-				{vivo ? (
-					<AgenteAnimado nome={nome} {...(avatar ? { avatar } : {})} atividade={atividade} />
-				) : (
-					<AvatarAgente nome={nome} {...(avatar ? { avatar } : {})} />
-				)}
+				<AgenteAnimado nome={nome} {...(avatar ? { avatar } : {})} atividade={vivo ? atividade : "parado"} />
 				<span className="bloco__nome body-strong">{nomeBonito(nome)}</span>
 				{vivo ? <span className="ap-visually-hidden">{ROTULOS_ATIVIDADE[atividade as Exclude<typeof atividade, "parado">]}</span> : null}
 			</>
@@ -361,7 +381,7 @@ export function PainelConversa({
 			texto={texto}
 			setTexto={setTexto}
 			executando={estado.executando}
-			desabilitado={!conectada || Boolean(estado.carregando) || (embutido && !estado.pronto)}
+			desabilitado={campoDesabilitado}
 			fila={estado.fila}
 			enviar={enviar}
 			parar={parar}
@@ -413,12 +433,35 @@ export function PainelConversa({
 								aberto.estado === "pendente" ? (
 									<AgenteAnimado nome={agenteAtual} {...(avatarDe(agenteAtual) ? { avatar: avatarDe(agenteAtual)! } : {})} atividade="perguntando" tamanho={48} />
 								) : (
-									<AvatarAgente nome={agenteAtual} {...(avatarDe(agenteAtual) ? { avatar: avatarDe(agenteAtual)! } : {})} tamanho={48} />
+									<AgenteAnimado nome={agenteAtual} {...(avatarDe(agenteAtual) ? { avatar: avatarDe(agenteAtual)! } : {})} atividade="parado" tamanho={48} />
 								),
 						}
 					: {})}
 			/>
 		) : null;
+
+	const aviso =
+		conexao === "reconectando"
+			? "Reconectando ao servidor"
+			: conexao === "conectando"
+				? "Conectando ao servidor"
+				: !pronto
+					? (estado.carregando ?? "Montando a sessão")
+					: undefined;
+	const avisoVisivel = useValorEstavel(Boolean(aviso), Boolean(aviso), false);
+
+	// Documento e esqueleto trocam com um fade curto (cada um entra com a classe de fade).
+	const conteudo = pronto ? (
+		<div key="documento" className="painel-conversa__troca">
+			{documento}
+		</div>
+	) : (
+		<div key="esqueleto" className="painel-conversa__esqueleto painel-conversa__troca" aria-hidden="true">
+			<span />
+			<span />
+			<span />
+		</div>
+	);
 
 	if (!embutido) {
 		return (
@@ -427,7 +470,7 @@ export function PainelConversa({
 					<div className="rolagem">
 						<div className="centro__coluna">
 							<Avisos janela={janela} compacto={false} />
-							{documento}
+							{conteudo}
 						</div>
 					</div>
 					<div className="centro__pe">{barra}</div>
@@ -437,14 +480,6 @@ export function PainelConversa({
 		);
 	}
 
-	const aviso =
-		conexao === "reconectando"
-			? "Reconectando ao servidor"
-			: conexao === "conectando"
-				? "Conectando ao servidor"
-				: !estado.pronto
-					? (estado.carregando ?? "Montando a sessão")
-					: undefined;
 	return (
 		<section
 			className="painel-conversa painel-conversa--embutido"
@@ -453,24 +488,19 @@ export function PainelConversa({
 			inert={!abertaProp}
 		>
 			{cabecalho ? <div className="painel-conversa__cabecalho">{cabecalho}</div> : null}
-			{aviso ? (
-				<p className="painel-conversa__aviso body-sm" role="status">
-					{aviso}
-				</p>
-			) : null}
+			{/* Estados passageiros: só aparecem depois de 1 s e flutuam sobre o topo da conversa, sem empurrá-la. */}
+			<div className="painel-conversa__zona-aviso">
+				{avisoVisivel && aviso ? (
+					<p className="painel-conversa__aviso body-sm" role="status">
+						{aviso}
+					</p>
+				) : null}
+			</div>
 			<div className="painel-conversa__avisos">
 				<Avisos janela={janela} compacto />
 			</div>
 			<div className="rolagem painel-conversa__rolagem">
-				{estado.pronto ? (
-					<div className="painel-conversa__coluna">{documento}</div>
-				) : (
-					<div className="painel-conversa__esqueleto" aria-hidden="true">
-						<span />
-						<span />
-						<span />
-					</div>
-				)}
+				<div className="painel-conversa__coluna">{conteudo}</div>
 			</div>
 			{chegadas > 0 && hrefTelaCheia ? (
 				<a className="painel-conversa__tela-cheia body-sm" href={hrefTelaCheia}>

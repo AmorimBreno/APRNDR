@@ -119,6 +119,8 @@ a.cartao:hover .cartao__carregar .overline, a.cartao:focus-visible .cartao__carr
 .topo__controle:hover { box-shadow: inset 0 -3px 0 currentColor; }
 .topo__controle:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .topo__controle:disabled { cursor: default; opacity: var(--opacity-disabled); box-shadow: none; }
+/* O aviso de conexão flutua logo abaixo do topo: entra sem mexer na largura de nada. */
+.topo__aviso { position: absolute; z-index: 4; top: calc(100% + var(--space-2)); right: var(--space-6); }
 .topo__uso { flex: none; display: flex; flex-direction: column; gap: 2px; text-align: right; }
 .topo__acoes { flex: none; display: flex; align-items: center; gap: var(--space-2); align-self: stretch; padding-left: var(--space-4); border-left: var(--border-strong) solid currentColor; }
 /* Tecla de papel com duas linhas (o modelo): ação que abre o modal, não campo. */
@@ -137,9 +139,8 @@ a.cartao:hover .cartao__carregar .overline, a.cartao:focus-visible .cartao__carr
 
 .corpo { display: grid; grid-template-columns: 264px minmax(0, 1fr); gap: var(--space-4); min-height: 0; padding: var(--space-4); }
 .corpo--paineis { grid-template-columns: 264px minmax(0, 1fr) 360px; }
-/* As colunas rolam sem mostrar a barra (a do navegador ocupava a altura toda, fora das bordas redondas). */
-.coluna { min-height: 0; padding: var(--space-5); border-radius: var(--radius-xl); background: var(--surface-panel); overflow-y: auto; scrollbar-width: none; }
-.coluna::-webkit-scrollbar { display: none; }
+/* As colunas rolam com a barra fina (regra 8), igual à .rolagem. */
+.coluna { min-height: 0; padding: var(--space-5); border-radius: var(--radius-xl); background: var(--surface-panel); overflow-y: auto; }
 .coluna--paineis { padding: var(--space-3); background: var(--surface-ground); border: var(--border-hair) solid var(--line); }
 
 .centro { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
@@ -187,7 +188,9 @@ a.cartao:hover .cartao__carregar .overline, a.cartao:focus-visible .cartao__carr
 /* display: flex vence o atributo hidden; o painel escondido continua montado. */
 .painel-conversa--embutido[hidden] { display: none; }
 .painel-conversa__cabecalho { flex: none; }
-.painel-conversa__aviso { flex: none; margin: 0; padding: var(--space-2) var(--space-4); border-bottom: var(--border-hair) solid var(--line); background: var(--amber-tint); color: var(--ink); }
+/* A zona não ocupa altura: o aviso (passageiro) flutua sobre o topo da conversa em vez de empurrá-la. */
+.painel-conversa__zona-aviso { position: relative; z-index: 2; flex: none; height: 0; }
+.painel-conversa__aviso { position: absolute; top: 0; left: 0; right: 0; margin: 0; padding: var(--space-2) var(--space-4); border-bottom: var(--border-hair) solid var(--line); background: var(--surface-panel) linear-gradient(var(--amber-tint), var(--amber-tint)); color: var(--ink); }
 .painel-conversa__avisos { flex: none; display: flex; flex-direction: column; gap: var(--space-2); }
 .painel-conversa__avisos:not(:empty) { padding: var(--space-2) var(--space-3) 0; }
 .painel-conversa--embutido .rolagem { flex: 1; min-height: 0; padding: 0 var(--space-3) 0 var(--space-3); overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
@@ -205,9 +208,21 @@ a.cartao:hover .cartao__carregar .overline, a.cartao:focus-visible .cartao__carr
 /* Esqueleto enquanto a sessão carrega: três blocos esmaecidos que respiram. */
 .painel-conversa__esqueleto { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-5) 0; }
 .painel-conversa__esqueleto span { display: block; height: 56px; border-radius: var(--radius-md); background: var(--line); opacity: .5; animation: esqueleto-respira 1.6s ease-in-out infinite; }
+.painel-conversa__coluna > .painel-conversa__esqueleto { padding: 0; }
+/* Esqueleto e documento trocam com um fade curto, só de opacidade. */
+.painel-conversa__troca { animation: troca-fade .15s ease-out; }
+@keyframes troca-fade { from { opacity: 0; } }
 .painel-conversa__esqueleto span:nth-child(2) { width: 80%; }
 .painel-conversa__esqueleto span:nth-child(3) { width: 60%; }
 @keyframes esqueleto-respira { 50% { opacity: .22; } }
 @media (prefers-reduced-motion: reduce) {
-	.painel-conversa__esqueleto span { animation: none; }
+	.painel-conversa__esqueleto span, .painel-conversa__troca { animation: none; }
 }
+
+/* Rolagem fina e discreta em toda área que rola (padrões de interface, regra 8): mesmo estilo da .rolagem. */
+.perfis__corpo, .cartao__mensagem, .painel-carregando, .aviso-erro.aviso--compacto, .coluna { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.perfis__corpo:hover, .cartao__mensagem:hover, .painel-carregando:hover, .aviso-erro.aviso--compacto:hover, .coluna:hover { scrollbar-color: var(--line-strong) transparent; }
+.perfis__corpo::-webkit-scrollbar, .cartao__mensagem::-webkit-scrollbar, .painel-carregando::-webkit-scrollbar, .aviso-erro.aviso--compacto::-webkit-scrollbar, .coluna::-webkit-scrollbar { width: 6px; height: 6px; }
+.perfis__corpo::-webkit-scrollbar-track, .cartao__mensagem::-webkit-scrollbar-track, .painel-carregando::-webkit-scrollbar-track, .aviso-erro.aviso--compacto::-webkit-scrollbar-track, .coluna::-webkit-scrollbar-track { background: transparent; }
+.perfis__corpo::-webkit-scrollbar-thumb, .cartao__mensagem::-webkit-scrollbar-thumb, .painel-carregando::-webkit-scrollbar-thumb, .aviso-erro.aviso--compacto::-webkit-scrollbar-thumb, .coluna::-webkit-scrollbar-thumb { border-radius: var(--radius-full); background: var(--line); }
+.perfis__corpo:hover::-webkit-scrollbar-thumb, .cartao__mensagem:hover::-webkit-scrollbar-thumb, .painel-carregando:hover::-webkit-scrollbar-thumb, .aviso-erro.aviso--compacto:hover::-webkit-scrollbar-thumb, .coluna:hover::-webkit-scrollbar-thumb { background: var(--line-strong); }

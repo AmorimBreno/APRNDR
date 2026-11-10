@@ -9,7 +9,7 @@
 // mais de 4, quebram em linhas.
 
 import { EmptyState, Icon, ORNAMENT_MEANINGS, type OrnamentGlyph, pad2, Wordmark } from "@estudos/design-system";
-import { type ErroPerfil, type ResumoPerfil, usePerfis } from "@estudos/ui";
+import { type ErroPerfil, type ResumoPerfil, semMovimento, useValorEstavel, usePerfis } from "@estudos/ui";
 import { motion, useMotionValue, useSpring, useTransform } from "motion/react";
 import type { CSSProperties, PointerEvent } from "react";
 
@@ -38,6 +38,8 @@ function CartaoPerfil({ perfil }: { perfil: ResumoPerfil }) {
 	const arteX = useSpring(useTransform(px, [-0.5, 0.5], [10, -10]), mola);
 	const arteY = useSpring(useTransform(py, [-0.5, 0.5], [8, -8]), mola);
 	const mover = (evento: PointerEvent<HTMLAnchorElement>) => {
+		// Reduzir movimento: o MotionConfig não cobre o useSpring; o card fica parado.
+		if (semMovimento()) return;
 		const caixa = evento.currentTarget.getBoundingClientRect();
 		px.set((evento.clientX - caixa.left) / caixa.width - 0.5);
 		py.set((evento.clientY - caixa.top) / caixa.height - 0.5);
@@ -115,6 +117,9 @@ export function TelaPerfis() {
 	const perfis = lista?.perfis ?? [];
 	const invalidos = lista?.erros ?? [];
 	const cartoes = perfis.length + invalidos.length;
+	// "Carregando perfis" e o Recarregar desabilitado são passageiros: só aparecem se durarem mais de 1 s.
+	const mostrarCarregando = useValorEstavel(!lista, !lista, false);
+	const recarregando = useValorEstavel(carregando, carregando, false);
 
 	let corpo;
 	if (erro) {
@@ -124,11 +129,11 @@ export function TelaPerfis() {
 			</EmptyState>
 		);
 	} else if (!lista) {
-		corpo = (
+		corpo = mostrarCarregando ? (
 			<p className="perfis__carregando overline">
 				Carregando perfis <span className="ap-cursor" aria-hidden="true" />
 			</p>
-		);
+		) : null;
 	} else if (perfis.length === 0 && invalidos.length === 0) {
 		corpo = (
 			<EmptyState glyph="始" tone="moss" title="Nenhum perfil ainda">
@@ -159,7 +164,7 @@ export function TelaPerfis() {
 					<Wordmark size={32} />
 					<h1 className="overline">Escolha um perfil · {mesAno.format(new Date())}</h1>
 				</div>
-				<button type="button" className="perfis__recarregar button" onClick={recarregar} disabled={carregando}>
+				<button type="button" className="perfis__recarregar button" onClick={recarregar} disabled={recarregando}>
 					<Icon name="refresh" size={18} strokeWidth={2.25} />
 					Recarregar
 				</button>

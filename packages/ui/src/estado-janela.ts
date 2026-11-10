@@ -154,6 +154,11 @@ export interface EstadoJanela {
 	 * da resposta que traz o EstadoSessao; sem este aviso, comSessao zeraria o uso recém-posto.
 	 */
 	usoDoHistorico?: boolean;
+	/**
+	 * true entre o "historico" e a resposta que traz o EstadoSessao: a conversa já é a da
+	 * sessão nova, mas `sessao` ainda é a anterior (ou não existe). A tela não deve misturar os dois.
+	 */
+	historicoPendente?: boolean;
 	recarregado?: AvisoRecarregado;
 	/** Contador para as chaves dos itens (o reducer continua puro: vem no estado). */
 	contador: number;
@@ -256,6 +261,7 @@ function comSessao(estado: EstadoJanela, sessao: EstadoSessao): EstadoJanela {
 		diagnosticos: [...sessao.diagnosticos, ...extras],
 		...(outraSessao && !estado.usoDoHistorico ? { uso: usoZerado } : {}),
 		usoDoHistorico: false,
+		historicoPendente: false,
 		// Os registros já reconstruídos do histórico desta sessão ficam (a resposta chega depois dele).
 		...(outraSessao && estado.sessaoDosPedidos !== sessao.sessaoId ? { registrosPedidos: {} } : {}),
 	};
@@ -617,6 +623,7 @@ export function reduzirJanela(estado: EstadoJanela, acao: AcaoJanela): EstadoJan
 				// Com uso, é a soma do ramo inteiro da sessão; sem, zera como antes. Os "uso" ao vivo somam por cima.
 				uso: acao.uso ? usoSomadoDe(acao.uso) : usoZerado,
 				usoDoHistorico: acao.uso !== undefined,
+				historicoPendente: true,
 				pronto: true,
 				carregando: undefined,
 			};

@@ -139,7 +139,10 @@ export function MenuSuspenso(props: PropsMenuSuspenso) {
 										<span className="body-strong">{opcao.titulo}</span>
 										{opcao.detalhe != null ? <span className="menu-agente__papel overline">{opcao.detalhe}</span> : null}
 									</span>
-									{marcado ? <Icon name="check" size={18} strokeWidth={2.5} /> : null}
+									{/* O check existe em todos os itens (invisível nos outros): a largura do menu não varia com o item atual. */}
+									<span className={`menu-agente__check${marcado ? "" : " menu-agente__check--oculto"}`} aria-hidden="true">
+										<Icon name="check" size={18} strokeWidth={2.5} />
+									</span>
 								</button>
 							);
 						})}

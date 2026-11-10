@@ -4,6 +4,7 @@
 
 import { Icon, Modal, Tag, TextField } from "@estudos/design-system";
 import { useMemo, useState } from "react";
+import { useValorEstavel } from "../valor-estavel.ts";
 import type { InfoModelo } from "../tipos.ts";
 
 const compacto = new Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 });
@@ -20,6 +21,8 @@ export interface PropsSeletorModelo {
 	desabilitado?: boolean;
 	/** Linha acima do título do modal ("Perfil · Estudos"). */
 	legenda?: string;
+	/** O estado da sessão ainda não chegou: a tecla mostra "—" em vez de "Nenhum". */
+	carregando?: boolean;
 	/** "pill": a pill compacta com o nome curto, para a caixa da conversa embutida. Padrão: a tecla do topo. */
 	variante?: "tecla" | "pill";
 }
@@ -29,15 +32,16 @@ export function nomeCurtoDoModelo(modelo: string): string {
 	return modelo.slice(modelo.lastIndexOf("/") + 1);
 }
 
-function detalhes(info: InfoModelo | undefined): string {
-	if (!info) return "Fora do catálogo";
+/** `catalogo` = o catálogo já chegou: sem ele, "Fora do catálogo" seria um valor passageiro. */
+function detalhes(info: InfoModelo | undefined, catalogo: boolean): string {
+	if (!info) return catalogo ? "Fora do catálogo" : " ";
 	const partes = [`Contexto ${compacto.format(info.janelaContexto)} tokens`];
 	if (info.raciocinio) partes.push("raciocínio");
 	if (info.imagem) partes.push("imagem");
 	return partes.join(" · ");
 }
 
-function Opcao(props: { nome: string; info?: InfoModelo; atual: boolean; escolher(nome: string): void }) {
+function Opcao(props: { nome: string; info?: InfoModelo; catalogo: boolean; atual: boolean; escolher(nome: string): void }) {
 	return (
 		<li>
 			<button
@@ -49,7 +53,7 @@ function Opcao(props: { nome: string; info?: InfoModelo; atual: boolean; escolhe
 				<span className="modelo__texto">
 					<span className="body-strong">{props.info?.titulo ?? props.nome}</span>
 					<span className="modelo__nome data">{props.nome}</span>
-					<span className="modelo__detalhes body-sm">{detalhes(props.info)}</span>
+					<span className="modelo__detalhes body-sm">{detalhes(props.info, props.catalogo)}</span>
 				</span>
 				{props.atual ? (
 					<Tag tone="amber" size="sm" icon="check">
@@ -64,6 +68,9 @@ function Opcao(props: { nome: string; info?: InfoModelo; atual: boolean; escolhe
 export function SeletorModelo(props: PropsSeletorModelo) {
 	const [aberto, setAberto] = useState(false);
 	const [busca, setBusca] = useState("");
+	const catalogo = props.modelos.length > 0;
+	// "Carregando o catálogo" só aparece se o catálogo demorar mais de 1 s.
+	const mostrarCarregando = useValorEstavel(!catalogo, !catalogo, false);
 
 	const porNome = useMemo(() => new Map(props.modelos.map((info) => [info.nome, info])), [props.modelos]);
 	const doPerfil = useMemo(() => {
@@ -113,7 +120,7 @@ export function SeletorModelo(props: PropsSeletorModelo) {
 					disabled={props.desabilitado}
 				>
 					<span className="overline">Modelo</span>
-					<span className="topo__valor data">{props.atual ?? "Nenhum"}</span>
+					<span className="topo__valor data">{props.carregando ? "—" : (props.atual ?? "Nenhum")}</span>
 					<Icon name="arrow-up-right" size={16} strokeWidth={2.5} />
 				</button>
 			)}
@@ -130,7 +137,7 @@ export function SeletorModelo(props: PropsSeletorModelo) {
 						placeholder="Nome ou provedor, como claude ou openai/gpt"
 						value={busca}
 						onChange={(evento) => setBusca(evento.target.value)}
-						hint={props.modelos.length ? `${props.modelos.length} modelos no catálogo` : "Carregando o catálogo"}
+						hint={catalogo ? `${props.modelos.length} modelos no catálogo` : mostrarCarregando ? "Carregando o catálogo" : " "}
 						autoFocus
 					/>
 					{termo ? (
@@ -144,7 +151,7 @@ export function SeletorModelo(props: PropsSeletorModelo) {
 							</p>
 							<ul className="seletor__lista">
 								{encontrados.slice(0, LIMITE_RESULTADOS).map((info) => (
-									<Opcao key={info.nome} nome={info.nome} info={info} atual={info.nome === props.atual} escolher={escolher} />
+									<Opcao key={info.nome} nome={info.nome} info={info} catalogo atual={info.nome === props.atual} escolher={escolher} />
 								))}
 							</ul>
 						</section>
@@ -154,7 +161,7 @@ export function SeletorModelo(props: PropsSeletorModelo) {
 							<ul className="seletor__lista">
 								{doPerfil.map((nome) => {
 									const info = porNome.get(nome);
-									return <Opcao key={nome} nome={nome} {...(info ? { info } : {})} atual={nome === props.atual} escolher={escolher} />;
+									return <Opcao key={nome} nome={nome} {...(info ? { info } : {})} catalogo={catalogo} atual={nome === props.atual} escolher={escolher} />;
 								})}
 							</ul>
 						</section>

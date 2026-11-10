@@ -227,6 +227,8 @@
 .editor-nota__situacao { color: var(--ink-muted); white-space: nowrap; }
 .editor-nota__corpo { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-8) var(--space-4) 30vh; }
 .editor-nota__pagina { position: relative; display: flex; flex-direction: column; gap: var(--space-4); box-sizing: content-box; max-width: var(--largura-leitura-estudos); margin: 0 auto; padding: 0 var(--space-6) 0 56px; }
+/* Enquanto a nota carrega e os blocos especiais ainda não foram desenhados, a página fica escondida (ocupando o espaço). */
+.editor-nota__pagina--carregando { visibility: hidden; }
 .editor-nota__titulo { display: block; width: 100%; margin: 0 0 var(--space-2); padding: 0; overflow: hidden; border: 0; background: none; color: var(--ink); font-family: var(--font-sans); font-size: 36px; line-height: 44px; font-weight: 750; letter-spacing: -.01em; resize: none; }
 .editor-nota__titulo::placeholder { color: var(--ink-subtle); }
 .editor-nota__titulo:focus { outline: none; }

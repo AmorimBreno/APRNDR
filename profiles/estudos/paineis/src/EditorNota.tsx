@@ -101,6 +101,13 @@ function EditorDaNota(props: PropsEditorNota) {
 	const { janela, materiaId } = props;
 	const { acoes } = janela;
 	const [nota, setNota] = useState<NotaAberta | undefined>(undefined);
+	/**
+	 * A nota só aparece pronta: o conteúdo entra no editor e os blocos especiais (destaque, recolhível,
+	 * pergunta e resposta) são desenhados pelo React num passo seguinte; até lá a página fica escondida,
+	 * ocupando o espaço, para não piscar sem estilo (pedido do Breno em 2026-11-10). Cada carga soma 1.
+	 */
+	const [carga, setCarga] = useState(0);
+	const [pronta, setPronta] = useState(false);
 	const [erroAbrir, setErroAbrir] = useState<string | undefined>(undefined);
 	const [situacao, setSituacao] = useState<Situacao>({ tipo: "abrindo" });
 	const [somenteLeitura, setSomenteLeitura] = useState(false);
@@ -143,12 +150,40 @@ function EditorDaNota(props: PropsEditorNota) {
 		return () => observador.disconnect();
 	}, []);
 
+	// Espera os blocos especiais da carga de agora estarem desenhados (cada ".react-renderer" do TipTap com
+	// conteúdo) e mais um quadro, e só então mostra. Tem prazo (400 ms): se algum bloco não desenhar, a nota
+	// aparece assim mesmo. O quadro usa setTimeout como reserva, porque requestAnimationFrame para em aba escondida.
+	useEffect(() => {
+		if (!nota || !pagina) return;
+		let cancelado = false;
+		const inicio = performance.now();
+		const proximoQuadro = (fazer: () => void) => {
+			let feito = false;
+			const uma = () => {
+				if (feito || cancelado) return;
+				feito = true;
+				fazer();
+			};
+			requestAnimationFrame(uma);
+			setTimeout(uma, 32);
+		};
+		const conferir = () => {
+			const desenhados = [...pagina.querySelectorAll(".react-renderer")].every((elemento) => elemento.childElementCount > 0);
+			if (desenhados || performance.now() - inicio > 400) proximoQuadro(() => setPronta(true));
+			else proximoQuadro(conferir);
+		};
+		proximoQuadro(conferir);
+		return () => {
+			cancelado = true;
+		};
+	}, [nota, pagina, carga]);
+
 	useLayoutEffect(() => {
-		if (!nota || !pagina || fadeFeito.current) return;
+		if (!pronta || !pagina || fadeFeito.current) return;
 		fadeFeito.current = true;
 		if (semMovimento() || typeof pagina.animate !== "function") return;
 		pagina.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 150, easing: "ease-out" });
-	}, [nota, pagina]);
+	}, [pronta, pagina]);
 
 	// O que vale entre as respostas da extensão (refs: as respostas chegam fora do render).
 	const tituloAtual = useRef(props.titulo);
@@ -323,6 +358,8 @@ function EditorDaNota(props: PropsEditorNota) {
 	const carregar = (aberta: NotaAberta) => {
 		if (!editor) return;
 		const soLeitura = temHtmlDesconhecido(aberta.conteudo);
+		setPronta(false);
+		setCarga((atual) => atual + 1);
 		carregarNoEditor(editor, aberta.conteudo);
 		editor.setEditable(!soLeitura, false);
 		base.current = markdownDaNota(editor);
@@ -563,7 +600,7 @@ function EditorDaNota(props: PropsEditorNota) {
 			{props.abaixoDoCabecalho}
 			<div ref={setCorpo} className="editor-nota__corpo" onKeyDown={teclas}>
 				{/* A página, como no Notion: uma coluna de leitura no meio, com o título grande no topo. */}
-				<div ref={setPagina} className="editor-nota__pagina">
+				<div ref={setPagina} className={`editor-nota__pagina${pronta ? "" : " editor-nota__pagina--carregando"}`}>
 				<AlcaBlocos editor={editor} pagina={pagina} editavel={Boolean(nota) && !somenteLeitura} />
 				<textarea
 					ref={campoTitulo}

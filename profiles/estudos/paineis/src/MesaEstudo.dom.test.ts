@@ -5,7 +5,7 @@
 // sem desmontar o chat nem esvaziar a faixa, e os comandos do professor abrem a prévia sem
 // repetir os do histórico. Nada aqui toca a pasta de dados.
 
-import type { AcaoRecebida, JanelaPerfilHook, PropsConversaEmbutida } from "@estudos/ui";
+import { type AcaoRecebida, type JanelaPerfilHook, type PropsConversaEmbutida, ProvedorImagens } from "@estudos/ui";
 import { createElement, type ReactNode, useEffect, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -23,6 +23,7 @@ const NOTAS: Record<string, string> = {
 	A: "# Séries\n\nA série geométrica converge quando a razão é menor que um.\n\nOutro parágrafo qualquer.",
 	B: "# Limites\n\nO limite lateral existe quando os dois lados concordam.",
 	C: "# Derivadas\n\nA derivada é o limite da razão incremental.",
+	D: "# Diagramas\n\n> ![[viz-tokenizacao.png|650]]\n>\n> — Professor, conversa de 11/11/2026\n\nTexto depois.",
 };
 
 const esperar = (ms: number) => new Promise((resolver) => setTimeout(resolver, ms));
@@ -277,4 +278,18 @@ describe("os comandos do professor", () => {
 		await esperar(150);
 		expect(rotulosDasAbas()).toEqual(["A"]);
 	}, 10_000);
+});
+
+describe("a imagem embutida na nota (o Guardar na nota de um diagrama)", () => {
+	it("a nota mostra a imagem pela rota de imagens do perfil, com a largura do embed, e não uma menção", async () => {
+		guardarAbas([aba("D")]);
+		root.render(createElement(ProvedorImagens, { perfilId: PERFIL, children: createElement(Bancada, { inicial: rotaDa("D") }) }));
+		await ate(() => notaPronta("D"));
+		await ate(() => container.querySelector(".editor-nota__texto img[src]") !== null);
+		const imagem = container.querySelector<HTMLImageElement>(".editor-nota__texto img[src]")!;
+		expect(imagem.getAttribute("src")).toBe("/api/perfis/estudos/imagens/viz-tokenizacao.png");
+		expect(imagem.getAttribute("width")).toBe("650");
+		expect(container.querySelector(".editor-nota__texto .nota-mencao")).toBeNull();
+		expect(container.querySelector(".editor-nota__texto")?.textContent).not.toContain("[[");
+	});
 });

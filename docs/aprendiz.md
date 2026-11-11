@@ -78,3 +78,11 @@ Os tipos estão em profiles/estudos/lib/aprendiz-indicadores-tipos.ts (WP0). Doi
 - WP2, a tela: a rota aprendiz/indicadores[/<matéria>], o botão na tela de cadernos (como o da Agenda), a aba Indicadores, o cliente da ponte (aprendiz-ponte.ts) e o registro do painel "aprendiz" (foraDaArea) no index do perfil.
 - A ponte (painel "aprendiz", constante PAINEL_APRENDIZ): a tela manda `indicadores` ({}), a extensão responde com `interface:mostrar` (gravar: false) `indicadores` ({ indicadores: IndicadoresAprendiz }) ou `erro` ({ mensagem }). A extensão devolve todas as matérias; o filtro por matéria é da tela. A extensão só fala depois de session_start (regra de docs/ponte-de-eventos.md), como as outras.
 - Sem aba Hipóteses nem Histórico nesta parte: a tela mostra só Indicadores (as outras abas entram na parte B, sem botão desligado no lugar).
+- Desvios e detalhes do WP1 (2026-11-11), para a tela e a parte B saberem:
+  - Os eventos reais usam `avaliacao: "parcial"` na verificação (o contrato dizia em_parte); o código aceita os dois.
+  - A confusão já vem no `resultado.confusao` do respondeu_questao errado (diagnóstico e módulo); o código a usa primeiro e só procura no curso.json ou no módulo quando o evento não a traz. A segunda tentativa errada do quiz (`resultado.tentativa` 2) não entra no BKT, mas a sua confusão conta e o id do evento entra em `eventos` do conceito.
+  - Um conceito só autoavaliado (sem nenhuma resposta) aparece com `observacoes` 0, `sessoes` 0, `dominio` igual ao início do BKT (0,3: é só o ponto de partida, não um domínio medido) e `disse` preenchido. A tela deve tratar `observacoes === 0` como "sem dados".
+  - `nao_sabia_questao` com `resultado.tentativas` > 0 não observa de novo (a tentativa já foi uma observação).
+  - `ObservacaoConceito` ganhou o irmão `ObservacaoDoConceito` (com o campo `conceito`); o tipo original não mudou.
+  - O cache (indicadores.json) também vale só por um dia (VALIDADE_DO_CACHE_MS): o decaimento depende da data de hoje. O nome do conceito (`nome`) não vai para o cache; sai do mapa a cada resposta.
+  - Quando a tela manda `pedido` na ação, a extensão devolve o mesmo `pedido` junto de `indicadores` ou `erro` (como a agenda).

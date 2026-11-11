@@ -7,6 +7,8 @@
 import { Editor, type JSONContent } from "@tiptap/core";
 import type { Node as NoPM } from "@tiptap/pm/model";
 import { afterEach, describe, expect, it } from "vitest";
+import { formatarTrechoGuardado } from "../../lib/trecho-guardado.ts";
+import { temHtmlDesconhecido } from "../../lib/nota-tipos.ts";
 import { acrescentarMarkdown, ajudaDoBloco, carregarNoEditor, extensoesDaNota, markdownDaNota } from "./editor-nota.ts";
 
 let editor: Editor | undefined;
@@ -328,5 +330,13 @@ describe("imagem embutida ![[nome.png|650]] (o Guardar na nota de um diagrama)",
 		editor = new Editor({ extensions: extensoesDaNota(), content: "# Nota", contentType: "markdown" });
 		expect(acrescentarMarkdown(editor, "> ![[viz-a.png|650]]\n>\n> — Professor, conversa de 11/11/2026\n<!-- conversa:abc -->")).toBe(true);
 		expect(markdownDaNota(editor)).toContain("![[viz-a.png|650]]");
+	});
+});
+
+describe("o que o Guardar na nota escreve passa pelo editor sem mudar", () => {
+	it("o link da conversa volta igual e a nota não vira só leitura (nada de comentário HTML)", () => {
+		const guardado = formatarTrechoGuardado({ texto: "Um bloco com `código` e **negrito**.", em: new Date(2026, 10, 11), sessao: "019e0000-0000-7000-8000-e119b2a5aaaa" });
+		expect(temHtmlDesconhecido(guardado)).toBe(false);
+		expect(idaEVolta(guardado)).toBe(guardado);
 	});
 });

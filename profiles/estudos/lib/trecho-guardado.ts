@@ -3,12 +3,15 @@
 // formato para as notas do professor (a marca "do professor" entra lá).
 //
 // O formato: uma citação em markdown com o texto do bloco, a linha de fonte e o id curto
-// da conversa num comentário HTML, legível fora do app:
+// da conversa num link, legível fora do app:
 //
 //     > texto do bloco
 //     >
-//     > — Professor, conversa de 11/11/2026
-//     <!-- conversa:abc123 -->
+//     > — Professor, [conversa de 11/11/2026](conversa:abc123)
+//
+// O id vai num link com o esquema "conversa:" e não num comentário HTML: o editor das notas
+// descarta o comentário ao salvar e uma nota com ele abre só para leitura (temHtmlDesconhecido);
+// o link passa pelo editor sem mudar. A parte D faz o clique no link abrir a conversa.
 
 export interface EntradaTrechoGuardado {
 	/** O markdown do bloco como o professor escreveu. */
@@ -49,7 +52,6 @@ export function formatarTrechoGuardado(entrada: EntradaTrechoGuardado): string {
 	// Toda linha do bloco ganha o "> ": listas, código e fórmulas ficam legíveis dentro da citação.
 	// A linha em branco vira só ">", sem espaço sobrando no fim.
 	const citadas = linhas.map((linha) => (linha.trim() === "" ? ">" : `> ${linha}`));
-	const fonte = `> — Professor, conversa de ${dataLocal(entrada.em)}`;
-	const comentario = `<!-- conversa:${idCurtoDaConversa(entrada.sessao)} -->`;
-	return [...(citadas.length > 0 ? [...citadas, ">"] : []), fonte, comentario].join("\n");
+	const fonte = `> — Professor, [conversa de ${dataLocal(entrada.em)}](conversa:${idCurtoDaConversa(entrada.sessao)})`;
+	return [...(citadas.length > 0 ? [...citadas, ">"] : []), fonte].join("\n");
 }

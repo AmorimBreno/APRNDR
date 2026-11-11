@@ -30,7 +30,7 @@ Tenha à mão uma matéria com pelo menos uma nota, um módulo gerado (uma liç�
 ## C. Guardar na nota
 
 13. Com uma nota em foco, passe o mouse (ou use Tab) sobre um parágrafo da resposta do professor. Esperado: um botão pequeno de guardar aparece à direita do parágrafo, sem empurrar o texto.
-14. Clique nele. Esperado: o trecho entra no FIM da nota aberta como uma citação, com a linha "Professor, conversa de <data>" e um comentário `<!-- conversa:… -->`; a nota salva sozinha. Abra o arquivo da nota fora do app para conferir que o formato é legível.
+14. Clique nele. Esperado: o trecho entra no FIM da nota aberta como uma citação, com a linha "— Professor, conversa de <data>" com o link para a conversa (`conversa:<id>`); a nota salva sozinha. Abra o arquivo da nota fora do app para conferir que o formato é legível.
 15. Guarde um bloco de lista, um de código e um com fórmula. Esperado: aparecem inteiros dentro da citação, legíveis.
 16. Com uma LIÇÃO em foco, clique em guardar. Esperado: abre um seletor curto com as notas da matéria e "Nova nota…". Escolha uma nota que NÃO está aberta: o texto vai para o fim dela. Abra a nota depois e confira.
 17. Escolha "Nova nota…", dê um título e confirme. Esperado: a nota é criada e o trecho entra nela. (Ela fica sem a tag "do professor": isso é da parte D.)

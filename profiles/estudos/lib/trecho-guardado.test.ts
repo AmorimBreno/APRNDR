@@ -7,10 +7,10 @@ const SESSAO = "019a6c1e-3f2b-7d4a-9c8e-5b1f0a2d3e4c";
 const EM = new Date(2026, 10, 11, 9, 30);
 
 describe("formatarTrechoGuardado", () => {
-	it("cita o bloco em markdown com a linha de fonte e o id curto da conversa em comentário", () => {
+	it("cita o bloco em markdown com a linha de fonte e o id curto da conversa num link", () => {
 		const saida = formatarTrechoGuardado({ texto: "O limite existe quando os dois lados concordam.", em: EM, sessao: SESSAO });
 		expect(saida).toBe(
-			["> O limite existe quando os dois lados concordam.", ">", "> — Professor, conversa de 11/11/2026", `<!-- conversa:${idCurtoDaConversa(SESSAO)} -->`].join("\n"),
+			["> O limite existe quando os dois lados concordam.", ">", `> — Professor, [conversa de 11/11/2026](conversa:${idCurtoDaConversa(SESSAO)})`].join("\n"),
 		);
 	});
 
@@ -18,9 +18,9 @@ describe("formatarTrechoGuardado", () => {
 		const saida = formatarTrechoGuardado({ texto: "\n\nPrimeiro parágrafo.\nSegunda linha.\n\nOutro parágrafo.\n\n", em: EM, sessao: SESSAO });
 		const linhas = saida.split("\n");
 		expect(linhas.slice(0, 5)).toEqual(["> Primeiro parágrafo.", "> Segunda linha.", ">", "> Outro parágrafo.", ">"]);
-		expect(linhas.every((linha) => linha === ">" || linha.startsWith("> ") || linha.startsWith("<!--"))).toBe(true);
+		expect(linhas.every((linha) => linha === ">" || linha.startsWith("> "))).toBe(true);
 		expect(saida.startsWith(">")).toBe(true);
-		expect(saida.endsWith("-->")).toBe(true);
+		expect(saida.endsWith("(conversa:" + idCurtoDaConversa(SESSAO) + ")")).toBe(true);
 		expect(saida).not.toMatch(/ \n/);
 	});
 
@@ -29,7 +29,7 @@ describe("formatarTrechoGuardado", () => {
 		const saida = formatarTrechoGuardado({ texto, em: EM, sessao: SESSAO });
 		const dentro = saida
 			.split("\n")
-			.slice(0, -3)
+			.slice(0, -2)
 			.map((linha) => (linha === ">" ? "" : linha.slice(2)))
 			.join("\n");
 		// Tirando o "> " de cada linha, volta exatamente o bloco original.
@@ -45,8 +45,8 @@ describe("formatarTrechoGuardado", () => {
 	});
 
 	it("a data sai como dd/mm/aaaa, com zeros, no fuso local", () => {
-		expect(formatarTrechoGuardado({ texto: "x", em: new Date(2026, 0, 5, 23, 59), sessao: SESSAO })).toContain("> — Professor, conversa de 05/01/2026");
-		expect(formatarTrechoGuardado({ texto: "x", em: new Date(2026, 11, 31, 0, 0), sessao: SESSAO })).toContain("conversa de 31/12/2026");
+		expect(formatarTrechoGuardado({ texto: "x", em: new Date(2026, 0, 5, 23, 59), sessao: SESSAO })).toContain("> — Professor, [conversa de 05/01/2026]");
+		expect(formatarTrechoGuardado({ texto: "x", em: new Date(2026, 11, 31, 0, 0), sessao: SESSAO })).toContain("[conversa de 31/12/2026]");
 	});
 });
 

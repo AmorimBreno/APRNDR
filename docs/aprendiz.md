@@ -69,3 +69,12 @@ Cada parte tem plano e aprovação do Breno no app antes da próxima (como o ite
 - B: lib/hipoteses-tipos.ts e lib/hipoteses.ts, prompts/reflexao.md e a validação (Sonnet; o Opus revisa o prompt e a validação), extensions/aprendiz.ts (Sonnet), a tela de hipóteses (Sonnet).
 - C: lib/perfil-injetado.ts, a injeção nas chamadas e a config (Sonnet).
 - D1 e D2: planos próprios depois da C.
+
+
+## 7. Parte A: contrato entre os pacotes (2026-11-11, aprovada pelo Breno)
+
+Os tipos estão em profiles/estudos/lib/aprendiz-indicadores-tipos.ts (WP0). Dois pacotes de arquivos disjuntos, em paralelo, ambos Sonnet:
+- WP1, o cálculo e a extensão: no mesmo arquivo de tipos, as funções puras (observações dos eventos, BKT, decaimento, Brier, ganho normalizado de Hake, confusões); lib/aprendiz.ts (leitura de aprendiz/eventos.jsonl e de aprendiz/config.json, matérias que existem, nomes do mapa, as confusões lidas do curso e do módulo, e o cache em %LOCALAPPDATA%\estudos-app\aprendiz\indicadores.json, com a pasta do cache como parâmetro); extensions/aprendiz.ts (a ponte) e os testes. A extensão não grava nada na pasta de dados nesta parte.
+- WP2, a tela: a rota aprendiz/indicadores[/<matéria>], o botão na tela de cadernos (como o da Agenda), a aba Indicadores, o cliente da ponte (aprendiz-ponte.ts) e o registro do painel "aprendiz" (foraDaArea) no index do perfil.
+- A ponte (painel "aprendiz", constante PAINEL_APRENDIZ): a tela manda `indicadores` ({}), a extensão responde com `interface:mostrar` (gravar: false) `indicadores` ({ indicadores: IndicadoresAprendiz }) ou `erro` ({ mensagem }). A extensão devolve todas as matérias; o filtro por matéria é da tela. A extensão só fala depois de session_start (regra de docs/ponte-de-eventos.md), como as outras.
+- Sem aba Hipóteses nem Histórico nesta parte: a tela mostra só Indicadores (as outras abas entram na parte B, sem botão desligado no lugar).

@@ -5,6 +5,7 @@
 import type { EntradaTelaInicial, RegistroPaineis } from "@estudos/ui";
 import { ehPergunta, PainelQuiz } from "./PainelQuiz.tsx";
 import { trocaSemTransicao } from "./transicoes.ts";
+import { PAINEL_MESA } from "../../lib/mesa-tipos.ts";
 import { PAINEL_AGENDA } from "./agenda-ponte.ts";
 import { PAINEL_CADERNOS, usarAparenciaMaterias } from "./comum.ts";
 import { PAINEL_CURSOS } from "./cursos-ponte.ts";
@@ -45,6 +46,8 @@ export const paineisEstudos: RegistroPaineis = {
 	[PAINEL_MODULOS]: { componente: () => null, titulo: "Módulos", foraDaArea: true },
 	// A ponte de "Como o professor escreve" com a extensão dos módulos: as regras de escrita são do modal.
 	[PAINEL_ESCRITA]: { componente: () => null, titulo: "Regras de escrita", foraDaArea: true },
+	// Os comandos do professor para a mesa (abrir uma aba, destacar um trecho; docs/mesa-parte-c.md): nunca viram card.
+	[PAINEL_MESA]: { componente: () => null, titulo: "Mesa", foraDaArea: true },
 	// A ponte da agenda com a extensão da agenda: as tarefas são do calendário e da tela da agenda.
 	[PAINEL_AGENDA]: { componente: () => null, titulo: "Agenda", foraDaArea: true },
 	// Só pedidos: cada questão é respondida no modal, pelo botão na conversa,

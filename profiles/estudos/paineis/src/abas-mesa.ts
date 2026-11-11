@@ -6,6 +6,8 @@
 // a lição (andar de lição em lição fica na mesma aba). O caminho guarda a rota
 // de agora, para voltar à mesma lição.
 
+import { rotaDaOrigem } from "./origem-mesa.ts";
+
 export type TipoAbaMesa = "nota" | "licao";
 
 export interface AbaMesa {
@@ -28,7 +30,9 @@ export const LIMITE_ABAS_MESA = 6;
  * - caderno/<m>/notas/<título> (o título pode ter barras): nota, chave = a rota;
  * - caderno/<m>/cursos/<c>/modulos/<mód>[/<lição>]: lição, chave = a rota sem a lição.
  */
-export function abaDoCaminho(caminho: string): { tipo: TipoAbaMesa; chave: string } | undefined {
+export function abaDoCaminho(origem: string): { tipo: TipoAbaMesa; chave: string } | undefined {
+	// A âncora de uma origem (depois do "?", origem-mesa.ts) não faz parte da chave da aba.
+	const caminho = rotaDaOrigem(origem);
 	const partes = caminho.split("/");
 	if (partes[0] !== "caderno" || !partes[1]) return undefined;
 	if (partes[2] === "notas" && partes.length > 3 && partes.slice(3).every(Boolean)) return { tipo: "nota", chave: caminho };

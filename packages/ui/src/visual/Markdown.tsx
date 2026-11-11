@@ -177,7 +177,23 @@ function criarComponentes(emLinha: boolean, ligacoes: LigacoesMarkdown): Compone
  * está chegando (ou chegou nesta janela), e as palavras novas aparecem uma a
  * uma com fade. Fica ligado depois do fim, para as últimas terminarem de aparecer.
  */
-export function Markdown({ texto, emLinha = false, aparecendo = false, ligacoes }: { texto: string; emLinha?: boolean; aparecendo?: boolean; ligacoes?: LigacoesMarkdown }) {
+export function Markdown({
+	texto,
+	emLinha = false,
+	aparecendo = false,
+	ligacoes,
+}: {
+	texto: string;
+	emLinha?: boolean;
+	aparecendo?: boolean;
+	ligacoes?: LigacoesMarkdown;
+	/**
+	 * Ações por bloco de primeiro nível (parágrafo, lista, tabela, código, fórmula,
+	 * citação): desenhadas à direita do bloco, com a fonte original dele (pelas posições
+	 * do nó sobre `texto`). Contrato do WP0 (docs/mesa-parte-c.md, seção 5); o WP3 liga.
+	 */
+	acoesDoBloco?(fonte: string, indice: number): ReactNode;
+}) {
 	const herdadas = useContext(ContextoLigacoes);
 	const registradas = ligacoes ?? herdadas;
 	const componentes = useMemo(() => criarComponentes(emLinha, registradas), [emLinha, registradas]);

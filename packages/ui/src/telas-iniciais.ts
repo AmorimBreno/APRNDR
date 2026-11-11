@@ -5,6 +5,7 @@
 
 import type { ContextoTela } from "@estudos/core/protocolo";
 import type { ComponentType, ReactNode } from "react";
+import type { ItemConversa } from "./estado-janela.ts";
 import type { JanelaPerfilHook } from "./use-janela-perfil.ts";
 import type { ResumoPerfil } from "./use-perfis.ts";
 
@@ -29,6 +30,10 @@ export interface PropsTelaInicial {
 	conversa?: ComponentType<PropsConversaEmbutida>;
 }
 
+/** Um item de resposta e um de mensagem do usuário da conversa. */
+export type ItemAssistenteConversa = Extract<ItemConversa, { tipo: "assistente" }>;
+export type ItemUsuarioConversa = Extract<ItemConversa, { tipo: "usuario" }>;
+
 /** O que a tela inicial passa à conversa embutida. */
 export interface PropsConversaEmbutida {
 	/** A janela que a tela inicial já usa (um useJanelaPerfil só: abrir de novo duplicaria o perfil). */
@@ -50,6 +55,19 @@ export interface PropsConversaEmbutida {
 	 * fileira da pill da citação (na mesa: a aba ativa com o olho). Ausente = só a citação.
 	 */
 	acimaDoCampo?: ReactNode;
+	/**
+	 * Desenhado pelo perfil logo depois de cada resposta pronta (nunca com a resposta
+	 * em andamento). `perguntaAnterior` é a mensagem do usuário que abriu o turno, com
+	 * os contextosTela. Só o último item de assistente do turno pede o rodapé; quem
+	 * decide é o perfil. Na mesa: "Ir ao trecho". Ausente = nada (docs/mesa-parte-c.md, seção 5).
+	 */
+	rodapeDaResposta?(resposta: ItemAssistenteConversa, perguntaAnterior?: ItemUsuarioConversa): ReactNode;
+	/**
+	 * Ações por bloco de primeiro nível da resposta (parágrafo, lista, tabela, código,
+	 * fórmula, citação), desenhadas à direita do bloco, com o mouse ou o foco. `fonte` é
+	 * o markdown original do bloco, pelas posições do nó. Na mesa: "Guardar na nota".
+	 */
+	acoesDoBloco?(fonte: string, indice: number, resposta: ItemAssistenteConversa): ReactNode;
 	/** O texto de exemplo do campo ("Pergunte sobre Árvores de Decisão…"); sem ele, o padrão da conversa. */
 	placeholder?: string;
 	/** Avisa se há pedido esperando resposta, para a tela mostrar isso com a conversa fechada (a foto pulsa). */

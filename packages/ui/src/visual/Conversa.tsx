@@ -358,6 +358,13 @@ export interface PropsDocumentoConversa {
 	voo?: Voo;
 	/** O voo pousou (ou não tinha para onde ir). */
 	aoPousar?(): void;
+	/**
+	 * Depois de cada resposta pronta (nunca em andamento): o rodapé do perfil, com a
+	 * mensagem do usuário que abriu o turno (docs/mesa-parte-c.md, seção 5). O desenho é do WP3.
+	 */
+	rodapeDaResposta?(resposta: ItemAssistente, perguntaAnterior?: Extract<ItemConversa, { tipo: "usuario" }>): ReactNode;
+	/** Ações por bloco de primeiro nível do markdown da resposta, com a fonte do bloco. O desenho é do WP3. */
+	acoesDoBloco?(fonte: string, indice: number, resposta: ItemAssistente): ReactNode;
 }
 
 /** A sua mensagem: a nota creme com a sua foto. Se ela acabou de ser enviada, o voo pousa nela. */

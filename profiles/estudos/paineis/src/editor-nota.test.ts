@@ -7,7 +7,7 @@
 import { Editor, type JSONContent } from "@tiptap/core";
 import type { Node as NoPM } from "@tiptap/pm/model";
 import { afterEach, describe, expect, it } from "vitest";
-import { ajudaDoBloco, carregarNoEditor, extensoesDaNota, markdownDaNota } from "./editor-nota.ts";
+import { acrescentarMarkdown, ajudaDoBloco, carregarNoEditor, extensoesDaNota, markdownDaNota } from "./editor-nota.ts";
 
 let editor: Editor | undefined;
 
@@ -263,5 +263,31 @@ describe("texto digitado ao pé da letra", () => {
 	});
 	it("só escapa o necessário", () => {
 		expect(textoDeVolta("\\alpha, snake_case, 2 * 3, a < b & c").markdown).toBe("\\alpha, snake_case, 2 * 3, a < b & c");
+	});
+});
+
+describe("itálico e código juntos (o Guardar na nota)", () => {
+	// O parser do markdown junta as duas marcas em *texto `código`*; o ProseMirror recusa
+	// ("Invalid collection of marks for node text: code,italic"), então só a de código fica.
+	const bloco = "> uma célula *do arquivo `.ipynb`, célula 13* e mais";
+
+	it("acrescentarMarkdown não lança e mantém o código", () => {
+		editor = new Editor({ extensions: extensoesDaNota(), content: "# Nota", contentType: "markdown" });
+		expect(() => acrescentarMarkdown(editor!, bloco)).not.toThrow();
+		const texto = markdownDaNota(editor);
+		expect(texto).toContain("`.ipynb`");
+		expect(texto).toContain("célula 13");
+	});
+
+	it("carregarNoEditor abre um arquivo que já tem a mistura", () => {
+		editor = new Editor({ extensions: extensoesDaNota(), content: "", contentType: "markdown" });
+		expect(() => carregarNoEditor(editor!, `# Nota\n\n${bloco}`)).not.toThrow();
+		expect(markdownDaNota(editor)).toContain("`.ipynb`");
+	});
+
+	it("o texto que não mistura as marcas fica como está", () => {
+		editor = new Editor({ extensions: extensoesDaNota(), content: "", contentType: "markdown" });
+		carregarNoEditor(editor, "Com **negrito**, *itálico* e `código`.");
+		expect(markdownDaNota(editor)).toBe("Com **negrito**, *itálico* e `código`.");
 	});
 });

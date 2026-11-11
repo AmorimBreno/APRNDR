@@ -11,7 +11,7 @@
 // entende; uma nota com ele abre só para leitura (temHtmlDesconhecido, em
 // lib/nota-tipos.ts).
 
-import { type AnyExtension, type Editor, Extension } from "@tiptap/core";
+import { type AnyExtension, type Editor, Extension, type JSONContent } from "@tiptap/core";
 import { TaskItem, TaskList } from "@tiptap/extension-list";
 import { Markdown } from "@tiptap/markdown";
 import type { Node as NoPM } from "@tiptap/pm/model";
@@ -190,7 +190,24 @@ export function markdownDaNota(editor: Editor): string {
  */
 export function acrescentarMarkdown(editor: Editor, markdown: string): boolean {
 	if (editor.isDestroyed || !markdown.trim()) return false;
-	return editor.commands.insertContentAt(editor.state.doc.content.size, markdown, { contentType: "markdown", updateSelection: false } as Parameters<Editor["commands"]["insertContentAt"]>[2]);
+	// O markdown vira JSON (e perde as marcas que o esquema não aceita) antes de entrar: um *`código`* sairia do
+	// parser como texto em itálico e em código ao mesmo tempo, e o ProseMirror recusa isso ("Invalid collection of marks").
+	return editor.commands.insertContentAt(editor.state.doc.content.size, jsonDoMarkdown(editor, markdown), { updateSelection: false });
+}
+
+/**
+ * Lê o markdown com o parser do editor e conserta o que o esquema do ProseMirror não aceita: a marca de código
+ * exclui todas as outras (negrito, itálico, tachado, link…), e o markdown pode juntá-las (`*texto `código`*`). Em
+ * texto com código, só a marca de código fica.
+ */
+export function jsonDoMarkdown(editor: Editor, markdown: string): JSONContent {
+	return semMarcasConflitantes(editor.markdown?.parse(markdown) ?? { type: "doc", content: [] });
+}
+
+function semMarcasConflitantes(no: JSONContent): JSONContent {
+	const marcas = no.marks;
+	const conserto: JSONContent = marcas?.some((marca) => marca.type === "code") && marcas.length > 1 ? { ...no, marks: marcas.filter((marca) => marca.type === "code") } : no;
+	return conserto.content ? { ...conserto, content: conserto.content.map(semMarcasConflitantes) } : conserto;
 }
 
 /**
@@ -206,6 +223,8 @@ export function carregarNoEditor(editor: Editor, markdown: string): void {
 			tr.setMeta("addToHistory", false);
 			return true;
 		})
-		.setContent(markdown, { contentType: "markdown", emitUpdate: false })
+		// Pelo JSON, com as marcas conflitantes consertadas: uma nota que o "Guardar na nota" escreveu no arquivo
+		// pode ter *`código`* (itálico e código juntos), que o ProseMirror recusaria ao abrir.
+		.setContent(jsonDoMarkdown(editor, markdown), { emitUpdate: false })
 		.run();
 }

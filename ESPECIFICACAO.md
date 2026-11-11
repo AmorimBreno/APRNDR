@@ -416,3 +416,5 @@ Depois, anotado e fora da primeira entrega:
 - Relacionados (a lição, o slide e a nota do mesmo conceito, pelas menções e pelo mapa), a paleta Ctrl+K, o fechamento da sessão (um resumo do que foi visto e das dúvidas abertas, sem placar) e a revisão espaçada como opção discreta no caderno, sem fila diária.
 
 Risco técnico. Hoje cada janela de perfil tem uma sessão só, e trocar de sessão zera as ações da ponte (TelaCaderno.tsx). Na mesa, a sessão é a conversa da matéria, e as abas da esquerda precisam pedir os dados de novo depois de cada troca (Nova, reabrir uma antiga).
+
+Reduzido em 2026-11-11 (o Breno: "é demais"). Do bloco "O professor e as notas" ficam só a criação de notas pelo professor (com a marca "do professor" na primeira linha, o link da conversa e o cartão com Abrir e Desfazer) e o "Guardar na nota" das respostas (já implementado). As sugestões nas notas do Breno e os atalhos do pé do chat saíram; nas notas do Breno o professor continua só lendo. O contrato está em docs/mesa-parte-d.md.

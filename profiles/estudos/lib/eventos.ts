@@ -100,7 +100,18 @@ export type VerboEvento =
 	| "escreveu_entendimento"
 	| "respondeu_questao"
 	| "respondeu_dissertativa"
-	| "marcou_confianca";
+	| "marcou_confianca"
+	// As hipóteses do perfil do aprendiz (item 9, parte B; docs/aprendiz.md, seção 8). Todos vão para o
+	// aprendiz/eventos.jsonl e nenhum observa (não entram no BKT); objeto { hipotese, materia?, conceitos? }.
+	| "refletiu"
+	| "propos_hipotese"
+	| "propos_mudanca_hipotese"
+	| "aprovou_hipotese"
+	| "rejeitou_hipotese"
+	| "aprovou_mudanca_hipotese"
+	| "rejeitou_mudanca_hipotese"
+	| "editou_hipotese"
+	| "expirou_hipotese";
 
 /** Um evento no formato da seção 9.2 (inspirado no xAPI). */
 export interface Evento {

@@ -182,6 +182,18 @@ describe("notas", () => {
 		await salvarNota(dados, materia, "Nova", "# Nova\n\nconteúdo", { versao: versaoDe("") });
 		const { notas } = await listarNotas(dados, materia);
 		expect(notas.map((nota) => nota.titulo)).toEqual(["Nova", "Velha"]);
-		expect(notas[0]).toMatchObject({ previa: "Nova conteúdo", tamanho: Buffer.byteLength("# Nova\n\nconteúdo\n") });
+		expect(notas[0]).toMatchObject({ previa: "Nova conteúdo", tamanho: Buffer.byteLength("# Nova\n\nconteúdo\n"), doProfessor: false });
+	});
+
+	it("a lista marca doProfessor lendo o arquivo, e a prévia da nota do professor começa depois da marca", async () => {
+		await criarNota(dados, materia, "Do professor");
+		await criarNota(dados, materia, "Do Breno");
+		const marca = "Nota do professor · [conversa de 11/11/2026](conversa:abc12345)";
+		await writeFile(arquivoNota(dados, materia, "Do professor"), `${marca}\n\n# Resumo\n\ntexto\n`, "utf8");
+		await writeFile(arquivoNota(dados, materia, "Do Breno"), `# Meu\n\n${marca} escrito por mim, no meio\n`, "utf8");
+		const { notas } = await listarNotas(dados, materia);
+		const porTitulo = Object.fromEntries(notas.map((nota) => [nota.titulo, nota]));
+		expect(porTitulo["Do professor"]).toMatchObject({ doProfessor: true, previa: "Resumo texto" });
+		expect(porTitulo["Do Breno"]!.doProfessor).toBe(false);
 	});
 });

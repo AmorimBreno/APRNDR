@@ -129,3 +129,16 @@ As cores são `tijolo`, `ambar`, `musgo`, `aco` e `salvia`. A cor do texto é `<
 - Use as linhas em branco dentro dos blocos como nos exemplos.
 - Blocos podem ficar uns dentro dos outros (uma caixa com uma fórmula, um recolhível dentro de uma caixa).
 - Fora desta lista, não use HTML: a nota passa a abrir só para leitura no app.
+
+
+## Nota do professor
+
+Quando o professor cria uma nota (a ferramenta `criar_nota`, na conversa de uma matéria), a primeira linha do arquivo é a marca, com o link da conversa em que ela nasceu, e uma linha em branco vem antes do conteúdo:
+
+```
+Nota do professor · [conversa de 11/11/2026](conversa:abc12345)
+
+# Conteúdo da nota
+```
+
+É o mesmo link `conversa:<id curto>` do "Guardar na nota" (o id vem de `idCurtoDaConversa`, em lib/trecho-guardado.ts). Uma nota é "do professor" (`ehNotaDoProfessor`, em lib/nota-tipos.ts) quando a primeira linha não vazia começa com `Nota do professor · ` e traz um link `conversa:`. A lista de notas mostra a tag "do professor" nela e a prévia começa depois da marca. Se o Breno apagar a linha, a nota passa a ser dele: a tag some e o Desfazer do cartão não a apaga mais (o arquivo deixa de ser igual ao que o professor gravou). O resto do arquivo segue o formato acima.

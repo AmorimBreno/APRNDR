@@ -23,6 +23,11 @@ export type VerboEvento =
 	// Mesa de estudo, parte C1 (docs/mesa-parte-c.md, seção 5): o Breno clicou em "Guardar na nota"
 	// num bloco da resposta do professor. objeto: { materia, titulo, sessao, tamanho }.
 	| "guardou_na_nota"
+	// Mesa de estudo, parte D (docs/mesa-parte-d.md, seção 1): o professor criou uma nota com criar_nota
+	// (objeto: { materia, titulo, tamanho, hash }, hash = sha256 do arquivo como foi gravado) e o Breno
+	// apagou essa nota no Desfazer do cartão, com o arquivo ainda igual ao hash (objeto: { materia, titulo }).
+	| "criou_nota_do_professor"
+	| "desfez_nota_do_professor"
 	// Mapa de conteúdo (item 4.4): docs/mapa-conteudo.md, "Eventos".
 	| "mapeou_material"
 	| "atualizou_mapa"

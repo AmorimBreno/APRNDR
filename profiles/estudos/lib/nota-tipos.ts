@@ -9,8 +9,10 @@ export interface ResumoNota {
 	modificadaEm: string;
 	/** Bytes do arquivo. */
 	tamanho: number;
-	/** O começo do texto, sem a marcação do markdown. */
+	/** O começo do texto, sem a marcação do markdown (e sem a linha da marca "do professor"). */
 	previa: string;
+	/** A primeira linha é a marca de uma nota criada pelo professor (ehNotaDoProfessor). */
+	doProfessor: boolean;
 }
 
 export interface ListaNotas {
@@ -113,9 +115,34 @@ export function temHtmlDesconhecido(markdown: string): boolean {
 	return false;
 }
 
-/** O começo do texto sem a marcação do markdown, para a lista de notas. */
+/** O começo da marca "do professor", a primeira linha da nota (docs/notas-formato.md, "Nota do professor"). */
+export const INICIO_MARCA_PROFESSOR = "Nota do professor · ";
+
+/** Um link com o esquema conversa: (o do Guardar na nota e o da marca). */
+const LINK_CONVERSA = /\]\(conversa:[^)\s]+\)/;
+
+/** Separa a primeira linha não vazia do resto; undefined se o markdown é só espaço. */
+function primeiraLinha(markdown: string): { linha: string; resto: string } | undefined {
+	const semBom = markdown.charCodeAt(0) === 0xfeff ? markdown.slice(1) : markdown;
+	const achado = /^(?:[ \t]*\r?\n)*([^\r\n]*)(?:\r?\n)?/.exec(semBom);
+	if (!achado || achado[1]!.trim() === "") return undefined;
+	return { linha: achado[1]!, resto: semBom.slice(achado[0].length) };
+}
+
+/**
+ * A nota foi criada pelo professor: a primeira linha não vazia começa com
+ * "Nota do professor · " e traz um link conversa:<id>. Se o Breno apaga a
+ * linha, a nota deixa de ser "do professor" (passa a ser dele).
+ */
+export function ehNotaDoProfessor(markdown: string): boolean {
+	const primeira = primeiraLinha(markdown);
+	return primeira !== undefined && primeira.linha.startsWith(INICIO_MARCA_PROFESSOR) && LINK_CONVERSA.test(primeira.linha);
+}
+
+/** O começo do texto sem a marcação do markdown, para a lista de notas. A linha da marca "do professor" não entra. */
 export function previaDaNota(markdown: string, tamanho = 140): string {
-	const texto = markdown
+	const semMarca = ehNotaDoProfessor(markdown) ? (primeiraLinha(markdown)?.resto ?? "") : markdown;
+	const texto = semMarca
 		.replace(/^ {0,3}(`{3,}|~{3,}).*$/gm, "")
 		.replace(/^\s{0,3}(#{1,6}\s+|>\s?|[-*+]\s+(\[[ xX]\]\s+)?|\d+[.)]\s+)/gm, "")
 		.replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")

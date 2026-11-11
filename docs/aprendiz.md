@@ -86,3 +86,22 @@ Os tipos estão em profiles/estudos/lib/aprendiz-indicadores-tipos.ts (WP0). Doi
   - `ObservacaoConceito` ganhou o irmão `ObservacaoDoConceito` (com o campo `conceito`); o tipo original não mudou.
   - O cache (indicadores.json) também vale só por um dia (VALIDADE_DO_CACHE_MS): o decaimento depende da data de hoje. O nome do conceito (`nome`) não vai para o cache; sai do mapa a cada resposta.
   - Quando a tela manda `pedido` na ação, a extensão devolve o mesmo `pedido` junto de `indicadores` ou `erro` (como a agenda).
+
+
+## 8. Parte B: contrato entre os pacotes (2026-11-11, aprovada pelo Breno)
+
+Os tipos e a forma da ponte estão em profiles/estudos/lib/hipoteses-tipos.ts (WP0). Ordem: WP1 e WP3 em paralelo (WP3 só precisa dos tipos e da forma da ponte), depois o WP2 (que usa o que o WP1 entrega). Todos Sonnet; o Opus só revisa o prompt e a validação, com o ok do Breno, no fim.
+
+Regras do código (valem nos pacotes):
+- Confiança (`confiancaDe(aFavor, eventos)`, do código): baixa com menos de 3 eventos a favor ou eventos de uma sessão só; média com 3 ou mais eventos em 2 ou mais sessões; alta com 5 ou mais eventos em 3 ou mais sessões. Evidências contra recentes (últimos 60 dias) que superam as a favor recentes tiram a hipótese de aprovada e a devolvem a "proposta" (com a mudança pendente explicando), nunca em silêncio.
+- Validade: 60 dias a partir da última confirmação (cada reforço aprovado confirma). Uma hipótese vencida vira "expirada" quando a reflexão ou uma decisão roda (evento `expirou_hipotese`); ler não grava.
+- Proposta de CRIAR (validação do código sobre a saída do modelo): enunciado de 12 a 300 caracteres, sem os rótulos e elogios proibidos ("aprendiz visual", "auditivo", "estilo de aprendizagem", "excelente aluno", "muito bom"…); tipo e escopo válidos; pelo menos 2 ids de evento que EXISTEM no eventos.jsonl e estavam na janela lida, de pelo menos 2 sessões diferentes (um sinal isolado é evidência fraca); não repetir (comparação por texto normalizado) uma hipótese que já existe, nem rejeitada. Escopo de conceito/matéria precisa de ids que existam (mapa e matérias existentes). Sem evidência válida, é descartada e contada em `descartadas`.
+- Propostas de REFORÇAR e ENFRAQUECER: a hipótese existe e não está rejeitada; as evidências são ids existentes que a hipótese ainda não cita (a lista pode encolher; sobrando nenhuma, descarta); viram uma MudancaPendente. EXPIRAR: só de hipótese aprovada ou proposta, com o motivo; vira MudancaPendente.
+- O que vira estado sem a aprovação: uma criação vira hipótese com status "proposta" (aprovada: false); o resto são mudanças pendentes. Nada vira "aprovada" nem muda uma aprovada sem uma decisão do Breno (`decidir`). Rejeitada fica no arquivo (status "rejeitada") e entra na entrada da reflexão como "não repetir".
+- Todas as gravações do hipoteses.json passam por UMA fila na extensão (como as regras de escrita), por gravação segura de lib/arquivos.ts.
+- Eventos (aprendiz/eventos.jsonl, só de acréscimo, com a sessão): `refletiu` (o ResumoDaReflexao), `propos_hipotese`, `propos_mudanca_hipotese`, `aprovou_hipotese`, `rejeitou_hipotese`, `aprovou_mudanca_hipotese`, `rejeitou_mudanca_hipotese`, `editou_hipotese` (resultado: o que mudou), `expirou_hipotese`; cada um leva o id da hipótese e as evidências. Nenhum deles é um verbo que observa (não entra no BKT).
+
+Pacotes:
+- WP1 (lib): as funções puras de hipoteses-tipos.ts (confiancaDe, validarProposta, aplicar de uma proposta aceita, decidir, editar, expirar, conflito) e o disco em lib/hipoteses.ts (ler o arquivo; as operações que o WP2 usa: registrar uma reflexão, decidir, editar; os eventos), com os testes.
+- WP2 (reflexão e extensão), depois do WP1: prompts/reflexao.md; lib/reflexao.ts (montar a entrada: os eventos novos com a autoavaliação rotulada "o aluno disse", as hipóteses atuais, os indicadores da parte A e os nomes dos conceitos, com limite de tamanho; ler a saída do modelo; aplicar a validação); a extensão aprendiz.ts (a ponte da seção acima, a fila única de escrita, a trava de uma reflexão por vez, a chamada ao modelo pelo ctx.modelRegistry como a extensão do mapa, os gatilhos, a ferramenta `ler_perfil_aprendiz` só de leitura); extensions/modulos.ts só para emitir `pi.events.emit("aprendiz:gatilho", { motivo })` ao gravar `avaliou_licao` e `concluiu_modulo`.
+- WP3 (tela), em paralelo com o WP1: as abas Hipóteses e Histórico na TelaAprendiz, o botão Refletir, aprovar, editar e rejeitar, as evidências ligadas ao Histórico, o cliente da ponte.

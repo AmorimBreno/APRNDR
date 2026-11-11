@@ -9,6 +9,7 @@
 // "caderno/<matéria>/cursos/<curso>/modulos/<módulo>[/<lição>]" = a visão do
 // módulo gerado, com a CourseBar no lugar da aba do caderno.
 // "agenda/<aba>[/<matéria>]" = a tela da agenda (calendario, tarefas ou quadro), filtrada pela matéria.
+// "aprendiz/<aba>[/<matéria>]" = a tela "Perfil do aprendiz" (hoje só a aba indicadores), filtrada pela matéria.
 // Um caminho desconhecido cai nos cadernos.
 //
 // Também é ela quem troca a sessão da janela para a conversa da matéria ao
@@ -20,11 +21,13 @@ import { type PropsTelaInicial, useJanelaPerfil } from "@estudos/ui";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Materia } from "../../lib/materia-tipos.ts";
 import { abaDaRota } from "./agenda-tela.ts";
+import { abaDaRotaAprendiz } from "./aprendiz-tela.ts";
 import { contextoDaMateria, lerAcoes, PAINEL_CADERNOS, prepararConversa } from "./comum.ts";
 import { gravarCaminho, gravarSessao, lerMemoria } from "./memoria-mesa.ts";
 import { rotaDoModulo } from "./modulo-tela.ts";
 import { chaveDaMateria, decidirSessao, type SituacaoMesa } from "./sessao-materia.ts";
 import { TelaAgenda } from "./TelaAgenda.tsx";
+import { TelaAprendiz } from "./TelaAprendiz.tsx";
 import { TelaCaderno } from "./TelaCaderno.tsx";
 import { TelaCadernos } from "./TelaCadernos.tsx";
 import { type SituacaoTroca, TrocaSessaoContexto } from "./troca-sessao.tsx";
@@ -81,8 +84,10 @@ export function TelaEstudos(props: PropsTelaInicial) {
 	const materia = materiaAtiva ? (lidas.lista ? lidas.lista.materias.find((item) => item.id === materiaAtiva) : conhecidas.current.get(materiaAtiva)) : undefined;
 	useEffect(() => {
 		// A TelaCaderno também pede; aqui é para a troca não depender de quem montou primeiro.
-		if (sessaoId && materiaAtiva && !materia && !lidas.lista) acoes.acaoDaInterface(PAINEL_CADERNOS, "listar").catch(() => {});
-	}, [sessaoId, materiaAtiva, materia, lidas.lista, acoes]);
+		// A tela do aprendiz precisa dos nomes das matérias (o filtro e as linhas) e não tem outra fonte.
+		const querLista = tipo === "aprendiz" || Boolean(materiaAtiva && !materia);
+		if (sessaoId && querLista && !lidas.lista) acoes.acaoDaInterface(PAINEL_CADERNOS, "listar").catch(() => {});
+	}, [sessaoId, tipo, materiaAtiva, materia, lidas.lista, acoes]);
 
 	// Carregando: sem conexão, a janela montando a sessão, ou a troca desta tela. O núcleo tem fila própria, então
 	// "executando" tem um respiro entre uma mensagem e a próxima: a fila não vazia também conta como respondendo.
@@ -197,8 +202,12 @@ export function TelaEstudos(props: PropsTelaInicial) {
 	const troca = useMemo(() => ({ situacao, voltarParaMateria, registrarAntesDeTrocar, executarAntesDeTrocar }), [situacao, voltarParaMateria, registrarAntesDeTrocar, executarAntesDeTrocar]);
 
 	// "agenda/<aba>[/<matéria>]": o segundo pedaço é a aba e o terceiro, a matéria do filtro.
+	// "aprendiz/<aba>[/<matéria>]": igual, e as matérias que a tela já conhece dão os nomes do filtro.
+	const materiasDoAprendiz = tipo === "aprendiz" ? (lidas.lista ? lidas.lista.materias : [...conhecidas.current.values()]) : [];
 	const tela =
-		tipo === "agenda" ? (
+		tipo === "aprendiz" ? (
+			<TelaAprendiz {...props} janela={janela} aba={abaDaRotaAprendiz(materiaId)} materias={materiasDoAprendiz} {...(secao ? { materia: secao } : {})} />
+		) : tipo === "agenda" ? (
 			<TelaAgenda {...props} janela={janela} aba={abaDaRota(materiaId)} {...(secao ? { materia: secao } : {})} />
 		) : noCaderno && materiaId ? (
 			<TelaCaderno {...props} janela={janela} materiaId={materiaId} {...(secao ? { secao } : {})} {...(nota ? { nota } : {})} {...(material ? { material } : {})} {...(guia ? { guia } : {})} {...(cursoPronto ? { curso: cursoPronto } : {})} {...(modulo ? { modulo } : {})} />

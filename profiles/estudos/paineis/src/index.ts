@@ -7,6 +7,8 @@ import { ehPergunta, PainelQuiz } from "./PainelQuiz.tsx";
 import { trocaSemTransicao } from "./transicoes.ts";
 import { PAINEL_MESA } from "../../lib/mesa-tipos.ts";
 import { PAINEL_AGENDA } from "./agenda-ponte.ts";
+import { PAINEL_APRENDIZ } from "./aprendiz-ponte.ts";
+import { ehRotaDoAprendiz } from "./aprendiz-tela.ts";
 import { PAINEL_CADERNOS, usarAparenciaMaterias } from "./comum.ts";
 import { PAINEL_CURSOS } from "./cursos-ponte.ts";
 import { PAINEL_ESCRITA } from "./escrita-ponte.ts";
@@ -24,10 +26,10 @@ export { TelaEstudos } from "./TelaEstudos.tsx";
 export const telaInicialEstudos: EntradaTelaInicial = {
 	componente: TelaEstudos,
 	rotuloVoltar: "Cadernos",
-	rotuloDoCaminho: (caminho) => (caminho.startsWith("caderno/") ? "Caderno" : caminho.startsWith("agenda") ? "Agenda" : undefined),
+	rotuloDoCaminho: (caminho) => (caminho.startsWith("caderno/") ? "Caderno" : caminho.startsWith("agenda") ? "Agenda" : ehRotaDoAprendiz(caminho) ? "Aprendiz" : undefined),
 	// O nome e a cor de agora de cada matéria, para a pílula do histórico da conversa.
 	usarAparenciaContextos: usarAparenciaMaterias,
-	// Trocas dentro do mesmo lugar (tags do caderno, abas da mesa, abas da agenda) não animam a página inteira:
+	// Trocas dentro do mesmo lugar (tags do caderno, abas da mesa, abas da agenda, abas e filtro do aprendiz) não animam a página inteira:
 	// só a parte que muda é refeita (transicoes.ts).
 	semTransicao: trocaSemTransicao,
 };
@@ -50,6 +52,8 @@ export const paineisEstudos: RegistroPaineis = {
 	[PAINEL_MESA]: { componente: () => null, titulo: "Mesa", foraDaArea: true },
 	// A ponte da agenda com a extensão da agenda: as tarefas são do calendário e da tela da agenda.
 	[PAINEL_AGENDA]: { componente: () => null, titulo: "Agenda", foraDaArea: true },
+	// A ponte da tela "Perfil do aprendiz" com a extensão do aprendiz: os indicadores são da tela, não viram card.
+	[PAINEL_APRENDIZ]: { componente: () => null, titulo: "Aprendiz", foraDaArea: true },
 	// Só pedidos: cada questão é respondida no modal, pelo botão na conversa,
 	// e o modal continua aberto depois de conferir, com o retorno.
 	quiz: {

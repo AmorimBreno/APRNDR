@@ -17,6 +17,7 @@ import { continuarDeOndeParei, lerMemoria } from "./memoria-mesa.ts";
 import { dataCurta, lerAcoes, PAINEL_CADERNOS, prepararConversa, proximaProva, quando, rotuloCapa } from "./comum.ts";
 import { useAjustes } from "./ajustes-ponte.ts";
 import { useEscrita } from "./escrita-ponte.ts";
+import { rotaDoAprendiz, TITULO_APRENDIZ } from "./aprendiz-tela.ts";
 import { TITULO_ESCRITA } from "./escrita-tela.ts";
 import { ModalEscrita } from "./ModalEscrita.tsx";
 import { ModalMateria } from "./ModalMateria.tsx";
@@ -205,6 +206,10 @@ export function TelaCadernos(props: PropsTelaCadernos) {
 						<button type="button" className="tecla-papel button" title={TITULO_ESCRITA} onClick={() => setVendoEscrita(true)}>
 							<Icon name="book" size={18} strokeWidth={2.25} />
 							Escrita
+						</button>
+						<button type="button" className="tecla-papel button" title={TITULO_APRENDIZ} onClick={() => sairE(() => props.navegar(rotaDoAprendiz()))()}>
+							<Icon name="chart" size={18} strokeWidth={2.25} />
+							Perfil do aprendiz
 						</button>
 						{continuar ? (
 							<button

@@ -19,6 +19,15 @@ describe("trocaSemTransicao", () => {
 		expect(trocaSemTransicao("agenda/tarefas", "agenda/tarefas/calc")).toBe(true);
 	});
 
+	it("a aba e o filtro de matéria do aprendiz não animam; entrar e sair dele anima", () => {
+		expect(trocaSemTransicao("aprendiz/indicadores", "aprendiz/indicadores/calc")).toBe(true);
+		expect(trocaSemTransicao("aprendiz/indicadores/calc", "aprendiz/indicadores/fisica")).toBe(true);
+		expect(trocaSemTransicao("aprendiz/indicadores/calc", "aprendiz/indicadores")).toBe(true);
+		expect(trocaSemTransicao("", "aprendiz/indicadores")).toBe(false);
+		expect(trocaSemTransicao("aprendiz/indicadores", "")).toBe(false);
+		expect(trocaSemTransicao("aprendiz/indicadores", "agenda/calendario")).toBe(false);
+	});
+
 	it("o resto anima como antes", () => {
 		expect(trocaSemTransicao("", "caderno/calc")).toBe(false);
 		expect(trocaSemTransicao("caderno/calc/notas", "caderno/fisica/notas")).toBe(false);

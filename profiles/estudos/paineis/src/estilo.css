@@ -1958,3 +1958,94 @@ button.cal-etq:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .painel-caderno::-webkit-scrollbar-track, .painel-caderno__fixo::-webkit-scrollbar-track, .painel-caderno__rolagem::-webkit-scrollbar-track, .faixa-cursos__trilho::-webkit-scrollbar-track, .tarefas-cad__corpo::-webkit-scrollbar-track, .agenda__corpo::-webkit-scrollbar-track, .cal-cheio__lateral::-webkit-scrollbar-track, .cal-cheio__grade--semana .cal-cheio__etiquetas::-webkit-scrollbar-track, .quadro::-webkit-scrollbar-track, .menu-barra__lista::-webkit-scrollbar-track { background: transparent; }
 .painel-caderno::-webkit-scrollbar-thumb, .painel-caderno__fixo::-webkit-scrollbar-thumb, .painel-caderno__rolagem::-webkit-scrollbar-thumb, .faixa-cursos__trilho::-webkit-scrollbar-thumb, .tarefas-cad__corpo::-webkit-scrollbar-thumb, .agenda__corpo::-webkit-scrollbar-thumb, .cal-cheio__lateral::-webkit-scrollbar-thumb, .cal-cheio__grade--semana .cal-cheio__etiquetas::-webkit-scrollbar-thumb, .quadro::-webkit-scrollbar-thumb, .menu-barra__lista::-webkit-scrollbar-thumb { border-radius: var(--radius-full); background: var(--line); }
 .painel-caderno:hover::-webkit-scrollbar-thumb, .painel-caderno__fixo:hover::-webkit-scrollbar-thumb, .painel-caderno__rolagem:hover::-webkit-scrollbar-thumb, .faixa-cursos__trilho:hover::-webkit-scrollbar-thumb, .tarefas-cad__corpo:hover::-webkit-scrollbar-thumb, .agenda__corpo:hover::-webkit-scrollbar-thumb, .cal-cheio__lateral:hover::-webkit-scrollbar-thumb, .cal-cheio__grade--semana .cal-cheio__etiquetas:hover::-webkit-scrollbar-thumb, .quadro:hover::-webkit-scrollbar-thumb, .menu-barra__lista:hover::-webkit-scrollbar-thumb { background: var(--line-strong); }
+
+/* ── A tela do aprendiz (TelaAprendiz.tsx): a barra tijolo no topo (como a da agenda) e, embaixo, o resumo, o aviso e a lista de conceitos ── */
+.aprendiz { display: flex; flex-direction: column; gap: var(--space-4); height: 100%; padding: var(--space-4); box-sizing: border-box; }
+.aprendiz > :not(.aprendiz__corpo) { flex: none; }
+.aprendiz__titulo { max-width: 380px; }
+.aprendiz__corpo { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.aprendiz__corpo:hover { scrollbar-color: var(--line-strong) transparent; }
+.aprendiz__corpo::-webkit-scrollbar { width: 6px; height: 6px; }
+.aprendiz__corpo::-webkit-scrollbar-track { background: transparent; }
+.aprendiz__corpo::-webkit-scrollbar-thumb { border-radius: var(--radius-full); background: var(--line); }
+.aprendiz__corpo:hover::-webkit-scrollbar-thumb { background: var(--line-strong); }
+/* O conteúdo que troca (esperando, erro ou dados). Sem rolagem para o lado: nada passa da largura. */
+.aprendiz__aba { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; padding-bottom: var(--space-6); }
+.aprendiz__espera { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.aprendiz__carregando { margin: 0; color: var(--ink-muted); }
+.aprendiz__vazio { display: grid; place-items: center; padding: var(--space-8) 0; }
+.aprendiz__erro { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3) var(--space-4); padding: var(--space-4); border-radius: var(--radius-lg); background: var(--brick-tint); color: var(--ink); }
+.aprendiz__erro > .ap-icon { flex: none; color: var(--brick-text); }
+.aprendiz__erro-texto { flex: 1 1 240px; display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.aprendiz__erro .ap-btn { flex: none; min-width: 168px; }
+
+/* O resumo: quatro fichas do mesmo tamanho, que viram duas por linha em tela estreita. */
+.apz-resumo { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-3); }
+.apz-ficha { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; padding: var(--space-3) var(--space-4); border-radius: var(--radius-sm); background: var(--surface-panel); box-shadow: inset 0 0 0 var(--border-strong) var(--line-strong); }
+.apz-ficha__rotulo { color: var(--ink-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.apz-ficha__valor { font-variant-numeric: tabular-nums; }
+.apz-legenda, .apz-ignorados { margin: 0; color: var(--ink-muted); }
+.apz-ignorados { display: flex; align-items: flex-start; gap: var(--space-2); }
+.apz-ignorados .ap-icon { flex: none; margin-top: 2px; }
+
+/* A lista: um cartão por conceito. A linha fechada tem sempre a mesma estrutura (e a mesma altura na mesma largura); os detalhes abrem embaixo dela. */
+.apz-lista { display: flex; flex-direction: column; gap: var(--space-3); margin: 0; padding: 0; list-style: none; container-type: inline-size; min-width: 0; }
+.apz-item { min-width: 0; border-radius: var(--radius-md); background: var(--surface-panel); box-shadow: inset 0 0 0 var(--border-hair) var(--line); }
+.apz-item--aberto { background: var(--surface-raised); }
+.apz-linha { position: relative; display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); }
+/* O botão cobre o cartão inteiro (clicar em qualquer parte da linha abre os detalhes); o anel de foco aparece no cartão. */
+.apz-alternar { min-width: 0; padding: 0; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.apz-alternar::after { content: ""; position: absolute; inset: 0; border-radius: var(--radius-md); transition: background-color .12s ease-out; }
+.apz-alternar:hover::after { background: color-mix(in srgb, var(--ink) 4%, transparent); }
+.apz-alternar:focus-visible { outline: none; }
+.apz-alternar:focus-visible::after { box-shadow: var(--focus-ring); }
+.apz-nome { overflow: hidden; text-overflow: ellipsis; }
+.apz-nome__id { color: var(--ink-muted); }
+.apz-linha__topo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, auto) 7.5ch 18px; align-items: center; gap: var(--space-3); min-width: 0; min-height: 28px; }
+.apz-materia { display: flex; align-items: center; min-width: 0; color: var(--ink-muted); }
+.apz-materia__nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.apz-materia .lista-ponto { margin-right: 6px; }
+.apz-quando { color: var(--ink-subtle); text-align: right; white-space: nowrap; }
+.apz-seta { flex: none; width: 18px; height: 18px; color: var(--ink-muted); transition: transform .12s ease-out; }
+.apz-item--aberto .apz-seta { transform: rotate(180deg); }
+/* A barra de domínio: trilho contornado como o do Meter do design system; o preenchimento é sálvia (progresso) e a faixa vem escrita ao lado. */
+.apz-dominio { display: grid; grid-template-columns: minmax(0, 1fr) 4.5ch 7ch; align-items: center; gap: var(--space-3); min-width: 0; min-height: 20px; }
+/* O conceito sem respostas troca a barra por este texto, na mesma célula e na mesma altura. */
+.apz-dominio__sem { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-muted); line-height: 20px; }
+.apz-barra { position: relative; display: block; height: 16px; overflow: hidden; border-radius: 3px; box-shadow: inset 0 0 0 var(--border-strong) var(--ink-muted); }
+.apz-barra__cheio { position: absolute; top: 4px; bottom: 4px; left: 4px; max-width: calc(100% - 8px); border-radius: 1px; background: var(--sage); }
+.apz-dominio__pct { text-align: right; font-variant-numeric: tabular-nums; }
+.apz-dominio__faixa { color: var(--ink-muted); text-transform: uppercase; }
+.apz-numeros { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(0, 1.9fr); gap: var(--space-2) var(--space-3); margin: 0; }
+.apz-dito { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2) var(--space-3); margin: 0; padding-top: var(--space-2); border-top: var(--border-hair) solid var(--line); }
+.apz-num { min-width: 0; }
+.apz-num__rotulo { margin: 0; color: var(--ink-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.apz-num__valor { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+@container (max-width: 640px) {
+	.apz-linha__topo { grid-template-columns: minmax(0, 1fr) 18px; }
+	.apz-linha__topo .apz-materia { grid-column: 1; grid-row: 2; }
+	.apz-linha__topo .apz-quando { grid-column: 1; grid-row: 3; text-align: left; }
+	.apz-linha__topo .apz-seta { grid-column: 2; grid-row: 1; }
+	.apz-numeros { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+	.apz-num--larga { grid-column: 1 / -1; }
+}
+@media (max-width: 760px) {
+	.apz-resumo { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+	.apz-resumo > :last-child { grid-column: 1 / -1; }
+}
+
+/* Os detalhes de um conceito, embaixo da linha. */
+.apz-detalhes { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-3) var(--space-4) var(--space-4); border-top: var(--border-hair) solid var(--line); }
+.apz-detalhes__bloco { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.apz-detalhes__titulo { margin: 0; color: var(--ink-muted); }
+.apz-detalhes__texto { margin: 0; }
+.apz-confusoes { display: flex; flex-direction: column; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+.apz-confusao { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-1) var(--space-3); align-items: baseline; }
+.apz-confusao__conta { color: var(--ink-muted); white-space: nowrap; }
+.apz-confusao .apz-ids { grid-column: 1 / -1; }
+.apz-ids { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-2); margin: 0; }
+.apz-id { padding: 0 var(--space-1); border-radius: var(--radius-xs); background: var(--surface-well); color: var(--ink-muted); font-family: var(--font-mono); font-size: 12px; line-height: 20px; }
+.apz-ids__resto { color: var(--ink-muted); }
+@media (prefers-reduced-motion: reduce) {
+	.apz-alternar::after, .apz-seta { transition: none; }
+}

@@ -3,6 +3,8 @@
 // e 2.7). Contrato escrito no WP0; o provedor do React (vendo.tsx) vem no
 // WP5b, e a nota e a lição se registram nele no WP7b.
 
+import type { NivelAncora, PedidoAncora } from "./ancora.ts";
+
 /** Uma aba da mesa que pode ser mandada ao professor. Registrada pela nota ou pela lição aberta. */
 export interface FonteVendo {
 	/** "nota" ou "licao" (o tipo do ContextoTela). */
@@ -20,7 +22,31 @@ export interface FonteVendo {
 	texto(): string | undefined;
 	/** Chamado antes de qualquer troca de sessão (entrada no caderno, Nova, seletor): a nota salva e espera. */
 	antesDeTrocar?(): Promise<void>;
+	/**
+	 * Parte C1 (docs/mesa-parte-c.md, seção 4): acha o trecho (ou o bloco) do pedido, rola até
+	 * ele e destaca sem mudar o documento. undefined = o conteúdo ainda não está pronto (a mesa
+	 * tenta de novo no próximo quadro, até o prazo); senão, o nível em que achou.
+	 */
+	mostrar?(pedido: PedidoAncora, opcoes: OpcoesMostrar): NivelAncora | undefined;
+	/**
+	 * Só a nota aberta no editor: acrescenta o markdown ao fim do buffer, pelo mesmo parser do
+	 * editor, e o salvamento automático grava (o "Guardar na nota" do WP3). Recusa com o
+	 * motivo se o editor está em conflito, só leitura, salvando ou ainda sem a nota.
+	 */
+	inserirNoBuffer?(markdown: string): ResultadoInserir;
 }
+
+export interface OpcoesMostrar {
+	/** A área da esquerda da mesa (onde procurar o conteúdo desenhado). */
+	raiz: HTMLElement;
+	/** Rolar com animação (a aba já estava na tela) ou de uma vez (acabou de chegar). */
+	suave: boolean;
+}
+
+/** Por que inserirNoBuffer recusou. */
+export type MotivoRecusaInserir = "sem-nota" | "conflito" | "somente-leitura" | "salvando" | "vazio";
+
+export type ResultadoInserir = { ok: true } | { ok: false; motivo: MotivoRecusaInserir };
 
 /** O que o provedor oferece à mesa e às abas. */
 export interface ValorVendo {

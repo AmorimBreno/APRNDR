@@ -150,3 +150,39 @@
 /* O trecho selecionado marcado enquanto a barra está aberta (CSS Custom Highlight API; BarraSelecao.tsx): a seleção do
  * navegador some quando o foco vai para o chat. Sem suporte, nada é marcado. */
 ::highlight(selecao-pergunta) { background-color: color-mix(in srgb, var(--amber) 32%, transparent); color: inherit; }
+
+/* Parte C1 (docs/mesa-parte-c.md, seção 4): o professor na esquerda.
+ * A vaga de prévia (AbasMesa.tsx): a aba que o professor abriu e o Breno ainda não tocou tem o contorno âmbar; ao
+ * abrir, ela pulsa (um anel por sombra, feito com animate em AbasMesa.tsx; sem pulso com movimento reduzido). Só cor e
+ * sombra: o tamanho da aba não muda. */
+.mesa-aba--previa { box-shadow: inset 0 0 0 var(--border-hair) var(--amber); }
+.mesa-aba--previa .mesa-aba__rotulo { opacity: .85; }
+.mesa-aba--previa.mesa-aba--ativa .mesa-aba__rotulo { opacity: 1; }
+
+/* O destaque do trecho, que some sozinho em 3 s ou no próximo clique. Na nota, uma Decoration do ProseMirror (a classe
+ * no trecho ou no título da seção; destaque-nota.ts); na lição, o CSS Custom Highlight API (trecho-na-tela.ts), sem
+ * animação possível; sem a API, a classe de reserva no bloco. Só fundo: nada muda de tamanho. */
+.mesa-destaque { border-radius: 2px; background-color: color-mix(in srgb, var(--amber) 38%, transparent); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.mesa-destaque--bloco { border-radius: var(--radius-sm); }
+::highlight(mesa-destaque) { background-color: color-mix(in srgb, var(--amber) 38%, transparent); color: inherit; }
+.mesa-destaque-bloco { border-radius: var(--radius-sm); background-color: color-mix(in srgb, var(--amber) 16%, transparent); }
+@media (prefers-reduced-motion: no-preference) {
+	.mesa-destaque:not(.mesa-destaque--parado) { animation: mesa-destaque-entra .18s ease-out; }
+	.mesa-destaque-bloco:not(.mesa-destaque-bloco--parado) { animation: mesa-destaque-entra .18s ease-out; }
+}
+@keyframes mesa-destaque-entra { from { background-color: transparent; } }
+
+/* O aviso "O trecho mudou desde a pergunta" (MesaEstudo.tsx): por cima do corpo, embaixo e no meio (posição absoluta na
+ * área "corpo" da grade da mesa), sempre montado; só a opacidade muda, então nada empurra nada. */
+.mesa__trecho-aviso {
+	position: absolute; grid-area: corpo; justify-self: center; align-self: end; z-index: 3; margin-bottom: var(--space-4);
+	max-width: calc(100% - 2 * var(--space-4)); padding: var(--space-2) var(--space-3); border-radius: var(--radius-full);
+	background: var(--surface-raised); color: var(--ink); box-shadow: var(--sticker-shadow), 0 0 0 var(--border-hair) var(--line-strong);
+	opacity: 0; pointer-events: none;
+}
+.mesa__trecho-aviso--visivel { opacity: 1; }
+/* O texto visível é fixo (para o fade de saída não perder o texto); o leitor de tela ouve só a região de status. */
+.mesa__so-leitor { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+@media (prefers-reduced-motion: no-preference) {
+	.mesa__trecho-aviso { transition: opacity .15s ease-out; }
+}

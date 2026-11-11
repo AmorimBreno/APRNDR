@@ -10,6 +10,7 @@
 import type { ContextoTela } from "@estudos/ui";
 import { createContext, type ReactNode, useCallback, useContext, useMemo, useRef, useState } from "react";
 import { abaDoCaminho, type TipoAbaMesa } from "./abas-mesa.ts";
+import { type Ancora, formatarOrigem, rotaDaOrigem } from "./origem-mesa.ts";
 import { type FonteVendo, LIMITE_CONTEUDO_VENDO, type ValorVendo } from "./vendo.ts";
 
 /** O que saiu de ler uma fonte: o contexto e se o texto() falhou (para o chip avisar). */
@@ -74,6 +75,32 @@ export interface EntradaContextos {
 /** A chave da aba de uma fonte (a mesma de abaDoCaminho). */
 export function chaveDaFonte(fonte: FonteVendo): string | undefined {
 	return abaDoCaminho(fonte.origem)?.chave;
+}
+
+/**
+ * A fonte registrada é a da rota pedida (regra 4 dos padrões: na troca, a fonte da aba
+ * anterior fica registrada por alguns quadros)? Mesma aba, sem diferença de caixa (o
+ * Windows não diferencia os títulos); na lição, se a rota traz a lição, a mesma lição.
+ */
+export function fonteServeARota(fonte: Pick<FonteVendo, "origem">, rota: string): boolean {
+	const pedida = abaDoCaminho(rota);
+	const daFonte = abaDoCaminho(fonte.origem);
+	if (!pedida || !daFonte || pedida.chave.toLowerCase() !== daFonte.chave.toLowerCase()) return false;
+	if (pedida.tipo !== "licao" || rotaDaOrigem(rota) === pedida.chave) return true;
+	return rotaDaOrigem(fonte.origem).toLowerCase() === rotaDaOrigem(rota).toLowerCase();
+}
+
+/**
+ * Põe a âncora na origem do contexto que vai levar o trecho (o em foco, ou o primeiro, a
+ * mesma regra do painel da conversa), se ele é da aba de onde o trecho veio. A origem
+ * vira formatarOrigem(rota, ancora) (origem-mesa.ts, com o limite de 500 caracteres).
+ */
+export function comAncoraNoFoco(contextos: readonly ContextoTela[], chave: string, ancora: Ancora): ContextoTela[] {
+	const alvo = Math.max(0, contextos.findIndex((contexto) => contexto.foco));
+	return contextos.map((contexto, indice) => {
+		if (indice !== alvo || !contexto.origem || abaDoCaminho(contexto.origem)?.chave !== chave) return contexto;
+		return { ...contexto, origem: formatarOrigem(rotaDaOrigem(contexto.origem), ancora) };
+	});
 }
 
 /**

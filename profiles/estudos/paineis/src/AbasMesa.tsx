@@ -9,6 +9,7 @@
 // bordas esmaecidas (data-esq e data-dir, lidos pelo mesa.css) onde há mais.
 
 import { Icon } from "@estudos/design-system";
+import { semMovimento } from "@estudos/ui";
 import { type KeyboardEvent, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { type AbaMesa, abaDoCaminho } from "./abas-mesa.ts";
 import { abaVizinha } from "./painel-caderno.ts";
@@ -20,7 +21,14 @@ function chaveAbas(perfilId: string, materiaId: string): string {
 function ehAba(valor: unknown): valor is AbaMesa {
 	if (typeof valor !== "object" || valor === null) return false;
 	const aba = valor as Record<string, unknown>;
-	return typeof aba.chave === "string" && typeof aba.caminho === "string" && typeof aba.rotulo === "string" && (aba.tipo === "nota" || aba.tipo === "licao") && (aba.rolagem === undefined || typeof aba.rolagem === "number");
+	return (
+		typeof aba.chave === "string" &&
+		typeof aba.caminho === "string" &&
+		typeof aba.rotulo === "string" &&
+		(aba.tipo === "nota" || aba.tipo === "licao") &&
+		(aba.rolagem === undefined || typeof aba.rolagem === "number") &&
+		(aba.previa === undefined || typeof aba.previa === "boolean")
+	);
 }
 
 /** As abas lembradas da matéria; sem localStorage, ou com dado estragado, nenhuma. Descarta as que não são mais uma aba reconhecida. */
@@ -72,13 +80,36 @@ export interface PropsAbasMesa {
 	ativa?: string;
 	/** O rótulo da aba ativa vindo da fonte registrada, que vale mais que o guardado. */
 	rotuloDaAtiva?: string;
+	/** A aba que o professor abriu ou apontou (parte C1): pulsa uma vez a cada `vez` nova, quando ela já está na faixa. */
+	pulso?: { chave: string; vez: number };
 	escolher(aba: AbaMesa): void;
 	fechar(aba: AbaMesa): void;
 }
 
-export function AbasMesa({ abas, ativa, rotuloDaAtiva, escolher, fechar }: PropsAbasMesa) {
+/** O pulso da aba do professor: um anel âmbar que acende e apaga (só sombra e fundo: o tamanho não muda). */
+const QUADROS_PULSO: Keyframe[] = [
+	{ boxShadow: "inset 0 0 0 1px var(--line), 0 0 0 0 color-mix(in srgb, var(--amber) 0%, transparent)" },
+	{ boxShadow: "inset 0 0 0 1px var(--amber), 0 0 0 3px color-mix(in srgb, var(--amber) 45%, transparent)" },
+	{ boxShadow: "inset 0 0 0 1px var(--line), 0 0 0 0 color-mix(in srgb, var(--amber) 0%, transparent)" },
+];
+
+const pulsosFeitos = new WeakSet<object>();
+
+export function AbasMesa({ abas, ativa, rotuloDaAtiva, pulso, escolher, fechar }: PropsAbasMesa) {
 	const base = useId();
 	const botoes = useRef<Record<string, HTMLButtonElement | null>>({});
+	// O pulso de cada pedido sai uma vez só, quando a aba já existe na faixa (a aba nova pode chegar um render depois). A
+	// faixa é remontada ao trocar de nota: o registro do que já pulsou fica fora do componente.
+	const chavesAgora = abas.map((aba) => aba.chave).join("\n");
+	useEffect(() => {
+		if (!pulso || pulsosFeitos.has(pulso)) return;
+		const caixa = botoes.current[pulso.chave]?.parentElement;
+		if (!caixa) return;
+		pulsosFeitos.add(pulso);
+		caixa.scrollIntoView?.({ inline: "nearest", block: "nearest" });
+		if (semMovimento() || typeof caixa.animate !== "function") return;
+		caixa.animate(QUADROS_PULSO, { duration: 700, iterations: 3, easing: "ease-in-out" });
+	}, [pulso, chavesAgora]);
 	const faixa = useRef<HTMLDivElement>(null);
 	const [bordas, setBordas] = useState({ esq: false, dir: false });
 	const temAbas = abas.length > 0;
@@ -132,7 +163,7 @@ export function AbasMesa({ abas, ativa, rotuloDaAtiva, escolher, fechar }: Props
 					<div
 							key={aba.chave}
 							role="presentation"
-							className={`mesa-aba${escolhida ? " mesa-aba--ativa" : ""}`}
+							className={`mesa-aba${escolhida ? " mesa-aba--ativa" : ""}${aba.previa ? " mesa-aba--previa" : ""}`}
 							// O botão do meio fecha a aba; o mousedown dele não pode abrir o rolar automático do navegador.
 							onMouseDown={(evento) => {
 								if (evento.button === 1) evento.preventDefault();

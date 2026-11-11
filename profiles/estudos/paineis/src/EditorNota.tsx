@@ -20,7 +20,8 @@ import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import { type KeyboardEvent, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { conferirTitulo, type NotaAberta, TAMANHO_TITULO, temHtmlDesconhecido } from "../../lib/nota-tipos.ts";
-import { carregarNoEditor, extensoesDaNota, markdownDaNota } from "./editor-nota.ts";
+import { ancoraDoEditor, mostrarNaNota } from "./destaque-nota.ts";
+import { acrescentarMarkdown, carregarNoEditor, extensoesDaNota, markdownDaNota } from "./editor-nota.ts";
 import { AlcaBlocos } from "./AlcaBlocos.tsx";
 import { BarraFormatacao } from "./BarraFormatacao.tsx";
 import { AcoesDePergunta, BarraSelecao, useSelecaoDoDocumento } from "./BarraSelecao.tsx";
@@ -548,8 +549,16 @@ function EditorDaNota(props: PropsEditorNota & { rotuloInicial?: string | undefi
 
 	// A nota aberta se registra no "Vendo" da mesa (vendo.tsx): o professor recebe o markdown do buffer do editor, mesmo antes
 	// de salvar. Fora da mesa não há provedor e nada acontece. A troca de sessão já salva pela registrarAntesDeTrocar acima.
+	// Parte C1: a mesa pede por aqui para achar e destacar um trecho (mostrar, só com a página pronta) e o "Guardar na
+	// nota" acrescenta ao buffer (inserirNoBuffer). Tudo lê das refs: a fonte não é registrada de novo a cada render.
 	const registrarVendo = useVendoOpcional()?.registrar;
 	const notaCarregada = Boolean(nota);
+	const prontaAgora = useRef(pronta);
+	prontaAgora.current = pronta;
+	const somenteLeituraAgora = useRef(somenteLeitura);
+	somenteLeituraAgora.current = somenteLeitura;
+	const corpoAgora = useRef(corpo);
+	corpoAgora.current = corpo;
 	useEffect(() => {
 		if (!registrarVendo || !editor || !notaCarregada) return;
 		return registrarVendo({
@@ -557,6 +566,17 @@ function EditorDaNota(props: PropsEditorNota & { rotuloInicial?: string | undefi
 			rotulo: tituloVigente,
 			origem: `caderno/${materiaId}/notas/${tituloVigente}`,
 			texto: () => (editor.isDestroyed ? undefined : markdownDaNota(editor)),
+			mostrar: (pedido, { suave }) => {
+				if (editor.isDestroyed || !prontaAgora.current || base.current === undefined) return undefined;
+				return mostrarNaNota(editor, pedido, { rolavel: corpoAgora.current, suave, parado: semMovimento() });
+			},
+			inserirNoBuffer: (markdown) => {
+				if (editor.isDestroyed || base.current === undefined) return { ok: false, motivo: "sem-nota" };
+				if (emConflito.current) return { ok: false, motivo: "conflito" };
+				if (somenteLeituraAgora.current || !editor.isEditable) return { ok: false, motivo: "somente-leitura" };
+				if (emVoo.current || renomeando.current) return { ok: false, motivo: "salvando" };
+				return acrescentarMarkdown(editor, markdown) ? { ok: true } : { ok: false, motivo: "vazio" };
+			},
 		});
 	}, [registrarVendo, editor, notaCarregada, tituloVigente, materiaId]);
 
@@ -715,7 +735,9 @@ function EditorDaNota(props: PropsEditorNota & { rotuloInicial?: string | undefi
 								key={vezBarra}
 								editor={editor}
 								editarFormula={(latex, posicao) => logica.current.editarFormula("linha", latex, posicao)}
-								{...(trechoDoEditor ? { extra: <AcoesDePergunta trecho={trechoDoEditor} depois={soltarSelecaoDoEditor} /> } : {})}
+								{...(trechoDoEditor
+									? { extra: <AcoesDePergunta trecho={trechoDoEditor} ancora={() => (editor.isDestroyed ? undefined : ancoraDoEditor(editor.state))} depois={soltarSelecaoDoEditor} /> }
+									: {})}
 							/>
 						</div>
 					</BubbleMenu>

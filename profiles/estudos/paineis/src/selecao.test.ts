@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { CONTEXTO_MAXIMO } from "./origem-mesa.ts";
 import {
+	ancoraDaSelecao,
 	decidirSelecao,
 	JEITOS_DE_EXPLICAR,
 	juntarEspacos,
@@ -87,6 +89,29 @@ describe("decidirSelecao", () => {
 	it("a lista de proibidos inclui o painel do professor e os campos", () => {
 		expect(PROIBIDOS_PADRAO).toContain(".mesa__professor");
 		expect(PROIBIDOS_PADRAO).toContain("textarea");
+	});
+});
+
+describe("ancoraDaSelecao", () => {
+	it("lição: leva o bloco, a versão e até 40 caracteres de cada lado, com os espaços juntos", () => {
+		const antes = `${"x".repeat(100)} o fim\n do   texto antes `;
+		const depois = ` e o começo\n\n do texto depois ${"y".repeat(100)}`;
+		const ancora = ancoraDaSelecao({ bloco: "b3", versao: 2, antes, depois });
+		expect(ancora.bloco).toBe("b3");
+		expect(ancora.versao).toBe(2);
+		expect(ancora.antes).toHaveLength(CONTEXTO_MAXIMO);
+		expect(ancora.antes?.endsWith("o fim do texto antes ")).toBe(true);
+		expect(ancora.depois).toHaveLength(CONTEXTO_MAXIMO);
+		expect(ancora.depois?.startsWith(" e o começo do texto depois")).toBe(true);
+	});
+
+	it("nota: o título da seção é o bloco, sem versão", () => {
+		expect(ancoraDaSelecao({ bloco: "  Critério\nda razão ", antes: "a ", depois: " b" })).toEqual({ bloco: "Critério da razão", antes: "a ", depois: " b" });
+	});
+
+	it("sem nada em volta (começo de um bloco), os campos vazios saem", () => {
+		expect(ancoraDaSelecao({ antes: "", depois: "  \n " })).toEqual({});
+		expect(ancoraDaSelecao({ versao: -1, antes: "", depois: "" })).toEqual({});
 	});
 });
 

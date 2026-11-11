@@ -18,6 +18,8 @@ import { motion } from "motion/react";
 import { type KeyboardEvent, type ReactNode, type RefObject, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useProfessorDaMesa } from "./MesaEstudo.tsx";
+import type { Ancora } from "./origem-mesa.ts";
+import { ancoraDoRange } from "./trecho-na-tela.ts";
 import { decidirSelecao, JEITOS_DE_EXPLICAR, type JeitoDeExplicar, PEDIDO_ME_TESTE, pedidoDoJeito, PROIBIDOS_PADRAO } from "./selecao.ts";
 import { posicionarFlutuante, type Retangulo } from "./termos-tela.ts";
 
@@ -25,6 +27,8 @@ export interface SelecaoAtiva {
 	trecho: string;
 	/** Onde a seleção está na tela (coordenadas físicas de viewport). */
 	alvo: Retangulo;
+	/** Onde a seleção estava (o bloco e o texto em volta), para "Ir ao trecho" voltar a ela (parte C1, origem-mesa.ts). */
+	ancora?: Ancora;
 }
 
 export interface OpcoesSelecao {
@@ -74,7 +78,21 @@ export function useSelecaoDoDocumento(raiz: RefObject<HTMLElement | null>, opcoe
 				cruzaProibido,
 				...(limite !== undefined ? { limite } : {}),
 			});
-			setSelecao(trecho ? { trecho, alvo: range.getBoundingClientRect() } : undefined);
+			if (!trecho) {
+				setSelecao(undefined);
+				return;
+			}
+			// A âncora só é lida quando uma ação a usa (selectionchange dispara muitas vezes ao arrastar).
+			const copia = range.cloneRange();
+			let ancora: Ancora | undefined;
+			setSelecao({
+				trecho,
+				alvo: range.getBoundingClientRect(),
+				get ancora() {
+					ancora ??= ancoraDoRange(copia, area);
+					return ancora;
+				},
+			});
 		};
 		const tecla = (evento: globalThis.KeyboardEvent) => {
 			// Esc no painel do professor (a conversa) não apaga a seleção feita no texto da página.
@@ -219,6 +237,8 @@ function useMarcaDaSelecao(trecho: string): void {
 export interface PropsAcoesDePergunta {
 	/** O trecho já limpo (selecao.ts) em que as ações agem. */
 	trecho: string;
+	/** Onde o trecho estava (bloco e contexto), que vai na origem do contexto em foco; uma função é lida só no clique. */
+	ancora?: Ancora | (() => Ancora | undefined) | undefined;
 	/** Depois de uma ação que saiu: quem chama apaga a seleção. */
 	depois(): void;
 }
@@ -229,7 +249,8 @@ export interface PropsAcoesDePergunta {
  * BubbleMenu da nota. Os botões não tomam o foco do mouse (preventDefault no
  * mousedown) para a seleção não sumir ao clicar.
  */
-export function AcoesDePergunta({ trecho, depois }: PropsAcoesDePergunta) {
+export function AcoesDePergunta({ trecho, ancora: ancoraOuFuncao, depois }: PropsAcoesDePergunta) {
+	const lerAncora = () => (typeof ancoraOuFuncao === "function" ? ancoraOuFuncao() : ancoraOuFuncao);
 	const professor = useProfessorDaMesa();
 	const [menu, setMenu] = useState(false);
 	const [erro, setErro] = useState<string>();
@@ -253,7 +274,7 @@ export function AcoesDePergunta({ trecho, depois }: PropsAcoesDePergunta) {
 		setEnviando(true);
 		setMenu(false);
 		professor
-			.perguntar(pedido, trecho)
+			.perguntar(pedido, trecho, lerAncora())
 			.then(depois)
 			.catch((falha: unknown) => setErro(`Não consegui mandar: ${falha instanceof Error ? falha.message : String(falha)}`))
 			.finally(() => setEnviando(false));
@@ -285,7 +306,7 @@ export function AcoesDePergunta({ trecho, depois }: PropsAcoesDePergunta) {
 				disabled={enviando}
 				title="Citar este trecho acima do campo do professor"
 				onClick={() => {
-					professor.citar(trecho);
+					professor.citar(trecho, lerAncora());
 					depois();
 				}}
 			>
@@ -379,7 +400,7 @@ export function BarraSelecao({ selecao, limpar, extras }: PropsBarraSelecao) {
 			<div className="selecao-barra__linha" onMouseDown={(evento) => evento.preventDefault()} onKeyDown={moverFocoNaBarra}>
 				{extras}
 				{extras && professor ? <span className="selecao-barra__fio" aria-hidden="true" /> : null}
-				<AcoesDePergunta trecho={selecao.trecho} depois={limpar} />
+				<AcoesDePergunta trecho={selecao.trecho} ancora={() => selecao.ancora} depois={limpar} />
 			</div>
 		</Flutuante>
 	);

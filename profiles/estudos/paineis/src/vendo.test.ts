@@ -1,6 +1,37 @@
 import { describe, expect, it, vi } from "vitest";
 import { type FonteVendo, LIMITE_CONTEUDO_VENDO } from "./vendo.ts";
-import { type AbaDaBancada, contextoDaFonte, LIMITE_SOMA_VENDO, lerFonte, montarContextos } from "./vendo.tsx";
+import { type AbaDaBancada, comAncoraNoFoco, contextoDaFonte, fonteServeARota, LIMITE_SOMA_VENDO, lerFonte, montarContextos } from "./vendo.tsx";
+
+describe("fonteServeARota (parte C1)", () => {
+	it("nota: a mesma aba, sem diferença de caixa, ignorando a âncora", () => {
+		expect(fonteServeARota({ origem: "caderno/calc/notas/Séries" }, "caderno/calc/notas/séries?bloco=x")).toBe(true);
+		expect(fonteServeARota({ origem: "caderno/calc/notas/Outra" }, "caderno/calc/notas/Séries")).toBe(false);
+	});
+
+	it("lição: com a lição na rota, só a mesma lição; sem ela, qualquer lição do módulo", () => {
+		const fonte = { origem: "caderno/calc/cursos/c1/modulos/m2/l3" };
+		expect(fonteServeARota(fonte, "caderno/calc/cursos/c1/modulos/m2/l3")).toBe(true);
+		expect(fonteServeARota(fonte, "caderno/calc/cursos/c1/modulos/m2/l1")).toBe(false);
+		expect(fonteServeARota(fonte, "caderno/calc/cursos/c1/modulos/m2")).toBe(true);
+	});
+});
+
+describe("comAncoraNoFoco (parte C1)", () => {
+	const contextos = [
+		{ tipo: "nota", rotulo: "A", origem: "caderno/calc/notas/A", olho: true },
+		{ tipo: "nota", rotulo: "B", origem: "caderno/calc/notas/B", olho: true, foco: true },
+	];
+
+	it("a origem do contexto em foco vira rota mais âncora", () => {
+		const saida = comAncoraNoFoco(contextos, "caderno/calc/notas/B", { bloco: "Título", antes: "x y" });
+		expect(saida[1]?.origem).toBe("caderno/calc/notas/B?bloco=T%C3%ADtulo&antes=x%20y");
+		expect(saida[0]).toBe(contextos[0]);
+	});
+
+	it("o contexto em foco de outra aba (o foco mudou depois de citar) fica como está", () => {
+		expect(comAncoraNoFoco(contextos, "caderno/calc/notas/A", { antes: "x" })).toEqual(contextos);
+	});
+});
 
 function fonte(texto: () => string | undefined): FonteVendo {
 	return { tipo: "nota", rotulo: "Séries", origem: "caderno/calc/notas/Séries", texto };

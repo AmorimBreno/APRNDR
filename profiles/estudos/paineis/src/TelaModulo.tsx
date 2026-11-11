@@ -184,6 +184,7 @@ import { type DestinoDaEvidencia, ID_RELATORIO, TITULO_RELATORIO } from "./relat
 import { EtiquetaReferencia } from "./SecaoMapa.tsx";
 import { Teclas } from "./Teclas.tsx";
 import { textoDaLicao } from "./licao-texto.ts";
+import { mostrarNoDom } from "./trecho-na-tela.ts";
 import { useVendoOpcional } from "./vendo.tsx";
 import { type AcoesTermos, apontarTermo, ExplicacoesDoBloco, MarcarTermos, ProvedorTermos, TextoComTermos, useDestinoTermo } from "./TermosModulo.tsx";
 
@@ -271,6 +272,12 @@ export function TelaModulo(props: PropsTelaModulo) {
 				const modulo = moduloDaFonteRef.current;
 				const licao = modulo?.licoes.find((candidata) => candidata.id === licaoDaFonteId);
 				return modulo && licao ? textoDaLicao(licao, modulo.situacao === "gerado" ? modulo.explicacoes : undefined) : undefined;
+			},
+			// Parte C1: achar e destacar um trecho na lição desenhada (a desta fonte, conferida pelo data-licao), sem mudar nada no DOM.
+			mostrar: (pedido, { raiz, suave }) => {
+				const artigo = [...raiz.querySelectorAll<HTMLElement>(".modulo__licao")].find((elemento) => elemento.dataset.licao === licaoDaFonteId);
+				if (!artigo || artigo.dataset.pronta !== "sim") return undefined;
+				return mostrarNoDom(artigo, pedido, { rolavel: artigo.closest<HTMLElement>(".modulo__corpo"), suave });
 			},
 		});
 	}, [registrarVendo, licaoDaFonteId, rotuloDaFonte, origemDaFonte]);
@@ -753,7 +760,14 @@ function LicaoAberta(props: {
 				</nav>
 				<div className="modulo__leitura">
 					<SectionRuler className="modulo__regua" label="Blocos da lição" items={itensDaRegua(licao)} {...(atual ? { current: atual } : {})} onSelect={irParaBloco} />
-					<article ref={artigo} className={`modulo__licao${pronta ? "" : " modulo__licao--carregando"}`} aria-labelledby="modulo-licao-titulo">
+					<article
+						ref={artigo}
+						className={`modulo__licao${pronta ? "" : " modulo__licao--carregando"}`}
+						aria-labelledby="modulo-licao-titulo"
+						// A mesa (parte C1) só procura um trecho na lição certa e desenhada.
+						data-licao={licao.id}
+						data-pronta={pronta ? "sim" : "nao"}
+					>
 						<AnimatePresence initial={false}>
 							{aviso ? (
 								<motion.div
@@ -1049,7 +1063,7 @@ export function BlocoDaLicao(props: {
 		) : undefined;
 
 	return (
-		<div className={`modulo__bloco${pratica ? " modulo__bloco--pratica" : ""}${reescrevendo ? " retorno__bloco--reescrevendo" : ""}`} data-bloco={bloco.id} aria-busy={reescrevendo || undefined}>
+		<div className={`modulo__bloco${pratica ? " modulo__bloco--pratica" : ""}${reescrevendo ? " retorno__bloco--reescrevendo" : ""}`} data-bloco={bloco.id} data-versao={versao} aria-busy={reescrevendo || undefined}>
 			<AnimatePresence initial={false}>
 				{reescrevendo ? (
 					<motion.div

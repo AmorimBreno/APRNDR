@@ -24,6 +24,7 @@ import { type ArquivoMencionavel, Mencao } from "./mencao.ts";
 import { MenuBarra } from "./MenuBarra.tsx";
 import { CaixaNaTela, RecolhivelNaTela } from "./VisoesBlocos.tsx";
 import { BlocoSobMouse } from "./AlcaBlocos.tsx";
+import { DestaqueMesa } from "./destaque-nota.ts";
 
 export interface OpcoesEditorNota {
 	/** A ajuda que aparece na nota vazia. */
@@ -77,6 +78,8 @@ export function extensoesDaNota(opcoes: OpcoesEditorNota = {}): AnyExtension[] {
 		...(opcoes.naTela ? [BlocoSobMouse] : []),
 		Markdown.configure({ indentation: { style: "space", size: 2 } }),
 		EscapeEnxuto,
+		// O destaque da mesa (destaque-nota.ts): uma Decoration, fora do documento e do markdown.
+		DestaqueMesa,
 		// A ajuda de cada bloco vazio (ajudaDoBloco): todos os blocos de texto, também dentro de listas e caixas.
 		...(opcoes.textoVazio ? [AjudaDosBlocos.configure({ textoVazio: opcoes.textoVazio })] : []),
 	];
@@ -177,6 +180,17 @@ const AjudaDosBlocos = Extension.create<{ textoVazio: string }>({
  */
 export function markdownDaNota(editor: Editor): string {
 	return editor.getMarkdown().replace(/\s+$/, "");
+}
+
+/**
+ * Acrescenta markdown ao fim do documento, lido pelo mesmo parser do editor (o
+ * "Guardar na nota" da parte C1). É uma mudança comum: entra no desfazer e dispara
+ * o onUpdate, e o salvamento automático grava. Não mexe na seleção nem no foco.
+ * Devolve false se o editor já foi destruído ou o markdown está vazio.
+ */
+export function acrescentarMarkdown(editor: Editor, markdown: string): boolean {
+	if (editor.isDestroyed || !markdown.trim()) return false;
+	return editor.commands.insertContentAt(editor.state.doc.content.size, markdown, { contentType: "markdown", updateSelection: false } as Parameters<Editor["commands"]["insertContentAt"]>[2]);
 }
 
 /**

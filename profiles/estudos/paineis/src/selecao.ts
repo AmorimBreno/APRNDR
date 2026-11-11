@@ -4,6 +4,7 @@
 // só o que precisa para decidir.
 
 import { MAXIMO_CARACTERES_TRECHO } from "../../lib/termos-tipos.ts";
+import { type Ancora, CONTEXTO_MAXIMO } from "./origem-mesa.ts";
 
 /** O trecho que a barra aceita: de 1 a 2000 caracteres, depois de juntar os espaços. */
 export const MAXIMO_TRECHO_BARRA = 2000;
@@ -63,6 +64,34 @@ export function decidirSelecao(entrada: EntradaDecisaoSelecao): string | undefin
 	if (inicio.closest(proibidos) || fim.closest(proibidos)) return undefined;
 	if (entrada.cruzaProibido) return undefined;
 	return trechoDaBarra(entrada.texto, entrada.limite);
+}
+
+/** O que a captura da âncora lê em volta da seleção (o DOM da lição ou da nota, ou o documento do editor). */
+export interface EntradaAncoraSelecao {
+	/** Na lição, o id do bloco (data-bloco); na nota, o título da seção acima da seleção. */
+	bloco?: string | undefined;
+	/** A versão do bloco na lição (data-versao). */
+	versao?: number | undefined;
+	/** O texto antes da seleção (quanto houver; só o fim conta). */
+	antes: string;
+	/** O texto depois da seleção (quanto houver; só o começo conta). */
+	depois: string;
+}
+
+/**
+ * A âncora da seleção (docs/mesa-parte-c.md, seção 3): o bloco, a versão e até
+ * CONTEXTO_MAXIMO caracteres antes e depois, com os espaços juntos. Campos vazios saem.
+ */
+export function ancoraDaSelecao(entrada: EntradaAncoraSelecao): Ancora {
+	const antes = entrada.antes.replace(/\s+/g, " ").trimStart().slice(-CONTEXTO_MAXIMO);
+	const depois = entrada.depois.replace(/\s+/g, " ").trimEnd().slice(0, CONTEXTO_MAXIMO);
+	const bloco = entrada.bloco ? juntarEspacos(entrada.bloco) : "";
+	return {
+		...(bloco ? { bloco } : {}),
+		...(entrada.versao !== undefined && Number.isInteger(entrada.versao) && entrada.versao >= 0 ? { versao: entrada.versao } : {}),
+		...(antes.trim() ? { antes } : {}),
+		...(depois.trim() ? { depois } : {}),
+	};
 }
 
 /** Os jeitos do "Outro jeito", na ordem do menu. */

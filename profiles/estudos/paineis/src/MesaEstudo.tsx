@@ -23,17 +23,29 @@
 // lado por vez (a gaveta ocupa tudo). O modo vem de um ResizeObserver e vai no
 // data-modo, para a mola do Motion e o CSS (mesa.css) concordarem.
 
-import { AvatarAgente, type DadosAvatarAgente, type PropsConversaEmbutida, semMovimento } from "@estudos/ui";
+//
+// Parte C1 (docs/mesa-parte-c.md, seções 3 e 4): a mesa é a porta única para navegar até
+// um trecho (irPara, exposto por ContextoMesa em mesa-ir.ts). Ela consome os comandos do
+// professor (painel "mesa" da ponte, comandos-mesa.ts), abre as abas dele na vaga de prévia
+// (abas-mesa.ts) e guarda uma âncora pendente que vence a rolagem guardada da aba e é
+// resolvida pela fonte da aba (vendo.ts, mostrar) quando o conteúdo fica pronto.
+
+import { AvatarAgente, type ContextoTela, type DadosAvatarAgente, type PropsConversaEmbutida, semMovimento } from "@estudos/ui";
 import { motion } from "motion/react";
-import { type ComponentType, createContext, type CSSProperties, type ReactNode, type RefObject, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { type ComponentType, createContext, type CSSProperties, type ReactNode, type RefObject, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Materia } from "../../lib/materia-tipos.ts";
-import { abaDoCaminho, abrirAba, fecharAba, guardarRolagem, type TipoAbaMesa } from "./abas-mesa.ts";
+import { type ComandoMesa, PAINEL_MESA } from "../../lib/mesa-tipos.ts";
+import { abaDoCaminho, abrirAba, abrirPrevia, fecharAba, fixarAba, guardarRolagem, mudarCaminho, type TipoAbaMesa } from "./abas-mesa.ts";
 import { AbasMesa, useAbasGuardadas } from "./AbasMesa.tsx";
+import { AVISO_TRECHO_MUDOU, type PedidoAncora, quedaMereceAviso } from "./ancora.ts";
 import { CabecalhoProfessor } from "./CabecalhoProfessor.tsx";
 import { ChipVendo } from "./ChipVendo.tsx";
+import { type EstadoComandos, novosComandos } from "./comandos-mesa.ts";
+import { type AlvoIrPara, ContextoMesa, type ValorMesa } from "./mesa-ir.ts";
 import { mesmoTitulo, PAINEL_NOTAS } from "./notas-ponte.ts";
+import { type Ancora, lerOrigem } from "./origem-mesa.ts";
 import { alternarEscolha, chavesSelecionadas, escolhasVigentes, type EscolhasBancada, SEM_ESCOLHAS } from "./selecao-bancada.ts";
-import { type AbaDaBancada, chaveDaFonte, ProvedorVendo, useVendo } from "./vendo.tsx";
+import { type AbaDaBancada, chaveDaFonte, comAncoraNoFoco, fonteServeARota, ProvedorVendo, useVendo } from "./vendo.tsx";
 
 type Modo = "lado" | "gaveta" | "tela";
 
@@ -80,14 +92,18 @@ export interface ProfessorDaMesa {
 	alternar(): void;
 	/** Abre o painel se estiver fechado (não alterna). */
 	abrir(): void;
-	/** Guarda o trecho como citação acima do campo do professor e abre o painel (Perguntar). */
-	citar(trecho: string): void;
+	/**
+	 * Guarda o trecho como citação acima do campo do professor e abre o painel (Perguntar). A âncora
+	 * (onde o trecho estava) vai na origem do contexto em foco quando a mensagem sair.
+	 */
+	citar(trecho: string, ancora?: Ancora): void;
 	/**
 	 * Manda ao professor um pedido pronto sobre o trecho, com os contextos da bancada
 	 * e o trecho como selecao do contexto em foco (Outro jeito, Me teste nisso), e abre o painel.
+	 * Com a âncora, a origem do contexto em foco é formatarOrigem(rota, ancora).
 	 * Rejeita se o envio nem saiu (conexão caída).
 	 */
-	perguntar(pedido: string, trecho: string): Promise<void>;
+	perguntar(pedido: string, trecho: string, ancora?: Ancora): Promise<void>;
 	idPainel: string;
 	botao: RefObject<HTMLButtonElement | null>;
 }
@@ -106,6 +122,32 @@ const QUADROS_PARA_ROLAR = 45;
 /** Quanto esperar a nota pedida pela ponte (nota restaurada que ainda não abriu nesta sessão). */
 const PRAZO_NOTA_MS = 1500;
 const PASSO_NOTA_MS = 50;
+/** Quanto a âncora pendente espera o conteúdo da aba ficar pronto (a nota vem pela ponte, o módulo carrega); depois desiste em silêncio. */
+const PRAZO_ANCORA_MS = 5000;
+/** Uma âncora pendente numa aba que não tomou o foco vale até o Breno ir nela, mas não para sempre. */
+const VALIDADE_PENDENTE_MS = 120_000;
+/** Sem digitar há este tempo (e sem foco num campo da esquerda), o Breno não está editando: a prévia pode tomar o foco. */
+const ESPERA_SEM_DIGITAR_MS = 5000;
+/** Quanto o aviso "O trecho mudou desde a pergunta" fica na tela. */
+const DURACAO_AVISO_MS = 4000;
+/** Os campos da esquerda em que o foco quer dizer "editando". */
+const CAMPOS_DE_EDICAO = "textarea,input,select,[contenteditable='true'],[contenteditable='']";
+
+/** A âncora esperando o conteúdo da aba ficar pronto. */
+interface AncoraPendente {
+	chave: string;
+	/** A rota pedida (na lição, com a lição). */
+	rota: string;
+	pedido: PedidoAncora;
+	/** A aba já estava na tela: a rolagem anima. */
+	suave: boolean;
+	criadaEm: number;
+}
+
+/** A aba do navegador está visível e com foco: só ela reage aos comandos do professor (a janela é uma só). */
+function abaDoNavegadorAtiva(): boolean {
+	return document.visibilityState === "visible" && document.hasFocus();
+}
 
 /** O rótulo inicial de uma aba, pela rota: o título da nota; "Lição" no módulo (a lição registrada troca por um melhor). */
 function rotuloDaRota(caminho: string, tipo: TipoAbaMesa): string {
@@ -149,11 +191,15 @@ function MesaInterna(props: PropsMesaEstudo) {
 	const vendo = useVendo();
 	const [aberto, setAberto] = useState(() => lerAberto(perfilId));
 	const [pendente, setPendente] = useState(false);
-	/** O trecho citado (Perguntar), na mesa e não na barra, porque o painel do professor é que o mostra e o limpa. */
-	const [citacao, setCitacao] = useState<string | undefined>(undefined);
+	// O trecho citado (Perguntar), na mesa e não na barra, porque o painel do professor é que o mostra e o limpa. A âncora
+	// e a aba de onde o trecho veio vão junto, para a origem do contexto em foco levar o ponto exato (parte C1).
+	const [citacao, setCitacao] = useState<{ texto: string; ancora?: Ancora | undefined; chave: string | undefined } | undefined>(undefined);
+	const citacaoRef = useRef(citacao);
+	citacaoRef.current = citacao;
 	const [modo, setModo] = useState<Modo>("lado");
 	const [largura, setLargura] = useState(0);
 	const raiz = useRef<HTMLDivElement>(null);
+	const esquerda = useRef<HTMLDivElement>(null);
 	const painel = useRef<HTMLElement>(null);
 	const botao = useRef<HTMLButtonElement>(null);
 	const idPainel = useId();
@@ -167,6 +213,30 @@ function MesaInterna(props: PropsMesaEstudo) {
 	atualizarAbasRef.current = atualizarAbas;
 	const abaAtiva = caminho.split("/")[1] === materiaId ? abaDoCaminho(caminho) : undefined;
 	const chaveAtiva = abaAtiva?.chave;
+	const chaveAtivaRef = useRef(chaveAtiva);
+	chaveAtivaRef.current = chaveAtiva;
+	const caminhoRef = useRef(caminho);
+	caminhoRef.current = caminho;
+	const navegarRef = useRef(navegar);
+	navegarRef.current = navegar;
+
+	// A âncora pendente (irPara): resolvida quando a aba dela está em foco e o conteúdo, pronto. Vence a rolagem guardada.
+	const ancoraPendente = useRef<AncoraPendente | undefined>(undefined);
+	const [vezPendente, setVezPendente] = useState(0);
+	/** Para a devolução da rolagem guardada que estiver em curso (uma âncora nova chegou para a mesma aba). */
+	const pararDevolucao = useRef<(() => void) | undefined>(undefined);
+	/** A aba que o professor abriu e que toma o foco: entra na vaga de prévia quando a rota chegar (a navegação é assíncrona). */
+	const previaChegando = useRef<{ chave: string; rotulo: string } | undefined>(undefined);
+	/** A aba que pulsa na faixa (o professor abriu ou apontou nela); vez muda a cada pedido. */
+	const [pulso, setPulso] = useState<{ chave: string; vez: number } | undefined>(undefined);
+	const [aviso, setAviso] = useState(false);
+	const temporizadorAviso = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+	useEffect(() => () => clearTimeout(temporizadorAviso.current), []);
+	const mostrarAviso = useCallback(() => {
+		setAviso(true);
+		clearTimeout(temporizadorAviso.current);
+		temporizadorAviso.current = setTimeout(() => setAviso(false), DURACAO_AVISO_MS);
+	}, []);
 	const fonte = vendo.ativa();
 	// O rótulo que a aba ativa registrou (o título de agora da nota, "Lição 2.3 · …") vale mais que o da rota,
 	// mas só se a fonte for a desta aba. Ao trocar de aba, o foco muda antes de a nota nova montar: a fonte
@@ -177,8 +247,12 @@ function MesaInterna(props: PropsMesaEstudo) {
 	// abaAtiva é derivada do caminho: as dependências são o caminho e o que sai dele.
 	useLayoutEffect(() => {
 		if (!abaAtiva) return;
+		const chegando = previaChegando.current?.chave === abaAtiva.chave ? previaChegando.current : undefined;
+		previaChegando.current = undefined;
 		atualizarAbasRef.current((atuais) => {
 			const existente = atuais.find((aba) => aba.chave === abaAtiva.chave);
+			// A aba que o professor abriu e que tomou o foco: entra na vaga de prévia (a anterior, já fora do foco, sai no lugar dela).
+			if (chegando && !existente) return abrirPrevia(atuais, { chave: abaAtiva.chave, caminho, tipo: abaAtiva.tipo, rotulo: chegando.rotulo });
 			return abrirAba(atuais, { chave: abaAtiva.chave, caminho, tipo: abaAtiva.tipo, rotulo: existente?.rotulo ?? rotuloDaRota(caminho, abaAtiva.tipo) });
 		});
 	}, [caminho, abaAtiva?.chave, abaAtiva?.tipo]);
@@ -214,6 +288,8 @@ function MesaInterna(props: PropsMesaEstudo) {
 		}
 		chaveDaRolagem.current = chaveAtiva;
 		if (!chaveAtiva) return;
+		// Uma âncora pendente nesta aba (irPara) vence a rolagem guardada: quem rola é ela, quando o conteúdo ficar pronto.
+		if (ancoraPendente.current?.chave === chaveAtiva) return;
 		// O conteúdo da aba pode ainda estar chegando (a nota vem do servidor): espera ele ficar alto o bastante.
 		const topo = abasRef.current.find((aba) => aba.chave === chaveAtiva)?.rolagem ?? 0;
 		if (topo === 0 && (!antiga || antiga === chaveAtiva)) return;
@@ -233,9 +309,14 @@ function MesaInterna(props: PropsMesaEstudo) {
 			if (++tentativas <= QUADROS_PARA_ROLAR) quadro = requestAnimationFrame(devolver);
 		};
 		quadro = requestAnimationFrame(devolver);
-		return () => {
+		const parar = () => {
 			cancelAnimationFrame(quadro);
 			devolvendo.current = false;
+		};
+		pararDevolucao.current = parar;
+		return () => {
+			parar();
+			if (pararDevolucao.current === parar) pararDevolucao.current = undefined;
 		};
 	}, [chaveAtiva]);
 	// Ao sair da mesa (o painel do caderno, a conversa em tela cheia) a rolagem de agora também fica guardada.
@@ -247,17 +328,179 @@ function MesaInterna(props: PropsMesaEstudo) {
 		[],
 	);
 
-	const escolherAba = (aba: { chave: string; caminho: string }) => {
-		if (aba.chave !== chaveAtiva) navegar(aba.caminho);
+	// A âncora pendente da aba em foco: a cada quadro (com setTimeout de reserva, porque o requestAnimationFrame para em
+	// aba escondida) pede à fonte registrada que mostre o trecho. Só vale a fonte desta aba e desta rota (regra 4 dos
+	// padrões): na troca, a fonte da aba anterior ainda está registrada por alguns quadros. Sem conteúdo pronto no prazo,
+	// desiste em silêncio.
+	const ativaDoVendo = vendo.ativa;
+	useEffect(() => {
+		const atual = ancoraPendente.current;
+		if (!atual || atual.chave !== chaveAtiva) return;
+		if (Date.now() - atual.criadaEm > VALIDADE_PENDENTE_MS) {
+			ancoraPendente.current = undefined;
+			return;
+		}
+		let cancelado = false;
+		let quadro = 0;
+		let reserva: ReturnType<typeof setTimeout> | undefined;
+		const limite = performance.now() + PRAZO_ANCORA_MS;
+		const tentar = () => {
+			if (cancelado || ancoraPendente.current !== atual) return;
+			const fonte = ativaDoVendo();
+			const area = esquerda.current;
+			if (fonte?.mostrar && area && fonteServeARota(fonte, atual.rota)) {
+				const nivel = fonte.mostrar(atual.pedido, { raiz: area, suave: atual.suave });
+				if (nivel !== undefined) {
+					ancoraPendente.current = undefined;
+					if (quedaMereceAviso(nivel, atual.pedido)) mostrarAviso();
+					return;
+				}
+			}
+			if (performance.now() > limite) {
+				ancoraPendente.current = undefined;
+				return;
+			}
+			proximo();
+		};
+		const proximo = () => {
+			let feito = false;
+			const uma = () => {
+				if (feito) return;
+				feito = true;
+				cancelAnimationFrame(quadro);
+				clearTimeout(reserva);
+				tentar();
+			};
+			quadro = requestAnimationFrame(uma);
+			reserva = setTimeout(uma, 50);
+		};
+		proximo();
+		return () => {
+			cancelado = true;
+			cancelAnimationFrame(quadro);
+			clearTimeout(reserva);
+		};
+	}, [chaveAtiva, vezPendente, ativaDoVendo, mostrarAviso]);
+
+	// "Editando": o foco num campo da esquerda (o texto da nota, o título, uma resposta) ou uma tecla na esquerda há menos
+	// de 5 s. A prévia do professor só toma o foco fora disso.
+	const ultimaTecla = useRef(Number.NEGATIVE_INFINITY);
+	useEffect(() => {
+		const elemento = raiz.current;
+		if (!elemento) return;
+		const aoTeclar = (evento: KeyboardEvent) => {
+			if (evento.target instanceof Node && !painel.current?.contains(evento.target)) ultimaTecla.current = performance.now();
+		};
+		elemento.addEventListener("keydown", aoTeclar, true);
+		return () => elemento.removeEventListener("keydown", aoTeclar, true);
+	}, []);
+	const editando = useCallback(() => {
+		const foco = document.activeElement;
+		if (foco instanceof HTMLElement && raiz.current?.contains(foco) && !painel.current?.contains(foco) && (foco.isContentEditable || foco.matches(CAMPOS_DE_EDICAO))) return true;
+		return performance.now() - ultimaTecla.current < ESPERA_SEM_DIGITAR_MS;
+	}, []);
+
+	// A prévia vira fixa quando o Breno interage com ela: clicar, rolar com a roda ou teclar no conteúdo dela (a faixa das
+	// abas fica de fora: o clique numa aba é tratado em escolherAba). A rolagem feita pela mesa (âncora, devolução) não conta.
+	const ativaEhPrevia = abas.some((aba) => aba.chave === chaveAtiva && aba.previa);
+	useEffect(() => {
+		const elemento = raiz.current;
+		if (!ativaEhPrevia || !chaveAtiva || !elemento) return;
+		const fixar = (evento: Event) => {
+			if (!(evento.target instanceof Element) || painel.current?.contains(evento.target) || evento.target.closest(".mesa-abas, .mesa__faixa")) return;
+			atualizarAbasRef.current((atuais) => fixarAba(atuais, chaveAtiva));
+		};
+		const tipos = ["pointerdown", "wheel", "keydown"] as const;
+		for (const tipo of tipos) elemento.addEventListener(tipo, fixar, { capture: true, passive: true });
+		return () => {
+			for (const tipo of tipos) elemento.removeEventListener(tipo, fixar, { capture: true });
+		};
+	}, [ativaEhPrevia, chaveAtiva]);
+
+	/**
+	 * A porta única (mesa-ir.ts). `rotulo` vem do comando "abrir" do professor (o nome da aba nova). Uma rota de outra
+	 * matéria ou que não é aba é ignorada.
+	 */
+	const irPara = useCallback(
+		(alvo: AlvoIrPara, rotulo?: string) => {
+			const { rota, ancora } = lerOrigem(alvo.origem);
+			const aba = abaDoCaminho(rota);
+			if (!aba || rota.split("/")[1] !== materiaId) return;
+			const ativa = chaveAtivaRef.current;
+			const levar = alvo.quem === "usuario" || !editando();
+			// A rota do módulo sem a lição, com o módulo já em foco, fica na lição de agora (navegar abriria a primeira).
+			const mesmaLicao = aba.chave === ativa && aba.tipo === "licao" && rota === aba.chave;
+			const jaNaTela = aba.chave === ativa && (rota === caminhoRef.current || mesmaLicao);
+			if (alvo.trecho || ancora?.bloco) {
+				ancoraPendente.current = {
+					chave: aba.chave,
+					rota,
+					pedido: { ...(alvo.trecho ? { trecho: alvo.trecho } : {}), ...(ancora ? { ancora } : {}), soRolar: alvo.soRolar === true },
+					suave: jaNaTela,
+					criadaEm: Date.now(),
+				};
+				if (aba.chave === ativa) pararDevolucao.current?.();
+				setVezPendente((vez) => vez + 1);
+			}
+			const existente = abasRef.current.find((outra) => outra.chave === aba.chave);
+			if (alvo.quem === "previa") {
+				if (aba.chave !== ativa) setPulso((atual) => ({ chave: aba.chave, vez: (atual?.vez ?? 0) + 1 }));
+				if (!levar) {
+					// O Breno está editando: a aba abre (ou fica) na faixa, pulsando, e a âncora espera ele ir nela.
+					if (!existente) atualizarAbasRef.current((atuais) => abrirPrevia(atuais, { chave: aba.chave, caminho: rota, tipo: aba.tipo, rotulo: rotulo ?? rotuloDaRota(rota, aba.tipo) }, ativa));
+					else if (existente.previa) atualizarAbasRef.current((atuais) => mudarCaminho(atuais, aba.chave, rota));
+					return;
+				}
+				if (!existente) previaChegando.current = { chave: aba.chave, rotulo: rotulo ?? rotuloDaRota(rota, aba.tipo) };
+			}
+			if (!jaNaTela) navegarRef.current(rota);
+		},
+		[materiaId, editando],
+	);
+	const irParaRef = useRef(irPara);
+	irParaRef.current = irPara;
+	const valorMesa = useMemo<ValorMesa>(() => ({ irPara: (alvo) => irParaRef.current(alvo) }), []);
+
+	// Os comandos do professor (painel "mesa" da ponte, B2): só as chaves novas desde a montagem e desde a última troca de
+	// sessão, sem repetir id, e só na aba do navegador visível e com foco (comandos-mesa.ts).
+	const recebidasMesa = props.janela.estado.acoesPorPainel[PAINEL_MESA];
+	const sessaoAtual = props.janela.estado.sessao?.sessaoId;
+	const estadoComandos = useRef<EstadoComandos | undefined>(undefined);
+	useEffect(() => {
+		const { estado, comandos } = novosComandos(estadoComandos.current, sessaoAtual, recebidasMesa ?? [], abaDoNavegadorAtiva());
+		estadoComandos.current = estado;
+		for (const comando of comandos) executarComando(comando);
+	}, [recebidasMesa, sessaoAtual]);
+	function executarComando(comando: ComandoMesa) {
+		if (comando.cmd === "abrir") irParaRef.current({ origem: comando.caminho, quem: "previa" }, comando.rotulo);
+		else irParaRef.current({ origem: comando.caminho, trecho: comando.trecho, soRolar: comando.soRolar, quem: "previa" });
+	}
+
+	const escolherAba = (aba: { chave: string; caminho: string; previa?: boolean }) => {
+		// Clicar na prévia é interagir com ela: vira fixa.
+		if (aba.previa) atualizarAbas((atuais) => fixarAba(atuais, aba.chave));
+		// Com uma âncora pendente nesta aba (o professor apontou nela enquanto o Breno editava), vai à rota dela.
+		const destino = ancoraPendente.current?.chave === aba.chave ? ancoraPendente.current.rota : aba.caminho;
+		if (aba.chave !== chaveAtiva) navegar(destino);
 	};
 	const fecharUmaAba = (aba: { chave: string }) => {
+		if (ancoraPendente.current?.chave === aba.chave) ancoraPendente.current = undefined;
 		const resultado = fecharAba(abasRef.current, aba.chave, chaveAtiva);
 		atualizarAbas(() => resultado.abas);
 		// Fechou a ativa: vai para a vizinha, ou para o painel do caderno quando não sobra nenhuma.
 		if (aba.chave === chaveAtiva) navegar(resultado.ativar ?? `caderno/${materiaId}/notas`);
 	};
 
-	const nodeAbas = <AbasMesa abas={abas} {...(chaveAtiva ? { ativa: chaveAtiva } : {})} {...(rotuloDaFonte ? { rotuloDaAtiva: rotuloDaFonte } : {})} escolher={escolherAba} fechar={fecharUmaAba} />;
+	const nodeAbas = (
+		<AbasMesa
+			abas={abas}
+			{...(chaveAtiva ? { ativa: chaveAtiva } : {})}
+			{...(rotuloDaFonte ? { rotuloDaAtiva: rotuloDaFonte } : {})}
+			{...(pulso ? { pulso } : {})}
+			escolher={escolherAba}
+			fechar={fecharUmaAba}
+		/>
+	);
 
 	const alternar = useCallback(() => {
 		setAberto((atual) => {
@@ -273,8 +516,8 @@ function MesaInterna(props: PropsMesaEstudo) {
 		});
 	}, [perfilId]);
 	const citar = useCallback(
-		(trecho: string) => {
-			setCitacao(trecho);
+		(trecho: string, ancora?: Ancora) => {
+			setCitacao({ texto: trecho, ancora, chave: chaveAtivaRef.current });
 			abrir();
 		},
 		[abrir],
@@ -317,20 +560,28 @@ function MesaInterna(props: PropsMesaEstudo) {
 		return undefined;
 	}, []);
 	const obterContextosDoVendo = vendo.obterContextos;
-	const obterContextos = useCallback(() => obterContextosDoVendo({ ...bancadaRef.current, pedirNota }), [obterContextosDoVendo, pedirNota]);
+	// Com uma citação (Perguntar), a origem do contexto em foco leva a âncora dela: o painel da conversa põe o texto como
+	// selecao no mesmo contexto (o em foco, ou o primeiro) ao mandar.
+	const obterContextos = useCallback(async (): Promise<ContextoTela[]> => {
+		const contextos = await obterContextosDoVendo({ ...bancadaRef.current, pedirNota });
+		const citada = citacaoRef.current;
+		return citada?.ancora && citada.chave ? comAncoraNoFoco(contextos, citada.chave, citada.ancora) : contextos;
+	}, [obterContextosDoVendo, pedirNota]);
 	const perguntar = useCallback(
-		async (pedido: string, trecho: string) => {
-			const contextos = await obterContextos();
+		async (pedido: string, trecho: string, ancora?: Ancora) => {
+			const chaveDoTrecho = chaveAtivaRef.current;
+			const contextos = await obterContextosDoVendo({ ...bancadaRef.current, pedirNota });
 			abrir();
 			// O trecho vai no contexto com foco (ou no primeiro). Sem nenhuma aba na bancada não há onde pendurá-lo: vai no texto, como citação.
 			if (contextos.length === 0) {
 				await janelaRef.current.acoes.enviar(`${pedido}\n\n> ${trecho}`);
 				return;
 			}
-			const alvo = Math.max(0, contextos.findIndex((contexto) => contexto.foco));
-			await janelaRef.current.acoes.enviar(pedido, contextos.map((contexto, indice) => (indice === alvo ? { ...contexto, selecao: trecho } : contexto)));
+			const ancorados = ancora && chaveDoTrecho ? comAncoraNoFoco(contextos, chaveDoTrecho, ancora) : contextos;
+			const alvo = Math.max(0, ancorados.findIndex((contexto) => contexto.foco));
+			await janelaRef.current.acoes.enviar(pedido, ancorados.map((contexto, indice) => (indice === alvo ? { ...contexto, selecao: trecho } : contexto)));
 		},
-		[abrir, obterContextos],
+		[abrir, obterContextosDoVendo, pedirNota],
 	);
 
 	// Ctrl+J: na fase de captura e com preventDefault, para o Edge não abrir os Downloads.
@@ -406,6 +657,7 @@ function MesaInterna(props: PropsMesaEstudo) {
 	const contexto: ProfessorDaMesa | undefined = Conversa ? { aberto, pendente, pulsa, alternar, abrir, citar, perguntar, idPainel, botao } : undefined;
 
 	return (
+		<ContextoMesa.Provider value={valorMesa}>
 		<ContextoProfessor.Provider value={contexto}>
 		<div
 			ref={raiz}
@@ -414,7 +666,7 @@ function MesaInterna(props: PropsMesaEstudo) {
 			data-aberta={aberto ? "sim" : "nao"}
 			style={{ "--largura-professor": `${modo === "lado" ? larguraColuna : LARGURA_GAVETA}px` } as CSSProperties}
 		>
-			<div className="mesa__esquerda">
+			<div ref={esquerda} className="mesa__esquerda">
 				{Conversa && props.botaoNaFaixa ? (
 					<div className="mesa__faixa">
 						<span className="mesa__faixa-espaco" />
@@ -433,6 +685,14 @@ function MesaInterna(props: PropsMesaEstudo) {
 					</div>
 				) : null}
 				<div className="mesa__area">{typeof props.children === "function" ? props.children(nodeAbas) : props.children}</div>
+				{/* O aviso de quando o trecho não foi achado como era: por cima do corpo (posição absoluta na área da grade), sempre
+				    montado e só com a opacidade mudando, para nada mudar de tamanho. É um resultado, não um carregamento: aparece na hora. */}
+				<div className={`mesa__trecho-aviso body-sm${aviso ? " mesa__trecho-aviso--visivel" : ""}`}>
+					<span aria-hidden="true">{AVISO_TRECHO_MUDOU}</span>
+					<span className="mesa__so-leitor" role="status" aria-live="polite">
+						{aviso ? AVISO_TRECHO_MUDOU : ""}
+					</span>
+				</div>
 			</div>
 			{Conversa ? (
 				<motion.aside
@@ -452,6 +712,7 @@ function MesaInterna(props: PropsMesaEstudo) {
 							obterContextos={obterContextos}
 							cabecalho={<CabecalhoProfessor janela={props.janela} perfilId={perfilId} {...(props.materia ? { materia: props.materia } : {})} {...(props.abrirConversa ? { abrirConversa: props.abrirConversa } : {})} />}
 							acimaDoCampo={<ChipVendo abas={pilulas} chaveFoco={chaveAtiva} selecionadas={selecionadas} alternar={alternarSelecao} />}
+							{...(citacao ? { citacao: { texto: citacao.texto, limpar: limparCitacao } } : {})}
 							{...(rotuloDoCampo ? { placeholder: `Pergunte sobre ${rotuloDoCampo}…` } : {})}
 						/>
 					</div>
@@ -459,5 +720,6 @@ function MesaInterna(props: PropsMesaEstudo) {
 			) : null}
 		</div>
 		</ContextoProfessor.Provider>
+		</ContextoMesa.Provider>
 	);
 }

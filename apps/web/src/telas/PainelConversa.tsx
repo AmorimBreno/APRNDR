@@ -71,6 +71,9 @@ export interface PropsPainelConversa {
 	acimaDoCampo?: ReactNode;
 	placeholder?: string;
 	aoPedidoPendente?: PropsConversaEmbutida["aoPedidoPendente"];
+	/** Só no embutido: o rodapé de cada resposta pronta e as ações por bloco, desenhados pelo perfil (genéricos). Na tela cheia, nunca. */
+	rodapeDaResposta?: PropsConversaEmbutida["rodapeDaResposta"];
+	acoesDoBloco?: PropsConversaEmbutida["acoesDoBloco"];
 	/** Só no embutido: o link "Abrir na tela cheia" (a rota da conversa do perfil). */
 	hrefTelaCheia?: string;
 }
@@ -139,6 +142,8 @@ export function PainelConversa({
 	acimaDoCampo,
 	placeholder,
 	aoPedidoPendente,
+	rodapeDaResposta,
+	acoesDoBloco,
 	hrefTelaCheia,
 }: PropsPainelConversa) {
 	const embutido = modo === "embutido";
@@ -362,6 +367,9 @@ export function PainelConversa({
 			{...(aguardando ? { aguardando } : {})}
 			{...(voo ? { voo } : {})}
 			aoPousar={() => setVoo(undefined)}
+			// Os ganchos do perfil valem só no painel embutido: a conversa em tela cheia não muda em nada.
+			{...(embutido && rodapeDaResposta ? { rodapeDaResposta } : {})}
+			{...(embutido && acoesDoBloco ? { acoesDoBloco } : {})}
 			depois={soltos.map((registro) => (
 				<div key={registro.id} className="documento__pedido">
 					{botaoDoPedido(registro)}

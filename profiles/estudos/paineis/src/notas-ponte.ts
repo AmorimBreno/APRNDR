@@ -14,6 +14,8 @@ export interface RespostasNotas {
 	nota: { materia: string; titulo: string; conteudo: string; versao: string; modificadaEm: string };
 	criada: { materia: string; titulo: string };
 	salva: { materia: string; titulo: string; versao: string; modificadaEm: string; pedido?: string };
+	/** O "Guardar na nota" numa nota fechada gravou (extensions/notas.ts): a nota como ficou. */
+	guardada: { materia: string; titulo: string; conteudo: string; versao: string; modificadaEm: string; tamanho: number; pedido?: string };
 	conflito: { materia: string; titulo: string; mensagem: string; versaoAtual?: string; pedido?: string };
 	renomeada: { materia: string; de: string; para: string; mencoesAtualizadas?: string[] };
 	erro: { mensagem: string; ao?: string; materia?: string; titulo?: string; pedido?: string };

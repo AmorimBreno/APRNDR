@@ -186,3 +186,57 @@
 @media (prefers-reduced-motion: no-preference) {
 	.mesa__trecho-aviso { transition: opacity .15s ease-out; }
 }
+
+/* "Ir ao trecho" e "Guardar na nota" na conversa do professor (parte C1, WP3; ganchos-conversa.tsx, GuardarNaNota.tsx e
+ * SeletorDeNota.tsx). O núcleo reserva a linha do rodapé (.bloco__rodape) e o espaço das ações (.bloco-md__acoes): nada
+ * aqui muda o tamanho de nada. */
+
+/* O botão de guardar: 28 px quadrados, sempre; o desenho do repouso e o visto do "Guardado" ocupam o mesmo lugar. */
+.guardar-nota { position: relative; display: flex; justify-content: flex-end; }
+.guardar-nota__botao {
+	display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: var(--border-control) solid var(--line-strong);
+	border-radius: var(--radius-md); background: var(--surface-panel); color: var(--ink-muted); cursor: pointer;
+}
+.guardar-nota__botao:hover, .guardar-nota__botao[aria-expanded="true"], .guardar-nota[data-fase="guardado"] .guardar-nota__botao { border-color: var(--amber); background: var(--amber); color: var(--on-amber); }
+.guardar-nota__botao:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.guardar-nota__icone { grid-area: 1 / 1; display: grid; place-items: center; }
+.guardar-nota__icone[data-oculto] { visibility: hidden; }
+/* O erro flutua sobre o que vem embaixo do botão (posição absoluta): aparecer não empurra nada. */
+.guardar-nota__aviso {
+	position: absolute; z-index: 21; top: calc(100% + var(--space-1)); right: 0; width: max-content; max-width: 15rem; margin: 0;
+	padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); background: var(--surface-raised); color: var(--ink);
+	box-shadow: var(--sticker-shadow), 0 0 0 var(--border-hair) var(--line-strong);
+}
+
+/* O seletor: um popover pequeno à esquerda do botão, no visual do menu do seletor de agente. */
+.seletor-nota {
+	position: absolute; z-index: 20; top: 0; right: calc(100% + var(--space-2)); width: min(17rem, calc(100vw - 3rem)); display: flex; flex-direction: column;
+	gap: var(--space-1); padding: var(--space-2); border-radius: var(--radius-md); background: var(--ink-inverse); color: var(--ink);
+	box-shadow: 0 0 0 var(--border-control) var(--amber);
+}
+.seletor-nota:focus { outline: none; }
+.seletor-nota__titulo { padding: 0 var(--space-2); color: var(--ink-muted); }
+.seletor-nota__lista { display: flex; flex-direction: column; gap: 2px; min-height: 36px; max-height: 12rem; margin: 0; padding: 0; overflow-y: auto; list-style: none; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.seletor-nota__lista:hover { scrollbar-color: var(--line-strong) transparent; }
+.seletor-nota__lista::-webkit-scrollbar { width: 6px; height: 6px; }
+.seletor-nota__lista::-webkit-scrollbar-track { background: transparent; }
+.seletor-nota__lista::-webkit-scrollbar-thumb { border-radius: var(--radius-full); background: var(--line); }
+.seletor-nota__lista:hover::-webkit-scrollbar-thumb { background: var(--line-strong); }
+.seletor-nota__item {
+	display: flex; align-items: center; gap: var(--space-2); width: 100%; min-height: 36px; padding: 4px var(--space-2); border: 0;
+	border-radius: var(--radius-sm); background: transparent; color: inherit; text-align: left; cursor: pointer;
+}
+.seletor-nota__item:focus { outline: none; }
+.seletor-nota__item:hover, .seletor-nota__item:focus-visible { background: var(--surface-hover); }
+.seletor-nota__item:focus-visible { box-shadow: inset 0 0 0 2px var(--focus); }
+.seletor-nota__nome { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.seletor-nota__quando { flex: none; color: var(--ink-muted); }
+.seletor-nota__vazio { padding: var(--space-2); color: var(--ink-muted); }
+.seletor-nota__nova { display: flex; align-items: center; gap: var(--space-2); min-height: 36px; }
+.seletor-nota__campo { flex: 1; min-width: 0; height: 36px; padding: 0 var(--space-2); border: var(--border-control) solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-panel); color: var(--ink); }
+.seletor-nota__campo:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.seletor-nota__criar { flex: none; height: 36px; padding: 0 var(--space-3); border: 0; border-radius: var(--radius-sm); background: var(--amber); color: var(--on-amber); cursor: pointer; }
+.seletor-nota__criar:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.seletor-nota__criar:disabled { opacity: var(--opacity-disabled); cursor: default; }
+/* A linha do erro é reservada (uma linha): o erro aparecer não muda o tamanho do seletor. */
+.seletor-nota__erro { min-height: 20px; margin: 0; padding: 0 var(--space-2); color: var(--brick); }

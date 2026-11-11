@@ -297,7 +297,24 @@ function semConteudo(item: ItemAssistente): boolean {
  * (a foto e o nome do agente) e o texto. Sem etiqueta: é óbvio que é uma
  * resposta; tipos diferentes (Explicação, Exemplo…) virão com etiqueta.
  */
-function BlocoResposta({ item, numero, autor }: { item?: ItemAssistente; numero: number; autor?: ReactNode }) {
+function BlocoResposta({
+	item,
+	numero,
+	autor,
+	rodape,
+	reservarRodape = false,
+	acoesDoBloco,
+}: {
+	item?: ItemAssistente;
+	numero: number;
+	autor?: ReactNode;
+	/** O rodapé do perfil, já desenhado (só de resposta pronta). */
+	rodape?: ReactNode;
+	/** Reserva a linha do rodapé (mesmo vazia): o rodapé entrar, ou não, não muda o tamanho de nada. */
+	reservarRodape?: boolean;
+	/** As ações por bloco do perfil, com a resposta (só chamadas com a resposta pronta). */
+	acoesDoBloco?(fonte: string, indice: number, resposta: ItemAssistente): ReactNode;
+}) {
 	// Sem item = o lugar da próxima resposta, enquanto o agente pensa, pesquisa ou
 	// pergunta e ainda não há texto (o número e o cabeçalho com a foto animada).
 	// É o mesmo componente da resposta, com a mesma estrutura: quando o texto
@@ -323,7 +340,14 @@ function BlocoResposta({ item, numero, autor }: { item?: ItemAssistente; numero:
 							<p className="body-sm">{item.raciocinio}</p>
 						</details>
 					) : null}
-					{item.texto ? <Markdown texto={item.texto} aparecendo={aoVivo(item.chave)} /> : null}
+					{item.texto ? (
+						<Markdown
+							texto={item.texto}
+							aparecendo={aoVivo(item.chave)}
+							// O espaço das ações existe desde o primeiro pedaço do texto; as ações só são pedidas ao perfil com a resposta pronta.
+							{...(acoesDoBloco ? { acoesDoBloco: (fonte: string, indice: number) => (item.emAndamento ? null : acoesDoBloco(fonte, indice, item)) } : {})}
+						/>
+					) : null}
 					{item.erro ? (
 						<div className="aviso-erro" role="alert">
 							<span className="overline">Erro do modelo</span>
@@ -332,6 +356,7 @@ function BlocoResposta({ item, numero, autor }: { item?: ItemAssistente; numero:
 					) : null}
 				</div>
 			) : null}
+			{item && reservarRodape ? <div className="bloco__rodape">{item.emAndamento ? null : rodape}</div> : null}
 		</section>
 	);
 }
@@ -360,10 +385,15 @@ export interface PropsDocumentoConversa {
 	aoPousar?(): void;
 	/**
 	 * Depois de cada resposta pronta (nunca em andamento): o rodapé do perfil, com a
-	 * mensagem do usuário que abriu o turno (docs/mesa-parte-c.md, seção 5). O desenho é do WP3.
+	 * mensagem do usuário que abriu o turno (docs/mesa-parte-c.md, seção 5). Quem decide se
+	 * aparece é o perfil (null = nada); o núcleo só chama e reserva a linha do rodapé em toda
+	 * resposta, para ele entrar sem mudar o tamanho de nada.
 	 */
 	rodapeDaResposta?(resposta: ItemAssistente, perguntaAnterior?: Extract<ItemConversa, { tipo: "usuario" }>): ReactNode;
-	/** Ações por bloco de primeiro nível do markdown da resposta, com a fonte do bloco. O desenho é do WP3. */
+	/**
+	 * Ações por bloco de primeiro nível do markdown da resposta, com a fonte do bloco (Markdown.tsx).
+	 * Só são pedidas ao perfil com a resposta pronta; o espaço delas é reservado desde o início.
+	 */
 	acoesDoBloco?(fonte: string, indice: number, resposta: ItemAssistente): ReactNode;
 }
 
@@ -494,7 +524,18 @@ function ancestralQueRola(elemento: HTMLElement | null): HTMLElement | undefined
  * lado não se mexe, e quem subiu para ler não é puxado de volta. Mandar uma
  * mensagem sempre leva ao fim.
  */
-export function DocumentoConversa({ conversa, vazio, pedidoDaChamada, depois, autorDaResposta, aguardando, voo, aoPousar }: PropsDocumentoConversa) {
+export function DocumentoConversa({
+	conversa,
+	vazio,
+	pedidoDaChamada,
+	depois,
+	autorDaResposta,
+	aguardando,
+	voo,
+	aoPousar,
+	rodapeDaResposta,
+	acoesDoBloco,
+}: PropsDocumentoConversa) {
 	const fim = useRef<HTMLDivElement>(null);
 	/** Estava perto do fim antes do conteúdo crescer; atualizado a cada rolagem do leitor. */
 	const pertoDoFim = useRef(true);
@@ -547,6 +588,8 @@ export function DocumentoConversa({ conversa, vazio, pedidoDaChamada, depois, au
 	}, [conversa, primeiraChave, ultimaChave, ultimoEhUsuario]);
 
 	let numero = 0;
+	/** A mensagem do usuário que abriu o turno: a mais recente antes de cada resposta. */
+	let perguntaAnterior: Extract<ItemConversa, { tipo: "usuario" }> | undefined;
 	if (!aguardando) esperandoNumero.current = undefined;
 	const itens = agruparConversa(conversa, (id) => Boolean(pedidoDaChamada?.(id))).map((trecho) => {
 		if (trecho.tipo === "ferramentas") {
@@ -558,6 +601,7 @@ export function DocumentoConversa({ conversa, vazio, pedidoDaChamada, depois, au
 		}
 		const { item } = trecho;
 		if (item.tipo === "usuario") {
+			perguntaAnterior = item;
 			// A nota não entra subindo: quem traz ela é o voo (ou ela já estava lá).
 			return (
 				<div key={item.chave} className="documento__item documento__item--usuario">
@@ -589,7 +633,13 @@ export function DocumentoConversa({ conversa, vazio, pedidoDaChamada, depois, au
 		return (
 			// Sem entrada: o bloco esperando já estava neste lugar, com o mesmo cabeçalho.
 			<Item key={chaveVisual ?? item.chave} chave={item.chave} tipo="resposta" entrar={false}>
-				<BlocoResposta item={item} numero={numero} autor={autor} />
+				<BlocoResposta
+					item={item}
+					numero={numero}
+					autor={autor}
+					{...(rodapeDaResposta ? { reservarRodape: true, rodape: item.emAndamento ? null : rodapeDaResposta(item, perguntaAnterior) } : {})}
+					{...(acoesDoBloco ? { acoesDoBloco } : {})}
+				/>
 			</Item>
 		);
 	});

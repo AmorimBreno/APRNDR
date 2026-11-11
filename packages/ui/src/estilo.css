@@ -153,6 +153,20 @@ a.linha:hover .linha__texto .overline, a.linha:focus-visible .linha__texto .over
 .bloco__margem { position: absolute; top: 4px; right: calc(100% + var(--space-4)); display: flex; align-items: center; gap: var(--space-2); color: var(--ink-subtle); }
 .bloco__autor { display: flex; align-items: center; gap: var(--space-3); min-height: 32px; }
 .bloco__nome { color: var(--ink-muted); }
+/* Rodapé da resposta (o perfil desenha, o núcleo só reserva a linha em toda resposta, mesmo vazia: ele entrar não muda o tamanho de nada). */
+.bloco__rodape { display: flex; align-items: center; min-height: 32px; margin-top: var(--space-2); }
+/* Ações por bloco de primeiro nível (Markdown.tsx, acoesDoBloco): o espaço à direita é reservado (padding), então as ações
+ * que aparecem com o mouse sobre o bloco ou o foco do teclado dentro dele não empurram o texto nem mudam a largura.
+ * Um filho com data-fixo (um aviso, um "Guardado") mantém as ações visíveis mesmo com o mouse longe. */
+.bloco-md { position: relative; padding-right: 36px; }
+.bloco-md__acoes { position: absolute; top: 0; right: 0; width: 32px; display: flex; flex-direction: column; align-items: flex-end; opacity: 0; }
+.bloco-md:hover > .bloco-md__acoes, .bloco-md:focus-within > .bloco-md__acoes, .bloco-md__acoes:has([data-fixo]) { opacity: 1; }
+/* O último bloco não deixa a margem de baixo escapar pelo embrulho (.ap-prose > :last-child não o alcança). */
+.bloco-md:last-child > :nth-last-child(2) { margin-bottom: 0; }
+.bloco-md:first-child > :first-child { margin-top: 0; }
+@media (prefers-reduced-motion: no-preference) {
+	.bloco-md__acoes { transition: opacity .12s ease-out; }
+}
 .info-resposta { position: relative; display: inline-flex; }
 .info-resposta__botao { display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: var(--border-control) solid var(--line-strong); border-radius: var(--radius-full); background: transparent; color: var(--ink-muted); font-size: 12px; line-height: 1; cursor: pointer; transition: color .12s ease-out, border-color .12s ease-out, background-color .12s ease-out; }
 .info-resposta__botao:hover:not(:disabled), .info-resposta__botao[aria-expanded="true"] { border-color: var(--amber); background: var(--amber); color: var(--on-amber); }

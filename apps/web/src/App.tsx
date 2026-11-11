@@ -61,7 +61,7 @@ const conversasEmbutidas = new Map<string, ComponentType<PropsConversaEmbutida>>
 function conversaEmbutidaDe(perfilId: string): ComponentType<PropsConversaEmbutida> {
 	let componente = conversasEmbutidas.get(perfilId);
 	if (!componente) {
-		componente = function ConversaEmbutida({ janela, aberta, obterContextos, cabecalho, citacao, acimaDoCampo, placeholder, aoPedidoPendente }) {
+		componente = function ConversaEmbutida({ janela, aberta, obterContextos, cabecalho, citacao, acimaDoCampo, placeholder, aoPedidoPendente, rodapeDaResposta, acoesDoBloco }) {
 			const perfis = usePerfis();
 			const perfil = perfis.lista?.perfis.find((item) => item.id === perfilId);
 			return (
@@ -77,6 +77,8 @@ function conversaEmbutidaDe(perfilId: string): ComponentType<PropsConversaEmbuti
 					{...(acimaDoCampo ? { acimaDoCampo } : {})}
 					{...(placeholder ? { placeholder } : {})}
 					{...(aoPedidoPendente ? { aoPedidoPendente } : {})}
+					{...(rodapeDaResposta ? { rodapeDaResposta } : {})}
+					{...(acoesDoBloco ? { acoesDoBloco } : {})}
 					hrefTelaCheia={hashDaConversa(perfilId)}
 				/>
 			);

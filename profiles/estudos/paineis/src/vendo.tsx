@@ -180,6 +180,11 @@ export interface ValorVendoMesa extends ValorVendo {
 	obterContextos(entrada: Pick<EntradaContextos, "abas" | "chaveFoco" | "selecionadas" | "pedirNota">): Promise<ContextoTela[]>;
 	/** A última cópia guardada do texto da aba (de quando ela deixou de ser a ativa, ou do último envio). */
 	copia(chave: string): string | undefined;
+	/**
+	 * Apaga a cópia guardada da aba (sem diferença de caixa, como o Windows): a nota mudou por fora do editor
+	 * (o "Guardar na nota" gravou numa nota fechada) e a cópia ficou velha; o próximo envio pede a nota de novo.
+	 */
+	invalidarCopia(chave: string): void;
 }
 
 const ContextoVendo = createContext<ValorVendoMesa | undefined>(undefined);
@@ -257,6 +262,10 @@ export function ProvedorVendo({ perfilId, materiaId, children }: PropsProvedorVe
 	}, []);
 	const ativa = useCallback(() => fontes.current.at(-1), []);
 	const copia = useCallback((chaveDaAba: string) => copias.current.get(chaveDaAba), []);
+	const invalidarCopia = useCallback((chaveDaAba: string) => {
+		const minuscula = chaveDaAba.toLowerCase();
+		for (const chaveCopia of [...copias.current.keys()]) if (chaveCopia.toLowerCase() === minuscula) copias.current.delete(chaveCopia);
+	}, []);
 
 	const obterContextos = useCallback(async (entrada: Pick<EntradaContextos, "abas" | "chaveFoco" | "selecionadas" | "pedirNota">) => {
 		// Cópia de aba que já não está aberta não serve se ela voltar: some.
@@ -275,8 +284,8 @@ export function ProvedorVendo({ perfilId, materiaId, children }: PropsProvedorVe
 	}, []);
 
 	const valor = useMemo<ValorVendoMesa>(
-		() => ({ registrar, ativa, olho, alternarOlho, versao, falhou, obterContextos, copia }),
-		[registrar, ativa, olho, alternarOlho, versao, falhou, obterContextos, copia],
+		() => ({ registrar, ativa, olho, alternarOlho, versao, falhou, obterContextos, copia, invalidarCopia }),
+		[registrar, ativa, olho, alternarOlho, versao, falhou, obterContextos, copia, invalidarCopia],
 	);
 	return <ContextoVendo.Provider value={valor}>{children}</ContextoVendo.Provider>;
 }

@@ -48,6 +48,7 @@ import remarkMath from "remark-math";
 import { DesenhoDaEstrutura } from "./Estrutura.tsx";
 import { ImagemDoPerfil } from "./ImagemDoPerfil.tsx";
 import { lerEstrutura } from "./ler-estrutura.ts";
+import rehypeBlocos, { fonteDoBloco, posicaoDoBloco } from "./rehype-blocos.ts";
 import rehypeCodigo, { CLASSE_LINHA } from "./rehype-codigo.ts";
 import rehypePalavras from "./rehype-palavras.ts";
 import remarkDinheiro from "./remark-dinheiro.ts";
@@ -145,8 +146,34 @@ function BlocoDeCodigo({ no, emLinha, children }: { no: NoHast | undefined; emLi
 	);
 }
 
+/**
+ * O que o div de um bloco de primeiro nível lê na hora de desenhar (rehype-blocos.ts): o texto de agora e as
+ * ações. Fica numa ref para os `components` terem identidade estável (se mudassem a cada render o React
+ * remontaria todos os blocos) e mesmo assim desenharem as ações com o texto e a função mais novos.
+ */
+interface LeitorDeBlocos {
+	texto: string;
+	acoes: ((fonte: string, indice: number) => ReactNode) | undefined;
+}
+
+/**
+ * O bloco de primeiro nível com o espaço das ações à direita. O espaço é reservado (padding do bloco), então as
+ * ações que aparecem com o mouse ou o foco não empurram o texto nem mudam a largura (estilo.css, .bloco-md).
+ */
+function BlocoComAcoes({ no, leitor, children }: { no: NoHast | undefined; leitor: LeitorDeBlocos; children: ReactNode }) {
+	const posicao = posicaoDoBloco(no?.properties);
+	if (!posicao) return <div>{children}</div>;
+	const acoes = leitor.acoes?.(fonteDoBloco(leitor.texto, posicao), posicao.indice);
+	return (
+		<div className="bloco-md">
+			{children}
+			<div className="bloco-md__acoes">{acoes}</div>
+		</div>
+	);
+}
+
 // Links abrem fora do app (o app roda no Edge em modo app, sem barra de endereço).
-function criarComponentes(emLinha: boolean, ligacoes: LigacoesMarkdown): Components {
+function criarComponentes(emLinha: boolean, ligacoes: LigacoesMarkdown, leitor?: { current: LeitorDeBlocos }): Components {
 	return {
 		a: ({ node, children, ...props }) => {
 			const original = String(node?.properties?.href ?? props.href ?? "");
@@ -169,6 +196,19 @@ function criarComponentes(emLinha: boolean, ligacoes: LigacoesMarkdown): Compone
 		),
 		// Em linha (rótulos de opção, enunciados curtos): os parágrafos viram texto solto.
 		...(emLinha ? { p: ({ children }) => <>{children}</> } : {}),
+		// Só com ações por bloco (rehype-blocos.ts embrulha os blocos de primeiro nível num div marcado).
+		...(leitor
+			? {
+					div: ({ node, children, ...props }) =>
+						posicaoDoBloco(node?.properties) ? (
+							<BlocoComAcoes no={node as NoHast | undefined} leitor={leitor.current}>
+								{children}
+							</BlocoComAcoes>
+						) : (
+							<div {...props}>{children}</div>
+						),
+				}
+			: {}),
 	};
 }
 
@@ -182,24 +222,36 @@ export function Markdown({
 	emLinha = false,
 	aparecendo = false,
 	ligacoes,
+	acoesDoBloco,
 }: {
 	texto: string;
 	emLinha?: boolean;
 	aparecendo?: boolean;
 	ligacoes?: LigacoesMarkdown;
 	/**
-	 * Ações por bloco de primeiro nível (parágrafo, lista, tabela, código, fórmula,
-	 * citação): desenhadas à direita do bloco, com a fonte original dele (pelas posições
-	 * do nó sobre `texto`). Contrato do WP0 (docs/mesa-parte-c.md, seção 5); o WP3 liga.
+	 * Ações por bloco de primeiro nível (parágrafo, lista, tabela, código, fórmula em bloco,
+	 * citação): desenhadas à direita do bloco, visíveis com o mouse sobre ele ou o foco do
+	 * teclado dentro dele, num espaço reservado (sem empurrar o texto). `fonte` é o markdown
+	 * original do bloco, fatiado de `texto` pelas posições do nó; `indice` conta os blocos de
+	 * primeiro nível com ações, a partir de 0. A função pode devolver null (o bloco mantém o
+	 * espaço reservado, para ligar as ações no fim de uma resposta sem mudar nada de lugar).
+	 * Sem ela, o HTML é o de sempre; em linha (`emLinha`), não vale. O `aparecendo` não
+	 * desliga: ele continua ligado depois que a resposta termina, e as ações valem nela.
+	 * Contrato do WP0 (docs/mesa-parte-c.md, seção 5).
 	 */
 	acoesDoBloco?(fonte: string, indice: number): ReactNode;
 }) {
 	const herdadas = useContext(ContextoLigacoes);
 	const registradas = ligacoes ?? herdadas;
-	const componentes = useMemo(() => criarComponentes(emLinha, registradas), [emLinha, registradas]);
+	const comAcoes = acoesDoBloco !== undefined && !emLinha;
+	const leitor = useRef<LeitorDeBlocos>({ texto, acoes: acoesDoBloco });
+	leitor.current = { texto, acoes: acoesDoBloco };
+	const componentes = useMemo(() => criarComponentes(emLinha, registradas, comAcoes ? leitor : undefined), [emLinha, registradas, comAcoes]);
 	const atrasoDe = useFilaDePalavras();
+	// Os blocos embrulhados vêm antes de tudo: o rehype-katex troca a fórmula em bloco por HTML sem posição.
+	const base: PluginsRehype = comAcoes ? [rehypeBlocos, ...pluginsRehype] : pluginsRehype;
 	// Enquanto a resposta chega: cada palavra num span, e as novas aparecem uma a uma (rehype-palavras.ts).
-	const plugins: PluginsRehype = aparecendo ? [...pluginsRehype, [rehypePalavras, { atrasoDe }]] : pluginsRehype;
+	const plugins: PluginsRehype = aparecendo ? [...base, [rehypePalavras, { atrasoDe }]] : base;
 	return (
 		<ReactMarkdown
 			remarkPlugins={pluginsRemark}

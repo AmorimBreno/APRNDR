@@ -40,6 +40,7 @@ import { AbasMesa, useAbasGuardadas } from "./AbasMesa.tsx";
 import { AVISO_TRECHO_MUDOU, type PedidoAncora, quedaMereceAviso } from "./ancora.ts";
 import { CabecalhoProfessor } from "./CabecalhoProfessor.tsx";
 import { ChipVendo } from "./ChipVendo.tsx";
+import { useGanchosDaConversa } from "./ganchos-conversa.tsx";
 import { type EstadoComandos, novosComandos } from "./comandos-mesa.ts";
 import { type AlvoIrPara, ContextoMesa, type ValorMesa } from "./mesa-ir.ts";
 import { mesmoTitulo, PAINEL_NOTAS } from "./notas-ponte.ts";
@@ -654,6 +655,8 @@ function MesaInterna(props: PropsMesaEstudo) {
 	}, [aberto]);
 
 	const rotuloDoCampo = fonte?.rotulo;
+	// "Ir ao trecho" no rodapé das respostas e "Guardar na nota" em cada bloco (parte C1, WP3).
+	const ganchos = useGanchosDaConversa({ janela: props.janela, materiaId, chaveFoco: () => chaveAtivaRef.current });
 	const contexto: ProfessorDaMesa | undefined = Conversa ? { aberto, pendente, pulsa, alternar, abrir, citar, perguntar, idPainel, botao } : undefined;
 
 	return (
@@ -711,6 +714,8 @@ function MesaInterna(props: PropsMesaEstudo) {
 							aoPedidoPendente={setPendente}
 							obterContextos={obterContextos}
 							cabecalho={<CabecalhoProfessor janela={props.janela} perfilId={perfilId} {...(props.materia ? { materia: props.materia } : {})} {...(props.abrirConversa ? { abrirConversa: props.abrirConversa } : {})} />}
+							rodapeDaResposta={ganchos.rodapeDaResposta}
+							acoesDoBloco={ganchos.acoesDoBloco}
 							acimaDoCampo={<ChipVendo abas={pilulas} chaveFoco={chaveAtiva} selecionadas={selecionadas} alternar={alternarSelecao} />}
 							{...(citacao ? { citacao: { texto: citacao.texto, limpar: limparCitacao } } : {})}
 							{...(rotuloDoCampo ? { placeholder: `Pergunte sobre ${rotuloDoCampo}…` } : {})}

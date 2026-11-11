@@ -18,7 +18,7 @@ import { type JanelaPerfilHook, semMovimento, useValorEstavel } from "@estudos/u
 import { TextSelection } from "@tiptap/pm/state";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
-import { type KeyboardEvent, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type KeyboardEvent, type MouseEvent, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { conferirTitulo, type NotaAberta, TAMANHO_TITULO, temHtmlDesconhecido } from "../../lib/nota-tipos.ts";
 import { ancoraDoEditor, mostrarNaNota } from "./destaque-nota.ts";
 import { acrescentarMarkdown, carregarNoEditor, extensoesDaNota, markdownDaNota } from "./editor-nota.ts";
@@ -26,6 +26,8 @@ import { AlcaBlocos } from "./AlcaBlocos.tsx";
 import { BarraFormatacao } from "./BarraFormatacao.tsx";
 import { AcoesDePergunta, BarraSelecao, useSelecaoDoDocumento } from "./BarraSelecao.tsx";
 import { EditorFormula } from "./EditorFormula.tsx";
+import { idDoLinkDeConversa } from "./conversa-link.ts";
+import { useMesa } from "./mesa-ir.ts";
 import { type ArquivoMencionavel, META_TITULOS, materialDoAlvo } from "./mencao.ts";
 import { PROIBIDOS_PADRAO, trechoDaBarra } from "./selecao.ts";
 import { useTrocaSessao } from "./troca-sessao.tsx";
@@ -552,6 +554,16 @@ function EditorDaNota(props: PropsEditorNota & { rotuloInicial?: string | undefi
 	// Parte C1: a mesa pede por aqui para achar e destacar um trecho (mostrar, só com a página pronta) e o "Guardar na
 	// nota" acrescenta ao buffer (inserirNoBuffer). Tudo lê das refs: a fonte não é registrada de novo a cada render.
 	const registrarVendo = useVendoOpcional()?.registrar;
+	const abrirConversa = useMesa()?.abrirConversa;
+	const abrirConversaAgora = useRef(abrirConversa);
+	abrirConversaAgora.current = abrirConversa;
+	const aoClicarNaFolha = (evento: MouseEvent<HTMLDivElement>) => {
+		const idDaConversa = idDoLinkDeConversa(evento.target);
+		if (idDaConversa === undefined) return;
+		evento.preventDefault();
+		evento.stopPropagation();
+		if (idDaConversa !== "") abrirConversaAgora.current?.(idDaConversa);
+	};
 	const notaCarregada = Boolean(nota);
 	const prontaAgora = useRef(pronta);
 	prontaAgora.current = pronta;
@@ -706,7 +718,9 @@ function EditorDaNota(props: PropsEditorNota & { rotuloInicial?: string | undefi
 					</Callout>
 				) : null}
 				{!nota && !erroAbrir ? <p className="body caderno__carregando">Abrindo a nota…</p> : null}
-				<div ref={folha} className={`editor-nota__folha${nota ? "" : " editor-nota__folha--escondida"}`}>
+				{/* O link conversa:<id> (o do Guardar na nota e o da marca do professor) abre a conversa da matéria, na nota em edição e
+				    na em leitura; nunca abre endereço do navegador (a captura vem antes do clique do ProseMirror e do <a>). */}
+				<div ref={folha} className={`editor-nota__folha${nota ? "" : " editor-nota__folha--escondida"}`} onClickCapture={aoClicarNaFolha}>
 					<EditorContent editor={editor} />
 				</div>
 				{editor ? (

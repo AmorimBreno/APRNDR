@@ -15,6 +15,7 @@ import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from 
 import { conferirTitulo, TAMANHO_TITULO } from "../../lib/nota-tipos.ts";
 import { mesmoTitulo } from "./notas-ponte.ts";
 import { editadaHa, useListaNotas } from "./SecaoNotas.tsx";
+import { TagDoProfessor } from "./TagDoProfessor.tsx";
 
 export type DesfechoDeCriar = { ok: true; titulo: string } | { ok: false; mensagem: string };
 
@@ -116,6 +117,7 @@ export function SeletorDeNota({ janela, materiaId, aoEscolher, criar, aoFechar }
 					<li key={nota.titulo}>
 						<button type="button" className="seletor-nota__item" data-opcao="" onClick={() => aoEscolher(nota.titulo)}>
 							<span className="seletor-nota__nome body-strong">{nota.titulo}</span>
+							{nota.doProfessor ? <TagDoProfessor /> : null}
 							<span className="seletor-nota__quando data">{editadaHa(nota.modificadaEm)}</span>
 						</button>
 					</li>

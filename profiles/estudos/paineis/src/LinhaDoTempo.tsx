@@ -45,6 +45,11 @@ function valorDoCampo(campo: string, valor: unknown): string {
 
 const NOMES_CAMPO_TAREFA: Record<string, string> = { titulo: "título", nota: "nota", data: "data", hora: "hora", materia: "matéria" };
 
+/** O título da nota de um evento da mesa (objeto.titulo; os mais antigos usam objeto.nota). */
+function tituloDaNota(evento: Evento): string {
+	return texto(evento.objeto.titulo) ?? texto(evento.objeto.nota) ?? "uma nota";
+}
+
 /** As frases dos eventos de tarefa (docs/agenda.md, "Eventos"). */
 function descreverTarefa(evento: Evento): { icone: IconName; texto: string; detalhe?: string } {
 	const resultado = (evento.resultado ?? {}) as Record<string, unknown>;
@@ -149,6 +154,19 @@ export function descreverEvento(evento: Evento): { icone: IconName; texto: strin
 			return { icone: "file", texto: `Nota criada: ${nota}` };
 		case "editou_nota":
 			return { icone: "book", texto: `Nota editada: ${nota}` };
+		// Mesa de estudo, partes C1 e D: os eventos de nota da mesa guardam o título em objeto.titulo (os de cima, em objeto.nota).
+		case "guardou_na_nota": {
+			const tamanho = typeof evento.objeto.tamanho === "number" ? evento.objeto.tamanho : undefined;
+			return {
+				icone: "notebook",
+				texto: `Trecho guardado na nota: ${tituloDaNota(evento)}`,
+				...(tamanho !== undefined ? { detalhe: `${tamanho} ${tamanho === 1 ? "caractere" : "caracteres"}` } : {}),
+			};
+		}
+		case "criou_nota_do_professor":
+			return { icone: "file", texto: `Nota criada pelo professor: ${tituloDaNota(evento)}` };
+		case "desfez_nota_do_professor":
+			return { icone: "close", texto: `Nota do professor desfeita: ${tituloDaNota(evento)}` };
 		case "renomeou_nota":
 			return {
 				icone: "refresh",

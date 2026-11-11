@@ -18,6 +18,8 @@ export interface RespostasNotas {
 	guardada: { materia: string; titulo: string; conteudo: string; versao: string; modificadaEm: string; tamanho: number; pedido?: string };
 	conflito: { materia: string; titulo: string; mensagem: string; versaoAtual?: string; pedido?: string };
 	renomeada: { materia: string; de: string; para: string; mencoesAtualizadas?: string[] };
+	/** O Desfazer do cartão "Nota criada" apagou a nota (parte D, extensions/notas.ts). */
+	desfeita: { materia: string; titulo: string; pedido?: string };
 	erro: { mensagem: string; ao?: string; materia?: string; titulo?: string; pedido?: string };
 }
 

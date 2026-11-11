@@ -159,8 +159,8 @@ export async function esperarAcao<T>(
 }
 
 let contador = 0;
-/** Um id de pedido único (a extensão o devolve na resposta). */
-export function novoIdDePedido(): string {
+/** Um id de pedido único (a extensão o devolve na resposta). O prefixo diz de que pedido é ("guardar", "desfazer"). */
+export function novoIdDePedido(prefixo = "guardar"): string {
 	contador += 1;
-	return `guardar-${Date.now().toString(36)}-${contador}`;
+	return `${prefixo}-${Date.now().toString(36)}-${contador}`;
 }

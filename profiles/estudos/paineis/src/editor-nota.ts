@@ -52,7 +52,7 @@ export function extensoesDaNota(opcoes: OpcoesEditorNota = {}): AnyExtension[] {
 		StarterKit.configure({
 			heading: { levels: [1, 2, 3, 4] },
 			underline: false,
-			link: { openOnClick: false, autolink: true, defaultProtocol: "https" },
+			link: { openOnClick: false, autolink: true, defaultProtocol: "https", protocols: ["conversa"] },
 		}),
 		TaskList,
 		TaskItem.configure({ nested: true }),

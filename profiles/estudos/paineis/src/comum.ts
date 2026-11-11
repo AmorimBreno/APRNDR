@@ -92,7 +92,7 @@ export function contextoDaMateria(materia: Materia): ContextoSessao {
 			`Esta conversa é do caderno da matéria ${materia.nome} (pasta materias/${materia.id} da pasta de dados).`,
 			"Quando o Breno falar da matéria, da aula, dos slides ou da prova, é desta.",
 			"A busca nos materiais (buscar_material e listar_arquivos_de_material) já fica nesta matéria; só use todas: true se ele pedir para procurar em outras matérias.",
-			"As notas pessoais dele neste caderno você lê com listar_notas e ler_nota; elas são dele, então nunca escreva nem mude uma nota.",
+			"As notas pessoais dele neste caderno você lê com listar_notas e ler_nota; elas são dele, então nunca escreva nem mude uma nota. Notas novas você cria com criar_nota, só quando ele pedir uma nota ou um resumo ou quando uma nota nova claramente ajuda (nunca por garantia); depois diga o título e que há um botão Desfazer.",
 			`Numa nota, [[materiais/<arquivo>]] menciona um material desta matéria: leia com ler_material no caminho materias/${materia.id}/materiais/<arquivo>.`,
 			"O mapa de conteúdo da matéria (os conceitos do material, em ordem e com prioridades) você lê com ler_mapa_conteudo.",
 			"Os cursos da matéria (os planos de estudo, inclusive os rascunhos do guia de criação, com prazo, objetivo e os conceitos do mapa de cada um) você lê com ler_curso.",

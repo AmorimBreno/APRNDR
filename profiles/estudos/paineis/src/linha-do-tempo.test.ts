@@ -102,3 +102,24 @@ describe("descreverEvento: a agenda", () => {
 		expect(descreverEvento(eventoDaAgenda("alterou_quadro", quadro)).texto).toBe("Quadro alterado");
 	});
 });
+
+describe("descreverEvento: as notas da mesa (partes C1 e D)", () => {
+	it("guardou_na_nota: o trecho guardado, com o título e o tamanho", () => {
+		const { icone, texto, detalhe } = descreverEvento(eventoDaAgenda("guardou_na_nota", { materia: "calculo", titulo: "Séries", sessao: "s1", tamanho: 120 }));
+		expect(icone).toBe("notebook");
+		expect(texto).toBe("Trecho guardado na nota: Séries");
+		expect(detalhe).toBe("120 caracteres");
+		expect(descreverEvento(eventoDaAgenda("guardou_na_nota", { materia: "calculo", titulo: "Séries", tamanho: 1 })).detalhe).toBe("1 caractere");
+	});
+
+	it("criou_nota_do_professor e desfez_nota_do_professor têm rótulo e ícone próprios (não caem no texto genérico)", () => {
+		const criou = descreverEvento(eventoDaAgenda("criou_nota_do_professor", { materia: "calculo", titulo: "Resumo", tamanho: 300, hash: "abc" }));
+		expect(criou).toEqual({ icone: "file", texto: "Nota criada pelo professor: Resumo" });
+		const desfez = descreverEvento(eventoDaAgenda("desfez_nota_do_professor", { materia: "calculo", titulo: "Resumo" }));
+		expect(desfez).toEqual({ icone: "close", texto: "Nota do professor desfeita: Resumo" });
+	});
+
+	it("sem título no evento, diz 'uma nota'", () => {
+		expect(descreverEvento(eventoDaAgenda("guardou_na_nota", { materia: "calculo" })).texto).toBe("Trecho guardado na nota: uma nota");
+	});
+});

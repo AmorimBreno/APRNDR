@@ -26,6 +26,17 @@ export interface AlvoIrPara {
 
 export interface ValorMesa {
 	irPara(alvo: AlvoIrPara): void;
+	/**
+	 * Parte D: fecha a aba da nota `rota` se ela estiver aberta na mesa (o cartão "Nota criada" fecha a aba antes de
+	 * desfazer). Se a nota é a aba em foco, espera o salvamento terminar antes de fechar. Resolve quando a aba já foi
+	 * fechada (ou quando não havia aba). Opcional: uma mesa de teste pode não ter.
+	 */
+	fecharAbaDaNota?(rota: string): Promise<void>;
+	/**
+	 * Parte D: o clique num link `conversa:<id>` (conversa-link.ts). Reabre a conversa da matéria cujo id curto é `idCurto`,
+	 * pelas regras de troca da mesa (abrir-conversa.tsx), e abre o painel do professor. Opcional como o de cima.
+	 */
+	abrirConversa?(idCurto: string): void;
 }
 
 export const ContextoMesa = createContext<ValorMesa | undefined>(undefined);

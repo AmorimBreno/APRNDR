@@ -29,6 +29,9 @@
 // professor (painel "mesa" da ponte, comandos-mesa.ts), abre as abas dele na vaga de prévia
 // (abas-mesa.ts) e guarda uma âncora pendente que vence a rolagem guardada da aba e é
 // resolvida pela fonte da aba (vendo.ts, mostrar) quando o conteúdo fica pronto.
+//
+// Parte D (docs/mesa-parte-d.md): a mesma porta expõe fecharAbaDaNota (o Desfazer do cartão "Nota criada" fecha a
+// aba antes de apagar a nota) e abrirConversa (o clique num link conversa:<id> das notas, abrir-conversa.tsx).
 
 import { AvatarAgente, type ContextoTela, type DadosAvatarAgente, type PropsConversaEmbutida, semMovimento } from "@estudos/ui";
 import { motion } from "motion/react";
@@ -37,6 +40,7 @@ import type { Materia } from "../../lib/materia-tipos.ts";
 import { type ComandoMesa, PAINEL_MESA } from "../../lib/mesa-tipos.ts";
 import { abaDoCaminho, abrirAba, abrirPrevia, fecharAba, fixarAba, guardarRolagem, mudarCaminho, type TipoAbaMesa } from "./abas-mesa.ts";
 import { AbasMesa, useAbasGuardadas } from "./AbasMesa.tsx";
+import { AvisoDaConversaFlutuante, useAbrirConversa } from "./abrir-conversa.tsx";
 import { AVISO_TRECHO_MUDOU, type PedidoAncora, quedaMereceAviso } from "./ancora.ts";
 import { CabecalhoProfessor } from "./CabecalhoProfessor.tsx";
 import { ChipVendo } from "./ChipVendo.tsx";
@@ -45,6 +49,7 @@ import { type EstadoComandos, novosComandos } from "./comandos-mesa.ts";
 import { type AlvoIrPara, ContextoMesa, type ValorMesa } from "./mesa-ir.ts";
 import { mesmoTitulo, PAINEL_NOTAS } from "./notas-ponte.ts";
 import { type Ancora, lerOrigem } from "./origem-mesa.ts";
+import { useTrocaSessao } from "./troca-sessao.tsx";
 import { alternarEscolha, chavesSelecionadas, escolhasVigentes, type EscolhasBancada, SEM_ESCOLHAS } from "./selecao-bancada.ts";
 import { type AbaDaBancada, chaveDaFonte, comAncoraNoFoco, fonteServeARota, ProvedorVendo, useVendo } from "./vendo.tsx";
 
@@ -123,6 +128,8 @@ const QUADROS_PARA_ROLAR = 45;
 /** Quanto esperar a nota pedida pela ponte (nota restaurada que ainda não abriu nesta sessão). */
 const PRAZO_NOTA_MS = 1500;
 const PASSO_NOTA_MS = 50;
+/** Quanto fecharAbaDaNota espera a aba sair da faixa (e a rota mudar) antes de seguir. */
+const PRAZO_FECHAR_ABA_MS = 1500;
 /** Quanto a âncora pendente espera o conteúdo da aba ficar pronto (a nota vem pela ponte, o módulo carrega); depois desiste em silêncio. */
 const PRAZO_ANCORA_MS = 5000;
 /** Uma âncora pendente numa aba que não tomou o foco vale até o Breno ir nela, mas não para sempre. */
@@ -460,7 +467,13 @@ function MesaInterna(props: PropsMesaEstudo) {
 	);
 	const irParaRef = useRef(irPara);
 	irParaRef.current = irPara;
-	const valorMesa = useMemo<ValorMesa>(() => ({ irPara: (alvo) => irParaRef.current(alvo) }), []);
+	// Parte D: as duas portas novas leem de refs (a função de verdade é definida mais abaixo, com o que ela precisa).
+	const fecharAbaDaNotaRef = useRef<(rota: string) => Promise<void>>(() => Promise.resolve());
+	const abrirConversaRef = useRef<(idCurto: string) => void>(() => {});
+	const valorMesa = useMemo<ValorMesa>(
+		() => ({ irPara: (alvo) => irParaRef.current(alvo), fecharAbaDaNota: (rota) => fecharAbaDaNotaRef.current(rota), abrirConversa: (idCurto) => abrirConversaRef.current(idCurto) }),
+		[],
+	);
 
 	// Os comandos do professor (painel "mesa" da ponte, B2): só as chaves novas desde a montagem e desde a última troca de
 	// sessão, sem repetir id, e só na aba do navegador visível e com foco (comandos-mesa.ts).
@@ -491,6 +504,25 @@ function MesaInterna(props: PropsMesaEstudo) {
 		// Fechou a ativa: vai para a vizinha, ou para o painel do caderno quando não sobra nenhuma.
 		if (aba.chave === chaveAtiva) navegar(resultado.ativar ?? `caderno/${materiaId}/notas`);
 	};
+	const fecharUmaAbaRef = useRef(fecharUmaAba);
+	fecharUmaAbaRef.current = fecharUmaAba;
+	// Fecha a aba de uma nota pela rota (o Desfazer do cartão "Nota criada"). Se ela é a aba em foco, o editor salva antes
+	// (executarAntesDeTrocar): um salvamento depois de a nota ser apagada a recriaria. Sem a aba aberta, não faz nada.
+	const troca = useTrocaSessao();
+	const trocaRef = useRef(troca);
+	trocaRef.current = troca;
+	fecharAbaDaNotaRef.current = async (rota) => {
+		const aba = abaDoCaminho(rota);
+		if (!aba || !abasRef.current.some((outra) => outra.chave === aba.chave)) return;
+		if (aba.chave === chaveAtivaRef.current) await trocaRef.current.executarAntesDeTrocar().catch(() => {});
+		if (!abasRef.current.some((outra) => outra.chave === aba.chave)) return;
+		fecharUmaAbaRef.current({ chave: aba.chave });
+		// Espera a aba sair de verdade (a lista de abas e, se era a em foco, a rota): quem pediu só segue depois disso.
+		const limite = Date.now() + PRAZO_FECHAR_ABA_MS;
+		while (Date.now() < limite && (abasRef.current.some((outra) => outra.chave === aba.chave) || chaveAtivaRef.current === aba.chave)) {
+			await new Promise((resolver) => setTimeout(resolver, 20));
+		}
+	};
 
 	const nodeAbas = (
 		<AbasMesa
@@ -516,6 +548,9 @@ function MesaInterna(props: PropsMesaEstudo) {
 			return true;
 		});
 	}, [perfilId]);
+	// O clique num link conversa:<id> de uma nota: reabre a conversa da matéria (abrir-conversa.tsx) e abre o professor.
+	const conversaPeloLink = useAbrirConversa({ janela: props.janela, perfilId, materia: props.materia, aoAbrir: abrir });
+	abrirConversaRef.current = conversaPeloLink.abrir;
 	const citar = useCallback(
 		(trecho: string, ancora?: Ancora) => {
 			setCitacao({ texto: trecho, ancora, chave: chaveAtivaRef.current });
@@ -696,6 +731,7 @@ function MesaInterna(props: PropsMesaEstudo) {
 						{aviso ? AVISO_TRECHO_MUDOU : ""}
 					</span>
 				</div>
+				<AvisoDaConversaFlutuante aviso={conversaPeloLink.aviso} dispensar={conversaPeloLink.dispensar} />
 			</div>
 			{Conversa ? (
 				<motion.aside

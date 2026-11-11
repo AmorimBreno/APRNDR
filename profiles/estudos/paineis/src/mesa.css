@@ -174,13 +174,17 @@
 
 /* O aviso "O trecho mudou desde a pergunta" (MesaEstudo.tsx): por cima do corpo, embaixo e no meio (posição absoluta na
  * área "corpo" da grade da mesa), sempre montado; só a opacidade muda, então nada empurra nada. */
-.mesa__trecho-aviso {
+.mesa__trecho-aviso, .mesa__conversa-aviso {
 	position: absolute; grid-area: corpo; justify-self: center; align-self: end; z-index: 3; margin-bottom: var(--space-4);
 	max-width: calc(100% - 2 * var(--space-4)); padding: var(--space-2) var(--space-3); border-radius: var(--radius-full);
 	background: var(--surface-raised); color: var(--ink); box-shadow: var(--sticker-shadow), 0 0 0 var(--border-hair) var(--line-strong);
 	opacity: 0; pointer-events: none;
 }
 .mesa__trecho-aviso--visivel { opacity: 1; }
+/* Parte D (abrir-conversa.tsx): o aviso curto e a confirmação ao abrir uma conversa pelo link conversa:<id> das notas.
+ * Mesma posição do aviso do trecho; sem o fade de entrada (aparece na hora: é a resposta a um clique) e clicável. */
+.mesa__conversa-aviso { opacity: 1; pointer-events: auto; border-radius: var(--radius-md); }
+.mesa__conversa-aviso--acao { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--space-2) var(--space-3); }
 /* O texto visível é fixo (para o fade de saída não perder o texto); o leitor de tela ouve só a região de status. */
 .mesa__so-leitor { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 @media (prefers-reduced-motion: no-preference) {
@@ -240,3 +244,38 @@
 .seletor-nota__criar:disabled { opacity: var(--opacity-disabled); cursor: default; }
 /* A linha do erro é reservada (uma linha): o erro aparecer não muda o tamanho do seletor. */
 .seletor-nota__erro { min-height: 20px; margin: 0; padding: 0 var(--space-2); color: var(--brick); }
+
+/* Parte D (docs/mesa-parte-d.md): o cartão "Nota criada" no rodapé da resposta (NotaCriada.tsx) e a tag "do professor"
+ * nas listas de notas (TagDoProfessor.tsx). O cartão ocupa a linha reservada do rodapé (32 px, a mesma de .bloco__rodape
+ * do núcleo) em todos os estados: troca só o texto (uma linha, ou duas pequenas na confirmação e na recusa) e os botões,
+ * que têm o mesmo tamanho. Sem o "Ir ao trecho" ao lado ele ocupa a linha toda; com ele, quebra para a linha de baixo
+ * (a linha do rodapé cresce só nesse caso). */
+.bloco__rodape:has(.nota-criada) { flex-wrap: wrap; gap: var(--space-2); }
+.nota-criada {
+	display: flex; flex: 1 1 14rem; align-items: center; gap: var(--space-2); box-sizing: border-box; min-width: 0; height: 32px;
+	padding: 0 var(--space-1) 0 var(--space-3); border-radius: var(--radius-sm); background: var(--surface-well); color: var(--ink);
+	box-shadow: inset 0 0 0 var(--border-hair) var(--line);
+}
+.nota-criada > .ap-icon { flex: none; color: var(--amber); }
+.nota-criada[data-estado="desfeita"] > .ap-icon, .nota-criada[data-estado="inexistente"] > .ap-icon { color: var(--ink-subtle); }
+.nota-criada__texto {
+	display: -webkit-box; flex: 1; min-width: 0; max-height: 30px; overflow: hidden; font-size: 12px; line-height: 15px; overflow-wrap: anywhere;
+	-webkit-box-orient: vertical; -webkit-line-clamp: 2;
+}
+.nota-criada[data-estado="desfeita"] .nota-criada__texto, .nota-criada[data-estado="inexistente"] .nota-criada__texto { color: var(--ink-muted); }
+.nota-criada[data-estado="recusada"] .nota-criada__texto { color: var(--brick-text); }
+.nota-criada__botoes { display: inline-flex; flex: none; align-items: center; gap: 2px; }
+.nota-criada__botao {
+	height: 24px; padding: 0 var(--space-2); border: 0; border-radius: var(--radius-xs); background: transparent; color: var(--ink);
+	font: 600 11px/1 var(--font-sans); white-space: nowrap; cursor: pointer;
+}
+.nota-criada__botao:hover:not(:disabled) { background: var(--surface-hover); }
+.nota-criada__botao:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.nota-criada__botao:disabled { opacity: var(--opacity-disabled); cursor: default; }
+.nota-criada__botao--perigo { color: var(--brick-text); }
+
+/* A tag pequena "do professor": uma linha, altura e padding fixos (nunca quebra nem estica o item da lista). */
+.tag-professor {
+	display: inline-flex; flex: none; align-items: center; box-sizing: border-box; height: 18px; padding: 0 var(--space-2); border-radius: var(--radius-full);
+	color: var(--ink-muted); white-space: nowrap; box-shadow: inset 0 0 0 var(--border-hair) var(--amber);
+}

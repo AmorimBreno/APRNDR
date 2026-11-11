@@ -11,6 +11,7 @@ import { motion } from "motion/react";
 import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 import { conferirTitulo, type ListaNotas, TAMANHO_TITULO } from "../../lib/nota-tipos.ts";
 import { RotuloEstado } from "./RotuloEstado.tsx";
+import { TagDoProfessor } from "./TagDoProfessor.tsx";
 import { useAnimarEntrada } from "./comum.ts";
 import { FixoERolagem } from "./FixoERolagem.tsx";
 import { mesmoTitulo, PAINEL_NOTAS, ultimaLista, useNovasRespostas } from "./notas-ponte.ts";
@@ -141,8 +142,8 @@ export function SecaoNotas(props: PropsSecaoNotas) {
 	if (lista.notas.length === 0 && !criando) {
 		return envolver(
 			<EmptyState glyph="書" tone={props.tom} title="Nenhuma nota ainda">
-				Suas anotações em markdown: títulos, listas, tarefas, citações e código. Cada nota é um arquivo em notas/ que abre fora do app. Só você escreve nelas;
-				o professor pode lê-las na conversa do caderno. O botão Nova nota, ao lado das tags, cria a primeira.
+				Suas anotações em markdown: títulos, listas, tarefas, citações e código. Cada nota é um arquivo em notas/ que abre fora do app. Só você escreve nas suas;
+				o professor lê as notas na conversa do caderno e pode criar notas novas, marcadas "do professor". O botão Nova nota, ao lado das tags, cria a primeira.
 			</EmptyState>,
 		);
 	}
@@ -160,7 +161,10 @@ export function SecaoNotas(props: PropsSecaoNotas) {
 						<button type="button" className="notas__item" onClick={() => props.abrirNota(nota.titulo)}>
 							<Icon name="file" size={20} strokeWidth={2.25} />
 							<span className="notas__texto">
-								<span className="body-strong notas__titulo">{nota.titulo}</span>
+								<span className="notas__linha">
+									<span className="body-strong notas__titulo">{nota.titulo}</span>
+									{nota.doProfessor ? <TagDoProfessor /> : null}
+								</span>
 								<span className="body-sm notas__previa">{nota.previa || "Nota vazia"}</span>
 							</span>
 							<span className="data notas__quando">{editadaHa(nota.modificadaEm)}</span>

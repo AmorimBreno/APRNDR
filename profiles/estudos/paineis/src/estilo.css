@@ -269,6 +269,11 @@
 .editor-nota__texto ul[data-type="taskList"] li > div { flex: 1; min-width: 0; }
 .editor-nota__texto ul[data-type="taskList"] li[data-checked="true"] > div { color: var(--ink-muted); text-decoration: line-through; }
 .editor-nota__texto .nota-mencao { padding: 0 .3em; border-radius: var(--radius-xs); background: var(--amber-tint); color: var(--ink); font-weight: 600; }
+/* A imagem embutida ![[nome.png|650]] (imagem-embed.tsx): a imagem de verdade, que nunca passa da coluna. */
+.editor-nota__texto .imagem-nota { display: block; max-width: 100%; margin: var(--space-3, .75rem) 0; }
+.editor-nota__texto .imagem-nota .imagem-perfil { display: block; }
+.editor-nota__texto .imagem-nota img { display: block; max-width: 100%; height: auto; border-radius: var(--radius-xs); }
+.editor-nota__texto .imagem-nota--selecionada img { outline: 2px solid var(--amber); outline-offset: 2px; }
 .editor-nota__texto .ProseMirror-selectednode.nota-mencao, .editor-nota__texto .nota-mencao.ProseMirror-selectednode { box-shadow: var(--focus-ring); }
 .editor-nota__selecao { z-index: 20; }
 

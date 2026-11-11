@@ -20,6 +20,7 @@ import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { StarterKit } from "@tiptap/starter-kit";
 import { Caixa, CorDoTexto, Definicao, FormulaEmBloco, FormulaNaLinha, MarcaTexto, Recolhivel, Sublinhado, TermoDefinicao, TituloRecolhivel } from "./blocos-nota.ts";
 import { EscapeEnxuto } from "./escape-markdown.ts";
+import { ImagemEmbed, ImagemEmbedNaTela } from "./imagem-embed.tsx";
 import { type ArquivoMencionavel, Mencao } from "./mencao.ts";
 import { MenuBarra } from "./MenuBarra.tsx";
 import { CaixaNaTela, RecolhivelNaTela } from "./VisoesBlocos.tsx";
@@ -55,6 +56,8 @@ export function extensoesDaNota(opcoes: OpcoesEditorNota = {}): AnyExtension[] {
 		}),
 		TaskList,
 		TaskItem.configure({ nested: true }),
+		// ![[imagem.png|650]] (o Guardar na nota de um diagrama do professor): a imagem, não uma menção com um "!" solto.
+		opcoes.naTela ? ImagemEmbedNaTela : ImagemEmbed,
 		Mencao.configure({
 			...(opcoes.titulosNotas ? { titulos: opcoes.titulosNotas } : {}),
 			...(opcoes.arquivosMateria ? { arquivos: opcoes.arquivosMateria } : {}),

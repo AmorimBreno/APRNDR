@@ -31,6 +31,15 @@ Ver [[materiais/aula-04.pdf]].
 O caminho começa com `materiais/` e é relativo à pasta da matéria (o arquivo materias/<matéria>/materiais/aula-04.pdf). No app, a menção aparece com um clipe e o nome do arquivo, e o clique abre a seção Materiais do caderno com o arquivo em destaque. O professor lê o arquivo com ler_material.
 
 
+## Imagem
+
+```
+![[viz-tokenizacao-1794404516590.png|650]]
+```
+
+O mesmo embed da conversa (o formato do Obsidian): `![[nome.png]]`, `![[nome.png|650]]` (largura) e `![[nome.png|650x300]]` (largura e altura), só com extensão png, jpg, jpeg, webp ou svg. O nome é o de uma imagem da pasta de dados que o app serve (a pasta viz, onde as visual-tools gravam os diagramas do professor). No app a nota mostra a imagem, nunca maior que a coluna; sem a extensão de imagem, o `![[...]]` continua uma menção. O "Guardar na nota" de um diagrama do professor escreve este embed dentro da citação.
+
+
 ## Fórmulas (LaTeX)
 
 Na linha, entre cifrões:

@@ -291,3 +291,42 @@ describe("itálico e código juntos (o Guardar na nota)", () => {
 		expect(markdownDaNota(editor)).toBe("Com **negrito**, *itálico* e `código`.");
 	});
 });
+
+describe("imagem embutida ![[nome.png|650]] (o Guardar na nota de um diagrama)", () => {
+	const casos: Record<string, string> = {
+		"só a imagem": "![[viz-tokenizacao-1794404516590.png|650]]",
+		"com altura": "![[diagrama.svg|650x300]]",
+		"sem tamanho": "![[foto.jpg]]",
+		"na citação do Guardar": "> ![[viz-arvore.png|650]]\n>\n> — Professor, conversa de 11/11/2026",
+		"no meio do texto": "Veja ![[viz-a.png|300]] e depois [[Outra nota]].",
+	};
+	for (const [nome, markdown] of Object.entries(casos)) {
+		it(`ida e volta: ${nome}`, () => {
+			expect(idaEVolta(markdown)).toBe(markdown);
+		});
+	}
+
+	it("vira um nó de imagem com o nome e a largura, e não uma menção", () => {
+		editor = new Editor({ extensions: extensoesDaNota(), content: "![[viz-a.png|650]]", contentType: "markdown" });
+		const nos: Array<{ tipo: string; attrs: Record<string, unknown> }> = [];
+		editor.state.doc.descendants((no) => {
+			if (no.type.name === "imagemEmbed" || no.type.name === "mencao") nos.push({ tipo: no.type.name, attrs: no.attrs });
+		});
+		expect(nos).toEqual([{ tipo: "imagemEmbed", attrs: { caminho: "viz-a.png", largura: 650, altura: null } }]);
+	});
+
+	it("sem extensão de imagem, continua uma menção", () => {
+		editor = new Editor({ extensions: extensoesDaNota(), content: "![[Outra nota]]", contentType: "markdown" });
+		let achou = false;
+		editor.state.doc.descendants((no) => {
+			if (no.type.name === "imagemEmbed") achou = true;
+		});
+		expect(achou).toBe(false);
+	});
+
+	it("o Guardar na nota insere o bloco da imagem sem erro", () => {
+		editor = new Editor({ extensions: extensoesDaNota(), content: "# Nota", contentType: "markdown" });
+		expect(acrescentarMarkdown(editor, "> ![[viz-a.png|650]]\n>\n> — Professor, conversa de 11/11/2026\n<!-- conversa:abc -->")).toBe(true);
+		expect(markdownDaNota(editor)).toContain("![[viz-a.png|650]]");
+	});
+});

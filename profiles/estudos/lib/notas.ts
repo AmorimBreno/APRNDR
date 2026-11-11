@@ -43,7 +43,7 @@ function tituloValido(bruto: string): string {
 }
 
 /** A matéria precisa existir (o materia.json), para nunca criar notas numa pasta solta. */
-async function garantirMateria(dados: string, id: string): Promise<void> {
+export async function garantirMateria(dados: string, id: string): Promise<void> {
 	if (!/^[a-z0-9-]+$/.test(id)) throw new ErroMaterias(`Não achei a matéria "${id}".`);
 	try {
 		await stat(arquivoMateria(dados, id));

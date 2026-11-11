@@ -2,10 +2,17 @@
 // A lógica fica em ../lib/notas.ts; aqui ficam:
 // - a ponte com o caderno (docs/ponte-de-eventos.md): a tela manda
 //   "interface:acao" no painel "notas" (listar, abrir, criar, salvar,
-//   renomear) e a extensão responde com "interface:mostrar" (lista, nota,
-//   criada, salva, conflito, renomeada, erro), sempre passageiros (gravar:
-//   false). Os de uma nota levam materia e titulo; salvar leva o "pedido" da
-//   tela de volta, para ela saber a que salvamento a resposta é;
+//   renomear, guardar, guardou) e a extensão responde com "interface:mostrar"
+//   (lista, nota, criada, salva, guardada, conflito, renomeada, erro), sempre
+//   passageiros (gravar: false). Os de uma nota levam materia e titulo; salvar
+//   e guardar levam o "pedido" da tela de volta, para ela saber a que pedido a
+//   resposta é;
+// - o "Guardar na nota" da mesa (docs/mesa-parte-c.md, seção 5): guardar
+//   acrescenta o texto ao fim de uma nota FECHADA, na fila da nota, com a
+//   versão lida e a gravação segura, e grava guardou_na_nota; guardou só grava
+//   o evento (a tela inseriu o texto no editor aberto e o salvamento
+//   automático grava a nota). As duas levam a `sessao` da tela, que precisa ser
+//   a desta extensão;
 // - o evento editou_nota: um por abertura da nota em que ela mudou. A tela
 //   gera um id ("edicao") quando abre a nota e o manda em cada salvamento;
 //   só o primeiro salvamento de cada edicao grava o evento;
@@ -15,10 +22,14 @@
 //   notas pessoais.
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { ErroMaterias } from "../lib/materias.ts";
+import { acrescentarEvento, criarEvento } from "../lib/eventos.ts";
+import { ErroMaterias, eventosMateria } from "../lib/materias.ts";
 import { criarNota, ErroConflito, lerNota, listarNotas, renomearNota, salvarNota } from "../lib/notas.ts";
 
 const PAINEL = "notas";
+
+/** Até quantos caracteres o "Guardar na nota" acrescenta de uma vez. */
+const LIMITE_GUARDAR = 100_000;
 
 /** customType da entrada com o contexto da sessão, gravada pelo núcleo (packages/core/src/sessoes.ts). */
 const TIPO_ENTRADA_CONTEXTO = "nucleo.contexto";
@@ -36,6 +47,19 @@ interface DadosAcao {
 	pedido?: string;
 	de?: string;
 	para?: string;
+	/** guardar: o markdown a acrescentar (já formatado pela tela, lib/trecho-guardado.ts). */
+	texto?: string;
+	/** guardar e guardou: o id da sessão da conversa. */
+	sessao?: string;
+	/** guardou: quantos caracteres a tela inseriu. */
+	tamanho?: number;
+}
+
+/** O texto acrescentado ao fim da nota, com uma linha em branco antes; o que já estava na nota fica como está. */
+export function acrescentarAoFim(conteudo: string, texto: string): string {
+	if (conteudo === "") return texto;
+	if (conteudo.endsWith("\n\n")) return `${conteudo}${texto}`;
+	return `${conteudo}${conteudo.endsWith("\n") ? "\n" : "\n\n"}${texto}`;
 }
 
 /** A matéria da conversa: o último contexto "materia:<id>" gravado na sessão. */
@@ -50,6 +74,8 @@ export function materiaDaConversa(entradas: ReadonlyArray<{ type?: string; custo
 }
 
 const mensagemDe = (erro: unknown, acao: string) => (erro instanceof ErroMaterias ? erro.message : `Não consegui ${acao} a nota: ${(erro as Error).message}`);
+
+const mensagemGuardar = (erro: unknown, oQue: string) => (erro instanceof ErroMaterias ? erro.message : `Não consegui ${oQue}: ${(erro as Error).message}`);
 
 export default function notas(pi: ExtensionAPI) {
 	let pastaDados: string | undefined;
@@ -157,6 +183,51 @@ export default function notas(pi: ExtensionAPI) {
 					mostrar("erro", { mensagem: mensagemDe(erro, "renomear"), ao: "renomear", materia, titulo: de });
 				}
 			});
+		} else if ((acao === "guardar" || acao === "guardou") && typeof dadosAcao.titulo === "string") {
+			const { titulo, texto, pedido } = dadosAcao;
+			const falhou = (mensagem: string) => mostrar("erro", { mensagem, ao: acao, materia, titulo, ...(pedido ? { pedido } : {}) });
+			// A tela manda o id da sessão que ela mostra; se não é o desta extensão, o pedido é de outra conversa.
+			if (!sessao || dadosAcao.sessao !== sessao) {
+				falhou("Este pedido é de outra conversa, não da que está aberta. Nada foi guardado.");
+				return;
+			}
+			const chave = `${materia}/${titulo.toLowerCase()}`;
+			if (acao === "guardar") {
+				if (typeof texto !== "string" || texto.trim() === "") return falhou("Não há texto para guardar na nota.");
+				if (texto.length > LIMITE_GUARDAR) return falhou(`O trecho passa de ${LIMITE_GUARDAR} caracteres; guarde um pedaço menor.`);
+				// Nota fechada: lê, acrescenta no fim e grava na fila da nota, com a versão lida (se a nota mudou
+				// fora do app no meio, vem o conflito e nada é sobrescrito). Só depois de gravar vai o evento.
+				naFila(chave, async () => {
+					try {
+						const nota = await lerNota(dados, materia, titulo);
+						const novo = acrescentarAoFim(nota.conteudo, texto);
+						const salva = await salvarNota(dados, materia, nota.titulo, novo, { versao: nota.versao, ...daSessao });
+						await acrescentarEvento(
+							eventosMateria(dados, materia),
+							criarEvento({ ...daSessao, verbo: "guardou_na_nota", objeto: { materia, titulo: nota.titulo, sessao, tamanho: texto.length } }),
+						);
+						const conteudo = novo === "" || novo.endsWith("\n") ? novo : `${novo}\n`;
+						mostrar("guardada", { materia, titulo: nota.titulo, conteudo, versao: salva.versao, modificadaEm: salva.modificadaEm, tamanho: texto.length, ...(pedido ? { pedido } : {}) });
+					} catch (erro) {
+						falhou(erro instanceof ErroConflito ? `${erro.message} Nada foi guardado.` : mensagemGuardar(erro, "guardar o trecho na nota"));
+					}
+				});
+			} else {
+				const { tamanho } = dadosAcao;
+				if (typeof tamanho !== "number" || !Number.isInteger(tamanho) || tamanho < 0) return falhou("Faltou o tamanho do que foi guardado.");
+				// Nota aberta no editor: a tela inseriu o texto e o salvamento automático grava a nota; aqui só o evento.
+				naFila(chave, async () => {
+					try {
+						const nota = await lerNota(dados, materia, titulo);
+						await acrescentarEvento(
+							eventosMateria(dados, materia),
+							criarEvento({ ...daSessao, verbo: "guardou_na_nota", objeto: { materia, titulo: nota.titulo, sessao, tamanho } }),
+						);
+					} catch (erro) {
+						falhou(mensagemGuardar(erro, "registrar o que foi guardado na nota"));
+					}
+				});
+			}
 		}
 	});
 

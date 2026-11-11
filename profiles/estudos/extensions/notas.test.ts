@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { lerEventos } from "../lib/eventos.ts";
 import { criarMateria, eventosMateria } from "../lib/materias.ts";
 import { arquivoNota, criarNota, versaoDe } from "../lib/notas.ts";
-import notas, { materiaDaConversa } from "./notas.ts";
+import notas, { acrescentarAoFim, materiaDaConversa } from "./notas.ts";
 
 type Resultado = { content: Array<{ text: string }>; details: unknown; isError?: boolean };
 type Entrada = { type: string; customType?: string; data?: unknown };
@@ -155,6 +155,131 @@ describe("ponte das notas", () => {
 		await esperar(() => recebidas("lista").length > 0);
 		expect(recebidas("renomeada")[0]!.dados).toEqual({ materia, de: "Limites", para: "Limites laterais", mencoesAtualizadas: [] });
 		expect((recebidas("lista")[0]!.dados as { notas: Array<{ titulo: string }> }).notas.map((nota) => nota.titulo)).toEqual(["Limites laterais"]);
+	});
+});
+
+describe("guardar na nota (mesa, parte C1)", () => {
+	const TEXTO = "> Um bloco do professor.\n>\n> — Professor, conversa de 11/11/2026\n<!-- conversa:abcd1234 -->";
+	const guardados = async () => (await lerEventos(eventosMateria(dados, materia))).eventos.filter((evento) => evento.verbo === "guardou_na_nota");
+
+	it("guardar: acrescenta ao fim da nota fechada, com uma linha em branco antes, na versão lida, e grava guardou_na_nota", async () => {
+		await criarNota(dados, materia, "Limites");
+		await writeFile(arquivoNota(dados, materia, "Limites"), "# Limites\n\nTexto do Breno.\n", "utf8");
+		acao("guardar", { titulo: "limites", texto: TEXTO, sessao: "sessao-1", pedido: "g1" });
+		await esperar(() => recebidas("guardada").length > 0);
+		const esperado = `# Limites\n\nTexto do Breno.\n\n${TEXTO}\n`;
+		expect(await readFile(arquivoNota(dados, materia, "Limites"), "utf8")).toBe(esperado);
+		expect(recebidas("guardada")[0]).toMatchObject({
+			painel: "notas",
+			gravar: false,
+			dados: { materia, titulo: "Limites", conteudo: esperado, versao: versaoDe(esperado), tamanho: TEXTO.length, pedido: "g1" },
+		});
+		const eventos = await guardados();
+		expect(eventos).toHaveLength(1);
+		expect(eventos[0]).toMatchObject({ sessao: "sessao-1", objeto: { materia, titulo: "Limites", sessao: "sessao-1", tamanho: TEXTO.length } });
+		// A versão devolvida é a do arquivo: o próximo salvamento da tela, com ela, não dá conflito.
+		acao("salvar", { titulo: "Limites", conteudo: "outra", versao: recebidas("guardada")[0]!.dados.versao, edicao: "e1", pedido: "p1" });
+		await esperar(() => recebidas("salva").length > 0);
+		expect(recebidas("conflito")).toHaveLength(0);
+	});
+
+	it("guardar em nota vazia grava só o texto; duas seguidas entram na ordem, cada uma com a sua linha em branco", async () => {
+		await criarNota(dados, materia, "Limites");
+		acao("guardar", { titulo: "Limites", texto: "primeiro", sessao: "sessao-1", pedido: "g1" });
+		acao("guardar", { titulo: "Limites", texto: "segundo", sessao: "sessao-1", pedido: "g2" });
+		await esperar(() => recebidas("guardada").length === 2);
+		expect(await readFile(arquivoNota(dados, materia, "Limites"), "utf8")).toBe("primeiro\n\nsegundo\n");
+		expect(await guardados()).toHaveLength(2);
+		// Quem já termina com linha em branco não ganha outra.
+		await writeFile(arquivoNota(dados, materia, "Limites"), "a\n\n", "utf8");
+		acao("guardar", { titulo: "Limites", texto: "b", sessao: "sessao-1", pedido: "g3" });
+		await esperar(() => recebidas("guardada").length === 3);
+		expect(await readFile(arquivoNota(dados, materia, "Limites"), "utf8")).toBe("a\n\nb\n");
+	});
+
+	it("guardar com a sessão de outra conversa, sem sessão, sem texto, com título ruim ou inexistente: erro, e nada é gravado nem registrado", async () => {
+		await criarNota(dados, materia, "Limites");
+		acao("guardar", { titulo: "Limites", texto: TEXTO, sessao: "outra-sessao", pedido: "g1" });
+		acao("guardar", { titulo: "Limites", texto: TEXTO, pedido: "g2" });
+		acao("guardar", { titulo: "Limites", texto: "  \n", sessao: "sessao-1", pedido: "g3" });
+		acao("guardar", { titulo: "../Limites", texto: TEXTO, sessao: "sessao-1", pedido: "g4" });
+		acao("guardar", { titulo: "Não existe", texto: TEXTO, sessao: "sessao-1", pedido: "g5" });
+		await esperar(() => recebidas("erro").length === 5);
+		expect(recebidas("erro").map((mensagem) => [mensagem.dados.ao, mensagem.dados.pedido])).toEqual([
+			["guardar", "g1"],
+			["guardar", "g2"],
+			["guardar", "g3"],
+			["guardar", "g4"],
+			["guardar", "g5"],
+		]);
+		expect(String(recebidas("erro")[0]!.dados.mensagem)).toContain("outra conversa");
+		expect(String(recebidas("erro")[4]!.dados.mensagem)).toContain("Não achei a nota");
+		expect(await readFile(arquivoNota(dados, materia, "Limites"), "utf8")).toBe("");
+		expect(await guardados()).toHaveLength(0);
+		expect(recebidas("guardada")).toHaveLength(0);
+	});
+
+	it("guardar espera o salvamento que já estava na fila da nota e entra depois dele, sem perder nada", async () => {
+		await criarNota(dados, materia, "Limites");
+		await writeFile(arquivoNota(dados, materia, "Limites"), "versão um\n", "utf8");
+		// O salvamento do editor já estava na fila quando o guardar foi pedido.
+		acao("salvar", { titulo: "Limites", conteudo: "versão do editor", versao: versaoDe("versão um\n"), edicao: "e1", pedido: "p1" });
+		acao("guardar", { titulo: "Limites", texto: "citação", sessao: "sessao-1", pedido: "g1" });
+		await esperar(() => recebidas("guardada").length > 0);
+		// Na fila, o guardar leu o arquivo já salvo pelo editor: o texto entra depois dele, sem perder nada.
+		expect(await readFile(arquivoNota(dados, materia, "Limites"), "utf8")).toBe("versão do editor\n\ncitação\n");
+	});
+
+	it("guardou: só registra o evento (a nota não é tocada) e não responde nada à tela", async () => {
+		await criarNota(dados, materia, "Limites");
+		await writeFile(arquivoNota(dados, materia, "Limites"), "do editor\n", "utf8");
+		acao("guardou", { titulo: "LIMITES", sessao: "sessao-1", tamanho: 42 });
+		for (let tentativa = 0; tentativa < 200 && (await guardados()).length === 0; tentativa++) await new Promise((resolver) => setTimeout(resolver, 5));
+		const eventos = await guardados();
+		expect(eventos).toHaveLength(1);
+		expect(eventos[0]).toMatchObject({ sessao: "sessao-1", objeto: { materia, titulo: "Limites", sessao: "sessao-1", tamanho: 42 } });
+		expect(await readFile(arquivoNota(dados, materia, "Limites"), "utf8")).toBe("do editor\n");
+		expect(mostrados).toEqual([]);
+	});
+
+	it("guardou com a sessão errada, sem tamanho ou de uma nota que não existe: erro e nenhum evento", async () => {
+		await criarNota(dados, materia, "Limites");
+		acao("guardou", { titulo: "Limites", sessao: "outra", tamanho: 5, pedido: "x1" });
+		acao("guardou", { titulo: "Limites", sessao: "sessao-1", pedido: "x2" });
+		acao("guardou", { titulo: "Limites", sessao: "sessao-1", tamanho: -1, pedido: "x3" });
+		acao("guardou", { titulo: "Fantasma", sessao: "sessao-1", tamanho: 5, pedido: "x4" });
+		await esperar(() => recebidas("erro").length === 4);
+		expect(recebidas("erro").map((mensagem) => mensagem.dados.ao)).toEqual(["guardou", "guardou", "guardou", "guardou"]);
+		expect(await guardados()).toHaveLength(0);
+	});
+
+	it("uma cópia sem sessão no mesmo barramento fica calada também no guardar", async () => {
+		const copia = {
+			events: {
+				on: (canal: string, ouvinte: (dados: unknown) => void) => {
+					barramento.on(canal, ouvinte);
+					return () => barramento.off(canal, ouvinte);
+				},
+				emit: (canal: string, dados: unknown) => barramento.emit(canal, dados),
+			},
+			on: () => undefined,
+			registerTool: () => undefined,
+		} as unknown as ExtensionAPI;
+		notas(copia);
+		await criarNota(dados, materia, "Limites");
+		acao("guardar", { titulo: "Limites", texto: "x", sessao: "sessao-1", pedido: "g1" });
+		await esperar(() => recebidas("guardada").length > 0);
+		await new Promise((resolver) => setTimeout(resolver, 30));
+		expect(mostrados.map((mensagem) => mensagem.acao)).toEqual(["guardada"]);
+		expect(await guardados()).toHaveLength(1);
+	});
+
+	it("acrescentarAoFim: uma linha em branco antes, sem mexer no que já estava", () => {
+		expect(acrescentarAoFim("", "x")).toBe("x");
+		expect(acrescentarAoFim("a", "x")).toBe("a\n\nx");
+		expect(acrescentarAoFim("a\n", "x")).toBe("a\n\nx");
+		expect(acrescentarAoFim("a\n\n", "x")).toBe("a\n\nx");
+		expect(acrescentarAoFim("a\n\n\n", "x")).toBe("a\n\n\nx");
 	});
 });
 

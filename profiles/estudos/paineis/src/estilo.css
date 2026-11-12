@@ -2049,3 +2049,97 @@ button.cal-etq:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 @media (prefers-reduced-motion: reduce) {
 	.apz-alternar::after, .apz-seta { transition: none; }
 }
+
+/* ── A tela do aprendiz, parte B: as abas Hipóteses (AbaHipoteses.tsx) e Histórico (AbaHistorico.tsx) ──
+   Estado não muda tamanho: o destaque é só cor (box-shadow inset), o erro de um cartão ocupa o lugar ao lado dos botões e os
+   botões têm a largura do maior texto (RotuloEstado). */
+.apz-hipoteses, .apz-historico { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.apz-hipoteses__corpo { min-width: 0; }
+.apz-hipoteses__fase, .apz-historico__fase { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+
+/* O botão Refletir e a linha da última reflexão. */
+.apz-reflexao { display: flex; align-items: center; gap: var(--space-4); min-width: 0; padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--surface-panel); box-shadow: inset 0 0 0 var(--border-hair) var(--line); }
+.apz-reflexao__texto { flex: 1 1 0; min-width: 0; margin: 0; min-height: 40px; line-height: 20px; color: var(--ink-muted); overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow-wrap: anywhere; }
+.apz-reflexao__texto--erro { color: var(--brick-text); }
+.apz-reflexao .ap-btn { flex: none; min-width: 168px; }
+@media (max-width: 560px) {
+	.apz-reflexao { flex-wrap: wrap; }
+	.apz-reflexao__texto { flex-basis: 100%; }
+}
+
+/* As seções. */
+.apz-secao { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.apz-secao__titulo { margin: 0; }
+.apz-secao__alternar { position: relative; display: flex; align-items: center; gap: var(--space-3); width: 100%; min-height: 28px; padding: 0; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.apz-secao__alternar--fixo { cursor: default; }
+.apz-secao__alternar:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--radius-sm); }
+.apz-secao__conta { color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.apz-secao__alternar .apz-seta { margin-left: auto; }
+.apz-secao__alternar[aria-expanded="true"] .apz-seta { transform: rotate(180deg); }
+.apz-secao__vazio { margin: 0; color: var(--ink-muted); }
+
+/* O cartão de uma hipótese ou de uma mudança pendente. */
+.apz-hips { display: flex; flex-direction: column; gap: var(--space-3); margin: 0; padding: 0; list-style: none; min-width: 0; }
+.apz-hip { --hip-cor: var(--line-strong); display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; padding: var(--space-3) var(--space-4) var(--space-3) calc(var(--space-4) + 4px); border-radius: var(--radius-md); background: var(--surface-panel); box-shadow: inset 0 0 0 var(--border-hair) var(--line), inset 4px 0 0 var(--hip-cor); }
+.apz-hip--proposta { --hip-cor: var(--amber); }
+.apz-hip--aprovada { --hip-cor: var(--sage); }
+.apz-hip--rejeitada { --hip-cor: var(--brick); }
+.apz-hip--expirada { --hip-cor: var(--ink-subtle); }
+.apz-hip--mudanca { --hip-cor: var(--steel); }
+.apz-hip--destaque { background: var(--surface-raised); box-shadow: inset 0 0 0 2px var(--amber), inset 4px 0 0 var(--hip-cor); }
+.apz-hip__topo { display: flex; align-items: baseline; gap: var(--space-3); min-width: 0; }
+.apz-hip__tipo { flex: none; color: var(--ink-muted); }
+.apz-hip__escopo { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-muted); }
+.apz-hip__enunciado, .apz-hip__diff, .apz-hip__contexto, .apz-hip__motivo { margin: 0; overflow-wrap: anywhere; }
+.apz-hip__contexto, .apz-hip__motivo { color: var(--ink-muted); }
+.apz-hip__contexto { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+.apz-hip__aviso { display: flex; align-items: flex-start; gap: var(--space-2); margin: 0; padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); background: var(--amber-tint); color: var(--ink); }
+.apz-hip__aviso .ap-icon { flex: none; margin-top: 2px; }
+.apz-hip__meta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2) var(--space-3); margin: 0; padding-top: var(--space-2); border-top: var(--border-hair) solid var(--line); }
+.apz-hip__confianca .apz-num__valor { display: flex; align-items: center; gap: var(--space-2); }
+.apz-nivel { display: inline-flex; flex: none; gap: 2px; }
+.apz-nivel i { display: block; width: 8px; height: 12px; border-radius: 1px; background: var(--line-strong); }
+.apz-nivel[data-nivel="1"] i:nth-child(-n + 1), .apz-nivel[data-nivel="2"] i:nth-child(-n + 2), .apz-nivel[data-nivel="3"] i { background: var(--sage); }
+.apz-hip__evidencias { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.apz-hip__conta { margin: 0; min-height: 20px; color: var(--ink-muted); }
+.apz-fichas { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-2); margin: 0; padding: 0; list-style: none; }
+.apz-fichas > li { min-width: 0; max-width: 100%; display: flex; }
+.apz-ev { min-width: 0; max-width: 100%; padding: 0 var(--space-2) 0 calc(var(--space-2) + 3px); border: 0; border-radius: var(--radius-xs); background: var(--surface-well); color: var(--ink); font: inherit; font-size: 12px; line-height: 22px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; cursor: pointer; box-shadow: inset 3px 0 0 var(--sage); transition: background-color .12s ease-out; }
+.apz-fichas--contra .apz-ev { box-shadow: inset 3px 0 0 var(--brick); }
+button.apz-ev:hover { background: var(--surface-hover); }
+button.apz-ev:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.apz-ev--sem { cursor: default; color: var(--ink-muted); }
+.apz-acoes { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2); min-height: 32px; padding-top: var(--space-1); }
+.apz-acoes__espaco { flex: 1 1 0; }
+.apz-acoes__erro { flex: 1 1 0; min-width: 0; margin: 0; color: var(--brick-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.apz-acoes .ap-btn { flex: none; }
+.apz-modal { display: flex; flex-direction: column; gap: var(--space-3); }
+.apz-modal__erro { margin: 0; min-height: 20px; color: var(--brick-text); }
+
+/* O histórico: a linha do tempo por dia. */
+.apz-historico__barra { display: flex; align-items: center; gap: var(--space-4); min-height: 32px; min-width: 0; }
+.apz-historico__barra .ap-select { min-width: 200px; }
+.apz-historico__conta { margin: 0; min-width: 0; color: var(--ink-muted); }
+.apz-historico__aviso { display: flex; align-items: flex-start; gap: var(--space-2); margin: 0; color: var(--ink-muted); }
+.apz-historico__aviso .ap-icon { flex: none; margin-top: 2px; }
+.apz-dia { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.apz-dia__titulo { margin: 0; color: var(--ink-muted); }
+.apz-eventos { display: flex; flex-direction: column; gap: var(--space-1); margin: 0; padding: 0; list-style: none; min-width: 0; }
+.apz-evento { display: grid; grid-template-columns: 5.5ch minmax(0, 1fr) 28px; align-items: start; gap: var(--space-3); min-width: 0; padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); background: var(--surface-panel); box-shadow: inset 0 0 0 var(--border-hair) var(--line); }
+.apz-evento--destaque { background: var(--surface-raised); box-shadow: inset 0 0 0 2px var(--amber); }
+.apz-evento__hora { color: var(--ink-subtle); line-height: 20px; font-variant-numeric: tabular-nums; }
+.apz-evento__corpo { min-width: 0; }
+.apz-evento__verbo, .apz-evento__detalhe { margin: 0; min-width: 0; }
+.apz-evento__detalhe { display: flex; flex-wrap: wrap; align-items: center; color: var(--ink-muted); overflow-wrap: anywhere; }
+.apz-evento__sep { white-space: pre; }
+.apz-evento__citado { display: block; width: 28px; height: 28px; }
+.apz-evento__volta { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: var(--radius-sm); background: none; color: var(--ink-muted); cursor: pointer; }
+.apz-evento__volta:hover { color: var(--ink); background: var(--surface-hover); }
+.apz-evento__volta:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+@media (max-width: 560px) {
+	.apz-hip__meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+	.apz-historico__barra { flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: reduce) {
+	.apz-ev { transition: none; }
+}

@@ -99,11 +99,11 @@ const clicar = (alvo: Element) =>
 const fichas = () => Object.fromEntries([...container.querySelectorAll(".apz-ficha")].map((ficha) => [ficha.querySelector(".apz-ficha__rotulo")!.textContent, ficha.querySelector(".apz-ficha__valor")!.textContent]));
 
 describe("o cabeçalho e a aba", () => {
-	it("o título, uma única aba (Indicadores) e o pedido dos indicadores", () => {
+	it("o título, as três abas (Indicadores, Hipóteses e Histórico) e o pedido dos indicadores", () => {
 		desenhar();
 		expect(achar("h1").textContent).toBe("Perfil do aprendiz");
 		const abas = [...container.querySelectorAll('[role="tab"]')];
-		expect(abas.map((aba) => aba.textContent)).toEqual(["Indicadores"]);
+		expect(abas.map((aba) => aba.textContent)).toEqual(["Indicadores", "Hipóteses", "Histórico"]);
 		expect(abas[0]?.getAttribute("aria-selected")).toBe("true");
 		expect(pedir).toHaveBeenCalledWith(PAINEL_APRENDIZ, "indicadores", {});
 	});

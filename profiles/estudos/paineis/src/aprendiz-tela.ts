@@ -2,8 +2,9 @@
 // rota, o filtro de matéria, a ordem da lista, as faixas de domínio, os números em pt-BR e os textos curtos
 // ("há 3 dias", a leitura do Brier). Sem React e sem nada do Node.
 //
-// Caminho da tela: aprendiz/<aba>[/<matéria>]. Nesta parte só existe a aba indicadores (as outras entram na
-// parte B); a matéria é o id dela e filtra tudo, e sem matéria a tela mostra todas.
+// Caminho da tela: aprendiz/<aba>[/<matéria>] (abas indicadores, hipoteses e historico); a matéria é o id
+// dela e filtra tudo, e sem matéria a tela mostra todas. Depois de um "?" a rota pode pedir um destaque
+// (evento no Histórico, hipótese nas Hipóteses).
 
 import type { IconName } from "@estudos/design-system";
 import type { IndicadoresAprendiz, IndicadoresConceito } from "../../lib/aprendiz-indicadores-tipos.ts";
@@ -11,7 +12,7 @@ import type { Materia } from "../../lib/materia-tipos.ts";
 
 // --- As abas e as rotas ------------------------------------------------------
 
-export type AbaAprendiz = "indicadores";
+export type AbaAprendiz = "indicadores" | "hipoteses" | "historico";
 
 export interface InfoAbaAprendiz {
 	id: AbaAprendiz;
@@ -19,14 +20,55 @@ export interface InfoAbaAprendiz {
 	icone: IconName;
 }
 
-/** As abas da tela, na ordem em que aparecem. A parte A só tem Indicadores: nada de aba desligada no lugar das outras. */
-export const ABAS_DO_APRENDIZ: readonly InfoAbaAprendiz[] = [{ id: "indicadores", nome: "Indicadores", icone: "chart" }];
+/** As abas da tela, na ordem em que aparecem (a parte A fez Indicadores; a parte B, Hipóteses e Histórico). */
+export const ABAS_DO_APRENDIZ: readonly InfoAbaAprendiz[] = [
+	{ id: "indicadores", nome: "Indicadores", icone: "chart" },
+	{ id: "hipoteses", nome: "Hipóteses", icone: "bulb" },
+	{ id: "historico", nome: "Histórico", icone: "clock" },
+];
 
 /** A aba que a rota abre; sem aba ou com uma que não existe, Indicadores. */
 export const abaDaRotaAprendiz = (aba?: string): AbaAprendiz => ABAS_DO_APRENDIZ.find((item) => item.id === aba)?.id ?? "indicadores";
 
-/** A rota da tela, com a matéria do filtro quando houver (aprendiz/indicadores/calculo-i). */
-export const rotaDoAprendiz = (aba: AbaAprendiz = "indicadores", materia?: string): string => `aprendiz/${aba}${materia ? `/${materia}` : ""}`;
+/** O que a rota pede para destacar: um evento (no Histórico) ou uma hipótese (nas Hipóteses). */
+export interface DestaqueDaRota {
+	evento?: string;
+	hipotese?: string;
+}
+
+/**
+ * A rota da tela, com a matéria do filtro quando houver (aprendiz/indicadores/calculo-i) e, depois de um "?", o que
+ * destacar (aprendiz/historico/calculo-i?evento=<id>). O App guarda o "?" no hash já codificado e o devolve inteiro.
+ */
+export function rotaDoAprendiz(aba: AbaAprendiz = "indicadores", materia?: string, destaque: DestaqueDaRota = {}): string {
+	const consulta = new URLSearchParams();
+	if (destaque.evento) consulta.set("evento", destaque.evento);
+	if (destaque.hipotese) consulta.set("hipotese", destaque.hipotese);
+	const texto = consulta.toString();
+	return `aprendiz/${aba}${materia ? `/${materia}` : ""}${texto ? `?${texto}` : ""}`;
+}
+
+/** As partes de um caminho aprendiz/<aba>[/<matéria>][?evento=<id>&hipotese=<id>]. */
+export interface RotaDoAprendiz extends DestaqueDaRota {
+	aba: AbaAprendiz;
+	/** O id da matéria do filtro; sem ele, todas. */
+	materia?: string;
+}
+
+export function lerRotaDoAprendiz(caminho: string): RotaDoAprendiz {
+	const corte = caminho.indexOf("?");
+	const base = corte < 0 ? caminho : caminho.slice(0, corte);
+	const consulta = new URLSearchParams(corte < 0 ? "" : caminho.slice(corte + 1));
+	const [, aba, materia] = base.split("/");
+	const evento = consulta.get("evento");
+	const hipotese = consulta.get("hipotese");
+	return {
+		aba: abaDaRotaAprendiz(aba),
+		...(materia ? { materia } : {}),
+		...(evento ? { evento } : {}),
+		...(hipotese ? { hipotese } : {}),
+	};
+}
 
 /** A dica do botão que abre a tela, na tela de cadernos. */
 export const TITULO_APRENDIZ = "Indicadores por conceito, calculados das suas respostas";

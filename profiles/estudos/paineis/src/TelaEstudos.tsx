@@ -9,7 +9,8 @@
 // "caderno/<matéria>/cursos/<curso>/modulos/<módulo>[/<lição>]" = a visão do
 // módulo gerado, com a CourseBar no lugar da aba do caderno.
 // "agenda/<aba>[/<matéria>]" = a tela da agenda (calendario, tarefas ou quadro), filtrada pela matéria.
-// "aprendiz/<aba>[/<matéria>]" = a tela "Perfil do aprendiz" (hoje só a aba indicadores), filtrada pela matéria.
+// "aprendiz/<aba>[/<matéria>][?evento=<id>|?hipotese=<id>]" = a tela "Perfil do aprendiz" (abas indicadores, hipoteses e
+// historico), filtrada pela matéria; depois do "?", o evento ou a hipótese a destacar.
 // Um caminho desconhecido cai nos cadernos.
 //
 // Também é ela quem troca a sessão da janela para a conversa da matéria ao
@@ -21,7 +22,7 @@ import { type PropsTelaInicial, useJanelaPerfil } from "@estudos/ui";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Materia } from "../../lib/materia-tipos.ts";
 import { abaDaRota } from "./agenda-tela.ts";
-import { abaDaRotaAprendiz } from "./aprendiz-tela.ts";
+import { lerRotaDoAprendiz } from "./aprendiz-tela.ts";
 import { contextoDaMateria, lerAcoes, PAINEL_CADERNOS, prepararConversa } from "./comum.ts";
 import { gravarCaminho, gravarSessao, lerMemoria } from "./memoria-mesa.ts";
 import { rotaDoModulo } from "./modulo-tela.ts";
@@ -203,10 +204,20 @@ export function TelaEstudos(props: PropsTelaInicial) {
 
 	// "agenda/<aba>[/<matéria>]": o segundo pedaço é a aba e o terceiro, a matéria do filtro.
 	// "aprendiz/<aba>[/<matéria>]": igual, e as matérias que a tela já conhece dão os nomes do filtro.
+	// Depois de um "?" a rota pode pedir um destaque (aprendiz/historico?evento=<id>): lerRotaDoAprendiz separa as partes.
 	const materiasDoAprendiz = tipo === "aprendiz" ? (lidas.lista ? lidas.lista.materias : [...conhecidas.current.values()]) : [];
+	const rotaDoAprendiz = lerRotaDoAprendiz(props.caminho);
 	const tela =
 		tipo === "aprendiz" ? (
-			<TelaAprendiz {...props} janela={janela} aba={abaDaRotaAprendiz(materiaId)} materias={materiasDoAprendiz} {...(secao ? { materia: secao } : {})} />
+			<TelaAprendiz
+				{...props}
+				janela={janela}
+				aba={rotaDoAprendiz.aba}
+				materias={materiasDoAprendiz}
+				{...(rotaDoAprendiz.materia ? { materia: rotaDoAprendiz.materia } : {})}
+				{...(rotaDoAprendiz.evento ? { evento: rotaDoAprendiz.evento } : {})}
+				{...(rotaDoAprendiz.hipotese ? { hipotese: rotaDoAprendiz.hipotese } : {})}
+			/>
 		) : tipo === "agenda" ? (
 			<TelaAgenda {...props} janela={janela} aba={abaDaRota(materiaId)} {...(secao ? { materia: secao } : {})} />
 		) : noCaderno && materiaId ? (

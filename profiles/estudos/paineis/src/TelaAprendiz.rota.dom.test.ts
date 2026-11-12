@@ -95,6 +95,43 @@ describe("a rota na TelaEstudos", () => {
 		expect(opcoes).toEqual(["Todas as matérias", "Cálculo I", "Física"]);
 	});
 
+	it("aprendiz/hipoteses e aprendiz/historico abrem a aba delas (com a matéria), e pedem os dados dela", () => {
+		desenhar(TelaEstudos, "aprendiz/hipoteses/fisica");
+		expect(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("Hipóteses");
+		expect(pedir).toHaveBeenCalledWith(PAINEL_APRENDIZ, "hipoteses", {});
+		expect(pedir).toHaveBeenCalledWith(PAINEL_APRENDIZ, "historico", {});
+		desenhar(TelaEstudos, "aprendiz/historico");
+		expect(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("Histórico");
+	});
+
+	it("aprendiz/historico/<matéria>?evento=<id> não confunde o ? com a matéria nem com a aba, e destaca o evento; F5 volta para a mesma rota", () => {
+		const eventos = [{ id: "e-1", ts: new Date(2026, 10, 10, 14, 32).toISOString(), verbo: "respondeu_questao", objeto: { materia: "calculo" }, resultado: { correta: true } }];
+		const rota = "aprendiz/historico/calculo?evento=e-1";
+		desenhar(TelaEstudos, rota);
+		receber("cadernos", "lista", { materias: MATERIAS, erros: [] });
+		receber(PAINEL_APRENDIZ, "historico", { eventos });
+		receber(PAINEL_APRENDIZ, "hipoteses", { estado: { hipoteses: [], mudancas: [], refletindo: false } });
+		desenhar(TelaEstudos, rota);
+		expect(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("Histórico");
+		expect(container.querySelector(".ap-cbar__kicker")?.textContent).toBe("Cálculo I");
+		expect(container.querySelector('[data-evento="e-1"]')?.classList.contains("apz-evento--destaque")).toBe(true);
+		act(() => root.unmount());
+		root = createRoot(container);
+		desenhar(TelaEstudos, rota);
+		expect(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("Histórico");
+	});
+
+	it("aprendiz/hipoteses?hipotese=<id> destaca a hipótese", () => {
+		const estado = { hipoteses: [{ id: "h-1", tipo: "ritmo", escopo: { nivel: "global" }, enunciado: "Estuda melhor de manhã, em sessões curtas.", aFavor: [], contra: [], confianca: "baixa", criadaEm: "2026-11-01T10:00:00.000Z", ultimaConfirmacao: "2026-11-01T10:00:00.000Z", validade: "2027-01-01", status: "aprovada", aprovadaPeloUsuario: true, versao: 1, anteriores: [] }], mudancas: [], refletindo: false };
+		const rota = "aprendiz/hipoteses?hipotese=h-1";
+		desenhar(TelaEstudos, rota);
+		receber(PAINEL_APRENDIZ, "hipoteses", { estado });
+		receber(PAINEL_APRENDIZ, "historico", { eventos: [] });
+		desenhar(TelaEstudos, rota);
+		expect(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("Hipóteses");
+		expect(container.querySelector('[data-hipotese="h-1"]')?.classList.contains("apz-hip--destaque")).toBe(true);
+	});
+
 	it("recarregar a página na rota (montar de novo no mesmo caminho) volta para a tela", () => {
 		desenhar(TelaEstudos, "aprendiz/indicadores/calculo");
 		act(() => root.unmount());
@@ -105,9 +142,9 @@ describe("a rota na TelaEstudos", () => {
 	});
 
 	it("uma aba que não existe cai em Indicadores; os outros caminhos não abrem esta tela", () => {
-		desenhar(TelaEstudos, "aprendiz/hipoteses");
+		desenhar(TelaEstudos, "aprendiz/outra");
 		expect(container.querySelector("h1")?.textContent).toBe("Perfil do aprendiz");
-		expect(container.querySelector('[role="tab"]')?.textContent).toBe("Indicadores");
+		expect(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe("Indicadores");
 		desenhar(TelaEstudos, "");
 		expect(container.querySelector("h1")?.textContent).not.toBe("Perfil do aprendiz");
 	});
@@ -134,6 +171,7 @@ describe("o registro no perfil", () => {
 		const rotulo = telaInicialEstudos.rotuloDoCaminho!;
 		expect(rotulo("aprendiz/indicadores")).toBe("Aprendiz");
 		expect(rotulo("aprendiz/indicadores/fisica")).toBe("Aprendiz");
+		expect(rotulo("aprendiz/historico/fisica?evento=e-1")).toBe("Aprendiz");
 		expect(rotulo("agenda/calendario")).toBe("Agenda");
 		expect(rotulo("caderno/calculo")).toBe("Caderno");
 		expect(rotulo("")).toBeUndefined();
@@ -141,6 +179,7 @@ describe("o registro no perfil", () => {
 
 	it("as trocas dentro da tela não animam a página inteira", () => {
 		expect(telaInicialEstudos.semTransicao!("aprendiz/indicadores", "aprendiz/indicadores/fisica")).toBe(true);
+		expect(telaInicialEstudos.semTransicao!("aprendiz/hipoteses", "aprendiz/historico/fisica?evento=e-1")).toBe(true);
 		expect(telaInicialEstudos.semTransicao!("", "aprendiz/indicadores")).toBe(false);
 	});
 });

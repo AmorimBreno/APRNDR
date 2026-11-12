@@ -69,6 +69,13 @@ export function indicadoresDaMensagem(dados: unknown): IndicadoresAprendiz | und
 	};
 }
 
+/** Um `erro` é dos indicadores se não tem pedido e não diz que é de outra ação (`ao`); a parte A manda só { mensagem }. */
+export function erroEhDosIndicadores(dados: unknown): boolean {
+	if (!ehObjeto(dados)) return true;
+	if (typeof dados.pedido === "string" && dados.pedido) return false;
+	return dados.ao === undefined || dados.ao === "indicadores";
+}
+
 /** O que a extensão mandou, entre as ações que valem. */
 export interface LidoAprendiz {
 	/** Os últimos indicadores, se nenhum erro veio depois deles. */
@@ -94,6 +101,8 @@ export function lerAprendiz(recebidas: readonly AcaoRecebida[], ignoradas: Reado
 			chaveDaUltima = recebida.chave;
 		} else if (recebida.acao === "erro") {
 			const dados = recebida.dados as { mensagem?: unknown } | undefined;
+			// Os erros da parte B (de uma ação com pedido, ou de outro `ao`) são das abas Hipóteses e Histórico, não dos indicadores.
+			if (!erroEhDosIndicadores(recebida.dados)) continue;
 			const mensagem = ehObjeto(dados) && typeof dados.mensagem === "string" && dados.mensagem ? dados.mensagem : "Erro desconhecido.";
 			erro = { chave: recebida.chave, mensagem };
 			indicadores = undefined;
@@ -104,6 +113,22 @@ export function lerAprendiz(recebidas: readonly AcaoRecebida[], ignoradas: Reado
 }
 
 // --- O hook ------------------------------------------------------------------
+
+/**
+ * As chaves das ações que já estavam na ponte ao montar e as que estavam quando a sessão trocou: são de antes e não
+ * valem (a lista é a mesma instância entre as renderizações; cada hook do painel tem a sua). Usada pelos hooks da
+ * tela do aprendiz (indicadores, hipóteses e histórico).
+ */
+export function useChavesAntigas(recebidas: readonly AcaoRecebida[] | undefined, sessaoId: string | undefined): ReadonlySet<string> {
+	const antigas = useRef<Set<string> | undefined>(undefined);
+	antigas.current ??= new Set((recebidas ?? []).map((recebida) => recebida.chave));
+	const sessaoVista = useRef(sessaoId);
+	if (sessaoVista.current !== sessaoId) {
+		sessaoVista.current = sessaoId;
+		for (const recebida of recebidas ?? []) antigas.current.add(recebida.chave);
+	}
+	return antigas.current;
+}
 
 export interface IndicadoresAbertos {
 	/** Os indicadores a mostrar; undefined até a primeira resposta desta visita (ou enquanto um erro vale). */
@@ -124,17 +149,9 @@ export function useIndicadores(janela: JanelaPerfilHook): IndicadoresAbertos {
 	const { estado, acoes } = janela;
 	const sessaoId = estado.sessao?.sessaoId;
 	const recebidas = estado.acoesPorPainel[PAINEL_APRENDIZ];
+	const antigas = useChavesAntigas(recebidas, sessaoId);
 
-	// As chaves que já estavam lá ao montar (e ao trocar de sessão) são de antes: não valem.
-	const antigas = useRef<Set<string> | undefined>(undefined);
-	antigas.current ??= new Set((recebidas ?? []).map((recebida) => recebida.chave));
-	const sessaoVista = useRef(sessaoId);
-	if (sessaoVista.current !== sessaoId) {
-		sessaoVista.current = sessaoId;
-		for (const recebida of recebidas ?? []) antigas.current.add(recebida.chave);
-	}
-
-	const lido = useMemo(() => lerAprendiz(recebidas ?? [], antigas.current), [recebidas, sessaoId]);
+	const lido = useMemo(() => lerAprendiz(recebidas ?? [], antigas), [recebidas, sessaoId, antigas]);
 	const ultimos = useRef<IndicadoresAprendiz | undefined>(undefined);
 	if (lido.indicadores) ultimos.current = lido.indicadores;
 

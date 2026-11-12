@@ -1,23 +1,30 @@
-// A tela "Perfil do aprendiz" (docs/aprendiz.md, seção 7), a subtela do perfil no caminho
-// aprendiz/<aba>[/<matéria>]. Nesta parte só existe a aba Indicadores (as outras entram na parte B); a
-// matéria do caminho filtra tudo (sem ela, todas as matérias). No topo, a barra no estilo da aba tijolo
-// (as classes ap-cbar da CourseBar, como a agenda): o voltar, o título, a aba, o filtro de matéria. Embaixo,
-// o resumo (quantos conceitos e quantos em cada faixa de domínio), o aviso dos eventos ignorados e a lista de
-// conceitos do menor domínio para o maior. Uma linha abre os detalhes (as confusões e os eventos).
+// A tela "Perfil do aprendiz" (docs/aprendiz.md, seções 7 e 8), a subtela do perfil no caminho
+// aprendiz/<aba>[/<matéria>][?evento=<id>|?hipotese=<id>]. Três abas: Indicadores (parte A), Hipóteses e Histórico
+// (parte B: AbaHipoteses.tsx e AbaHistorico.tsx). A matéria do caminho filtra as três (sem ela, todas as matérias). No
+// topo, a barra no estilo da aba tijolo (as classes ap-cbar da CourseBar, como a agenda): o voltar, o título, as abas,
+// o filtro de matéria. Na aba Indicadores, o resumo (quantos conceitos e quantos em cada faixa de domínio), o aviso dos
+// eventos ignorados e a lista de conceitos do menor domínio para o maior; uma linha abre os detalhes (as confusões e
+// os eventos).
 //
 // O que a tela mostra é o cálculo da camada 2 (lib/aprendiz-indicadores-tipos.ts), recalculável dos eventos.
 // A autoavaliação ("o que você disse") fica ao lado do domínio medido ("o que você fez"), só como informação.
 //
 // Padrões de interface (docs/padroes-de-interface.md): "Calculando…" só aparece depois de 1 s (o esqueleto tem o
 // tamanho das linhas reais); a troca de filtro não desmonta a tela; só chegam as respostas da ponte desta visita
-// (aprendiz-ponte.ts); a altura da linha fechada não depende de estado nenhum; a largura da barra acompanha a
+// (aprendiz-ponte.ts e aprendiz-hipoteses-ponte.ts); trocar de aba também não refaz o cabeçalho (só o corpo faz o fade);
+// a altura da linha fechada não depende de estado nenhum; a largura da barra acompanha a
 // da linha (CSS, sem medida); o fade é só de opacidade e para com o movimento reduzido.
 
 import { Button, EmptyState, Icon, Select } from "@estudos/design-system";
 import { type JanelaPerfilHook, type PropsTelaInicial, semMovimento, useValorEstavel } from "@estudos/ui";
 import { motion } from "motion/react";
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { IndicadoresConceito } from "../../lib/aprendiz-indicadores-tipos.ts";
+import { AbaHipoteses } from "./AbaHipoteses.tsx";
+import { AbaHistorico } from "./AbaHistorico.tsx";
+import { useHipoteses, useHistorico } from "./aprendiz-hipoteses-ponte.ts";
+import { materiaDoEscopo, materiaParaAbrirHipoteses } from "./aprendiz-hipoteses-tela.ts";
+import { materiaDoEvento, materiaParaAbrirOEvento, nomesDosConceitos } from "./aprendiz-historico-tela.ts";
 import { useIndicadores } from "./aprendiz-ponte.ts";
 import {
 	ABAS_DO_APRENDIZ,
@@ -61,6 +68,10 @@ export interface PropsTelaAprendiz extends PropsTelaInicial {
 	aba: AbaAprendiz;
 	/** O id da matéria do filtro; sem ele, todas. */
 	materia?: string;
+	/** O evento que a rota pede para destacar no Histórico (aprendiz/historico?evento=<id>). */
+	evento?: string;
+	/** As hipóteses que a rota pede para destacar nas Hipóteses (aprendiz/hipoteses?hipotese=<id>[,<id>]). */
+	hipotese?: string;
 	/** As matérias que a TelaEstudos já conhece (o nome e a cor de cada uma); vazio até a lista chegar. */
 	materias: ReadonlyArray<MateriaConhecida>;
 }
@@ -287,6 +298,11 @@ function LinhaEsqueleto() {
 export function TelaAprendiz(props: PropsTelaAprendiz) {
 	const { aba, materia, materias, navegar } = props;
 	const aberto = useIndicadores(props.janela);
+	// Hipóteses e Histórico pedem os dados ao abrir cada uma das duas abas (e de novo a cada troca de sessão); as duas abas
+	// usam as duas coisas (as fichas de evidência precisam do histórico; o botão que volta às hipóteses, das hipóteses).
+	const abertura = aba === "hipoteses" || aba === "historico" ? aba : undefined;
+	const hip = useHipoteses(props.janela, abertura);
+	const hist = useHistorico(props.janela, abertura);
 	const { indicadores, erro } = aberto;
 	const agora = useAgora();
 	const baseIds = useId();
@@ -299,7 +315,19 @@ export function TelaAprendiz(props: PropsTelaAprendiz) {
 	// Enquanto a lista de matérias não chegou, o nome do filtro espera (nada do id cru por um instante).
 	const aguardandoMaterias = materias.length === 0;
 	const todos = indicadores?.conceitos;
-	const idsDosDados = useMemo(() => materiasDosDados(todos ?? []), [todos]);
+	// As matérias do filtro: as que aparecem nos indicadores e, se a pessoa já abriu as outras abas, nas hipóteses e nos eventos.
+	const hipotesesDaTela = hip.estado?.hipoteses;
+	const eventosDaTela = hist.eventos;
+	const idsDosDados = useMemo(
+		() => [
+			...new Set([
+				...materiasDosDados(todos ?? []),
+				...(hipotesesDaTela ?? []).flatMap((hipotese) => materiaDoEscopo(hipotese.escopo) ?? []),
+				...(eventosDaTela ?? []).flatMap((evento) => materiaDoEvento(evento) ?? []),
+			]),
+		],
+		[todos, hipotesesDaTela, eventosDaTela],
+	);
 	const doFiltro = useMemo(() => filtrarPorMateria(todos ?? [], materia), [todos, materia]);
 	const lista = useMemo(() => ordenarConceitos(doFiltro), [doFiltro]);
 	const resumo = useMemo(() => resumirConceitos(doFiltro), [doFiltro]);
@@ -316,6 +344,30 @@ export function TelaAprendiz(props: PropsTelaAprendiz) {
 		});
 
 	const fase = erro ? "erro" : indicadores ? "dados" : "espera";
+	// O nome dos conceitos vem dos indicadores (a tela os carrega ao abrir, qualquer que seja a aba).
+	const nomes = useMemo(() => nomesDosConceitos(indicadores), [indicadores]);
+
+	// Uma reflexão nova (a do botão ou a automática) acrescenta eventos: o histórico que a tela guarda fica velho.
+	const idDaReflexao = hip.estado?.ultimaReflexao?.id;
+	const reflexaoVista = useRef<{ id: string | undefined; tinhaEstado: boolean }>({ id: idDaReflexao, tinhaEstado: hip.estado !== undefined });
+	useEffect(() => {
+		const vista = reflexaoVista.current;
+		if (vista.tinhaEstado && vista.id !== idDaReflexao && abertura) hist.atualizar();
+		reflexaoVista.current = { id: idDaReflexao, tinhaEstado: vista.tinhaEstado || hip.estado !== undefined };
+	}, [idDaReflexao, hip.estado, abertura, hist.atualizar]);
+
+	// Uma ficha de evidência abre o evento no Histórico (a matéria do filtro só continua se for a do evento).
+	const abrirEvento = (id: string) => {
+		const evento = hist.eventos?.find((item) => item.id === id);
+		navegar(rotaDoAprendiz("historico", materiaParaAbrirOEvento(materia, evento), { evento: id }));
+	};
+	const abrirHipoteses = (ids: readonly string[]) => {
+		const dessas = (hip.estado?.hipoteses ?? []).filter((hipotese) => ids.includes(hipotese.id));
+		navegar(rotaDoAprendiz("hipoteses", materiaParaAbrirHipoteses(materia, dessas), { hipotese: ids.join(",") }));
+	};
+	const destacadas = useMemo(() => (aba === "hipoteses" && props.hipotese ? props.hipotese.split(",").filter(Boolean) : []), [aba, props.hipotese]);
+	const limparDestaque = () => navegar(rotaDoAprendiz(aba, materia));
+
 	const textoIgnorados = indicadores ? textoDosIgnorados(indicadores.ignorados) : "";
 
 	return (
@@ -349,8 +401,33 @@ export function TelaAprendiz(props: PropsTelaAprendiz) {
 
 			{/* O painel fica montado; só o conteúdo troca (esperando, erro ou dados), com um fade curto de opacidade (regra 7). */}
 			<main id={idDoPainel(baseIds)} role="tabpanel" aria-labelledby={idDaAba(baseIds, aba)} className="aprendiz__corpo">
-				<motion.div key={fase} className="aprendiz__aba" initial={parado ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15, ease: "easeOut" }}>
-					{erro ? (
+				<motion.div key={aba === "indicadores" ? fase : aba} className="aprendiz__aba" initial={parado ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15, ease: "easeOut" }}>
+					{aba === "hipoteses" ? (
+						<AbaHipoteses
+							hip={hip}
+							eventos={hist.eventos}
+							historicoFalhou={hist.erro !== undefined}
+							{...(materia ? { materia } : {})}
+							materias={materias}
+							nomes={nomes}
+							agora={agora}
+							destacadas={destacadas}
+							abrirEvento={abrirEvento}
+							limparDestaque={limparDestaque}
+						/>
+					) : aba === "historico" ? (
+						<AbaHistorico
+							hist={hist}
+							hipoteses={hip.estado}
+							{...(materia ? { materia } : {})}
+							materias={materias}
+							nomes={nomes}
+							{...(props.evento ? { evento: props.evento } : {})}
+							abrirHipoteses={abrirHipoteses}
+							limparDestaque={limparDestaque}
+							agora={agora}
+						/>
+					) : erro ? (
 						<div className="aprendiz__erro" role="alert">
 							<Icon name="alert" size={20} />
 							<div className="aprendiz__erro-texto">

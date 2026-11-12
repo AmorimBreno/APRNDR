@@ -23,6 +23,10 @@ describe("trocaSemTransicao", () => {
 		expect(trocaSemTransicao("aprendiz/indicadores", "aprendiz/indicadores/calc")).toBe(true);
 		expect(trocaSemTransicao("aprendiz/indicadores/calc", "aprendiz/indicadores/fisica")).toBe(true);
 		expect(trocaSemTransicao("aprendiz/indicadores/calc", "aprendiz/indicadores")).toBe(true);
+		expect(trocaSemTransicao("aprendiz/indicadores", "aprendiz/hipoteses")).toBe(true);
+		expect(trocaSemTransicao("aprendiz/hipoteses/calc", "aprendiz/historico/calc?evento=0abc-1234")).toBe(true);
+		expect(trocaSemTransicao("aprendiz/historico?evento=0abc-1234", "aprendiz/historico")).toBe(true);
+		expect(trocaSemTransicao("aprendiz/historico", "aprendiz/hipoteses?hipotese=h-1")).toBe(true);
 		expect(trocaSemTransicao("", "aprendiz/indicadores")).toBe(false);
 		expect(trocaSemTransicao("aprendiz/indicadores", "")).toBe(false);
 		expect(trocaSemTransicao("aprendiz/indicadores", "agenda/calendario")).toBe(false);

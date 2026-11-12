@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { conceitoDeTeste, conceitosVariados, MATERIAS_DE_TESTE } from "./aprendiz-fixtures.ts";
 import {
+	ABAS_DO_APRENDIZ,
 	abaDaRotaAprendiz,
 	agruparPorFaixa,
 	chaveDoConceito,
@@ -17,6 +18,7 @@ import {
 	idCurtoDoEvento,
 	LIMITE_EVENTOS_NOS_DETALHES,
 	leituraDoBrier,
+	lerRotaDoAprendiz,
 	materiasDosDados,
 	nomeDoConceito,
 	opcoesDeMateriaAprendiz,
@@ -30,16 +32,53 @@ import {
 } from "./aprendiz-tela.ts";
 
 describe("as rotas", () => {
-	it("aprendiz/indicadores[/matéria]", () => {
+	it("aprendiz/<aba>[/matéria]", () => {
 		expect(rotaDoAprendiz()).toBe("aprendiz/indicadores");
 		expect(rotaDoAprendiz("indicadores", "calculo")).toBe("aprendiz/indicadores/calculo");
+		expect(rotaDoAprendiz("hipoteses")).toBe("aprendiz/hipoteses");
+		expect(rotaDoAprendiz("historico", "fisica")).toBe("aprendiz/historico/fisica");
 		expect(rotaDeVoltarDoAprendiz()).toBe("");
+	});
+
+	it("as três abas, nesta ordem", () => {
+		expect(ABAS_DO_APRENDIZ.map((aba) => aba.id)).toEqual(["indicadores", "hipoteses", "historico"]);
+		expect(ABAS_DO_APRENDIZ.map((aba) => aba.nome)).toEqual(["Indicadores", "Hipóteses", "Histórico"]);
 	});
 
 	it("uma aba que não existe (ou nenhuma) abre Indicadores", () => {
 		expect(abaDaRotaAprendiz("indicadores")).toBe("indicadores");
-		expect(abaDaRotaAprendiz("historico")).toBe("indicadores");
+		expect(abaDaRotaAprendiz("hipoteses")).toBe("hipoteses");
+		expect(abaDaRotaAprendiz("historico")).toBe("historico");
+		expect(abaDaRotaAprendiz("outra")).toBe("indicadores");
 		expect(abaDaRotaAprendiz(undefined)).toBe("indicadores");
+	});
+
+	it("o destaque vai depois de um ?, com o id codificado, e a rota volta inteira", () => {
+		expect(rotaDoAprendiz("historico", undefined, { evento: "0abc-1234" })).toBe("aprendiz/historico?evento=0abc-1234");
+		expect(rotaDoAprendiz("historico", "calculo", { evento: "0abc-1234" })).toBe("aprendiz/historico/calculo?evento=0abc-1234");
+		expect(rotaDoAprendiz("hipoteses", "calculo", { hipotese: "h-1,h-2" })).toBe("aprendiz/hipoteses/calculo?hipotese=h-1%2Ch-2");
+		expect(lerRotaDoAprendiz("aprendiz/historico?evento=0abc-1234")).toEqual({ aba: "historico", evento: "0abc-1234" });
+		expect(lerRotaDoAprendiz("aprendiz/historico/calculo?evento=0abc-1234")).toEqual({ aba: "historico", materia: "calculo", evento: "0abc-1234" });
+		expect(lerRotaDoAprendiz(rotaDoAprendiz("hipoteses", "calculo", { hipotese: "h-1,h-2" }))).toEqual({ aba: "hipoteses", materia: "calculo", hipotese: "h-1,h-2" });
+	});
+
+	it("o App guarda cada pedaço do caminho codificado e o devolve decodificado: a rota com ? e = volta inteira (F5 e o botão voltar)", () => {
+		const caminho = rotaDoAprendiz("historico", "calculo", { evento: "0abc-1234" });
+		const hash = caminho.split("/").map(encodeURIComponent).join("/");
+		expect(hash).toBe("aprendiz/historico/calculo%3Fevento%3D0abc-1234");
+		const devolvido = hash.split("/").map(decodeURIComponent).join("/");
+		expect(devolvido).toBe(caminho);
+		expect(lerRotaDoAprendiz(devolvido)).toEqual({ aba: "historico", materia: "calculo", evento: "0abc-1234" });
+		// Sem matéria o ? fica no pedaço da aba.
+		const semMateria = rotaDoAprendiz("hipoteses", undefined, { hipotese: "h-1,h-2" });
+		expect(lerRotaDoAprendiz(semMateria.split("/").map(encodeURIComponent).join("/").split("/").map(decodeURIComponent).join("/"))).toEqual({ aba: "hipoteses", hipotese: "h-1,h-2" });
+	});
+
+	it("lerRotaDoAprendiz: sem aba ou com aba desconhecida cai em indicadores; o ? não vira matéria", () => {
+		expect(lerRotaDoAprendiz("aprendiz")).toEqual({ aba: "indicadores" });
+		expect(lerRotaDoAprendiz("aprendiz/xyz/fisica")).toEqual({ aba: "indicadores", materia: "fisica" });
+		expect(lerRotaDoAprendiz("aprendiz/hipoteses/calculo").materia).toBe("calculo");
+		expect(lerRotaDoAprendiz("aprendiz/historico?evento=").evento).toBeUndefined();
 	});
 
 	it("reconhece o caminho da tela", () => {

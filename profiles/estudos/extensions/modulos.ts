@@ -1818,8 +1818,8 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 	 * dela, pela origemDoBloco, sem repetir) e grava o questionário e o
 	 * avaliou_licao. Responde com o modulo com o pedido.
 	 */
-	const avaliarLicao = (dados: string, materia: string, curso: string, modulo: string, dadosAcao: DadosAcao, pedido: string | undefined) =>
-		naTrava(materia, async () => {
+	const avaliarLicao = async (dados: string, materia: string, curso: string, modulo: string, dadosAcao: DadosAcao, pedido: string | undefined) => {
+		await naTrava(materia, async () => {
 			const licao = textoOpcional(dadosAcao.licao);
 			if (!licao) throw new ErroModulo("Falta o id da lição.");
 			const lido = await lerModulo(dados, materia, curso, modulo);
@@ -1838,6 +1838,9 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 			const { modulo: novo } = await registrarQuestionario(dados, materia, curso, modulo, licao, { notas: dadosAcao.notas, texto: dadosAcao.texto }, { ...daSessao(), modelo: lido.modelo, prompts });
 			await mostrarModulo(materia, curso, novo, pedido);
 		});
+		// O evento avaliou_licao já foi gravado e a trava soltou: avisa a reflexão do aprendiz (extensions/aprendiz.ts).
+		pi.events.emit("aprendiz:gatilho", { motivo: "licao" });
+	};
 
 	/**
 	 * Reescreve um bloco a partir de um retorno (reescrever_bloco; docs/escrita.md,
@@ -2645,6 +2648,8 @@ export default function modulos(pi: ExtensionAPI, opcoes: OpcoesModulos = {}) {
 						await mostrarEstado(dados, materia, curso, pedido);
 						return marcado;
 					});
+					// O concluiu_modulo já foi gravado e a trava soltou: avisa a reflexão do aprendiz (extensions/aprendiz.ts).
+					pi.events.emit("aprendiz:gatilho", { motivo: "modulo" });
 					void gerarRelatorio(dados, materia, curso, modulo, controle, false);
 				}
 			} catch (erro) {

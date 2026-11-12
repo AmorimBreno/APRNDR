@@ -232,7 +232,8 @@ export function confiancaDe(aFavor: readonly string[], eventosPorId: ReadonlyMap
 	let eventos = 0;
 	for (const id of unicos(aFavor)) {
 		const evento = eventosPorId.get(id);
-		if (!evento || ehEventoDeHipotese(evento.verbo)) continue;
+		// O que o Breno DISSE de si (autoavaliou_conceito) não é evidência do que ele faz: não conta na confiança.
+		if (!evento || ehEventoDeHipotese(evento.verbo) || evento.verbo === "autoavaliou_conceito") continue;
 		eventos++;
 		if (typeof evento.sessao === "string" && evento.sessao !== "") sessoes.add(evento.sessao);
 	}

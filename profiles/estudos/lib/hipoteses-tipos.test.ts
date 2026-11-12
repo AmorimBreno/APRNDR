@@ -863,3 +863,18 @@ describe("lerArquivoHipoteses", () => {
 		expect(avisos).toHaveLength(3);
 	});
 });
+
+describe("confiancaDe e o que o Breno disse de si", () => {
+	it("a autoavaliação (autoavaliou_conceito) não conta como evidência na confiança", () => {
+		const eventos = indexarEventos([
+			evento("e1", "s1", "2026-11-01T10:00:00.000Z"),
+			evento("e2", "s2", "2026-11-02T10:00:00.000Z"),
+			evento("e3", "s3", "2026-11-03T10:00:00.000Z"),
+			evento("d1", "s1", "2026-11-01T09:00:00.000Z", "autoavaliou_conceito"),
+			evento("d2", "s2", "2026-11-02T09:00:00.000Z", "autoavaliou_conceito"),
+		]);
+		// 3 respostas em 3 sessões = média; as duas autoavaliações a mais não a levariam a alta (5 eventos em 3 sessões).
+		expect(confiancaDe(["e1", "e2", "e3", "d1", "d2"], eventos)).toBe("media");
+		expect(confiancaDe(["e1", "d1", "d2"], eventos)).toBe("baixa");
+	});
+});

@@ -1661,6 +1661,26 @@ describe("o feedback", () => {
 		expect(evento!.contexto).toEqual({ fase: "modulo", modelo: "teste/modelo-x", prompts: [PROMPT_DA_LICAO(), PROMPT_BLOCO_COM_INTRODUCAO()] });
 	});
 
+	it("avaliar_licao e concluir emitem aprendiz:gatilho (licao e modulo) só depois de gravar o evento; erro não emite", async () => {
+		const gatilhos: unknown[] = [];
+		barramento.on("aprendiz:gatilho", (recebido: unknown) => gatilhos.push(recebido));
+		acao("avaliar_licao", { modulo: "m1", licao: "l1", pedido: "e1", notas: {} });
+		await respondeu("e1");
+		expect(gatilhos).toEqual([]);
+		acao("avaliar_licao", { modulo: "m1", licao: "l1", pedido: "q1", notas: { clareza: 4 } });
+		await respondeu("q1");
+		expect(gatilhos).toEqual([{ motivo: "licao" }]);
+		expect(await doAprendiz("avaliou_licao")).toHaveLength(1);
+		acao("concluir", { modulo: "m1", pedido: "c1" });
+		await respondeu("c1");
+		expect(gatilhos).toEqual([{ motivo: "licao" }, { motivo: "modulo" }]);
+		expect(await doVerbo("concluiu_modulo")).toHaveLength(1);
+		await esperarEventosDoRelatorio(1); // o relatório em segundo plano termina antes de apagar a pasta
+		acao("concluir", { modulo: "m1", pedido: "c2" });
+		await respondeu("c2");
+		expect(gatilhos).toHaveLength(2);
+	});
+
 	it("avaliar_licao inválido ou de lição que não existe: erro com o pedido, nada gravado", async () => {
 		acao("avaliar_licao", { modulo: "m1", licao: "l1", pedido: "e1", notas: {} });
 		await respondeu("e1");

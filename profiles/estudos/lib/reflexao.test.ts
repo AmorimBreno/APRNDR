@@ -12,7 +12,6 @@ import { caminhoDoMapa } from "./mapa.ts";
 import { arquivoMateria, eventosAprendiz } from "./materias.ts";
 import {
 	cortarTexto,
-	descartarAutoavaliacaoSozinha,
 	executarReflexao,
 	janelaDaReflexao,
 	LIMITE_EVENTOS_DA_REFLEXAO,
@@ -167,6 +166,7 @@ describe("a entrada da reflexão", () => {
 				{ ...base, id: "h-1", enunciado: "Em tokenização, confunde pontuação com ruído", status: "proposta" },
 				{ ...base, id: "h-2", enunciado: "Em tokenização, ignora números sempre", status: "rejeitada" },
 				{ ...base, id: "h-3", enunciado: "Em tokenização, esquece o espaço inicial", status: "expirada" },
+				{ ...base, id: "h-4", enunciado: "Em tokenização, trata hífen como separador", status: "expirada", ultimaConfirmacao: "2026-05-01T10:00:00.000Z" },
 			],
 			mudancas: [{ id: "m-1", hipotese: "h-1", acao: "reforcar", evidencias: ["ev002"], motivo: "x", reflexao: "r-0", criadaEm: "2026-11-02T10:00:00.000Z" }],
 			ultimaReflexao: { id: "r-0", ts: "2026-11-02T10:00:00.000Z", motivo: "botao", ultimoEvento: "ev002", lidos: 2, propostas: 1, aceitas: 1, descartadas: [] },
@@ -176,7 +176,10 @@ describe("a entrada da reflexão", () => {
 		expect(preparada.janela).toEqual(["ev003", "ev004"]);
 		expect(preparada.mensagem).toContain("- h-1 | proposta | misconception | conceito token da matéria nlp | confiança baixa | 2 a favor, 0 contra | «Em tokenização, confunde pontuação com ruído» | mudança pendente esperando o aluno: reforcar");
 		expect(preparada.mensagem).toContain("- «Em tokenização, ignora números sempre»");
-		expect(preparada.mensagem).not.toContain("esquece o espaço");
+		// as expiradas dos últimos 90 dias aparecem (para reforçar pelo id e trazer de volta); as mais antigas, não
+		expect(preparada.mensagem).toContain("## Hipóteses expiradas nos últimos 90 dias");
+		expect(preparada.mensagem).toContain("- h-3 | misconception | conceito token da matéria nlp | «Em tokenização, esquece o espaço inicial»");
+		expect(preparada.mensagem).not.toContain("trata hífen");
 		expect(preparada.mensagem).not.toContain("- h-2 |");
 	});
 });
@@ -195,31 +198,6 @@ describe("a saída do modelo", () => {
 		expect(() => propostasDaResposta('{"propostas": ')).toThrow(/inválido/);
 		expect(() => propostasDaResposta('{"outra": []}')).toThrow(/propostas/);
 		expect(() => propostasDaResposta('{"propostas": "nada"}')).toThrow(/propostas/);
-	});
-
-	it("descartarAutoavaliacaoSozinha: hipótese de conhecimento apoiada na autoavaliação sai; metacognição e proposta sem autoavaliação passam", () => {
-		const eventos = new Map<string, { verbo: Evento["verbo"]; sessao?: string }>([
-			["a1", { verbo: "autoavaliou_conceito", sessao: "s1" }],
-			["a2", { verbo: "autoavaliou_conceito", sessao: "s2" }],
-			["r1", { verbo: "respondeu_questao", sessao: "s1" }],
-			["r2", { verbo: "respondeu_questao", sessao: "s2" }],
-			["r3", { verbo: "respondeu_questao", sessao: "s2" }],
-		]);
-		const hipoteses = [{ id: "h-1", tipo: "conhecimento" as const }];
-		const propostas = [
-			{ acao: "criar", tipo: "conhecimento", evidencias: ["a1", "a2"] },
-			{ acao: "criar", tipo: "conhecimento", evidencias: ["a1", "r1"] },
-			{ acao: "criar", tipo: "conhecimento", evidencias: ["r1", "r2", "a1"] },
-			{ acao: "criar", tipo: "metacognicao", evidencias: ["a1", "r1", "r2"] },
-			{ acao: "criar", tipo: "misconception", evidencias: ["r1", "r2"] },
-			{ acao: "reforcar", hipotese: "h-1", evidencias: ["a2"] },
-			{ acao: "reforcar", hipotese: "h-1", evidencias: ["a2", "r3"] },
-			"lixo",
-			{ acao: "criar" },
-		];
-		const { restam, descartadas } = descartarAutoavaliacaoSozinha(propostas, eventos, hipoteses);
-		expect(descartadas).toBe(3);
-		expect(restam).toEqual([propostas[2], propostas[3], propostas[4], propostas[6], "lixo", { acao: "criar" }]);
 	});
 });
 
@@ -269,14 +247,15 @@ describe("uma reflexão inteira com o modelo falso", () => {
 
 	it("descarta a proposta sem evidência, com evidência que não existe, de uma sessão só, de fora da janela e a que repete; o motivo vai no resumo", async () => {
 		await cenario();
-		await gravar(evento(5, "s4"), evento(6, "s5"));
-		// a primeira reflexão lê tudo; a segunda só ev007 e ev008 (a janela dela)
+		// ev005 é de outro conceito (idf): nunca é "anterior dos mesmos conceitos" dos eventos de token
+		await gravar(evento(5, "s4", { objeto: { materia: "nlp", curso: "c", questao: "q5", conceitos: ["idf"] } }), evento(6, "s5"));
+		// a primeira reflexão lê tudo; a segunda só ev007 e ev008 (a janela dela); ev001 e ev006 viram "anteriores"
 		await executarReflexao(dados, { motivo: "botao", agora: AGORA, pastaCache: cache, chamar: modeloFalso([]).chamar, naFila });
 		await gravar(evento(7, "s6"), evento(8, "s7"));
 		const modelo = modeloFalso([
 			criarMisconception([]),
 			{ ...criarMisconception(["ev007", "naoexiste"]), enunciado: "Em tokenização, ignora os números" },
-			{ ...criarMisconception(["ev001", "ev007"]), enunciado: "Em tokenização, esquece as contrações" },
+			{ ...criarMisconception(["ev005", "ev007"]), enunciado: "Em tokenização, esquece as contrações" },
 			{ ...criarMisconception(["ev007", "ev008"]), enunciado: "Em tokenização, divide palavras compostas" },
 			{ ...criarMisconception(["ev007", "ev008"]), enunciado: "Em tokenização, divide palavras compostas" },
 			"lixo",

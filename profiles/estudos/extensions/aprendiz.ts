@@ -9,16 +9,18 @@
 // Qualquer falha é `erro` ({ pedido?, ao, mensagem }). A extensão só fala depois de session_start (como as outras).
 //
 // Quem grava: SÓ esta extensão grava o aprendiz/hipoteses.json (e os eventos das hipóteses no
-// aprendiz/eventos.jsonl), pelas operações de ../lib/hipoteses.ts, todas numa FILA única (uma gravação de cada
-// vez; a leitura e a gravação de uma reflexão ficam dentro dela, a chamada ao modelo fora) e com UMA trava de
-// reflexão (um segundo pedido enquanto uma roda entra nela e recebe o mesmo resultado). A reflexão é feita pelo
-// modelo do prompts/reflexao.md (chamada separada da do professor, temperatura 0), pelo ctx.modelRegistry do pi
-// como o mapa. Gatilhos: o botão, e "aprendiz:gatilho" ({ motivo: "modulo" | "licao" }), que o modulos.ts
-// emite depois de gravar o concluiu_modulo e o avaliou_licao; a automática roda em segundo plano e, falhando,
-// só não registra nada.
+// aprendiz/eventos.jsonl), pelas operações de ../lib/hipoteses.ts, todas numa FILA única POR PASTA DE DADOS, do
+// processo (naFilaDoProcesso: o pi cria uma instância da extensão por sessão e, ao trocar de conversa, a nova pode
+// começar antes de a velha terminar; uma gravação de cada vez; a leitura e a gravação de uma reflexão ficam dentro
+// dela, a chamada ao modelo fora) e com UMA trava de reflexão por instância (um segundo pedido enquanto uma roda
+// entra nela e recebe o mesmo resultado). A reflexão é feita pelo modelo do prompts/reflexao.md (chamada separada
+// da do professor, temperatura 0), pelo ctx.modelRegistry do pi como o mapa. Gatilhos: o botão, e
+// "aprendiz:gatilho" ({ motivo: "modulo" | "licao" }), que o modulos.ts emite depois de gravar o concluiu_modulo e
+// o avaliou_licao; a automática só chama o modelo com pelo menos MINIMO_DO_GATILHO eventos de desempenho novos
+// (o botão chama sempre que há evento novo), roda em segundo plano e, falhando, só não registra nada.
 //
 // A ferramenta ler_perfil_aprendiz é só de leitura: devolve ao professor as hipóteses que o Breno APROVOU.
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readFile } from "node:fs/promises";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -43,7 +45,7 @@ import {
 	arquivoHipoteses,
 } from "../lib/hipoteses.ts";
 import { eventosAprendiz } from "../lib/materias.ts";
-import { cortarTexto, executarReflexao, propostasDaResposta } from "../lib/reflexao.ts";
+import { cortarTexto, executarReflexao, MINIMO_DO_GATILHO, propostasDaResposta } from "../lib/reflexao.ts";
 import { pedirJson, type RegistroCursos } from "./cursos.ts";
 import { lerPromptMapeador } from "./mapa.ts";
 import { materiaDaConversa } from "./notas.ts";
@@ -71,6 +73,34 @@ type Motivo = ResumoDaReflexao["motivo"];
 interface EmAndamento {
 	controle: AbortController;
 	pedidos: string[];
+	/** Só o gatilho automático: o mínimo de eventos de desempenho novos para chamar o modelo. */
+	minimo?: number;
+}
+
+// --- A fila de gravação do processo --------------------------------------------------------------------
+
+const CHAVE_DAS_FILAS = Symbol.for("estudos.aprendiz.filas");
+
+/** As filas do processo, uma por pasta de dados (em globalThis: cada carga da extensão tem o seu módulo). */
+function filasDoProcesso(): Map<string, Promise<unknown>> {
+	const global = globalThis as unknown as Record<symbol, Map<string, Promise<unknown>> | undefined>;
+	return (global[CHAVE_DAS_FILAS] ??= new Map());
+}
+
+/**
+ * Roda a tarefa na fila da pasta de dados: uma de cada vez, na ordem, mesmo que a anterior tenha falhado e mesmo
+ * que venha de outra instância da extensão (outra sessão do pi sobre a mesma pasta).
+ */
+export function naFilaDoProcesso<T>(dados: string, tarefa: () => Promise<T>): Promise<T> {
+	const filas = filasDoProcesso();
+	const chave = process.platform === "win32" ? resolve(dados).toLowerCase() : resolve(dados);
+	const proxima = (filas.get(chave) ?? Promise.resolve()).then(tarefa, tarefa);
+	const cauda = proxima.catch(() => undefined);
+	filas.set(chave, cauda);
+	void cauda.then(() => {
+		if (filas.get(chave) === cauda) filas.delete(chave);
+	});
+	return proxima;
 }
 
 /** "provedor/id" no registro do pi, com credencial. */
@@ -120,18 +150,16 @@ export function montarAprendiz(pi: ExtensionAPI, opcoes: OpcoesAprendiz = {}): v
 	let pastaDados: string | undefined;
 	let sessao: string | undefined;
 	let registro: RegistroCursos | undefined;
-	/** A fila única das leituras e gravações: cada tarefa espera a anterior, mesmo que ela tenha falhado. */
-	let fila: Promise<unknown> = Promise.resolve();
 	/** A reflexão que está rodando (a trava: uma por vez). */
 	let reflexao: EmAndamento | undefined;
 
 	const mostrar = (acao: string, dados: Record<string, unknown>) => pi.events.emit("interface:mostrar", { painel: PAINEL_APRENDIZ, acao, dados, gravar: false });
 
-	const naFila = <T>(tarefa: () => Promise<T>): Promise<T> => {
-		const proxima = fila.then(tarefa, tarefa);
-		fila = proxima.catch(() => undefined);
-		return proxima;
-	};
+	/** A fila de leituras e gravações da pasta de dados (do processo, não desta instância). */
+	const filaDe =
+		(dados: string) =>
+		<T>(tarefa: () => Promise<T>): Promise<T> =>
+			naFilaDoProcesso(dados, tarefa);
 
 	/** O estado das hipóteses como a tela o recebe (ler não grava: a validade vencida só expira numa gravação). */
 	const estadoDeAgora = async (dados: string): Promise<EstadoHipoteses> => {
@@ -183,24 +211,36 @@ export function montarAprendiz(pi: ExtensionAPI, opcoes: OpcoesAprendiz = {}): v
 	 * Quem pediu (`pedido`) recebe `refletiu` ou `erro`; sem pedido (a automática), só `hipoteses` quando deu certo, e
 	 * falhando não aparece nada.
 	 */
-	const refletir = (dados: string, motivo: Motivo, pedido?: string) => {
+	const refletir = (dados: string, motivo: Motivo, pedido?: string, minimo?: number) => {
 		if (reflexao) {
 			if (pedido && !reflexao.pedidos.includes(pedido)) reflexao.pedidos.push(pedido);
 			return;
 		}
-		const atual: EmAndamento = { controle: new AbortController(), pedidos: pedido ? [pedido] : [] };
+		const atual: EmAndamento = { controle: new AbortController(), pedidos: pedido ? [pedido] : [], ...(minimo !== undefined ? { minimo } : {}) };
 		reflexao = atual;
+		const naFilaGlobal = filaDe(dados);
+		// A sessão pode acabar enquanto a tarefa espera na fila (a instância nova já gravando): então nada é gravado.
+		const naFila = <T>(tarefa: () => Promise<T>): Promise<T> =>
+			naFilaGlobal(async () => {
+				if (atual.controle.signal.aborted) throw new ErroHipoteses("A sessão acabou; a reflexão parou e nada foi gravado.");
+				return tarefa();
+			});
 		void (async () => {
 			let resultado: Awaited<ReturnType<typeof executarReflexao>> | undefined;
 			let falha: unknown;
-			try {
-				resultado = await executarReflexao(dados, {
+			const rodar = (minimoDeDesempenho?: number) =>
+				executarReflexao(dados, {
 					motivo,
 					...(sessao ? { sessao } : {}),
 					...(opcoes.pastaCache !== undefined ? { pastaCache: opcoes.pastaCache } : { pastaCache: pastaCacheAprendiz() }),
+					...(minimoDeDesempenho !== undefined ? { minimoDeDesempenho } : {}),
 					chamar: (mensagem) => chamarModelo(mensagem, atual.controle.signal),
 					naFila,
 				});
+			try {
+				resultado = await rodar(atual.minimo);
+				// Um pedido do botão entrou numa reflexão automática que parou no mínimo: o botão chama sempre que há evento novo.
+				if (resultado.semEventos && resultado.abaixoDoMinimo && atual.pedidos.length > 0) resultado = await rodar(undefined);
 			} catch (erro) {
 				falha = erro;
 			}
@@ -213,7 +253,7 @@ export function montarAprendiz(pi: ExtensionAPI, opcoes: OpcoesAprendiz = {}): v
 					for (const alvo of pedidos) mostrar("erro", { pedido: alvo, ao: "refletir", mensagem: mensagemDe(falha, "refletir sobre os eventos") });
 					return;
 				}
-				const estado = await naFila(() => estadoDeAgora(dados));
+				const estado = await naFilaGlobal(() => estadoDeAgora(dados));
 				for (const alvo of pedidos) mostrar("refletiu", { pedido: alvo, resumo: resultado!.resumo, estado });
 				if (pedidos.length === 0 && !resultado!.semEventos) mostrar("hipoteses", { estado });
 			} catch (erro) {
@@ -228,7 +268,7 @@ export function montarAprendiz(pi: ExtensionAPI, opcoes: OpcoesAprendiz = {}): v
 		if (!dados) return;
 		const motivo = (recebido as { motivo?: unknown } | undefined)?.motivo;
 		if (motivo !== "modulo" && motivo !== "licao") return;
-		refletir(dados, motivo);
+		refletir(dados, motivo, undefined, MINIMO_DO_GATILHO);
 	});
 
 	pi.events.on("interface:acao", (recebido) => {
@@ -238,6 +278,7 @@ export function montarAprendiz(pi: ExtensionAPI, opcoes: OpcoesAprendiz = {}): v
 		// extensões uma vez a mais (montagem.ts), e essa carga continua ouvindo o barramento. Ela fica calada.
 		const dados = pastaDados;
 		if (!dados) return;
+		const naFila = filaDe(dados);
 		const dadosAcao = (typeof bruto === "object" && bruto !== null ? bruto : {}) as Record<string, unknown>;
 		const pedido = textoOuNada(dadosAcao.pedido) || undefined;
 		const eco = pedido ? { pedido } : {};

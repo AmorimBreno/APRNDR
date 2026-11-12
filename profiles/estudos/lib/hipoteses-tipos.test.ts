@@ -7,6 +7,7 @@ import {
 	aplicarReflexao,
 	type ArquivoHipoteses,
 	arquivoVazio,
+	conferirEnunciado,
 	confiancaDe,
 	conflitoRecente,
 	type ContextoValidacao,
@@ -33,8 +34,8 @@ import {
 const AGORA = new Date("2026-11-11T12:00:00.000Z");
 const M = MOTIVOS_DE_DESCARTE;
 
-function evento(id: string, sessao: string | undefined, ts: string, verbo: EventoDeEvidencia["verbo"] = "respondeu_questao"): EventoDeEvidencia {
-	return { id, ts, verbo, ...(sessao ? { sessao } : {}) };
+function evento(id: string, sessao: string | undefined, ts: string, verbo: EventoDeEvidencia["verbo"] = "respondeu_questao", objeto: EventoDeEvidencia["objeto"] = { materia: "calc", conceitos: ["limites", "series"] }): EventoDeEvidencia {
+	return { id, ts, verbo, objeto, ...(sessao ? { sessao } : {}) };
 }
 
 const EVENTOS = indexarEventos([
@@ -52,6 +53,24 @@ const EVENTOS = indexarEventos([
 	evento("sem", undefined, "2026-11-06T10:00:00.000Z"),
 	evento("f1", "s9", "2026-11-07T10:00:00.000Z"),
 	evento("x1", "s3", "2026-11-08T10:00:00.000Z", "propos_hipotese"),
+	// Autoavaliação (o que ele disse), de duas sessões e dois dias.
+	evento("a1", "s1", "2026-10-20T11:00:00.000Z", "autoavaliou_conceito"),
+	evento("a2", "s2", "2026-10-25T11:00:00.000Z", "autoavaliou_conceito"),
+	// Duas sessões diferentes no MESMO dia.
+	evento("d1", "s5", "2026-11-03T08:00:00.000Z"),
+	evento("d2", "s6", "2026-11-03T09:00:00.000Z"),
+	// Eventos que não são de desempenho (avaliou_bloco), de sessões e dias diferentes.
+	evento("b1", "s1", "2026-10-20T12:00:00.000Z", "avaliou_bloco"),
+	evento("b2", "s2", "2026-10-25T12:00:00.000Z", "avaliou_bloco"),
+	// Um evento anterior (já lido), de sessão e dia próprios.
+	evento("n1", "s7", "2026-09-20T10:00:00.000Z"),
+	// De outro conceito, de outra matéria que existe, de matéria que não existe e do método.
+	evento("c1", "s1", "2026-10-20T13:00:00.000Z", "respondeu_questao", { materia: "calc", conceitos: ["integrais"] }),
+	evento("c2", "s2", "2026-10-25T13:00:00.000Z", "respondeu_questao", { materia: "calc", conceitos: ["integrais"] }),
+	evento("g1", "s1", "2026-10-20T14:00:00.000Z", "respondeu_questao", { materia: "alg", conceitos: ["x"] }),
+	evento("g2", "s2", "2026-10-25T14:00:00.000Z", "respondeu_questao", { materia: "alg", conceitos: ["x"] }),
+	evento("z1", "s1", "2026-10-20T15:00:00.000Z", "respondeu_questao", { materia: "apagada", conceitos: ["x"] }),
+	evento("me", "s2", "2026-10-25T15:00:00.000Z", "aprovou_ajuste_metodo", { materia: "calc" }),
 ]);
 
 function hipotese(extra: Partial<Hipotese> = {}): Hipotese {
@@ -124,6 +143,24 @@ describe("normalizarTexto e as frases proibidas", () => {
 	it("tira acento, caixa e pontuação", () => {
 		expect(normalizarTexto("  É um APRENDIZ, Visual!! ")).toBe("e um aprendiz visual");
 	});
+	it("rótulos, traços, estados e elogios novos; 'cinestesic' vale como raiz", () => {
+		for (const frase of ["estilo de aprendizado", "aprende melhor visualmente", "perfil visual", "VARK", "cinestesic", "bom aluno", "aluno exemplar", "dedicado", "esforçado", "inteligente", "talentoso", "brilhante", "excelente", "ótimo", "inseguro", "ansioso", "desatento", "preguiçoso"]) {
+			expect(FRASES_PROIBIDAS).toContain(frase);
+			expect(conferirEnunciado(`Em limites, parece ${frase} nas contas`).ok, frase).toBe(false);
+		}
+		expect(conferirEnunciado("Prefere o modelo cinestésico nas aulas").ok).toBe(false);
+		expect(conferirEnunciado("Prefere o modelo cinestesico nas aulas").ok).toBe(false);
+		expect(conferirEnunciado("Erra o sinal do expoente nas potências de base negativa").ok).toBe(true);
+	});
+
+	it("recusa o enunciado em forma de rótulo: começa com 'É um', 'É uma' ou 'O aluno é'", () => {
+		for (const texto of ["É um estudante que erra o sinal", "é uma pessoa que erra o sinal", "O aluno é distraído nas contas", "E um erro comum no sinal do expoente"]) {
+			expect(conferirEnunciado(texto), texto).toMatchObject({ ok: false, motivo: M.enunciadoGenerico });
+		}
+		expect(conferirEnunciado("Em derivadas, é um erro frequente trocar o sinal").ok).toBe(true);
+		expect(conferirEnunciado("O aluno errou o sinal do expoente duas vezes").ok).toBe(true);
+	});
+
 	it("a lista traz as frases do contrato", () => {
 		for (const frase of ["aprendiz visual", "aprendiz auditivo", "estilo de aprendizagem", "excelente aluno", "muito bom", "ótimo aluno", "parabéns"]) {
 			expect(FRASES_PROIBIDAS).toContain(frase);
@@ -132,14 +169,17 @@ describe("normalizarTexto e as frases proibidas", () => {
 });
 
 describe("validarProposta", () => {
-	const materias = new Map([["calc", new Set(["limites", "series"])]]);
+	const materias = new Map([
+		["calc", new Set(["limites", "series", "integrais"])],
+		["alg", new Set(["x"])],
+	]);
 	const existentes = [
 		hipotese(),
 		hipotese({ id: "h-rej", status: "rejeitada", aprovadaPeloUsuario: false, enunciado: "Prefere ver o caso real antes da definição formal", aFavor: ["e4"] }),
 		hipotese({ id: "h-exp", status: "expirada", aprovadaPeloUsuario: false, enunciado: "Troca derivada por integral nas contas longas", aFavor: ["e8"] }),
 		propostaH({ id: "h-prop", enunciado: "Escreve o sinal do expoente ao contrário", aFavor: ["e2"] }),
 	];
-	const contexto: ContextoValidacao = { eventosPorId: EVENTOS, janela: ["e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "o1", "sem", "x1"], hipoteses: existentes, materias };
+	const contexto: ContextoValidacao = { eventosPorId: EVENTOS, janela: ["e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "o1", "sem", "x1", "a1", "a2", "d1", "d2", "b1", "b2", "c1", "c2", "g1", "g2", "z1", "me"], anteriores: ["n1"], hipoteses: existentes, materias };
 
 	const criar = (extra: Record<string, unknown> = {}) => ({
 		acao: "criar",
@@ -168,8 +208,8 @@ describe("validarProposta", () => {
 		});
 
 		it("aceita o escopo global (objeto ou a palavra) e o de conceito sem repetir", () => {
-			expect(validarProposta(criar({ escopo: "global" }), contexto)).toMatchObject({ ok: true, proposta: { escopo: { nivel: "global" } } });
-			expect(validarProposta(criar({ escopo: { nivel: "global" } }), contexto)).toMatchObject({ ok: true, proposta: { escopo: { nivel: "global" } } });
+			expect(validarProposta(criar({ escopo: "global", evidencias: ["e1", "g2"] }), contexto)).toMatchObject({ ok: true, proposta: { escopo: { nivel: "global" } } });
+			expect(validarProposta(criar({ escopo: { nivel: "global" }, evidencias: ["e1", "g2"] }), contexto)).toMatchObject({ ok: true, proposta: { escopo: { nivel: "global" } } });
 			expect(validarProposta(criar({ escopo: { nivel: "conceito", materia: "calc", conceitos: ["series", "limites", "series"] } }), contexto)).toMatchObject({
 				ok: true,
 				proposta: { escopo: { nivel: "conceito", materia: "calc", conceitos: ["series", "limites"] } },
@@ -259,6 +299,71 @@ describe("validarProposta", () => {
 		it("o enunciado vem antes da evidência na ordem das conferências", () => {
 			expect(motivoDe(criar({ enunciado: "curto", evidencias: ["nao-existe"] }))).toBe(M.enunciadoForaDoTamanho);
 		});
+
+		it("aceita citar eventos anteriores (já lidos) junto de pelo menos 1 evento novo; só anteriores, não", () => {
+			expect(validarProposta(criar({ evidencias: ["n1", "e1"] }), contexto)).toMatchObject({ ok: true, proposta: { evidencias: ["n1", "e1"] } });
+			expect(motivoDe(criar({ evidencias: ["n1", "e1", "e3"] }))).toBe("ok");
+			expect(motivoDe(criar({ evidencias: ["n1"] }))).toBe(M.evidenciaInsuficiente);
+			expect(motivoDe(criar({ evidencias: ["n1", "f1"] }))).toBe(M.evidenciaForaDaJanela);
+			// sem "anteriores" no contexto, o evento anterior não vale
+			const { anteriores: _, ...semAnteriores } = contexto;
+			expect(motivoDe(criar({ evidencias: ["n1", "e1"] }), semAnteriores)).toBe(M.evidenciaForaDaJanela);
+			// só eventos anteriores (nenhum novo) é recusado
+			const soAnteriores = { ...contexto, janela: ["e5"], anteriores: ["e1", "e3"] };
+			expect(motivoDe(criar({ evidencias: ["e1", "e3"] }), soAnteriores)).toBe(M.semEvidenciaNova);
+			expect(motivoDe(criar({ evidencias: ["e1", "e3", "e5"] }), soAnteriores)).toBe("ok");
+		});
+
+		it("exige 2 dias diferentes (a sessão do pi pode durar o dia todo) e a mesma regra baixa a confiança", () => {
+			// d1 e d2: sessões s5 e s6 diferentes, mas no mesmo dia
+			expect(motivoDe(criar({ evidencias: ["d1", "d2"] }))).toBe(M.evidenciaDeUmDia);
+			expect(motivoDe(criar({ evidencias: ["d1", "d2", "e1"] }))).toBe("ok");
+			expect(confiancaDe(["d1", "d2", "e1"], EVENTOS)).toBe("media");
+			expect(confiancaDe(["d1", "d2"], EVENTOS)).toBe("baixa");
+			// 3 eventos de 2 sessões, mas de um dia só: baixa
+			const umDia = indexarEventos([evento("u1", "sa", "2026-11-03T08:00:00.000Z"), evento("u2", "sa", "2026-11-03T09:00:00.000Z"), evento("u3", "sb", "2026-11-03T10:00:00.000Z")]);
+			expect(confiancaDe(["u1", "u2", "u3"], umDia)).toBe("baixa");
+		});
+
+		it("a autoavaliação não conta nos mínimos de nenhum tipo: autoavaliacao_sem_apoio quando só com ela a proposta passaria", () => {
+			for (const tipo of ["conhecimento", "misconception", "vocabulario", "metacognicao", "preferencia_de_forma", "ritmo"]) {
+				expect(motivoDe(criar({ tipo, evidencias: ["a1", "a2"] })), tipo).toBe(M.autoavaliacaoSemApoio);
+				expect(motivoDe(criar({ tipo, evidencias: ["a1", "e3"] })), tipo).toBe(M.autoavaliacaoSemApoio);
+			}
+			// 2 eventos reais mais a autoavaliação passam
+			expect(motivoDe(criar({ tipo: "metacognicao", evidencias: ["a1", "e1", "e3"] }))).toBe("ok");
+			// sem a autoavaliação os mínimos já falhavam por outro motivo: vale esse motivo
+			expect(motivoDe(criar({ evidencias: ["a1", "e1", "e2"] }))).toBe(M.evidenciaDeUmaSessao);
+		});
+
+		it("conhecimento, misconception e vocabulário pedem 2 eventos de desempenho; os outros tipos, não", () => {
+			// b1 e b2 são avaliou_bloco (opinião), de sessões e dias diferentes
+			for (const tipo of ["conhecimento", "misconception", "vocabulario"]) expect(motivoDe(criar({ tipo, evidencias: ["b1", "b2"] })), tipo).toBe(M.semDesempenho);
+			expect(motivoDe(criar({ tipo: "conhecimento", evidencias: ["b1", "b2", "e1"] }))).toBe(M.semDesempenho);
+			expect(motivoDe(criar({ tipo: "conhecimento", evidencias: ["b1", "e1", "e3"] }))).toBe("ok");
+			expect(motivoDe(criar({ tipo: "preferencia_de_forma", evidencias: ["b1", "b2"] }))).toBe("ok");
+		});
+
+		it("o escopo é conferido contra as evidências: conceito, matéria e global", () => {
+			const conceito = (...conceitos: string[]) => ({ nivel: "conceito", materia: "calc", conceitos });
+			expect(motivoDe(criar({ escopo: conceito("integrais"), evidencias: ["c1", "c2"] }))).toBe("ok");
+			expect(motivoDe(criar({ escopo: conceito("integrais"), evidencias: ["c1", "e3"] }))).toBe(M.escopoSemEvidencia);
+			expect(motivoDe(criar({ escopo: conceito("limites"), evidencias: ["g1", "g2"] }))).toBe(M.escopoSemEvidencia);
+			expect(motivoDe(criar({ escopo: conceito("limites", "integrais"), evidencias: ["c1", "e3"] }))).toBe("ok");
+			// a autoavaliação não é conferida contra os conceitos
+			expect(motivoDe(criar({ tipo: "metacognicao", escopo: conceito("integrais"), evidencias: ["a1", "c1", "c2"] }))).toBe("ok");
+			// de matéria: todos são dessa matéria
+			expect(motivoDe(criar({ escopo: { nivel: "materia", materia: "calc" }, evidencias: ["c1", "e3"] }))).toBe("ok");
+			expect(motivoDe(criar({ escopo: { nivel: "materia", materia: "calc" }, evidencias: ["g1", "e3"] }))).toBe(M.escopoSemEvidencia);
+			// global: eventos de pelo menos 2 matérias
+			expect(motivoDe(criar({ escopo: { nivel: "global" }, evidencias: ["e1", "e3"] }))).toBe(M.escopoSemEvidencia);
+			expect(motivoDe(criar({ escopo: { nivel: "global" }, evidencias: ["e1", "g2"] }))).toBe("ok");
+		});
+
+		it("evento que não é de aprendizagem (do método) ou de matéria que não existe é recusado na criação também", () => {
+			expect(motivoDe(criar({ evidencias: ["me", "e1"] }))).toBe(M.evidenciaNaoEDeAprendizagem);
+			expect(motivoDe(criar({ evidencias: ["z1", "e3"] }))).toBe(M.evidenciaNaoEDeAprendizagem);
+		});
 	});
 
 	describe("reforçar e enfraquecer", () => {
@@ -300,19 +405,59 @@ describe("validarProposta", () => {
 			expect(motivoDe(mudar({ evidencias: ["x1"] }))).toBe(M.evidenciaDeEventoDeHipotese);
 		});
 
-		it("não exige a janela nem 2 sessões", () => {
-			expect(motivoDe(mudar({ evidencias: ["f1"] }))).toBe("ok");
+		it("exige a janela (o evento anterior e o de fora não valem), mas não 2 sessões nem 2 dias", () => {
+			expect(motivoDe(mudar({ evidencias: ["f1"] }))).toBe(M.evidenciaForaDaJanela);
+			expect(motivoDe(mudar({ evidencias: ["n1"] }))).toBe(M.evidenciaForaDaJanela);
+			expect(motivoDe(mudar({ evidencias: ["e5", "n1"] }))).toBe(M.evidenciaForaDaJanela);
 			expect(motivoDe(mudar({ evidencias: ["e5"] }))).toBe("ok");
+		});
+
+		it("recusa evento que não é de aprendizagem (do método) e de matéria que não existe, em reforçar, enfraquecer e expirar", () => {
+			for (const acao of ["reforcar", "enfraquecer"]) {
+				expect(motivoDe(mudar({ acao, evidencias: ["me"] })), acao).toBe(M.evidenciaNaoEDeAprendizagem);
+				expect(motivoDe(mudar({ acao, evidencias: ["e5", "z1"] })), acao).toBe(M.evidenciaNaoEDeAprendizagem);
+			}
+			expect(motivoDe({ acao: "expirar", hipotese: "h-1", evidencias: ["me"], motivo: "x" })).toBe(M.evidenciaNaoEDeAprendizagem);
+			expect(motivoDe({ acao: "expirar", hipotese: "h-1", evidencias: ["z1"], motivo: "x" })).toBe(M.evidenciaNaoEDeAprendizagem);
+		});
+
+		it("as evidências precisam tocar o escopo da hipótese: as de outro conceito ou matéria saem; se nenhuma toca, escopo_sem_evidencia", () => {
+			// h-1 é de conceito (calc/limites)
+			expect(validarProposta(mudar({ evidencias: ["c1", "e5", "g1"] }), contexto)).toMatchObject({ ok: true, proposta: { evidencias: ["e5"] } });
+			expect(motivoDe(mudar({ evidencias: ["c1", "c2"] }))).toBe(M.escopoSemEvidencia);
+			expect(motivoDe(mudar({ evidencias: ["g1"] }))).toBe(M.escopoSemEvidencia);
+			// de matéria: qualquer conceito da matéria serve, outra matéria não
+			const daMateria = { ...contexto, hipoteses: [hipotese({ escopo: { nivel: "materia", materia: "calc" } })] };
+			expect(motivoDe(mudar({ evidencias: ["c1"] }), daMateria)).toBe("ok");
+			expect(motivoDe(mudar({ evidencias: ["g1"] }), daMateria)).toBe(M.escopoSemEvidencia);
+			// global: qualquer evento de aprendizagem
+			const global = { ...contexto, hipoteses: [hipotese({ escopo: { nivel: "global" } })] };
+			expect(motivoDe(mudar({ evidencias: ["g1"] }), global)).toBe("ok");
+		});
+
+		it("numa hipótese de conhecimento, misconception ou vocabulário a autoavaliação sozinha não vale (autoavaliacao_sem_apoio)", () => {
+			expect(motivoDe(mudar({ evidencias: ["a1", "a2"] }))).toBe(M.autoavaliacaoSemApoio);
+			expect(motivoDe(mudar({ acao: "enfraquecer", evidencias: ["a1"] }))).toBe(M.autoavaliacaoSemApoio);
+			expect(validarProposta(mudar({ evidencias: ["a1", "e5"] }), contexto)).toMatchObject({ ok: true, proposta: { evidencias: ["a1", "e5"] } });
+			// metacognição pode citá-la
+			const meta = { ...contexto, hipoteses: [hipotese({ tipo: "metacognicao" })] };
+			expect(motivoDe(mudar({ evidencias: ["a1"] }), meta)).toBe("ok");
 		});
 	});
 
 	describe("expirar", () => {
 		const expirar = (extra: Record<string, unknown> = {}) => ({ acao: "expirar", hipotese: "h-1", evidencias: [], motivo: "não aparece mais", ...extra });
 
-		it("aceita a aprovada e a proposta, com motivo, mesmo sem evidência", () => {
-			expect(validarProposta(expirar(), contexto)).toEqual({ ok: true, proposta: { acao: "expirar", hipotese: "h-1", evidencias: [], motivo: "não aparece mais" } });
-			expect(motivoDe(expirar({ hipotese: "h-prop" }))).toBe("ok");
-			expect(motivoDe(expirar({ evidencias: ["e8"] }))).toBe("ok");
+		it("aceita a aprovada e a proposta, com motivo e pelo menos 1 evidência da janela", () => {
+			expect(validarProposta(expirar({ evidencias: ["e8"] }), contexto)).toEqual({ ok: true, proposta: { acao: "expirar", hipotese: "h-1", evidencias: ["e8"], motivo: "não aparece mais" } });
+			expect(motivoDe(expirar({ hipotese: "h-prop", evidencias: ["e8"] }))).toBe("ok");
+		});
+
+		it("sem evidência ou com evidência de fora da janela é recusada", () => {
+			expect(motivoDe(expirar())).toBe(M.semEvidencia);
+			expect(motivoDe(expirar({ evidencias: undefined }))).toBe(M.semEvidencia);
+			expect(motivoDe(expirar({ evidencias: ["f1"] }))).toBe(M.evidenciaForaDaJanela);
+			expect(motivoDe(expirar({ evidencias: ["n1"] }))).toBe(M.evidenciaForaDaJanela);
 		});
 
 		it("descarta a rejeitada, a expirada, a que não existe e a sem motivo", () => {
@@ -325,7 +470,7 @@ describe("validarProposta", () => {
 
 		it("descarta a evidência que não existe e a expiração repetida", () => {
 			expect(motivoDe(expirar({ evidencias: ["zzz"] }))).toBe(M.evidenciaInexistente);
-			expect(motivoDe(expirar(), { ...contexto, mudancas: [mudanca({ acao: "expirar", evidencias: [] })] })).toBe(M.mudancaRepetida);
+			expect(motivoDe(expirar({ evidencias: ["e8"] }), { ...contexto, mudancas: [mudanca({ acao: "expirar", evidencias: [] })] })).toBe(M.mudancaRepetida);
 		});
 	});
 
@@ -350,6 +495,14 @@ describe("validarProposta", () => {
 				{ motivo: M.evidenciaJaCitada, quantas: 1 },
 				{ motivo: M.formatoInvalido, quantas: 1 },
 			]);
+		});
+
+		it("aceita no máximo 6 criações por reflexão; o resto vai para 'excesso' (as mudanças não contam)", () => {
+			const lote = Array.from({ length: 8 }, (_, indice) => criar({ enunciado: `Em séries, confunde o termo número ${indice + 1} com o seguinte` }));
+			const { validas, descartadas } = validarPropostas([...lote, { acao: "reforcar", hipotese: "h-1", evidencias: ["e5"], motivo: "" }], contexto);
+			expect(validas.filter((proposta) => proposta.acao === "criar")).toHaveLength(6);
+			expect(validas.filter((proposta) => proposta.acao === "reforcar")).toHaveLength(1);
+			expect(descartadas).toEqual([{ motivo: M.excesso, quantas: 2 }]);
 		});
 
 		it("o que não é lista perde tudo numa linha só; lista vazia não descarta nada", () => {
@@ -444,6 +597,16 @@ describe("conflitoRecente", () => {
 		expect(conflitoRecente({ aFavor: ["hoje"], contra: ["d60"] }, eventos, AGORA).conflito).toBe(false);
 		expect(conflitoRecente({ aFavor: ["hoje", "d61"], contra: ["d60", "hoje2"] }, eventos, AGORA)).toEqual({ conflito: false, aFavorRecentes: 1, contraRecentes: 1 });
 		expect(conflitoRecente({ aFavor: ["d61"], contra: ["hoje"] }, eventos, AGORA).conflito).toBe(true);
+	});
+
+	it("ignora a autoavaliação e os eventos de hipótese, como a confiança", () => {
+		const ev = indexarEventos([
+			evento("f", "s1", "2026-11-10T10:00:00.000Z"),
+			evento("auto1", "s1", "2026-11-10T10:00:00.000Z", "autoavaliou_conceito"),
+			evento("auto2", "s2", "2026-11-10T11:00:00.000Z", "autoavaliou_conceito"),
+			evento("hip", "s2", "2026-11-10T11:00:00.000Z", "propos_hipotese"),
+		]);
+		expect(conflitoRecente({ aFavor: ["f"], contra: ["auto1", "auto2", "hip"] }, ev, AGORA)).toEqual({ conflito: false, aFavorRecentes: 1, contraRecentes: 0 });
 	});
 });
 

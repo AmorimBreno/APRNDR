@@ -138,6 +138,17 @@ export function novoIdEvento(agora: number = Date.now()): string {
 	return `${agora.toString(36).padStart(12, "0")}-${randomBytes(4).toString("hex")}`;
 }
 
+/**
+ * O instante (em milissegundos) que o id carrega (o inverso de novoIdEvento), ou undefined se o texto não tem a
+ * forma de um id de novoIdEvento (os ids escritos à mão nos testes, por exemplo).
+ */
+export function instanteDoIdEvento(id: string): number | undefined {
+	const achado = /^([0-9a-z]{12})-[0-9a-f]{8}$/u.exec(id);
+	if (!achado) return undefined;
+	const instante = Number.parseInt(achado[1]!, 36);
+	return Number.isFinite(instante) ? instante : undefined;
+}
+
 /** Monta um evento com id e data e hora. */
 export function criarEvento(dados: Omit<Evento, "id" | "ts">, agora: Date = new Date()): Evento {
 	return { id: novoIdEvento(agora.getTime()), ts: agora.toISOString(), ...dados };

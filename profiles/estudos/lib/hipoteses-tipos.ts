@@ -81,6 +81,11 @@ export interface ResumoDaReflexao {
 	motivo: "botao" | "modulo" | "licao";
 	/** O id do último evento de aprendizagem que ela leu (a próxima começa depois dele). */
 	ultimoEvento?: string;
+	/**
+	 * Os ids que ela leu depois do `ultimoEvento` (os dos últimos 2 s antes dela, que entram de novo na próxima): uma
+	 * janela só desses ids não tem nada novo e não chama o modelo.
+	 */
+	jaLidos?: string[];
 	lidos: number;
 	/** Quantas propostas o modelo fez, quantas o código aceitou e quantas descartou (com o porquê em `descartadas`). */
 	propostas: number;
@@ -141,14 +146,25 @@ export const JANELA_DO_CONFLITO_DIAS = 60;
 export const ENUNCIADO_MINIMO = 12;
 export const ENUNCIADO_MAXIMO = 300;
 
-/** Para criar: pelo menos 2 eventos, de pelo menos 2 sessões diferentes (um sinal isolado é evidência fraca). */
+/**
+ * Para criar: pelo menos 2 eventos (sem contar a autoavaliação), de pelo menos 2 sessões do pi diferentes e de pelo
+ * menos 2 dias diferentes (um sinal isolado é evidência fraca; a "sessão" é a do pi, que pode durar um dia inteiro).
+ */
 export const EVIDENCIAS_MINIMAS_PARA_CRIAR = 2;
 export const SESSOES_MINIMAS_PARA_CRIAR = 2;
+export const DIAS_MINIMOS_PARA_CRIAR = 2;
 
 /** O motivo que o modelo dá é cortado neste tamanho. */
 export const MOTIVO_MAXIMO = 400;
 
-/** Rótulos e elogios proibidos nos enunciados (comparados sem acento, sem caixa e sem pontuação, como palavras inteiras). */
+/** No máximo tantas criações por reflexão; as que passam disso vão para o motivo `excesso`. */
+export const MAXIMO_DE_CRIACOES_POR_REFLEXAO = 6;
+
+/**
+ * Rótulos, traços de personalidade, estados e elogios proibidos nos enunciados (comparados sem acento, sem caixa e
+ * sem pontuação, como palavras inteiras; as RAIZES_PROIBIDAS casam com qualquer palavra que comece assim). É uma rede
+ * de segurança: quem segura de verdade é a aprovação do Breno.
+ */
 export const FRASES_PROIBIDAS = [
 	"aprendiz visual",
 	"aprendiz auditivo",
@@ -157,11 +173,75 @@ export const FRASES_PROIBIDAS = [
 	"aprendizes auditivos",
 	"estilo de aprendizagem",
 	"estilos de aprendizagem",
+	"estilo de aprendizado",
+	"aprende melhor visualmente",
+	"perfil visual",
+	"VARK",
+	"cinestesic",
 	"excelente aluno",
 	"ótimo aluno",
+	"bom aluno",
+	"aluno exemplar",
 	"muito bom",
 	"parabéns",
+	"dedicado",
+	"esforçado",
+	"inteligente",
+	"talentoso",
+	"brilhante",
+	"excelente",
+	"ótimo",
+	"inseguro",
+	"ansioso",
+	"desatento",
+	"preguiçoso",
 ] as const;
+
+/** Entradas de FRASES_PROIBIDAS (normalizadas) que valem como começo de palavra, não como palavra inteira. */
+const RAIZES_PROIBIDAS: readonly string[] = ["cinestesic"];
+
+/** Um enunciado normalizado que começa assim é um rótulo ("É um…", "O aluno é…"), não a descrição do que ele faz. */
+const COMECOS_DE_ROTULO = [" e um ", " e uma ", " o aluno e "] as const;
+
+/** Os verbos de aprendizagem que a reflexão lê: o que o Breno respondeu, avaliou, pediu e disse de si. */
+export const VERBOS_DA_REFLEXAO = [
+	"autoavaliou_conceito",
+	"respondeu_questao",
+	"respondeu_verificacao",
+	"respondeu_dissertativa",
+	"nao_sabia_questao",
+	"avaliou_bloco",
+	"avaliou_licao",
+	"reescreveu_bloco",
+	"pediu_explicacao",
+	"guardou_termo",
+	"pediu_reexplicacao",
+	"pediu_outro_jeito",
+	"escreveu_entendimento",
+	"marcou_confianca",
+] as const;
+
+/**
+ * O que ele FEZ (não o que disse nem o que opinou): respostas de questão, verificação e dissertativa, o "não sei" e
+ * os pedidos de explicação e de entendimento. Conhecimento, misconception e vocabulário precisam de pelo menos 2
+ * desses, e o gatilho automático da reflexão só chama o modelo com um mínimo deles.
+ */
+export const VERBOS_DE_DESEMPENHO = [
+	"respondeu_questao",
+	"respondeu_verificacao",
+	"respondeu_dissertativa",
+	"nao_sabia_questao",
+	"pediu_explicacao",
+	"pediu_reexplicacao",
+	"pediu_outro_jeito",
+	"escreveu_entendimento",
+] as const;
+
+/** O mínimo de eventos de desempenho de uma criação de conhecimento, misconception ou vocabulário. */
+export const DESEMPENHOS_MINIMOS_PARA_CRIAR = 2;
+
+/** Os tipos que dizem o que ele sabe: não se sustentam só com o que ele disse de si. */
+export const TIPOS_DE_CONHECIMENTO: readonly string[] = ["conhecimento", "misconception", "vocabulario"];
 
 /** Os verbos dos eventos de hipótese: nenhum deles pode ser citado como evidência nem é lido como observação. */
 export const VERBOS_DE_HIPOTESE = [
@@ -176,8 +256,11 @@ export const VERBOS_DE_HIPOTESE = [
 	"expirou_hipotese",
 ] as const;
 
-/** O que a confiança, a validação e o conflito precisam de um evento citado como evidência. */
-export type EventoDeEvidencia = Pick<Evento, "id" | "ts" | "sessao" | "verbo">;
+/**
+ * O que a confiança, a validação e o conflito precisam de um evento citado como evidência. O `objeto` (a matéria e os
+ * conceitos) serve para conferir o escopo; um evento sem ele não toca nenhum escopo de matéria ou de conceito.
+ */
+export type EventoDeEvidencia = Pick<Evento, "id" | "ts" | "sessao" | "verbo"> & { objeto?: Evento["objeto"] };
 
 /** Indexa os eventos por id (o `eventosPorId` de todas as funções daqui). */
 export function indexarEventos(eventos: Iterable<EventoDeEvidencia>): Map<string, EventoDeEvidencia> {
@@ -212,7 +295,21 @@ export function normalizarTexto(texto: string): string {
 		.trim();
 }
 
-const FRASES_PROIBIDAS_NORMALIZADAS = FRASES_PROIBIDAS.map((frase) => ` ${normalizarTexto(frase)} `);
+const FRASES_PROIBIDAS_NORMALIZADAS = FRASES_PROIBIDAS.map((frase) => {
+	const normal = normalizarTexto(frase);
+	return RAIZES_PROIBIDAS.includes(normal) ? ` ${normal}` : ` ${normal} `;
+});
+
+/** O dia (data local) de um instante ISO; undefined se não é uma data. */
+export function diaLocal(ts: string): string | undefined {
+	const data = new Date(ts);
+	if (Number.isNaN(data.getTime())) return undefined;
+	return `${data.getFullYear()}-${data.getMonth() + 1}-${data.getDate()}`;
+}
+
+const ehAutoavaliacao = (evento: Pick<EventoDeEvidencia, "verbo">) => evento.verbo === "autoavaliou_conceito";
+const ehDesempenho = (evento: Pick<EventoDeEvidencia, "verbo">) => (VERBOS_DE_DESEMPENHO as readonly string[]).includes(evento.verbo);
+const ehVerboDaReflexao = (verbo: string) => (VERBOS_DA_REFLEXAO as readonly string[]).includes(verbo);
 
 /** Os conceitos de um escopo (vazio se não for de conceito). */
 export const conceitosDoEscopo = (escopo: EscopoHipotese): string[] => (escopo.nivel === "conceito" ? [...escopo.conceitos] : []);
@@ -222,21 +319,25 @@ export const materiaDoEscopo = (escopo: EscopoHipotese): string | undefined => (
 // --- Confiança -----------------------------------------------------------------------------------------
 
 /**
- * A confiança (do código, nunca do modelo) pelas evidências a favor: baixa com menos de 3 eventos ou
- * eventos de uma sessão só; média com 3 ou mais eventos em 2 ou mais sessões; alta com 5 ou mais eventos
+ * A confiança (do código, nunca do modelo) pelas evidências a favor: baixa com menos de 3 eventos, eventos de uma
+ * sessão só ou eventos de um dia só; média com 3 ou mais eventos em 2 ou mais sessões; alta com 5 ou mais eventos
  * em 3 ou mais sessões. A sessão vem do evento; id que não existe (e evento de hipótese) não conta, e
- * evento sem sessão conta como evento mas não acrescenta sessão.
+ * evento sem sessão conta como evento mas não acrescenta sessão. O dia é a data local do ts.
  */
 export function confiancaDe(aFavor: readonly string[], eventosPorId: ReadonlyMap<string, EventoDeEvidencia>): ConfiancaHipotese {
 	const sessoes = new Set<string>();
+	const dias = new Set<string>();
 	let eventos = 0;
 	for (const id of unicos(aFavor)) {
 		const evento = eventosPorId.get(id);
 		// O que o Breno DISSE de si (autoavaliou_conceito) não é evidência do que ele faz: não conta na confiança.
-		if (!evento || ehEventoDeHipotese(evento.verbo) || evento.verbo === "autoavaliou_conceito") continue;
+		if (!evento || ehEventoDeHipotese(evento.verbo) || ehAutoavaliacao(evento)) continue;
 		eventos++;
 		if (typeof evento.sessao === "string" && evento.sessao !== "") sessoes.add(evento.sessao);
+		const dia = diaLocal(evento.ts);
+		if (dia !== undefined) dias.add(dia);
 	}
+	if (dias.size < 2) return "baixa";
 	if (eventos >= 5 && sessoes.size >= 3) return "alta";
 	if (eventos >= 3 && sessoes.size >= 2) return "media";
 	return "baixa";
@@ -295,6 +396,13 @@ export const MOTIVOS_DE_DESCARTE = {
 	evidenciaForaDaJanela: "evidencia_fora_da_janela",
 	evidenciaInsuficiente: "evidencia_insuficiente",
 	evidenciaDeUmaSessao: "evidencia_de_uma_sessao",
+	evidenciaDeUmDia: "evidencia_de_um_dia",
+	evidenciaNaoEDeAprendizagem: "evidencia_nao_e_de_aprendizagem",
+	semEvidenciaNova: "sem_evidencia_nova",
+	semDesempenho: "evidencia_sem_desempenho",
+	autoavaliacaoSemApoio: "autoavaliacao_sem_apoio",
+	escopoSemEvidencia: "escopo_sem_evidencia",
+	excesso: "excesso",
 	evidenciaJaCitada: "evidencia_ja_citada",
 	hipoteseInexistente: "hipotese_inexistente",
 	hipoteseRejeitada: "hipotese_rejeitada",
@@ -307,8 +415,10 @@ export type MotivoDeDescarte = (typeof MOTIVOS_DE_DESCARTE)[keyof typeof MOTIVOS
 /** O que a validação precisa saber do mundo. */
 export interface ContextoValidacao {
 	eventosPorId: ReadonlyMap<string, EventoDeEvidencia>;
-	/** Os ids dos eventos que a reflexão leu (a evidência de uma criação precisa estar aqui). */
+	/** Os ids dos eventos NOVOS que a reflexão leu (toda proposta cita ids daqui; uma criação precisa de pelo menos um). */
 	janela: ReadonlySet<string> | readonly string[];
+	/** Os ids dos eventos anteriores dos mesmos conceitos, já lidos antes: só uma criação pode citá-los, junto de pelo menos 1 evento da janela. Opcional. */
+	anteriores?: ReadonlySet<string> | readonly string[];
 	/** As hipóteses que existem, em qualquer status. */
 	hipoteses: readonly Hipotese[];
 	/** As matérias que existem e, de cada uma, os ids dos conceitos do mapa. */
@@ -332,7 +442,9 @@ export function conferirEnunciado(valor: unknown): { ok: true; texto: string } |
 	const texto = juntarEspacos(valor);
 	if (texto.length < ENUNCIADO_MINIMO || texto.length > ENUNCIADO_MAXIMO) return { ok: false, motivo: MOTIVOS_DE_DESCARTE.enunciadoForaDoTamanho };
 	const normal = ` ${normalizarTexto(texto)} `;
-	if (FRASES_PROIBIDAS_NORMALIZADAS.some((frase) => normal.includes(frase))) return { ok: false, motivo: MOTIVOS_DE_DESCARTE.enunciadoGenerico };
+	if (FRASES_PROIBIDAS_NORMALIZADAS.some((frase) => normal.includes(frase)) || COMECOS_DE_ROTULO.some((comeco) => normal.startsWith(comeco))) {
+		return { ok: false, motivo: MOTIVOS_DE_DESCARTE.enunciadoGenerico };
+	}
 	return { ok: true, texto };
 }
 
@@ -352,6 +464,13 @@ const MENSAGEM_DO_MOTIVO: Record<MotivoDeDescarte, string> = {
 	evidencia_fora_da_janela: "a evidência não está nos eventos lidos",
 	evidencia_insuficiente: `são precisos pelo menos ${EVIDENCIAS_MINIMAS_PARA_CRIAR} eventos`,
 	evidencia_de_uma_sessao: `os eventos precisam ser de pelo menos ${SESSOES_MINIMAS_PARA_CRIAR} sessões diferentes`,
+	evidencia_de_um_dia: `os eventos precisam ser de pelo menos ${DIAS_MINIMOS_PARA_CRIAR} dias diferentes`,
+	evidencia_nao_e_de_aprendizagem: "a evidência não é um evento de aprendizagem de uma matéria que existe",
+	sem_evidencia_nova: "nenhuma evidência é dos eventos novos",
+	evidencia_sem_desempenho: `são precisos pelo menos ${DESEMPENHOS_MINIMOS_PARA_CRIAR} eventos de desempenho (respostas, pedidos de explicação)`,
+	autoavaliacao_sem_apoio: "a autoavaliação não sustenta sozinha a hipótese",
+	escopo_sem_evidencia: "as evidências não são do escopo da hipótese",
+	excesso: `no máximo ${MAXIMO_DE_CRIACOES_POR_REFLEXAO} hipóteses novas por reflexão`,
 	evidencia_ja_citada: "a hipótese já cita essas evidências",
 	hipotese_inexistente: "a hipótese não existe",
 	hipotese_rejeitada: "a hipótese foi rejeitada",
@@ -401,15 +520,61 @@ function lerEvidencias(valor: unknown, contexto: ContextoValidacao): { ids: stri
 	return { ids };
 }
 
+const comoConjunto = (valor: ReadonlySet<string> | readonly string[] | undefined): ReadonlySet<string> => (valor instanceof Set ? valor : new Set(valor ?? []));
+
+/**
+ * Onde a evidência pode estar e o que pode ser: todo id está na janela (ou, se `comAnteriores`, nos eventos
+ * anteriores já lidos) e é um evento de aprendizagem (VERBOS_DA_REFLEXAO) de uma matéria que existe. Vale para as
+ * quatro ações; quem chama já conferiu que os ids existem.
+ */
+function conferirOrigem(ids: readonly string[], contexto: ContextoValidacao, comAnteriores: boolean): MotivoDeDescarte | undefined {
+	const janela = comoConjunto(contexto.janela);
+	const anteriores = comAnteriores ? comoConjunto(contexto.anteriores) : new Set<string>();
+	if (ids.some((id) => !janela.has(id) && !anteriores.has(id))) return MOTIVOS_DE_DESCARTE.evidenciaForaDaJanela;
+	for (const id of ids) {
+		const evento = contexto.eventosPorId.get(id)!;
+		const materia = evento.objeto?.materia;
+		if (!ehVerboDaReflexao(evento.verbo) || (typeof materia === "string" && !contexto.materias.has(materia))) return MOTIVOS_DE_DESCARTE.evidenciaNaoEDeAprendizagem;
+	}
+	return undefined;
+}
+
+/** O evento é do escopo (a matéria e algum dos conceitos)? Global: qualquer um. A autoavaliação não é conferida contra os conceitos de um escopo de conceito. */
+function dentroDoEscopo(evento: EventoDeEvidencia, escopo: EscopoHipotese): boolean {
+	if (escopo.nivel === "global") return true;
+	if (escopo.nivel === "conceito" && ehAutoavaliacao(evento)) return true;
+	if (evento.objeto?.materia !== escopo.materia) return false;
+	if (escopo.nivel === "materia") return true;
+	const conceitos = evento.objeto?.conceitos;
+	return Array.isArray(conceitos) && conceitos.some((conceito) => typeof conceito === "string" && escopo.conceitos.includes(conceito));
+}
+
+/** Os mínimos de eventos, sessões e dias de uma lista de eventos de evidência (o que falta, ou undefined). */
+function faltaNosMinimos(eventos: readonly EventoDeEvidencia[]): MotivoDeDescarte | undefined {
+	if (eventos.length < EVIDENCIAS_MINIMAS_PARA_CRIAR) return MOTIVOS_DE_DESCARTE.evidenciaInsuficiente;
+	const sessoes = new Set(eventos.flatMap((evento) => (typeof evento.sessao === "string" && evento.sessao !== "" ? [evento.sessao] : [])));
+	if (sessoes.size < SESSOES_MINIMAS_PARA_CRIAR) return MOTIVOS_DE_DESCARTE.evidenciaDeUmaSessao;
+	const dias = new Set(eventos.flatMap((evento) => diaLocal(evento.ts) ?? []));
+	if (dias.size < DIAS_MINIMOS_PARA_CRIAR) return MOTIVOS_DE_DESCARTE.evidenciaDeUmDia;
+	return undefined;
+}
+
 /**
  * Valida uma proposta do modelo (a entrada é `unknown`: o modelo erra). Devolve a proposta normalizada ou o
  * motivo do descarte (uma das MOTIVOS_DE_DESCARTE, curto e agrupável).
+ * - Nas quatro ações toda evidência existe, não é de hipótese, é um evento de aprendizagem (VERBOS_DA_REFLEXAO) de
+ *   uma matéria que existe e está na janela lida (os eventos novos). Só a criação pode citar também os eventos
+ *   anteriores dos mesmos conceitos (`anteriores`), e precisa de pelo menos 1 evento da janela.
  * - criar: enunciado de 12 a 300 caracteres sem rótulo nem elogio proibido; tipo e escopo válidos (matéria e
- *   conceitos que existem); pelo menos 2 ids que existem, estão na janela lida e são de pelo menos 2 sessões
- *   diferentes; e o enunciado (texto normalizado) não repete o de nenhuma hipótese existente, de qualquer status.
- * - reforçar e enfraquecer: a hipótese existe e não está rejeitada; as evidências existem e a hipótese ainda não
- *   as cita (as já citadas saem da lista; se não sobrar nenhuma, descarta).
- * - expirar: hipótese aprovada ou proposta, com o motivo.
+ *   conceitos que existem); pelo menos 2 eventos que não sejam autoavaliação, de pelo menos 2 sessões e de pelo
+ *   menos 2 dias diferentes (a autoavaliação sozinha não sustenta: `autoavaliacao_sem_apoio`); conhecimento,
+ *   misconception e vocabulário pedem pelo menos 2 eventos de desempenho; as evidências são do escopo (de conceito:
+ *   da matéria e de algum dos conceitos; de matéria: dessa matéria; global: de pelo menos 2 matérias); e o enunciado
+ *   (texto normalizado) não repete o de nenhuma hipótese existente, de qualquer status.
+ * - reforçar e enfraquecer: a hipótese existe e não está rejeitada; as evidências que tocam o escopo dela e que ela
+ *   ainda não cita (as outras saem da lista; se não sobrar nenhuma, descarta); numa hipótese de conhecimento,
+ *   misconception ou vocabulário, a autoavaliação sozinha não vale.
+ * - expirar: hipótese aprovada ou proposta, com o motivo e pelo menos 1 evidência da janela.
  */
 export function validarProposta(proposta: unknown, contexto: ContextoValidacao): ResultadoValidacao {
 	if (!ehObjeto(proposta)) return recusa(MOTIVOS_DE_DESCARTE.formatoInvalido);
@@ -430,15 +595,24 @@ export function validarProposta(proposta: unknown, contexto: ContextoValidacao):
 
 		const evidencias = lerEvidencias(proposta.evidencias, contexto);
 		if ("motivo" in evidencias) return recusa(evidencias.motivo);
-		const janela = contexto.janela instanceof Set ? contexto.janela : new Set(contexto.janela);
-		if (evidencias.ids.some((id) => !janela.has(id))) return recusa(MOTIVOS_DE_DESCARTE.evidenciaForaDaJanela);
+		const origem = conferirOrigem(evidencias.ids, contexto, true);
+		if (origem) return recusa(origem);
 		if (evidencias.ids.length < EVIDENCIAS_MINIMAS_PARA_CRIAR) return recusa(evidencias.ids.length === 0 ? MOTIVOS_DE_DESCARTE.semEvidencia : MOTIVOS_DE_DESCARTE.evidenciaInsuficiente);
-		const sessoes = new Set<string>();
-		for (const id of evidencias.ids) {
-			const sessao = contexto.eventosPorId.get(id)!.sessao;
-			if (typeof sessao === "string" && sessao !== "") sessoes.add(sessao);
-		}
-		if (sessoes.size < SESSOES_MINIMAS_PARA_CRIAR) return recusa(MOTIVOS_DE_DESCARTE.evidenciaDeUmaSessao);
+		const janela = comoConjunto(contexto.janela);
+		if (!evidencias.ids.some((id) => janela.has(id))) return recusa(MOTIVOS_DE_DESCARTE.semEvidenciaNova);
+
+		const eventos = evidencias.ids.map((id) => contexto.eventosPorId.get(id)!);
+		// A autoavaliação é o que ele disse, não o que fez: não conta nos mínimos (nenhum tipo se sustenta só com ela).
+		const reais = eventos.filter((evento) => !ehAutoavaliacao(evento));
+		const falta = faltaNosMinimos(reais);
+		if (falta) return recusa(reais.length < eventos.length && faltaNosMinimos(eventos) === undefined ? MOTIVOS_DE_DESCARTE.autoavaliacaoSemApoio : falta);
+		if (TIPOS_DE_CONHECIMENTO.includes(tipo) && eventos.filter(ehDesempenho).length < DESEMPENHOS_MINIMOS_PARA_CRIAR) return recusa(MOTIVOS_DE_DESCARTE.semDesempenho);
+
+		const noEscopo =
+			escopo.escopo.nivel === "global"
+				? new Set(eventos.flatMap((evento) => (typeof evento.objeto?.materia === "string" ? [evento.objeto.materia] : []))).size >= 2
+				: eventos.every((evento) => dentroDoEscopo(evento, escopo.escopo));
+		if (!noEscopo) return recusa(MOTIVOS_DE_DESCARTE.escopoSemEvidencia);
 		return { ok: true, proposta: { acao: "criar", tipo, escopo: escopo.escopo, enunciado: enunciado.texto, evidencias: evidencias.ids, motivo } };
 	}
 
@@ -454,22 +628,33 @@ export function validarProposta(proposta: unknown, contexto: ContextoValidacao):
 		if (pendentes.some((mudanca) => mudanca.acao === "expirar")) return recusa(MOTIVOS_DE_DESCARTE.mudancaRepetida);
 		const evidencias = lerEvidencias(proposta.evidencias, contexto);
 		if ("motivo" in evidencias) return recusa(evidencias.motivo);
+		if (evidencias.ids.length === 0) return recusa(MOTIVOS_DE_DESCARTE.semEvidencia);
+		const origem = conferirOrigem(evidencias.ids, contexto, false);
+		if (origem) return recusa(origem);
 		return { ok: true, proposta: { acao: "expirar", hipotese: alvo.id, evidencias: evidencias.ids, motivo } };
 	}
 
 	const evidencias = lerEvidencias(proposta.evidencias, contexto);
 	if ("motivo" in evidencias) return recusa(evidencias.motivo);
 	if (evidencias.ids.length === 0) return recusa(MOTIVOS_DE_DESCARTE.semEvidencia);
+	const origem = conferirOrigem(evidencias.ids, contexto, false);
+	if (origem) return recusa(origem);
+	// Só vale a evidência que toca o escopo da hipótese (a de outro conceito ou de outra matéria sai da lista).
+	const doEscopo = evidencias.ids.filter((id) => dentroDoEscopo(contexto.eventosPorId.get(id)!, alvo.escopo));
+	if (doEscopo.length === 0) return recusa(MOTIVOS_DE_DESCARTE.escopoSemEvidencia);
 	const citadas = new Set([...alvo.aFavor, ...alvo.contra, ...pendentes.filter((mudanca) => mudanca.acao !== "expirar").flatMap((mudanca) => mudanca.evidencias)]);
-	const novas = evidencias.ids.filter((id) => !citadas.has(id));
+	const novas = doEscopo.filter((id) => !citadas.has(id));
 	if (novas.length === 0) return recusa(MOTIVOS_DE_DESCARTE.evidenciaJaCitada);
+	// O que o Breno disse de si não sustenta sozinho uma hipótese do que ele sabe.
+	if (TIPOS_DE_CONHECIMENTO.includes(alvo.tipo) && novas.every((id) => ehAutoavaliacao(contexto.eventosPorId.get(id)!))) return recusa(MOTIVOS_DE_DESCARTE.autoavaliacaoSemApoio);
 	return { ok: true, proposta: { acao, hipotese: alvo.id, evidencias: novas, motivo } };
 }
 
 /**
  * Valida o lote inteiro que o modelo devolveu (`unknown`: se não for uma lista, tudo se perde numa linha de
  * formato_invalido). Uma criação aceita conta como já existente para as seguintes (um enunciado repetido no mesmo
- * lote é descartado) e uma mudança aceita conta como pendente para as seguintes. As descartadas voltam agrupadas
+ * lote é descartado) e uma mudança aceita conta como pendente para as seguintes. No máximo
+ * MAXIMO_DE_CRIACOES_POR_REFLEXAO criações valem; as outras vão para o motivo `excesso`. As descartadas voltam agrupadas
  * por motivo, na ordem em que cada motivo apareceu, prontas para o `descartadas` do ResumoDaReflexao.
  */
 export function validarPropostas(propostas: unknown, contexto: ContextoValidacao): { validas: PropostaValida[]; descartadas: { motivo: string; quantas: number }[] } {
@@ -478,15 +663,22 @@ export function validarPropostas(propostas: unknown, contexto: ContextoValidacao
 	const contagem = new Map<string, number>();
 	const enunciadosExtras = [...(contexto.enunciadosExtras ?? [])];
 	const mudancas = [...(contexto.mudancas ?? [])];
+	let criadas = 0;
 	for (const proposta of propostas) {
 		const resultado = validarProposta(proposta, { ...contexto, enunciadosExtras, mudancas });
 		if (!resultado.ok) {
 			contagem.set(resultado.motivo, (contagem.get(resultado.motivo) ?? 0) + 1);
 			continue;
 		}
+		if (resultado.proposta.acao === "criar" && criadas >= MAXIMO_DE_CRIACOES_POR_REFLEXAO) {
+			contagem.set(MOTIVOS_DE_DESCARTE.excesso, (contagem.get(MOTIVOS_DE_DESCARTE.excesso) ?? 0) + 1);
+			continue;
+		}
 		validas.push(resultado.proposta);
-		if (resultado.proposta.acao === "criar") enunciadosExtras.push(resultado.proposta.enunciado);
-		else mudancas.push({ hipotese: resultado.proposta.hipotese, acao: resultado.proposta.acao, evidencias: resultado.proposta.evidencias });
+		if (resultado.proposta.acao === "criar") {
+			criadas++;
+			enunciadosExtras.push(resultado.proposta.enunciado);
+		} else mudancas.push({ hipotese: resultado.proposta.hipotese, acao: resultado.proposta.acao, evidencias: resultado.proposta.evidencias });
 	}
 	return { validas, descartadas: [...contagem].map(([motivo, quantas]) => ({ motivo, quantas })) };
 }
@@ -557,7 +749,8 @@ export function aplicarReflexao(arquivo: ArquivoHipoteses, propostas: readonly P
 
 /**
  * A regra do conflito: nas evidências recentes (eventos dos últimos 60 dias, pelo ts), as contra superam as a
- * favor? Evento que não se acha em `eventosPorId` não conta.
+ * favor? Evento que não se acha em `eventosPorId` não conta, nem o de hipótese nem a autoavaliação (como na
+ * confiancaDe: o que o Breno disse de si não é evidência do que ele faz).
  */
 export function conflitoRecente(
 	hipotese: Pick<Hipotese, "aFavor" | "contra">,
@@ -567,7 +760,9 @@ export function conflitoRecente(
 	const limite = agora.getTime() - JANELA_DO_CONFLITO_DIAS * MS_POR_DIA;
 	const recentes = (ids: readonly string[]) =>
 		unicos(ids).filter((id) => {
-			const instante = Date.parse(eventosPorId.get(id)?.ts ?? "");
+			const evento = eventosPorId.get(id);
+			if (!evento || ehEventoDeHipotese(evento.verbo) || ehAutoavaliacao(evento)) return false;
+			const instante = Date.parse(evento.ts);
 			return Number.isFinite(instante) && instante >= limite;
 		}).length;
 	const aFavorRecentes = recentes(hipotese.aFavor);
@@ -867,6 +1062,7 @@ function resumoSalvo(valor: unknown): ResumoDaReflexao | undefined {
 		ts: valor.ts,
 		motivo: valor.motivo as ResumoDaReflexao["motivo"],
 		...(typeof valor.ultimoEvento === "string" ? { ultimoEvento: valor.ultimoEvento } : {}),
+		...(listaDeTextos(valor.jaLidos) ? { jaLidos: [...(valor.jaLidos as string[])] } : {}),
 		lidos: valor.lidos as number,
 		propostas: valor.propostas as number,
 		aceitas: valor.aceitas as number,

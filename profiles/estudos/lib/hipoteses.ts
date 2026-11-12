@@ -17,6 +17,10 @@
 // conceitos? } e resultado com o que mudou e as evidências. As evidências são ids de eventos de aprendizagem que
 // já existiam: um evento de hipótese nunca é citado como evidência. Os eventos de uma operação ganham ids
 // crescentes (1 ms de diferença entre um e outro), para a ordem de gravação ser também a ordem dos ids.
+//
+// Falha no meio: o hipoteses.json é gravado ANTES dos eventos. Cada evento tem uma segunda tentativa se o disco
+// falhar, e toda operação que grava começa reconciliando (reconciliarReflexao): se a última reflexão do arquivo
+// não tem o `refletiu` (ou os `propos_*`) no eventos.jsonl, eles são acrescentados antes de seguir.
 
 import { mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -106,9 +110,14 @@ export async function gravarHipoteses(dados: string, arquivo: ArquivoHipoteses):
 	await gravarDeUmaVez(arquivoHipoteses(dados), `${JSON.stringify(completo, null, "\t")}\n`);
 }
 
-/** Os eventos do aprendiz por id (para a confiança e o conflito). */
+/** Os eventos do aprendiz, na ordem do arquivo. */
+async function eventosDoAprendiz(dados: string): Promise<Evento[]> {
+	return (await lerEventos(eventosAprendiz(dados))).eventos;
+}
+
+/** Os eventos do aprendiz por id (para a confiança, o conflito e a conferência do escopo). */
 async function eventosPorIdDoAprendiz(dados: string) {
-	return indexarEventos((await lerEventos(eventosAprendiz(dados))).eventos);
+	return indexarEventos(await eventosDoAprendiz(dados));
 }
 
 /** As matérias que existem e, de cada uma, os ids dos conceitos do mapa (a matéria sem mapa legível fica sem conceitos). */
@@ -120,11 +129,12 @@ export async function materiasEConceitos(dados: string): Promise<Map<string, Set
 
 /**
  * O contexto da validação (validarProposta, validarPropostas) montado do disco: os eventos por id, a janela que a
- * reflexão leu, as hipóteses e as mudanças pendentes de agora e as matérias e conceitos que existem.
+ * reflexão leu (os eventos novos), os eventos anteriores dos mesmos conceitos que ela mostrou como já lidos (só uma
+ * criação pode citá-los), as hipóteses e as mudanças pendentes de agora e as matérias e conceitos que existem.
  */
-export async function contextoDeValidacao(dados: string, janela: Iterable<string>): Promise<ContextoValidacao> {
+export async function contextoDeValidacao(dados: string, janela: Iterable<string>, anteriores: Iterable<string> = []): Promise<ContextoValidacao> {
 	const [eventosPorId, { arquivo }, materias] = await Promise.all([eventosPorIdDoAprendiz(dados), lerHipotesesComAvisos(dados), materiasEConceitos(dados)]);
-	return { eventosPorId, janela: new Set(janela), hipoteses: arquivo.hipoteses, mudancas: arquivo.mudancas, materias };
+	return { eventosPorId, janela: new Set(janela), anteriores: new Set(anteriores), hipoteses: arquivo.hipoteses, mudancas: arquivo.mudancas, materias };
 }
 
 // --- Os eventos ----------------------------------------------------------------------------------------
@@ -163,8 +173,57 @@ function eventosDasMudancasRemovidas(criar: ReturnType<typeof fabricaDeEventos>,
 	);
 }
 
+/** Acrescenta um evento; se o disco falhar, tenta uma segunda vez (o hipoteses.json já foi gravado quando os eventos vêm). */
+async function acrescentarComRetentativa(dados: string, evento: Evento): Promise<void> {
+	try {
+		await acrescentarEvento(eventosAprendiz(dados), evento);
+	} catch {
+		await acrescentarEvento(eventosAprendiz(dados), evento);
+	}
+}
+
 async function acrescentarTodos(dados: string, eventos: readonly Evento[]): Promise<void> {
-	for (const evento of eventos) await acrescentarEvento(eventosAprendiz(dados), evento);
+	for (const evento of eventos) await acrescentarComRetentativa(dados, evento);
+}
+
+/**
+ * Se uma gravação anterior parou no meio (o hipoteses.json foi gravado e os eventos não, mesmo depois da segunda
+ * tentativa), acrescenta o que faltou da ÚLTIMA reflexão do arquivo: o `refletiu` (se nenhum tem o id dela), um
+ * `propos_hipotese` para cada hipótese que ela criou e um `propos_mudanca_hipotese` para cada mudança dela ainda
+ * pendente, se esse evento não existe. Os eventos refeitos levam o instante e o resumo da reflexão, sem sessão, e
+ * `contexto.reconciliado: true`. Não refaz os `expirou_hipotese` da reflexão, nem as decisões (ver docs/aprendiz.md).
+ * Vale chamar no começo de toda operação que grava: sem nada a refazer, não grava nada.
+ */
+async function reconciliarReflexao(dados: string, arquivo: ArquivoHipoteses, eventos: readonly Evento[]): Promise<void> {
+	const resumo = arquivo.ultimaReflexao;
+	if (!resumo) return;
+	const jaTem = (verbo: string, campo: string, id: string) => eventos.some((evento) => evento.verbo === verbo && evento.objeto?.[campo] === id);
+	const criar = fabricaDeEventos(new Date(resumo.ts), undefined);
+	const faltam: Evento[] = [];
+	if (!jaTem("refletiu", "reflexao", resumo.id)) faltam.push(criar("refletiu", { reflexao: resumo.id }, { ...structuredClone(resumo) }));
+	for (const hipotese of arquivo.hipoteses) {
+		if (hipotese.reflexao !== resumo.id || jaTem("propos_hipotese", "hipotese", hipotese.id)) continue;
+		faltam.push(
+			criar("propos_hipotese", objetoDaHipotese(hipotese), {
+				reflexao: resumo.id,
+				tipo: hipotese.tipo,
+				escopo: structuredClone(hipotese.escopo),
+				enunciado: hipotese.enunciado,
+				confianca: hipotese.confianca,
+				evidencias: [...hipotese.aFavor],
+			}),
+		);
+	}
+	for (const mudanca of arquivo.mudancas) {
+		if (mudanca.reflexao !== resumo.id || jaTem("propos_mudanca_hipotese", "mudanca", mudanca.id)) continue;
+		const hipotese = arquivo.hipoteses.find((item) => item.id === mudanca.hipotese);
+		const objeto: Evento["objeto"] = hipotese ? objetoDaHipotese(hipotese, mudanca.id) : { hipotese: mudanca.hipotese, mudanca: mudanca.id };
+		faltam.push(criar("propos_mudanca_hipotese", objeto, { reflexao: resumo.id, acao: mudanca.acao, evidencias: [...mudanca.evidencias], motivo: mudanca.motivo }));
+	}
+	await acrescentarTodos(
+		dados,
+		faltam.map((evento) => ({ ...evento, contexto: { reconciliado: true } })),
+	);
 }
 
 // --- Registrar uma reflexão ----------------------------------------------------------------------------
@@ -200,7 +259,9 @@ export interface ReflexaoRegistrada {
  */
 export async function registrarReflexao(dados: string, entrada: EntradaReflexao): Promise<ReflexaoRegistrada> {
 	const agora = entrada.agora ?? new Date();
-	const [atual, eventosPorId, materias] = await Promise.all([lerParaGravar(dados), eventosPorIdDoAprendiz(dados), materiasEConceitos(dados)]);
+	const [atual, lidos, materias] = await Promise.all([lerParaGravar(dados), eventosDoAprendiz(dados), materiasEConceitos(dados)]);
+	const eventosPorId = indexarEventos(lidos);
+	await reconciliarReflexao(dados, atual, lidos);
 
 	for (const proposta of entrada.propostasValidas) {
 		for (const id of proposta.evidencias) {
@@ -265,8 +326,9 @@ export type EdicaoRegistrada = ResultadoEdicao & { eventos: Evento[] };
  */
 export async function decidirHipotese(dados: string, entrada: { id: string; decisao: "aprovar" | "rejeitar"; enunciado?: string }, contexto: ContextoHipoteses = {}): Promise<DecisaoRegistrada> {
 	const agora = contexto.agora ?? new Date();
-	const [atual, eventosPorId] = await Promise.all([lerParaGravar(dados), eventosPorIdDoAprendiz(dados)]);
-	const resultado = decidir(atual, { alvo: "hipotese", ...entrada }, { agora, eventosPorId });
+	const [atual, lidos] = await Promise.all([lerParaGravar(dados), eventosDoAprendiz(dados)]);
+	await reconciliarReflexao(dados, atual, lidos);
+	const resultado = decidir(atual, { alvo: "hipotese", ...entrada }, { agora, eventosPorId: indexarEventos(lidos) });
 	await gravarHipoteses(dados, resultado.arquivo);
 
 	const criar = fabricaDeEventos(agora, contexto.sessao);
@@ -300,8 +362,9 @@ export async function decidirHipotese(dados: string, entrada: { id: string; deci
  */
 export async function decidirMudanca(dados: string, entrada: { id: string; decisao: "aprovar" | "rejeitar" }, contexto: ContextoHipoteses = {}): Promise<DecisaoRegistrada> {
 	const agora = contexto.agora ?? new Date();
-	const [atual, eventosPorId] = await Promise.all([lerParaGravar(dados), eventosPorIdDoAprendiz(dados)]);
-	const resultado = decidir(atual, { alvo: "mudanca", ...entrada }, { agora, eventosPorId });
+	const [atual, lidos] = await Promise.all([lerParaGravar(dados), eventosDoAprendiz(dados)]);
+	await reconciliarReflexao(dados, atual, lidos);
+	const resultado = decidir(atual, { alvo: "mudanca", ...entrada }, { agora, eventosPorId: indexarEventos(lidos) });
 	await gravarHipoteses(dados, resultado.arquivo);
 
 	const criar = fabricaDeEventos(agora, contexto.sessao);
@@ -344,6 +407,7 @@ export async function decidirMudanca(dados: string, entrada: { id: string; decis
 export async function editarHipotese(dados: string, entrada: { id: string; enunciado?: string; status?: "aprovada" | "rejeitada" }, contexto: ContextoHipoteses = {}): Promise<EdicaoRegistrada> {
 	const agora = contexto.agora ?? new Date();
 	const atual = await lerParaGravar(dados);
+	await reconciliarReflexao(dados, atual, await eventosDoAprendiz(dados));
 	const resultado = editar(atual, entrada, { agora });
 	if (resultado.mudou.length === 0) return { ...resultado, eventos: [] };
 	await gravarHipoteses(dados, resultado.arquivo);

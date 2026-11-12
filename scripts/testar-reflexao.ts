@@ -1,8 +1,9 @@
 // Verificação do agente de reflexão do aprendiz (item 9, parte B) com UMA chamada real ao modelo de
 // profiles/estudos/prompts/reflexao.md. Monta numa pasta temporária (fora do Drive; os dados do Breno nunca são
 // usados) uma pasta de dados com uma matéria de teste, um mapa pequeno e eventos SINTÉTICOS em 3 sessões, com
-// padrões plantados: um erro repetido (com a mesma confusão) em tokenização em 2 sessões, uma autoavaliação alta
-// de similaridade do cosseno contrariada pelos erros, e sinais ruidosos isolados. Carrega a extensão
+// padrões plantados (de cálculo, de propósito de outro domínio que o dos exemplos do prompt): a mesma confusão
+// na regra da cadeia em 3 sessões de 3 dias, uma autoavaliação alta de Taylor contrariada por erros com confiança
+// 4, acertos regulares em limites (que NÃO devem virar hipótese) e sinais ruidosos isolados. Carrega a extensão
 // profiles/estudos/extensions/aprendiz.ts pelo carregador de extensões do pi (o mesmo das sessões), entrega a ela
 // o registro de modelos de verdade, pede uma reflexão pelo botão e mostra o resumo (lidos, propostas, aceitas,
 // descartadas com os motivos, custo), o JSON que o modelo devolveu e as hipóteses criadas. O cache dos
@@ -33,18 +34,18 @@ const origem = carregarChaves(["OPENROUTER_API_KEY"]);
 console.log(`OPENROUTER_API_KEY: ${origem.OPENROUTER_API_KEY}`);
 
 const CONCEITOS: Array<[id: string, nome: string, descricao: string]> = [
-	["c-token", "Tokenização", "Dividir o texto em unidades (tokens) antes de processá-lo."],
-	["c-stop", "Stopwords", "Palavras muito comuns que costumam ser removidas."],
-	["c-tfidf", "TF-IDF", "Peso de um termo: frequência no documento vezes a raridade na coleção."],
-	["c-cos", "Similaridade do cosseno", "Comparar dois vetores de pesos pelo ângulo entre eles."],
-	["c-stem", "Stemming", "Reduzir palavras à raiz."],
+	["c-cadeia", "Regra da cadeia", "Derivar uma função composta: a derivada da externa vezes a derivada da interna."],
+	["c-produto", "Regra do produto", "Derivar o produto de duas funções: u'v + uv'."],
+	["c-partes", "Integração por partes", "Integrar um produto escolhendo u e dv: a integral de u dv = uv - a integral de v du."],
+	["c-limite", "Limites", "O valor de que uma função se aproxima quando a variável se aproxima de um ponto."],
+	["c-taylor", "Série de Taylor", "Aproximar uma função por um polinômio a partir de suas derivadas num ponto."],
 ];
 
 const dados = await mkdtemp(join(tmpdir(), "estudos-testar-reflexao-"));
 const cache = await mkdtemp(join(tmpdir(), "estudos-testar-reflexao-cache-"));
 let falhou = false;
 try {
-	const materia = (await criarMateria(dados, { nome: "Processamento de texto" })).id;
+	const materia = (await criarMateria(dados, { nome: "Cálculo" })).id;
 	await gravarMapa(dados, materia, {
 		...mapaVazio(),
 		situacao: "aprovado",
@@ -68,36 +69,40 @@ try {
 			resultado,
 		});
 	};
-	const CONFUSAO = "Achar que remover a pontuação é o mesmo que remover o ruído do texto";
+	// Padrões plantados: (1) a mesma confusão na regra da cadeia em 3 sessões e 3 dias (misconception que DEVE
+	// virar hipótese); (2) autoavaliação alta de Taylor contrariada por erros com confiança 4 (metacognição);
+	// (3) limites: acerta tudo, o que NÃO deve virar hipótese (acertar não é hipótese) e (4) ruído isolado.
+	const CONFUSAO = "Achar que a derivada de uma composta é só o produto das duas funções, sem a derivada da interna";
+	const CONFUSAO_TAYLOR = "Achar que a série de Taylor só vale no ponto de expansão";
 	let q = 0;
 	const questao = () => ({ questao: `q${++q}` });
 
 	// Sessão A (antes de tudo, o aluno se autoavalia)
-	await gravar("A", "autoavaliou_conceito", "c-cos", { nivel: 3 });
-	await gravar("A", "autoavaliou_conceito", "c-tfidf", { nivel: 1 });
-	await gravar("A", "respondeu_questao", "c-token", { correta: false, escolha: 1, confianca: 4, tentativa: 1, confusao: CONFUSAO, tempoMs: 21_000 }, questao());
-	await gravar("A", "respondeu_questao", "c-token", { correta: false, escolha: 1, confianca: 3, tentativa: 1, confusao: CONFUSAO, tempoMs: 18_000 }, questao());
-	await gravar("A", "respondeu_questao", "c-stop", { correta: true, escolha: 0, confianca: 3, tentativa: 1, tempoMs: 9_000 }, questao());
-	await gravar("A", "respondeu_questao", "c-tfidf", { correta: true, escolha: 2, confianca: 2, tentativa: 1, tempoMs: 30_000 }, questao());
-	await gravar("A", "respondeu_questao", "c-cos", { correta: false, escolha: 0, confianca: 4, tentativa: 1, confusao: "Achar que o cosseno mede a distância entre os vetores", tempoMs: 25_000 }, questao());
-	await gravar("A", "avaliou_bloco", "c-tfidf", { avaliacao: "ruim", motivos: ["longo_demais"], texto: "Esse bloco foi longo demais." }, { bloco: "l1-b2", licao: "l1" });
+	await gravar("A", "autoavaliou_conceito", "c-taylor", { nivel: 3 });
+	await gravar("A", "autoavaliou_conceito", "c-partes", { nivel: 1 });
+	await gravar("A", "respondeu_questao", "c-cadeia", { correta: false, escolha: 1, confianca: 4, tentativa: 1, confusao: CONFUSAO, tempoMs: 21_000 }, questao());
+	await gravar("A", "respondeu_questao", "c-cadeia", { correta: false, escolha: 1, confianca: 3, tentativa: 1, confusao: CONFUSAO, tempoMs: 18_000 }, questao());
+	await gravar("A", "respondeu_questao", "c-limite", { correta: true, escolha: 0, confianca: 3, tentativa: 1, tempoMs: 9_000 }, questao());
+	await gravar("A", "respondeu_questao", "c-partes", { correta: true, escolha: 2, confianca: 2, tentativa: 1, tempoMs: 30_000 }, questao());
+	await gravar("A", "respondeu_questao", "c-taylor", { correta: false, escolha: 0, confianca: 4, tentativa: 1, confusao: CONFUSAO_TAYLOR, tempoMs: 25_000 }, questao());
+	await gravar("A", "avaliou_bloco", "c-partes", { avaliacao: "ruim", motivos: ["longo_demais"], texto: "Esse bloco foi longo demais." }, { bloco: "l1-b2", licao: "l1" });
 	// Sessão B
-	await gravar("B", "respondeu_questao", "c-token", { correta: true, escolha: 0, confianca: 3, tentativa: 1, tempoMs: 12_000 }, questao());
-	await gravar("B", "respondeu_questao", "c-cos", { correta: false, escolha: 2, confianca: 4, tentativa: 1, confusao: "Achar que o cosseno mede a distância entre os vetores", tempoMs: 22_000 }, questao());
-	await gravar("B", "respondeu_verificacao", "c-cos", { avaliacao: "errada", confianca: 4, texto: "O cosseno é a distância entre os dois vetores, quanto menor, mais parecidos.", retorno: "O cosseno mede o ângulo, não a distância." }, questao());
-	await gravar("B", "respondeu_questao", "c-tfidf", { correta: true, escolha: 1, confianca: 3, tentativa: 1, tempoMs: 20_000 }, questao());
-	await gravar("B", "respondeu_questao", "c-stop", { correta: true, escolha: 0, confianca: 4, tentativa: 1, tempoMs: 7_000 }, questao());
-	await gravar("B", "respondeu_questao", "c-stem", { correta: false, escolha: 3, confianca: 2, tentativa: 1, confusao: "Confundir stemming com lematização", tempoMs: 40_000 }, questao());
-	await gravar("B", "pediu_explicacao", "c-stem", { tipo: "nao_sei", trecho: "lematização" }, { bloco: "l2-b1", licao: "l2" });
+	await gravar("B", "respondeu_questao", "c-cadeia", { correta: true, escolha: 0, confianca: 3, tentativa: 1, tempoMs: 12_000 }, questao());
+	await gravar("B", "respondeu_questao", "c-taylor", { correta: false, escolha: 2, confianca: 4, tentativa: 1, confusao: CONFUSAO_TAYLOR, tempoMs: 22_000 }, questao());
+	await gravar("B", "respondeu_verificacao", "c-taylor", { avaliacao: "errada", confianca: 4, texto: "A série de Taylor só serve exatamente no ponto onde foi expandida.", retorno: "Ela aproxima a função perto do ponto, com erro que cresce ao se afastar." }, questao());
+	await gravar("B", "respondeu_questao", "c-partes", { correta: true, escolha: 1, confianca: 3, tentativa: 1, tempoMs: 20_000 }, questao());
+	await gravar("B", "respondeu_questao", "c-limite", { correta: true, escolha: 0, confianca: 4, tentativa: 1, tempoMs: 7_000 }, questao());
+	await gravar("B", "respondeu_questao", "c-produto", { correta: false, escolha: 3, confianca: 2, tentativa: 1, confusao: "Esquecer um dos dois termos da regra do produto", tempoMs: 40_000 }, questao());
+	await gravar("B", "pediu_explicacao", "c-produto", { tipo: "nao_sei", trecho: "u'v + uv'" }, { bloco: "l2-b1", licao: "l2" });
 	// Sessão C
-	await gravar("C", "respondeu_questao", "c-token", { correta: false, escolha: 1, confianca: 4, tentativa: 1, confusao: CONFUSAO, tempoMs: 16_000 }, questao());
-	await gravar("C", "respondeu_questao", "c-cos", { correta: false, escolha: 0, confianca: 4, tentativa: 1, confusao: "Achar que o cosseno mede a distância entre os vetores", tempoMs: 19_000 }, questao());
-	await gravar("C", "respondeu_questao", "c-tfidf", { correta: true, escolha: 2, confianca: 3, tentativa: 1, tempoMs: 15_000 }, questao());
-	await gravar("C", "respondeu_questao", "c-stop", { correta: true, escolha: 1, confianca: 4, tentativa: 1, tempoMs: 6_000 }, questao());
-	await gravar("C", "respondeu_dissertativa", "c-tfidf", { total: 3, max: 4, tentativa: 1, confianca: 3 }, questao());
-	await gravar("C", "avaliou_licao", "c-tfidf", { notas: { entendimento: 4, clareza: 4, exemplos: 3, questoes: 4, ritmo: 3 }, texto: "Gostei, mas gostaria de mais exemplos numéricos no TF-IDF." }, { licao: "l1" });
-	await gravar("C", "guardou_termo", "c-token", { termo: "n-grama" }, { bloco: "l1-b3", licao: "l1" });
-	await gravar("C", "nao_sabia_questao", "c-stem", { tipo: "alternativa", tentativas: 0 }, questao());
+	await gravar("C", "respondeu_questao", "c-cadeia", { correta: false, escolha: 1, confianca: 4, tentativa: 1, confusao: CONFUSAO, tempoMs: 16_000 }, questao());
+	await gravar("C", "respondeu_questao", "c-taylor", { correta: false, escolha: 0, confianca: 4, tentativa: 1, confusao: CONFUSAO_TAYLOR, tempoMs: 19_000 }, questao());
+	await gravar("C", "respondeu_questao", "c-partes", { correta: true, escolha: 2, confianca: 3, tentativa: 1, tempoMs: 15_000 }, questao());
+	await gravar("C", "respondeu_questao", "c-limite", { correta: true, escolha: 1, confianca: 4, tentativa: 1, tempoMs: 6_000 }, questao());
+	await gravar("C", "respondeu_dissertativa", "c-partes", { total: 3, max: 4, tentativa: 1, confianca: 3 }, questao());
+	await gravar("C", "avaliou_licao", "c-partes", { notas: { entendimento: 4, clareza: 4, exemplos: 3, questoes: 4, ritmo: 3 }, texto: "Gostei, mas gostaria de mais exemplos numéricos em integração por partes." }, { licao: "l1" });
+	await gravar("C", "guardou_termo", "c-limite", { termo: "limite lateral" }, { bloco: "l1-b3", licao: "l1" });
+	await gravar("C", "nao_sabia_questao", "c-produto", { tipo: "alternativa", tentativas: 0 }, questao());
 	console.log(`Eventos sintéticos: ${(await lerEventos(eventosAprendiz(dados))).eventos.length} em ${sessoes.length} sessões, matéria "${materia}".`);
 
 	// --- A extensão pelo carregador do pi, num barramento próprio. ---

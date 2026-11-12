@@ -13,7 +13,7 @@ import { acrescentarEvento, type Evento, lerEventos } from "../lib/eventos.ts";
 import { gravarHipoteses, lerHipoteses, VERSAO_HIPOTESES, type Hipotese } from "../lib/hipoteses.ts";
 import { caminhoDoMapa } from "../lib/mapa.ts";
 import { arquivoMateria, eventosAprendiz } from "../lib/materias.ts";
-import aprendizPadrao, { CAMINHO_PROMPT_REFLEXAO, montarAprendiz } from "./aprendiz.ts";
+import aprendizPadrao, { CAMINHO_PROMPT_REFLEXAO, montarAprendiz, naFilaDoProcesso } from "./aprendiz.ts";
 import { lerPromptMapeador } from "./mapa.ts";
 
 type Entrada = { type: string; customType?: string; data?: unknown };
@@ -433,7 +433,10 @@ describe("ponte do aprendiz: refletir", () => {
 		expect(recebidas("refletiu")[2]!.dados.resumo).toMatchObject({ lidos: 1, ultimoEvento: "ev005" });
 		const mensagem = JSON.stringify(chamadas[1]!.contexto.messages);
 		expect(mensagem).toContain("ev005");
-		expect(mensagem).not.toMatch(/ev00[1-3] \|/);
+		// ev001 a ev003 já foram lidos: só aparecem na seção dos anteriores, não entre os eventos novos
+		const [anteriores, novos] = mensagem.split("## Eventos novos");
+		expect(novos).not.toMatch(/ev00[1-3] \|/);
+		expect(anteriores).toMatch(/ev001 \|/);
 	});
 
 	it("uma reflexão por vez: o segundo pedido recebe refletindo, não chama o modelo de novo, e os dois recebem o mesmo refletiu; hipoteses diz refletindo true", async () => {
@@ -518,8 +521,14 @@ describe("ponte do aprendiz: refletir", () => {
 });
 
 describe("ponte do aprendiz: os gatilhos automáticos", () => {
-	it("aprendiz:gatilho (lição ou módulo) reflete em segundo plano e manda hipoteses { estado } sozinha, sem pedido", async () => {
+	/** O cenário com 5 eventos de desempenho, o mínimo do gatilho automático. */
+	async function cenarioDoGatilho(): Promise<void> {
 		await cenario();
+		await gravarEventos(erro(4, "s2"), erro(5, "s3"));
+	}
+
+	it("aprendiz:gatilho (lição ou módulo) reflete em segundo plano e manda hipoteses { estado } sozinha, sem pedido", async () => {
+		await cenarioDoGatilho();
 		ligar();
 		respostas.push(propostaCriar(["ev001", "ev003"]));
 		barramento.emit("aprendiz:gatilho", { motivo: "licao" });
@@ -527,16 +536,48 @@ describe("ponte do aprendiz: os gatilhos automáticos", () => {
 		expect(mostrados.map((mensagem) => mensagem.acao)).toEqual(["hipoteses"]);
 		expect(mostrados[0]!.dados).not.toHaveProperty("pedido");
 		expect(mostrados[0]!.dados.estado.hipoteses).toHaveLength(1);
-		expect(mostrados[0]!.dados.estado.ultimaReflexao).toMatchObject({ motivo: "licao", lidos: 3 });
-		await gravarEventos(erro(5, "s3"));
+		expect(mostrados[0]!.dados.estado.ultimaReflexao).toMatchObject({ motivo: "licao", lidos: 5 });
+		await gravarEventos(erro(6, "s3"), erro(7, "s3"), erro(8, "s3"), erro(9, "s3"), erro(10, "s3"));
 		respostas.push('{"propostas": []}');
 		barramento.emit("aprendiz:gatilho", { motivo: "modulo" });
 		await esperar(() => recebidas("hipoteses").length === 2);
-		expect(recebidas("hipoteses")[1]!.dados.estado.ultimaReflexao).toMatchObject({ motivo: "modulo", lidos: 1 });
+		expect(recebidas("hipoteses")[1]!.dados.estado.ultimaReflexao).toMatchObject({ motivo: "modulo", lidos: 5 });
+	});
+
+	it("o gatilho com menos de 5 eventos de desempenho novos não chama o modelo, não mostra nada e a janela não avança; o botão chama", async () => {
+		await cenario(); // 3 eventos de desempenho
+		ligar();
+		barramento.emit("aprendiz:gatilho", { motivo: "licao" });
+		await pausa(100);
+		expect(chamadas).toEqual([]);
+		expect(mostrados).toEqual([]);
+		expect((await lerHipoteses(dados)).ultimaReflexao).toBeUndefined();
+		// só 2 de desempenho novos: continua sem chamar
+		await gravarEventos(erro(4, "s2"), erro(5, "s3", { verbo: "avaliou_licao", resultado: { notas: { entendimento: 4 } } }));
+		barramento.emit("aprendiz:gatilho", { motivo: "modulo" });
+		await pausa(100);
+		expect(chamadas).toEqual([]);
+		// o botão chama sempre que há evento novo, com a janela inteira
+		respostas.push('{"propostas": []}');
+		pedir({ pedido: "r1" }, "aprendiz", "refletir");
+		await esperar(() => recebidas("refletiu").length === 1);
+		expect(recebidas("refletiu")[0]!.dados.resumo).toMatchObject({ motivo: "botao", lidos: 5 });
+		expect(chamadas).toHaveLength(1);
+	});
+
+	it("um pedido do botão que entra numa reflexão automática parada no mínimo ainda recebe a reflexão", async () => {
+		await cenario();
+		ligar();
+		respostas.push('{"propostas": []}');
+		barramento.emit("aprendiz:gatilho", { motivo: "licao" });
+		pedir({ pedido: "r1" }, "aprendiz", "refletir");
+		await esperar(() => recebidas("refletiu").length === 1);
+		expect(recebidas("refletiu")[0]!.dados.resumo.lidos).toBe(3);
+		expect(chamadas).toHaveLength(1);
 	});
 
 	it("sem evento novo não chama o modelo nem mostra nada; falha não mostra nada e não registra", async () => {
-		await cenario();
+		await cenarioDoGatilho();
 		ligar();
 		credencial = false;
 		barramento.emit("aprendiz:gatilho", { motivo: "modulo" });
@@ -554,7 +595,7 @@ describe("ponte do aprendiz: os gatilhos automáticos", () => {
 	});
 
 	it("o gatilho durante uma reflexão não começa outra, e um pedido do botão que chega no meio recebe o resultado dela", async () => {
-		await cenario();
+		await cenarioDoGatilho();
 		ligar();
 		const espera = adiada();
 		respostas.push(espera.resposta);
@@ -572,7 +613,7 @@ describe("ponte do aprendiz: os gatilhos automáticos", () => {
 	});
 
 	it("se a sessão acaba no meio, a reflexão para e não grava nem mostra nada", async () => {
-		await cenario();
+		await cenarioDoGatilho();
 		ligar();
 		const espera = adiada();
 		respostas.push(espera.resposta);
@@ -734,5 +775,89 @@ describe("a ferramenta ler_perfil_aprendiz", () => {
 		const resultado = await executar();
 		expect(resultado.isError).toBe(true);
 		expect(resultado.content[0]!.text).toMatch(/Ensine normalmente/);
+	});
+});
+
+describe("a fila de gravação é do processo, não da instância da extensão", () => {
+	it("naFilaDoProcesso: tarefas da mesma pasta rodam uma de cada vez, na ordem, mesmo se uma falhar; pastas diferentes não se esperam", async () => {
+		const ordem: string[] = [];
+		let soltar: () => void = () => undefined;
+		const porta = new Promise<void>((resolver) => (soltar = resolver));
+		const primeira = naFilaDoProcesso(dados, async () => {
+			ordem.push("1 começa");
+			await porta;
+			ordem.push("1 termina");
+			throw new Error("falhou");
+		});
+		const segunda = naFilaDoProcesso(`${dados}${"/"}.`, async () => {
+			ordem.push("2");
+			return "ok";
+		});
+		const outraPasta = await naFilaDoProcesso(cache, async () => "livre");
+		expect(outraPasta).toBe("livre");
+		await pausa(30);
+		expect(ordem).toEqual(["1 começa"]);
+		soltar();
+		await expect(primeira).rejects.toThrow("falhou");
+		expect(await segunda).toBe("ok");
+		expect(ordem).toEqual(["1 começa", "1 termina", "2"]);
+	});
+
+	it("duas instâncias da extensão sobre a mesma pasta (duas sessões do pi) não perdem gravações uma da outra", async () => {
+		await cenario();
+		const nomes = ["a", "b", "c", "d", "e", "f"];
+		await guardarHipoteses(
+			...nomes.map((nome, indice) =>
+				hipotese({ id: `h-${nome}`, enunciado: `Em c1, comete o erro número ${indice + 1} nas contas longas`, validade: new Date(Date.now() + 30 * 86_400_000).toISOString() }),
+			),
+		);
+		// A segunda instância: outro barramento, outros tratadores, a mesma pasta de dados.
+		const barramentoB = new EventEmitter();
+		const tratadoresB: Record<string, (evento: unknown, contexto: Contexto) => void> = {};
+		const mostradosB: Mostrado[] = [];
+		barramentoB.on("interface:mostrar", (mensagem: Mostrado) => mostradosB.push(mensagem));
+		const piB = {
+			events: { on: (canal: string, ouvinte: (dados: unknown) => void) => barramentoB.on(canal, ouvinte), emit: (canal: string, dadosEvento: unknown) => barramentoB.emit(canal, dadosEvento) },
+			on: (evento: string, tratador: (evento: unknown, contexto: Contexto) => void) => {
+				tratadoresB[evento] = tratador;
+			},
+			registerTool: () => undefined,
+		} as unknown as ExtensionAPI;
+		ligar(); // a instância A
+		montarAprendiz(piB, { pastaCache: cache, caminhoPrompt });
+		tratadoresB.session_start?.({}, ctx);
+		try {
+			nomes.forEach((nome, indice) => {
+				const alvo = indice % 2 === 0 ? barramento : barramentoB;
+				alvo.emit("interface:acao", { painel: "aprendiz", acao: "editar", dados: { pedido: `e-${nome}`, id: `h-${nome}`, enunciado: `Em c1, comete o erro editado ${indice + 1} nas contas` } });
+			});
+			await esperar(() => recebidas("decidida").length + mostradosB.filter((mensagem) => mensagem.acao === "decidida").length === 6);
+			const arquivo = await lerHipoteses(dados);
+			expect(arquivo.hipoteses.map((item) => item.enunciado)).toEqual(nomes.map((_, indice) => `Em c1, comete o erro editado ${indice + 1} nas contas`));
+			expect(arquivo.hipoteses.every((item) => item.versao === 2)).toBe(true);
+		} finally {
+			tratadoresB.session_shutdown?.({}, ctx);
+		}
+	});
+
+	it("a reflexão de uma sessão que acabou enquanto esperava na fila não grava", async () => {
+		await cenario();
+		ligar();
+		const espera = adiada();
+		respostas.push(espera.resposta);
+		pedir({ pedido: "r1" }, "aprendiz", "refletir");
+		await esperar(() => espera.chegou());
+		// a fila da pasta está ocupada por outra instância quando a reflexão tenta gravar
+		let soltar: () => void = () => undefined;
+		const porta = new Promise<void>((resolver) => (soltar = resolver));
+		const ocupada = naFilaDoProcesso(dados, () => porta);
+		espera.soltar(propostaCriar(["ev001", "ev003"]));
+		await pausa(30);
+		tratadores.session_shutdown?.({}, ctx);
+		soltar();
+		await ocupada;
+		await pausa(60);
+		expect((await lerHipoteses(dados)).ultimaReflexao).toBeUndefined();
+		expect((await lerHipoteses(dados)).hipoteses).toEqual([]);
 	});
 });

@@ -1,7 +1,7 @@
 // O agente de reflexão do perfil do aprendiz (item 9, parte B; docs/aprendiz.md, seção 8), sem o modelo:
-// monta a ENTRADA da reflexão (os eventos de aprendizagem novos, as hipóteses atuais, os indicadores da
-// parte A e os nomes dos conceitos), lê a SAÍDA do modelo e a valida (validarPropostas, de
-// hipoteses-tipos.ts) e orquestra uma reflexão inteira (executarReflexao). A chamada ao modelo, a trava de
+// monta a ENTRADA da reflexão (os eventos de aprendizagem novos, os anteriores dos mesmos conceitos, as hipóteses
+// atuais, os indicadores da parte A e os nomes dos conceitos), lê a SAÍDA do modelo e a valida (validarPropostas,
+// de hipoteses-tipos.ts) e orquestra uma reflexão inteira (executarReflexao). A chamada ao modelo, a trava de
 // uma reflexão por vez e a fila de gravação são da extensão (extensions/aprendiz.ts), que entrega a
 // `chamar` e a `naFila` a executarReflexao. Aqui só se LÊ a pasta de dados; a única gravação é a do
 // registrarReflexao (hipoteses.json e eventos do aprendiz), no fim.
@@ -10,31 +10,42 @@
 // (VERBOS_DE_HIPOTESE) nunca entram, nem os de matéria que não existe mais, nem os do método (ajustes e
 // experimentos) e das regras de escrita, que não dizem nada do que o Breno sabe. A autoavaliação
 // (`autoavaliou_conceito`) vai rotulada como "o aluno disse": é o que ele afirma, nunca uma verdade.
+//
+// A entrada traz duas listas: os eventos NOVOS (desde a última reflexão; só deles saem as evidências de reforçar,
+// enfraquecer e expirar) e os eventos ANTERIORES dos mesmos conceitos (já lidos, dos últimos 90 dias), que uma
+// criação pode citar junto de pelo menos um evento novo. Sem eles criar quase nunca seria possível: cada reflexão
+// costuma ter uma sessão só.
 
 import { readFile } from "node:fs/promises";
 import { type IndicadoresConceito, indicadoresDoAprendiz, materiasExistentes, nomesDosConceitos, pastaCacheAprendiz } from "./aprendiz.ts";
 import { NOMES_NIVEL } from "./diagnostico-tipos.ts";
-import { type Evento, lerEventos, novoIdEvento } from "./eventos.ts";
+import { type Evento, instanteDoIdEvento, lerEventos, novoIdEvento } from "./eventos.ts";
 import {
+	arquivoHipoteses,
 	conceitosDoEscopo,
 	contextoDeValidacao,
+	ErroHipoteses,
 	type EscopoHipotese,
 	type Hipotese,
 	lerHipotesesComAvisos,
 	materiaDoEscopo,
+	MOTIVOS_DE_DESCARTE,
 	type MudancaPendente,
-	normalizarTexto,
 	type PropostaValida,
 	registrarReflexao,
 	type ReflexaoRegistrada,
 	type ResumoDaReflexao,
 	validarPropostas,
+	VERBOS_DA_REFLEXAO,
+	VERBOS_DE_DESEMPENHO,
 	VERBOS_DE_HIPOTESE,
 } from "./hipoteses.ts";
 import { objetoJsonDoModelo } from "./json-do-modelo.ts";
 import { arquivoMateria, eventosAprendiz } from "./materias.ts";
 
-/** No máximo tantos eventos entram numa reflexão (os mais antigos saem). */
+export { VERBOS_DA_REFLEXAO, VERBOS_DE_DESEMPENHO };
+
+/** No máximo tantos eventos novos entram numa reflexão (os mais novos ficam para a próxima). */
 export const LIMITE_EVENTOS_DA_REFLEXAO = 200;
 
 /** O texto livre de um evento (resposta, comentário, trecho) é cortado neste tamanho. */
@@ -43,31 +54,33 @@ export const LIMITE_TEXTO_DA_REFLEXAO = 400;
 /** Quantas hipóteses rejeitadas vão como "não repetir" (as mais recentes do arquivo). */
 export const LIMITE_REJEITADAS_DA_REFLEXAO = 20;
 
+/** Quantas hipóteses expiradas dos últimos dias vão como "pode reforçar pelo id para trazer de volta". */
+export const LIMITE_EXPIRADAS_DA_REFLEXAO = 20;
+
+/** As hipóteses expiradas há menos de tantos dias aparecem na entrada. */
+export const DIAS_DAS_EXPIRADAS = 90;
+
 /** Quantos conceitos vão na seção de indicadores. */
 export const LIMITE_INDICADORES_DA_REFLEXAO = 40;
 
-/** Os verbos de aprendizagem que a reflexão lê: o que o Breno respondeu, avaliou, pediu e disse de si. */
-export const VERBOS_DA_REFLEXAO = [
-	"autoavaliou_conceito",
-	"respondeu_questao",
-	"respondeu_verificacao",
-	"respondeu_dissertativa",
-	"nao_sabia_questao",
-	"avaliou_bloco",
-	"avaliou_licao",
-	"reescreveu_bloco",
-	"pediu_explicacao",
-	"guardou_termo",
-	"pediu_reexplicacao",
-	"pediu_outro_jeito",
-	"escreveu_entendimento",
-	"marcou_confianca",
-] as const;
+/** Os eventos anteriores dos mesmos conceitos: de quantos dias para trás e quantos, no máximo. */
+export const DIAS_DOS_ANTERIORES = 90;
+export const LIMITE_ANTERIORES_DA_REFLEXAO = 60;
 
-/** A autoavaliação não sustenta sozinha uma hipótese de conhecimento (9.3): o descarte que o código faz além da validação. */
-export const MOTIVO_AUTOAVALIACAO_SOZINHA = "autoavaliacao_sem_apoio";
+/**
+ * Os eventos dos últimos 2 s antes de a reflexão começar nunca viram o `ultimoEvento`: os ids vêm do relógio de
+ * quando o evento foi criado, não de quando foi gravado, então um evento de id menor pode chegar ao arquivo depois
+ * de um de id maior. Eles entram de novo na reflexão seguinte (reler é inofensivo: as evidências já citadas saem).
+ */
+export const MARGEM_DO_ULTIMO_EVENTO_MS = 2000;
 
-const TIPOS_DE_CONHECIMENTO: readonly string[] = ["conhecimento", "misconception", "vocabulario"];
+/** O gatilho automático (fim de lição ou de módulo) só chama o modelo com pelo menos tantos eventos de desempenho novos. O botão chama sempre que há evento novo. */
+export const MINIMO_DO_GATILHO = 5;
+
+const MS_POR_DIA = 86_400_000;
+
+/** A autoavaliação sozinha não sustenta uma hipótese (9.3): o motivo do descarte feito na validação. */
+export const MOTIVO_AUTOAVALIACAO_SOZINHA = MOTIVOS_DE_DESCARTE.autoavaliacaoSemApoio;
 
 const ehObjeto = (valor: unknown): valor is Record<string, unknown> => typeof valor === "object" && valor !== null && !Array.isArray(valor);
 
@@ -77,23 +90,38 @@ export function cortarTexto(valor: string, limite: number = LIMITE_TEXTO_DA_REFL
 	return limpo.length > limite ? `${limpo.slice(0, Math.max(0, limite - 1)).trimEnd()}…` : limpo;
 }
 
+/** A matéria de um evento, se tem. */
+const materiaDoEvento = (evento: Pick<Evento, "objeto">): string | undefined => (ehObjeto(evento.objeto) && typeof evento.objeto.materia === "string" ? evento.objeto.materia : undefined);
+
+/** Os pares "matéria\0conceito" de um evento. */
+function paresDoEvento(evento: Pick<Evento, "objeto">): string[] {
+	const materia = materiaDoEvento(evento);
+	if (!materia || !Array.isArray(evento.objeto.conceitos)) return [];
+	return (evento.objeto.conceitos as unknown[]).flatMap((conceito) => (typeof conceito === "string" ? [`${materia}\u0000${conceito}`] : []));
+}
+
+const porId = (a: Pick<Evento, "id">, b: Pick<Evento, "id">) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+
 // --- A janela de eventos -------------------------------------------------------------------------------
 
 export interface JanelaDaReflexao {
 	/** Os eventos que entram, do mais antigo para o mais novo. */
 	eventos: Evento[];
-	/** Quantos eventos novos ficaram de fora por passar do limite (os mais antigos). */
+	/** Quantos eventos novos ficaram de fora por passar do limite (os mais novos: ficam para a próxima reflexão). */
 	cortados: number;
-	/** O id do último evento que entrou; ausente se a janela está vazia. */
+	/** O id do último evento estável que entrou (ver `antesDe`); ausente se a janela está vazia ou nenhum é estável. */
 	ultimoEvento?: string;
 }
 
 /**
  * Os eventos que a reflexão lê: os de VERBOS_DA_REFLEXAO com id depois de `depoisDe` (comparação de texto: os ids
  * são ordenáveis), sem os de uma matéria que não existe mais (objeto.materia fora de `materias`); em ordem de id.
- * Passando do limite, os mais antigos saem e o último que entrou é o último de todos.
+ * Passando do limite, entram os MAIS ANTIGOS e os mais novos ficam para a próxima reflexão. O `ultimoEvento` é o
+ * último evento que entrou e cujo id carrega um instante ANTERIOR a `antesDe` (milissegundos; a reflexão passa o
+ * começo dela menos MARGEM_DO_ULTIMO_EVENTO_MS): os mais novos que isso ainda podem ter um vizinho de id menor a
+ * caminho do arquivo, e por isso entram de novo na janela seguinte. Id sem a forma de novoIdEvento conta como antigo.
  */
-export function janelaDaReflexao(eventos: readonly Evento[], opcoes: { depoisDe?: string; materias: ReadonlySet<string>; limite?: number }): JanelaDaReflexao {
+export function janelaDaReflexao(eventos: readonly Evento[], opcoes: { depoisDe?: string; materias: ReadonlySet<string>; limite?: number; antesDe?: number }): JanelaDaReflexao {
 	const limite = opcoes.limite ?? LIMITE_EVENTOS_DA_REFLEXAO;
 	const verbos: readonly string[] = VERBOS_DA_REFLEXAO;
 	const proibidos: readonly string[] = VERBOS_DE_HIPOTESE;
@@ -101,14 +129,45 @@ export function janelaDaReflexao(eventos: readonly Evento[], opcoes: { depoisDe?
 		.filter((evento) => {
 			if (!verbos.includes(evento.verbo) || proibidos.includes(evento.verbo)) return false;
 			if (opcoes.depoisDe !== undefined && !(evento.id > opcoes.depoisDe)) return false;
-			const materia = ehObjeto(evento.objeto) ? evento.objeto.materia : undefined;
-			return typeof materia !== "string" || opcoes.materias.has(materia);
+			const materia = materiaDoEvento(evento);
+			return materia === undefined || opcoes.materias.has(materia);
 		})
-		.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-	// Passando do limite, entram os MAIS ANTIGOS e o ultimoEvento é o último que entrou: a próxima reflexão continua dali, sem perder nenhum.
+		.sort(porId);
+	// Passando do limite, entram os MAIS ANTIGOS: a próxima reflexão continua dali, sem perder nenhum.
 	const entram = limite > 0 && novos.length > limite ? novos.slice(0, limite) : novos;
-	const ultimo = entram[entram.length - 1]?.id;
+	const estavel = (evento: Evento) => {
+		if (opcoes.antesDe === undefined) return true;
+		const instante = instanteDoIdEvento(evento.id);
+		return instante === undefined || instante < opcoes.antesDe;
+	};
+	const ultimo = [...entram].reverse().find(estavel)?.id;
 	return { eventos: entram, cortados: novos.length - entram.length, ...(ultimo !== undefined ? { ultimoEvento: ultimo } : {}) };
+}
+
+/**
+ * Os eventos de aprendizagem anteriores aos novos, dos mesmos pares matéria/conceito que aparecem na janela, dos
+ * últimos DIAS_DOS_ANTERIORES dias (pelo ts), sem autoavaliação nem evento de hipótese, só de matéria que existe,
+ * que não estejam na janela nem sejam mais novos que o último dela; os `limite` mais recentes, em ordem de id.
+ */
+export function eventosAnterioresDaReflexao(eventos: readonly Evento[], janela: JanelaDaReflexao, opcoes: { materias: ReadonlySet<string>; agora: Date; limite?: number }): Evento[] {
+	const pares = new Set(janela.eventos.flatMap(paresDoEvento));
+	if (pares.size === 0) return [];
+	const naJanela = new Set(janela.eventos.map((evento) => evento.id));
+	const ultimoDaJanela = janela.eventos[janela.eventos.length - 1]?.id ?? "";
+	const desde = opcoes.agora.getTime() - DIAS_DOS_ANTERIORES * MS_POR_DIA;
+	const verbos: readonly string[] = VERBOS_DA_REFLEXAO;
+	const limite = opcoes.limite ?? LIMITE_ANTERIORES_DA_REFLEXAO;
+	const achados = eventos
+		.filter((evento) => {
+			if (!verbos.includes(evento.verbo) || evento.verbo === "autoavaliou_conceito" || naJanela.has(evento.id) || evento.id > ultimoDaJanela) return false;
+			const materia = materiaDoEvento(evento);
+			if (materia === undefined || !opcoes.materias.has(materia)) return false;
+			const instante = Date.parse(evento.ts);
+			if (!Number.isFinite(instante) || instante < desde) return false;
+			return paresDoEvento(evento).some((par) => pares.has(par));
+		})
+		.sort(porId);
+	return limite > 0 ? achados.slice(-limite) : [];
 }
 
 // --- O texto da entrada --------------------------------------------------------------------------------
@@ -122,12 +181,15 @@ export function rotulosDeSessao(eventos: readonly Pick<Evento, "sessao">[]): Map
 	return rotulos;
 }
 
-/** O valor do resultado para o modelo: textos cortados, listas curtas, objetos até duas camadas. */
+/**
+ * O valor do resultado para o modelo: textos cortados, listas curtas, objetos até três camadas. As listas não
+ * aumentam a profundidade (os `criterios` de uma dissertativa são uma lista de objetos e chegam inteiros).
+ */
 function valorParaOModelo(valor: unknown, fundo: number): unknown {
 	if (typeof valor === "string") return cortarTexto(valor);
-	if (Array.isArray(valor)) return valor.slice(0, 8).map((item) => valorParaOModelo(item, fundo + 1));
+	if (Array.isArray(valor)) return valor.slice(0, 8).map((item) => valorParaOModelo(item, fundo));
 	if (ehObjeto(valor)) {
-		if (fundo >= 2) return "…";
+		if (fundo >= 3) return "…";
 		return Object.fromEntries(Object.entries(valor).map(([chave, item]) => [chave, valorParaOModelo(item, fundo + 1)]));
 	}
 	return valor;
@@ -201,6 +263,8 @@ function linhaDoIndicador(indicador: IndicadoresConceito, nome: string | undefin
 export interface EntradaDaMensagem {
 	agora: Date;
 	janela: JanelaDaReflexao;
+	/** Os eventos anteriores dos mesmos conceitos (eventosAnterioresDaReflexao), já lidos. */
+	anteriores?: readonly Evento[];
 	hipoteses: readonly Hipotese[];
 	mudancas: readonly MudancaPendente[];
 	indicadores: readonly IndicadoresConceito[];
@@ -211,27 +275,33 @@ export interface EntradaDaMensagem {
 
 /**
  * A mensagem que vai ao modelo da reflexão: as matérias e os conceitos, as hipóteses atuais (proposta e aprovada,
- * com o id para reforçar, enfraquecer e expirar), as rejeitadas como "não repetir", os indicadores dos conceitos
- * que aparecem nos eventos e os eventos novos, um por linha, com o id que a proposta cita.
+ * com o id para reforçar, enfraquecer e expirar), as rejeitadas como "não repetir", as expiradas dos últimos 90 dias
+ * (que podem voltar por um reforço), os indicadores dos conceitos que aparecem nos eventos, os eventos anteriores dos
+ * mesmos conceitos (já lidos) e os eventos novos, um por linha, com o id que a proposta cita.
  */
 export function mensagemDaReflexao(entrada: EntradaDaMensagem): string {
 	const { janela, hipoteses, mudancas } = entrada;
-	const rotulos = rotulosDeSessao(janela.eventos);
-	const naJanela = new Set<string>();
+	const anteriores = entrada.anteriores ?? [];
+	// As sessões dos anteriores e dos novos dividem os mesmos rótulos: o modelo conta sessões diferentes pelo rótulo.
+	const rotulos = rotulosDeSessao([...anteriores, ...janela.eventos]);
+	const sessoesNovas = new Set(janela.eventos.flatMap((evento) => (evento.sessao ? [evento.sessao] : []))).size;
+	const naJanela = new Set(janela.eventos.flatMap(paresDoEvento));
 	const materiasDaJanela = new Set<string>();
-	for (const evento of janela.eventos) {
-		const materia = ehObjeto(evento.objeto) && typeof evento.objeto.materia === "string" ? evento.objeto.materia : undefined;
+	for (const evento of [...janela.eventos, ...anteriores]) {
+		const materia = materiaDoEvento(evento);
 		if (materia) materiasDaJanela.add(materia);
-		for (const conceito of Array.isArray(evento.objeto?.conceitos) ? (evento.objeto.conceitos as unknown[]) : []) {
-			if (typeof conceito === "string" && materia) naJanela.add(`${materia}\u0000${conceito}`);
-		}
 	}
 
 	const atuais = hipoteses.filter((hipotese) => hipotese.status === "proposta" || hipotese.status === "aprovada");
 	const rejeitadas = hipoteses.filter((hipotese) => hipotese.status === "rejeitada").slice(-LIMITE_REJEITADAS_DA_REFLEXAO);
+	const desdeExpiradas = entrada.agora.getTime() - DIAS_DAS_EXPIRADAS * MS_POR_DIA;
+	// A hipótese expirada vira "expirada" numa versão nova: o instante em que expirou é o ts da última versão anterior.
+	const expiradas = hipoteses
+		.filter((hipotese) => hipotese.status === "expirada" && Date.parse(hipotese.anteriores[hipotese.anteriores.length - 1]?.ts ?? hipotese.ultimaConfirmacao) >= desdeExpiradas)
+		.slice(-LIMITE_EXPIRADAS_DA_REFLEXAO);
 
-	// Os conceitos que vale nomear: os dos eventos e os dos escopos das hipóteses atuais.
-	const aNomear = new Set(naJanela);
+	// Os conceitos que vale nomear: os dos eventos (novos e anteriores) e os dos escopos das hipóteses atuais.
+	const aNomear = new Set([...naJanela, ...anteriores.flatMap(paresDoEvento)]);
 	for (const hipotese of atuais) {
 		const materia = materiaDoEscopo(hipotese.escopo);
 		if (materia) for (const conceito of conceitosDoEscopo(hipotese.escopo)) aNomear.add(`${materia}\u0000${conceito}`);
@@ -253,9 +323,15 @@ export function mensagemDaReflexao(entrada: EntradaDaMensagem): string {
 	);
 	secoes.push(`## Hipóteses que o aluno rejeitou (NÃO repetir, nem com outras palavras)\n${rejeitadas.length ? rejeitadas.map((hipotese) => `- «${hipotese.enunciado}»`).join("\n") : "(nenhuma)"}`);
 	secoes.push(
-		`## Indicadores dos conceitos que aparecem nos eventos (calculados pelo código a partir de TODOS os eventos)\n${indicadores.length ? indicadores.map((indicador) => linhaDoIndicador(indicador, nomeDoConceito(entrada.nomes, indicador.materia, indicador.conceito))).join("\n") : "(nenhum)"}`,
+		`## Hipóteses expiradas nos últimos ${DIAS_DAS_EXPIRADAS} dias (não crie outra igual; se os eventos novos a confirmam, pode reforçar pelo id para trazer de volta)\n${expiradas.length ? expiradas.map((hipotese) => `- ${hipotese.id} | ${hipotese.tipo} | ${descricaoDoEscopo(hipotese.escopo)} | «${hipotese.enunciado}»`).join("\n") : "(nenhuma)"}`,
 	);
-	const cabecalho = `${janela.eventos.length} eventos novos${janela.cortados > 0 ? ` (os ${janela.cortados} mais antigos ficaram de fora)` : ""}, ${rotulos.size} sessões (S1 a S${rotulos.size}); do mais antigo para o mais novo`;
+	secoes.push(
+		`## Indicadores dos conceitos que aparecem nos eventos novos (calculados pelo código a partir de TODOS os eventos; os ids de confusões são de eventos antigos: NÃO os cite)\n${indicadores.length ? indicadores.map((indicador) => linhaDoIndicador(indicador, nomeDoConceito(entrada.nomes, indicador.materia, indicador.conceito))).join("\n") : "(nenhum)"}`,
+	);
+	secoes.push(
+		`## Eventos anteriores dos mesmos conceitos (já lidos, dos últimos ${DIAS_DOS_ANTERIORES} dias; só uma proposta de CRIAR pode citá-los, junto de pelo menos 1 evento novo)\n${anteriores.length ? anteriores.map((evento) => linhaDoEventoParaReflexao(evento, rotulos, entrada.nomes)).join("\n") : "(nenhum)"}`,
+	);
+	const cabecalho = `${janela.eventos.length} eventos novos${janela.cortados > 0 ? ` (os ${janela.cortados} mais novos ficam para a próxima reflexão)` : ""}, de ${sessoesNovas} sessões; do mais antigo para o mais novo`;
 	secoes.push(`## Eventos novos (${cabecalho})\n${janela.eventos.map((evento) => linhaDoEventoParaReflexao(evento, rotulos, entrada.nomes)).join("\n")}`);
 	return secoes.join("\n\n");
 }
@@ -268,12 +344,21 @@ export type ReflexaoPreparada =
 			semEventos: false;
 			/** A mensagem ao modelo. */
 			mensagem: string;
-			/** Os ids dos eventos que entraram (a janela da validação) e o que cada um é. */
+			/** Os ids dos eventos novos que entraram (a janela da validação) e o que cada um é. */
 			janela: string[];
+			/** Os ids dos eventos anteriores mostrados como já lidos (só uma criação os cita). */
+			anteriores: string[];
 			eventos: Pick<Evento, "id" | "verbo" | "sessao">[];
 			lidos: number;
 			cortados: number;
-			ultimoEvento: string;
+			/** Os ids da janela depois do `ultimoEvento` (vão em `jaLidos` do resumo). */
+			jaLidos: string[];
+			/** Quantos eventos novos são de desempenho (VERBOS_DE_DESEMPENHO): o que o gatilho automático confere. */
+			desempenho: number;
+			/** O último evento estável que entrou; se nenhum é (todos dos últimos 2 s), o da reflexão anterior; pode faltar. */
+			ultimoEvento?: string;
+			/** O `ultimoEvento` da reflexão anterior. */
+			depoisDe?: string;
 	  };
 
 async function nomesDasMaterias(dados: string, materias: readonly string[]): Promise<{ id: string; nome: string }[]> {
@@ -291,31 +376,48 @@ async function nomesDasMaterias(dados: string, materias: readonly string[]): Pro
 
 /**
  * Lê o disco e monta a entrada da reflexão: os eventos de aprendizagem depois do `ultimoEvento` da última reflexão
- * (janelaDaReflexao), as hipóteses, os indicadores da parte A e os nomes. Sem nenhum evento novo na janela, devolve
- * `semEventos: true` (e o modelo não deve ser chamado). Não grava nada na pasta de dados; os indicadores usam o
- * cache fora dela (`pastaCache`).
+ * (janelaDaReflexao), os anteriores dos mesmos conceitos, as hipóteses, os indicadores da parte A e os nomes. Sem
+ * nenhum evento novo na janela, devolve `semEventos: true` (e o modelo não deve ser chamado). Um hipoteses.json que
+ * não dá para ler por inteiro é erro (ErroHipoteses) já aqui, antes de gastar uma chamada ao modelo. Não grava nada
+ * na pasta de dados; os indicadores usam o cache fora dela (`pastaCache`). O `ultimoEvento` fica pelo menos
+ * MARGEM_DO_ULTIMO_EVENTO_MS antes de `agora` (o começo da preparação).
  */
 export async function prepararReflexao(dados: string, opcoes: { pastaCache?: string; agora?: Date } = {}): Promise<ReflexaoPreparada> {
 	const agora = opcoes.agora ?? new Date();
-	const [{ eventos }, { arquivo }, materias] = await Promise.all([lerEventos(eventosAprendiz(dados)), lerHipotesesComAvisos(dados), materiasExistentes(dados)]);
+	const [{ eventos }, { arquivo, avisos }, materias] = await Promise.all([lerEventos(eventosAprendiz(dados)), lerHipotesesComAvisos(dados), materiasExistentes(dados)]);
+	if (avisos.length > 0) {
+		throw new ErroHipoteses(`Não consegui ler as hipóteses ${arquivoHipoteses(dados)}: ${avisos.join("; ")}. Corrija o arquivo ou tire-o da pasta; o modelo não foi chamado e nada foi gravado.`);
+	}
 	const depoisDe = arquivo.ultimaReflexao?.ultimoEvento;
-	const janela = janelaDaReflexao(eventos, { ...(depoisDe !== undefined ? { depoisDe } : {}), materias: new Set(materias) });
-	if (janela.eventos.length === 0) return { semEventos: true, ...(depoisDe !== undefined ? { ultimoEvento: depoisDe } : {}) };
+	const jaLidos = new Set(arquivo.ultimaReflexao?.jaLidos ?? []);
+	const existentes = new Set(materias);
+	const janela = janelaDaReflexao(eventos, { ...(depoisDe !== undefined ? { depoisDe } : {}), materias: existentes, antesDe: agora.getTime() - MARGEM_DO_ULTIMO_EVENTO_MS });
+	// Sem evento novo; ou só os dos últimos 2 s da reflexão anterior, que entram de novo mas que ela já leu.
+	if (janela.eventos.length === 0 || janela.eventos.every((evento) => jaLidos.has(evento.id))) {
+		return { semEventos: true, ...(depoisDe !== undefined ? { ultimoEvento: depoisDe } : {}) };
+	}
 
+	const anteriores = eventosAnterioresDaReflexao(eventos, janela, { materias: existentes, agora });
 	const [indicadores, nomes, nomesDasMateriasLidas] = await Promise.all([
 		indicadoresDoAprendiz(dados, opcoes.pastaCache ?? pastaCacheAprendiz(), agora),
 		nomesDosConceitos(dados, materias),
 		nomesDasMaterias(dados, materias),
 	]);
-	const mensagem = mensagemDaReflexao({ agora, janela, hipoteses: arquivo.hipoteses, mudancas: arquivo.mudancas, indicadores: indicadores.conceitos, materias: nomesDasMateriasLidas, nomes });
+	const mensagem = mensagemDaReflexao({ agora, janela, anteriores, hipoteses: arquivo.hipoteses, mudancas: arquivo.mudancas, indicadores: indicadores.conceitos, materias: nomesDasMateriasLidas, nomes });
+	const desempenhos: readonly string[] = VERBOS_DE_DESEMPENHO;
+	const ultimoEvento = janela.ultimoEvento ?? depoisDe;
 	return {
 		semEventos: false,
 		mensagem,
 		janela: janela.eventos.map((evento) => evento.id),
+		anteriores: anteriores.map((evento) => evento.id),
 		eventos: janela.eventos.map(({ id, verbo, sessao }) => ({ id, verbo, ...(sessao !== undefined ? { sessao } : {}) })),
 		lidos: janela.eventos.length,
 		cortados: janela.cortados,
-		ultimoEvento: janela.ultimoEvento!,
+		jaLidos: janela.eventos.filter((evento) => ultimoEvento === undefined || evento.id > ultimoEvento).map((evento) => evento.id),
+		desempenho: janela.eventos.filter((evento) => desempenhos.includes(evento.verbo)).length,
+		...(ultimoEvento !== undefined ? { ultimoEvento } : {}),
+		...(depoisDe !== undefined ? { depoisDe } : {}),
 	};
 }
 
@@ -331,63 +433,25 @@ export function propostasDaResposta(texto: string): unknown[] {
 	return propostas;
 }
 
-/**
- * A autoavaliação sozinha não sustenta uma hipótese de conhecimento (9.3): a criação ou a mudança de tipo
- * conhecimento, misconception ou vocabulário que cita só `autoavaliou_conceito` (ou, ao criar, menos de 2 eventos de
- * 2 sessões que não sejam autoavaliação) sai da lista, e o motivo MOTIVO_AUTOAVALIACAO_SOZINHA conta como descarte.
- * Propostas que não têm a forma esperada passam adiante: quem as descarta é a validação.
- */
-export function descartarAutoavaliacaoSozinha(
-	propostas: readonly unknown[],
-	eventos: ReadonlyMap<string, Pick<Evento, "verbo" | "sessao">>,
-	hipoteses: readonly Pick<Hipotese, "id" | "tipo">[],
-): { restam: unknown[]; descartadas: number } {
-	const restam: unknown[] = [];
-	let descartadas = 0;
-	for (const proposta of propostas) {
-		if (!ehObjeto(proposta) || !Array.isArray(proposta.evidencias) || proposta.evidencias.some((id) => typeof id !== "string")) {
-			restam.push(proposta);
-			continue;
-		}
-		const ids = [...new Set(proposta.evidencias as string[])];
-		const reais = ids.filter((id) => eventos.get(id)?.verbo !== "autoavaliou_conceito");
-		const acao = typeof proposta.acao === "string" ? normalizarTexto(proposta.acao) : "";
-		const tipo = acao === "criar" ? (typeof proposta.tipo === "string" ? normalizarTexto(proposta.tipo).replace(/ /gu, "_") : "") : hipoteses.find((hipotese) => hipotese.id === proposta.hipotese)?.tipo;
-		const deConhecimento = tipo !== undefined && TIPOS_DE_CONHECIMENTO.includes(tipo);
-		let semApoio = false;
-		if (deConhecimento && acao === "criar") {
-			const sessoes = new Set(reais.map((id) => eventos.get(id)?.sessao).filter((sessao): sessao is string => typeof sessao === "string" && sessao !== ""));
-			semApoio = ids.length > 0 && (reais.length < 2 || sessoes.size < 2) && ids.some((id) => eventos.get(id)?.verbo === "autoavaliou_conceito");
-		} else if (deConhecimento && (acao === "reforcar" || acao === "enfraquecer")) {
-			semApoio = ids.length > 0 && reais.length === 0;
-		}
-		if (semApoio) descartadas++;
-		else restam.push(proposta);
-	}
-	return { restam, descartadas };
-}
-
 export interface SaidaValidada {
 	validas: PropostaValida[];
 	descartadas: { motivo: string; quantas: number }[];
 	/** Quantas propostas o modelo fez. */
 	propostas: number;
 	lidos: number;
-	ultimoEvento: string;
+	ultimoEvento?: string;
 }
 
 /**
- * Valida o que o modelo propôs contra o disco de agora (hipóteses, eventos e matérias que existem) e contra a janela
- * que a reflexão leu: validarPropostas mais o descarte da autoavaliação sozinha. Devolve as válidas, as descartadas
- * com o motivo, quantas o modelo fez e o que a reflexão leu.
+ * Valida o que o modelo propôs contra o disco de agora (hipóteses, eventos e matérias que existem) e contra os
+ * eventos que a reflexão leu (os novos e os anteriores já lidos): validarPropostas, que também descarta a
+ * autoavaliação sozinha e passa de 6 criações. Devolve as válidas, as descartadas com o motivo, quantas o modelo fez
+ * e o que a reflexão leu.
  */
 export async function validarSaidaDaReflexao(dados: string, propostas: readonly unknown[], preparada: Extract<ReflexaoPreparada, { semEventos: false }>): Promise<SaidaValidada> {
-	const contexto = await contextoDeValidacao(dados, preparada.janela);
-	const porId = new Map(preparada.eventos.map((evento) => [evento.id, evento]));
-	const filtrado = descartarAutoavaliacaoSozinha(propostas, porId, contexto.hipoteses);
-	const { validas, descartadas } = validarPropostas(filtrado.restam, contexto);
-	const todas = filtrado.descartadas > 0 ? [...descartadas, { motivo: MOTIVO_AUTOAVALIACAO_SOZINHA, quantas: filtrado.descartadas }] : descartadas;
-	return { validas, descartadas: todas, propostas: propostas.length, lidos: preparada.lidos, ultimoEvento: preparada.ultimoEvento };
+	const contexto = await contextoDeValidacao(dados, preparada.janela, preparada.anteriores);
+	const { validas, descartadas } = validarPropostas(propostas, contexto);
+	return { validas, descartadas, propostas: propostas.length, lidos: preparada.lidos, ...(preparada.ultimoEvento !== undefined ? { ultimoEvento: preparada.ultimoEvento } : {}) };
 }
 
 // --- Uma reflexão inteira ------------------------------------------------------------------------------
@@ -404,6 +468,11 @@ export interface OpcoesDaReflexao {
 	sessao?: string;
 	agora?: Date;
 	pastaCache?: string;
+	/**
+	 * Só chama o modelo se a janela tem pelo menos tantos eventos de desempenho (VERBOS_DE_DESEMPENHO). É o gatilho
+	 * automático (MINIMO_DO_GATILHO); o botão não passa. Abaixo disso nada é chamado nem gravado e a janela não avança.
+	 */
+	minimoDeDesempenho?: number;
 	/** Chama o modelo com a mensagem e devolve as propostas lidas do JSON. Falhou: lança, e nada é gravado. */
 	chamar: (mensagem: string) => Promise<RespostaDaReflexao>;
 	/** Roda a tarefa na fila única de gravação das hipóteses (a leitura e a gravação ficam dentro dela; o modelo, fora). */
@@ -411,22 +480,26 @@ export interface OpcoesDaReflexao {
 }
 
 export type ResultadoDaReflexao =
-	| { semEventos: true; resumo: ResumoDaReflexao }
+	| { semEventos: true; resumo: ResumoDaReflexao; /** Houve eventos novos, mas menos de minimoDeDesempenho eventos de desempenho. */ abaixoDoMinimo?: true }
 	| { semEventos: false; resumo: ResumoDaReflexao; registrada: ReflexaoRegistrada; cortados: number };
 
 /**
  * Faz uma reflexão: monta a entrada (na fila), chama o modelo (fora dela), valida a saída contra o disco de
  * agora e grava (na fila, registrarReflexao). Sem nenhum evento novo na janela, o modelo NÃO é chamado, nada é
- * gravado e o resultado é `semEventos` com um resumo de 0 lidos. Se o modelo falhar, nada é gravado e o
+ * gravado e o resultado é `semEventos` com um resumo de 0 lidos. O mesmo vale para o gatilho automático com menos
+ * de `minimoDeDesempenho` eventos de desempenho (`abaixoDoMinimo`). Se o modelo falhar, nada é gravado e o
  * `ultimoEvento` não avança: a próxima reflexão lê os mesmos eventos de novo.
  */
 export async function executarReflexao(dados: string, opcoes: OpcoesDaReflexao): Promise<ResultadoDaReflexao> {
 	const agora = opcoes.agora ?? new Date();
 	const preparada = await opcoes.naFila(() => prepararReflexao(dados, { ...(opcoes.pastaCache ? { pastaCache: opcoes.pastaCache } : {}), agora }));
-	if (preparada.semEventos) {
+	const semNada = (ultimoEvento: string | undefined, abaixoDoMinimo: boolean): ResultadoDaReflexao => {
 		const base = { id: `r-${novoIdEvento(agora.getTime())}`, ts: agora.toISOString(), motivo: opcoes.motivo };
-		return { semEventos: true, resumo: { ...base, ...(preparada.ultimoEvento !== undefined ? { ultimoEvento: preparada.ultimoEvento } : {}), lidos: 0, propostas: 0, aceitas: 0, descartadas: [] } };
-	}
+		const resumo: ResumoDaReflexao = { ...base, ...(ultimoEvento !== undefined ? { ultimoEvento } : {}), lidos: 0, propostas: 0, aceitas: 0, descartadas: [] };
+		return { semEventos: true, resumo, ...(abaixoDoMinimo ? { abaixoDoMinimo: true as const } : {}) };
+	};
+	if (preparada.semEventos) return semNada(preparada.ultimoEvento, false);
+	if (opcoes.minimoDeDesempenho !== undefined && preparada.desempenho < opcoes.minimoDeDesempenho) return semNada(preparada.depoisDe, true);
 	const resposta = await opcoes.chamar(preparada.mensagem);
 	return opcoes.naFila(async () => {
 		// O instante do registro é o do fim da chamada (a validade das hipóteses conta daí).
@@ -435,7 +508,8 @@ export async function executarReflexao(dados: string, opcoes: OpcoesDaReflexao):
 		const saida = await validarSaidaDaReflexao(dados, resposta.propostas, preparada);
 		const resumo: ResumoDaReflexao = {
 			...base,
-			ultimoEvento: saida.ultimoEvento,
+			...(saida.ultimoEvento !== undefined ? { ultimoEvento: saida.ultimoEvento } : {}),
+			...(preparada.jaLidos.length > 0 ? { jaLidos: preparada.jaLidos } : {}),
 			lidos: saida.lidos,
 			propostas: saida.propostas,
 			aceitas: saida.validas.length,

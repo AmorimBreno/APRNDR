@@ -10,6 +10,7 @@ O editor do app (profiles/estudos/paineis) lê e escreve exatamente estes format
 - Títulos `#` a `####`, parágrafos, **negrito**, *itálico*, ~~tachado~~ e `código`.
 - Listas com `-`, numeradas com `1.`, e tarefas com `- [ ]` e `- [x]`.
 - Citação com `>`, bloco de código com três crases, linha divisória com `---`, links `[texto](endereço)` (a barra da seleção põe `https://` num endereço sem protocolo).
+- Tabelas no formato do GitHub (`| a | b |`, linha `| - | - |` e as linhas de dados). O editor as mostra e as grava de volta com as colunas alinhadas; células com código, negrito e fórmulas funcionam. Antes de 2026-11-12 o editor não tinha a tabela: ele a descartava ao abrir e o salvamento a apagava do arquivo.
 - Sublinhado: o markdown não tem, então é HTML, `<u>trecho</u>` (Ctrl+U ou o U da barra da seleção).
 
 

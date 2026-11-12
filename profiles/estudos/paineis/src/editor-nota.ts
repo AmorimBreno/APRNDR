@@ -13,6 +13,7 @@
 
 import { type AnyExtension, type Editor, Extension, type JSONContent } from "@tiptap/core";
 import { TaskItem, TaskList } from "@tiptap/extension-list";
+import { Table, TableCell, TableHeader, TableRow } from "@tiptap/extension-table";
 import { Markdown } from "@tiptap/markdown";
 import type { Node as NoPM } from "@tiptap/pm/model";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
@@ -56,6 +57,11 @@ export function extensoesDaNota(opcoes: OpcoesEditorNota = {}): AnyExtension[] {
 		}),
 		TaskList,
 		TaskItem.configure({ nested: true }),
+		// Tabelas do GFM (| a | b |). Sem estas, o editor descartava a tabela ao abrir a nota e o salvamento a apagava do arquivo.
+		Table,
+		TableRow,
+		TableHeader,
+		TableCell,
 		// ![[imagem.png|650]] (o Guardar na nota de um diagrama do professor): a imagem, não uma menção com um "!" solto.
 		opcoes.naTela ? ImagemEmbedNaTela : ImagemEmbed,
 		Mencao.configure({

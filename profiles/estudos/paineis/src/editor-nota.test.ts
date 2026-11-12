@@ -105,6 +105,33 @@ describe("blocos e decorações da parte C", () => {
 	});
 });
 
+describe("tabela (GFM)", () => {
+	const tabela = "| N | Característica | Significado |\n| - | - | - |\n| 16 | **Amplitude em BPFO** — `amp_bpfo` | Mede o destaque do envelope a 236 Hz. |\n| 17 | Segundo harmônico | Soma $A_1 + A_2$ de BPFO. |";
+
+	it("a tabela não some ao abrir a nota (antes o salvamento a apagava do arquivo)", () => {
+		const volta = idaEVolta(`Antes\n\n${tabela}\n\nDepois`);
+		expect(editor!.getJSON().content?.map((no) => no.type)).toEqual(["paragraph", "table", "paragraph"]);
+		expect(volta).toContain("Amplitude em BPFO");
+		expect(volta).toContain("`amp_bpfo`");
+		expect(volta).toContain("$A_1 + A_2$");
+		expect(volta).toContain("Depois");
+	});
+
+	it("depois da primeira volta o markdown fica estável (salvar de novo não muda o arquivo)", () => {
+		const primeira = idaEVolta(tabela);
+		editor?.destroy();
+		expect(idaEVolta(primeira)).toBe(primeira);
+	});
+
+	it("o cabeçalho e as linhas viram células de cabeçalho e de corpo", () => {
+		idaEVolta(tabela);
+		const linhas: JSONContent[] = editor!.getJSON().content?.[0]?.content ?? [];
+		expect(linhas).toHaveLength(3);
+		expect(linhas[0]?.content?.map((c: JSONContent) => c.type)).toEqual(["tableHeader", "tableHeader", "tableHeader"]);
+		expect(linhas[1]?.content?.map((c: JSONContent) => c.type)).toEqual(["tableCell", "tableCell", "tableCell"]);
+	});
+});
+
 describe("ajuda dos blocos vazios", () => {
 	/** A ajuda de cada bloco de texto vazio, na ordem do documento (o cursor no bloco de índice `cursor`). */
 	function ajudas(conteudo: JSONContent[], cursor?: number): string[] {

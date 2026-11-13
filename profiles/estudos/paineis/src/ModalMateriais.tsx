@@ -6,7 +6,7 @@
 // não suportado. A lista se atualiza sozinha pelo evento "materiais".
 // Quando o caderno existir (4.3), este conteúdo vira a seção Materiais dele.
 
-import { Button, FileDrop, formatBytes, Icon, type IconName, Modal, Tag, type TagProps } from "@estudos/design-system";
+import { Button, Checkbox, FileDrop, formatBytes, Icon, type IconName, Modal, Tag, type TagProps } from "@estudos/design-system";
 import { semMovimento, type SituacaoMaterial, useValorEstavel } from "@estudos/ui";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
@@ -109,6 +109,11 @@ export interface PropsConteudoMateriais {
 	destaque?: string;
 	/** Só o caderno liga: a área de soltar e os avisos ficam fixos no topo e só a lista dos arquivos rola (FixoERolagem). */
 	dividir?: boolean;
+	/**
+	 * Só o guia de curso liga: cada material pronto ganha uma marcação para entrar ou não no curso
+	 * (`desmarcados` são os nomes dos que ficam de fora). Os outros estados não são escolhidos.
+	 */
+	escolha?: { desmarcados: ReadonlySet<string>; alternar(nome: string): void };
 }
 
 /** A área de soltar e a lista, sem o modal: o modal da tela de cadernos e a seção Materiais do caderno usam. */
@@ -173,6 +178,7 @@ export function ConteudoMateriais(props: PropsConteudoMateriais) {
 									material={material}
 									reprocessar={props.reprocessar}
 									destacado={props.destaque !== undefined && material.nome.toLowerCase() === props.destaque.toLowerCase()}
+									{...(props.escolha ? { escolha: { marcado: !props.escolha.desmarcados.has(material.nome), alternar: () => props.escolha?.alternar(material.nome) } } : {})}
 								/>
 						))}
 					</AnimatePresence>
@@ -186,7 +192,14 @@ function LinhaMaterial({
 	material,
 	reprocessar,
 	destacado = false,
-}: { material: SituacaoMaterial; reprocessar(caminho: string): Promise<void>; destacado?: boolean }) {
+	escolha,
+}: {
+	material: SituacaoMaterial;
+	reprocessar(caminho: string): Promise<void>;
+	destacado?: boolean;
+	/** No guia de curso: se o material entra no curso. Só os prontos têm a marcação; os outros guardam o lugar dela. */
+	escolha?: { marcado: boolean; alternar(): void };
+}) {
 	const [pedindo, setPedindo] = useState(false);
 	// Com movimento reduzido, a linha entra, sai e muda de lugar sem animar.
 	const parado = semMovimento();
@@ -205,8 +218,20 @@ function LinhaMaterial({
 			exit={parado ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, x: -16, transition: { duration: 0.16 } }}
 			transition={parado ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 30 }}
 			ref={linha}
-			className={`ap-file material${material.estado === "erro" ? " ap-file--error" : ""}${destacado ? " material--destacado" : ""}`}
+			className={`ap-file material${material.estado === "erro" ? " ap-file--error" : ""}${destacado ? " material--destacado" : ""}${escolha ? " material--escolha" : ""}${escolha && material.estado === "pronto" && !escolha.marcado ? " material--fora" : ""}`}
 		>
+			{escolha ? (
+				material.estado === "pronto" ? (
+					<Checkbox
+						className="material__marcar"
+						checked={escolha.marcado}
+						onChange={escolha.alternar}
+						label={<span className="ap-visually-hidden">{`${material.nome} neste curso`}</span>}
+					/>
+				) : (
+					<span className="material__marcar material__marcar--vazio" aria-hidden="true" />
+				)
+			) : null}
 			<Icon name={(material.tipo && ICONE_TIPO[material.tipo]) || "file"} size={20} strokeWidth={2.25} />
 			<span className="ap-file__name body-sm" title={material.nome}>
 				{material.nome}

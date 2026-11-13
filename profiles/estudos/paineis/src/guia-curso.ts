@@ -5,10 +5,13 @@
 
 import type { SituacaoMaterial } from "@estudos/ui";
 import {
+	type ArquivoDoCurso,
 	type Curso,
+	type DadosMateriais,
 	type DadosObjetivo,
 	ETAPAS,
 	type EntradaBasico,
+	escolherMateriais,
 	type Escopo,
 	type Etapa,
 	nomeDaEtapa,
@@ -154,6 +157,41 @@ export const OPCOES_TIPO: ReadonlyArray<{ value: TipoCurso; label: string; descr
 ];
 
 // --- Materiais ------------------------------------------------------------------
+
+/**
+ * Os materiais desmarcados ao abrir a etapa: os que o Breno já tinha tirado do
+ * curso. Um material novo (que nunca esteve na etapa) vem marcado.
+ */
+export function desmarcadosDosMateriais(curso: Pick<Curso, "materiais"> | undefined): Set<string> {
+	return new Set(curso?.materiais?.excluidos ?? []);
+}
+
+/**
+ * O que a etapa Materiais confirmaria com estas marcações, para comparar com
+ * o salvo (o que invalida, se mudou): os prontos que a extensão mandou menos
+ * os desmarcados. Sem os prontos ainda, parte do salvo.
+ */
+export function materiaisEscolhidos(curso: Pick<Curso, "materiais">, prontos: readonly ArquivoDoCurso[] | undefined, desmarcados: ReadonlySet<string>): DadosMateriais {
+	if (prontos) return escolherMateriais(prontos, desmarcados);
+	const salvos = [...(curso.materiais?.arquivos ?? []), ...(curso.materiais?.excluidos ?? []).map((arquivo) => ({ arquivo, hash: "" }))];
+	return escolherMateriais(salvos, desmarcados);
+}
+
+/** Quantos materiais prontos entram no curso, de quantos prontos há ("2 de 3 materiais neste curso"). */
+export function resumoDaEscolha(materiais: readonly SituacaoMaterial[], desmarcados: ReadonlySet<string>): { total: number; escolhidos: number; texto: string } {
+	const prontos = materiais.filter((material) => material.estado === "pronto");
+	const escolhidos = prontos.filter((material) => !desmarcados.has(material.nome)).length;
+	const total = prontos.length;
+	const texto =
+		total === 0
+			? ""
+			: escolhidos === 0
+				? "Nenhum material neste curso."
+				: escolhidos === total
+					? `${total} ${total === 1 ? "material" : "materiais"} neste curso`
+					: `${escolhidos} de ${total} materiais neste curso`;
+	return { total, escolhidos, texto };
+}
 
 /** Quantos materiais da pasta ainda estão na fila ou processando. */
 export const processando = (materiais: readonly SituacaoMaterial[]) =>

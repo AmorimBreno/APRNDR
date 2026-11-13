@@ -41,6 +41,7 @@ import { type CursosDaMateria, useCurso } from "./cursos-ponte.ts";
 import {
 	caminhoDoGuia,
 	campoDoErroBasico,
+	desmarcadosDosMateriais,
 	desmarcadosIniciais,
 	entradaBasico,
 	etapaDepois,
@@ -49,12 +50,14 @@ import {
 	formBasico,
 	formObjetivo,
 	marcados as idsMarcados,
+	materiaisEscolhidos,
 	motivoMapaParado,
 	OPCOES_ESCOPO,
 	OPCOES_TIPO,
 	podeAbrir,
 	processando,
 	provasFuturas,
+	resumoDaEscolha,
 	rotuloDaProva,
 	textoPrimarioMapa,
 	textoSelecao,
@@ -123,6 +126,8 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 	const [basico, setBasico] = useState<FormBasico>(() => formBasico(curso, provas));
 	const [objetivo, setObjetivo] = useState<DadosObjetivo>(() => formObjetivo(curso));
 	const [desmarcados, setDesmarcados] = useState<ReadonlySet<string>>(() => new Set());
+	/** Os materiais da matéria que ficam de fora do curso (a etapa Materiais). */
+	const [foraDoCurso, setForaDoCurso] = useState<ReadonlySet<string>>(() => desmarcadosDosMateriais(curso));
 	/** A seleção do Mapa já partiu do curso (o mapa pode chegar depois da etapa abrir). */
 	const selecaoIniciada = useRef(false);
 	/** Algo mudou nos campos desde que a etapa abriu. */
@@ -161,6 +166,7 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 	const reverter = () => {
 		setBasico(formBasico(curso, provas));
 		setObjetivo(formObjetivo(curso));
+		setForaDoCurso(desmarcadosDosMateriais(curso));
 		const estadoMapa = mapa.estado;
 		setDesmarcados(estadoMapa ? desmarcadosIniciais(estadoMapa.mapa, curso) : new Set());
 		selecaoIniciada.current = Boolean(estadoMapa);
@@ -233,6 +239,11 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 	const sujo = (() => {
 		if (pronto) return false;
 		if (vista === "basico") return curso?.basico ? !iguais("basico", curso.basico, entrada) || basico.nome.trim() !== curso.nome : mexido;
+		if (vista === "materiais") {
+			// Só as marcações do Breno contam (um material que chegou depois não é uma edição dele).
+			const salvos = desmarcadosDosMateriais(curso);
+			return curso?.materiais ? salvos.size !== foraDoCurso.size || [...foraDoCurso].some((nome) => !salvos.has(nome)) : mexido;
+		}
 		if (vista === "objetivo") return curso?.objetivo ? !iguais("objetivo", curso.objetivo, objetivo) : mexido;
 		if (vista === "mapa") return curso?.mapa ? !iguais("mapa", curso.mapa, { conceitos: marcadosIds }) : mexido;
 		return false;
@@ -280,8 +291,10 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 				}
 				confirmarComAviso("basico", limpo, limpo);
 			} else if (vista === "materiais" && curso) {
-				// A extensão monta a lista com os prontos do disco; o aviso compara com os prontos que ela mandou com o curso.
-				confirmarComAviso("materiais", {}, prontos ? { arquivos: prontos } : (curso.materiais ?? { arquivos: [] }));
+				// A extensão monta a lista com os prontos do disco menos os que ficam de fora; o aviso compara com os prontos
+				// que ela mandou com o curso.
+				const escolhidos = materiaisEscolhidos(curso, prontos, foraDoCurso);
+				confirmarComAviso("materiais", { excluidos: escolhidos.excluidos ?? [] }, escolhidos);
 			} else if (vista === "objetivo" && curso) {
 				const limpo = validarEtapa("objetivo", objetivo, { curso });
 				confirmarComAviso("objetivo", limpo, limpo);
@@ -390,9 +403,18 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 		primario = { texto: "Continuar" };
 	} else if (vista === "materiais" && curso) {
 		const quantos = processando(materiais);
+		const escolha = resumoDaEscolha(materiais, foraDoCurso);
+		const alternar = (nome: string) => {
+			setForaDoCurso((atual) => {
+				const novo = new Set(atual);
+				if (!novo.delete(nome)) novo.add(nome);
+				return novo;
+			});
+			setMexido(true);
+		};
 		corpo = (
 			<>
-				<p className="body guia__texto">Os materiais são da matéria: o que você adicionar aqui vale também para os outros cursos dela.</p>
+				<p className="body guia__texto">Os materiais são da matéria: o que você adicionar aqui vale também para os outros cursos dela. Marque os que entram neste curso; os que você desmarcar continuam na matéria, só não valem aqui. Sem nenhum material marcado, o curso não usa arquivos e o escopo “Só o material” fica indisponível.</p>
 				{quantos > 0 ? (
 					<Callout tone="steel" label="Processando" icon="clock" quote={false}>
 						<p>
@@ -400,7 +422,12 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 						</p>
 					</Callout>
 				) : null}
+				{/* A linha guarda o lugar mesmo vazia (a lista não pula quando o texto chega ou muda). */}
+				<p className={`body-sm guia__escolha${escolha.total > 0 && escolha.escolhidos === 0 ? " guia__escolha--nenhum" : ""}`} aria-live="polite">
+					{escolha.total === 0 ? " " : escolha.texto}
+				</p>
 				<ConteudoMateriais
+					escolha={{ desmarcados: foraDoCurso, alternar }}
 					{...(props.materiais ? { materiais: props.materiais } : {})}
 					pasta={pastaMateriaisRelativa(materiaId)}
 					enviar={(arquivos) => props.janela.acoes.enviarMateriais(pastaMateriaisRelativa(materiaId), arquivos)}
@@ -408,7 +435,7 @@ export function TelaGuiaCurso(props: PropsGuiaCurso) {
 				/>
 			</>
 		);
-		primario = { texto: materiais.length === 0 ? "Continuar sem material" : "Continuar" };
+		primario = { texto: escolha.escolhidos === 0 ? "Continuar sem material" : "Continuar" };
 	} else if (vista === "objetivo" && curso) {
 		const semMaterial = !curso.materiais?.arquivos.length;
 		const mudar = (mudanca: Partial<DadosObjetivo>) => {

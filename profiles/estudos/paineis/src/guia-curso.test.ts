@@ -12,6 +12,7 @@ import type { Evento } from "../../lib/eventos.ts";
 import { aplicarOperacoes, type Conceito, type MapaConteudo, mapaVazio } from "../../lib/mapa-tipos.ts";
 import {
 	campoDoErroBasico,
+	desmarcadosDosMateriais,
 	desmarcadosIniciais,
 	entradaBasico,
 	etapaDepois,
@@ -19,11 +20,13 @@ import {
 	formBasico,
 	formObjetivo,
 	marcados,
+	materiaisEscolhidos,
 	motivoMapaParado,
 	podeAbrir,
 	processando,
 	provasFuturas,
 	rotuloCurso,
+	resumoDaEscolha,
 	rotuloDaProva,
 	textoEditado,
 	textoPrazo,
@@ -209,6 +212,35 @@ describe("os materiais", () => {
 
 	it("conta os que ainda estão na fila ou processando", () => {
 		expect(processando([material("a.pdf"), material("d.pdf", "processando"), material("e.pdf", "na_fila"), material("f.pdf", "erro")])).toBe(2);
+	});
+
+	it("parte dos que ele já tinha tirado do curso; um curso sem a etapa ou de antes (sem excluidos) parte sem nenhum", () => {
+		expect(desmarcadosDosMateriais(undefined)).toEqual(new Set());
+		expect(desmarcadosDosMateriais(curso())).toEqual(new Set());
+		expect(desmarcadosDosMateriais(curso({ materiais: { arquivos: [{ arquivo: "a.pdf", hash: "1" }] } }))).toEqual(new Set());
+		expect(desmarcadosDosMateriais(curso({ materiais: { arquivos: [], excluidos: ["b.pdf"] } }))).toEqual(new Set(["b.pdf"]));
+	});
+
+	it("o que a etapa confirmaria: os prontos menos os desmarcados; sem os prontos ainda, parte do salvo", () => {
+		const salvo = curso({ materiais: { arquivos: [{ arquivo: "a.pdf", hash: "1" }], excluidos: ["b.pdf"] } });
+		const prontos = [{ arquivo: "a.pdf", hash: "1" }, { arquivo: "b.pdf", hash: "2" }, { arquivo: "c.pdf", hash: "3" }];
+		expect(materiaisEscolhidos(salvo, prontos, new Set(["b.pdf"]))).toEqual({ arquivos: [prontos[0], prontos[2]], excluidos: ["b.pdf"] });
+		expect(materiaisEscolhidos(salvo, prontos, new Set())).toEqual({ arquivos: prontos });
+		expect(materiaisEscolhidos(salvo, undefined, new Set(["b.pdf"]))).toEqual({ arquivos: [{ arquivo: "a.pdf", hash: "1" }], excluidos: ["b.pdf"] });
+		// Marcar b.pdf de volta e desmarcar a.pdf (sem os prontos, o hash de b.pdf ainda não se sabe).
+		expect(materiaisEscolhidos(salvo, undefined, new Set(["a.pdf"]))).toEqual({ arquivos: [{ arquivo: "b.pdf", hash: "" }], excluidos: ["a.pdf"] });
+	});
+
+	it("a contagem conta só os prontos: todos, alguns ou nenhum; sem pronto, sem texto", () => {
+		const todos = [material("a.pdf"), material("b.pdf"), material("c.pdf", "processando")];
+		expect(resumoDaEscolha(todos, new Set())).toEqual({ total: 2, escolhidos: 2, texto: "2 materiais neste curso" });
+		expect(resumoDaEscolha([material("a.pdf")], new Set())).toMatchObject({ total: 1, texto: "1 material neste curso" });
+		expect(resumoDaEscolha(todos, new Set(["b.pdf"]))).toEqual({ total: 2, escolhidos: 1, texto: "1 de 2 materiais neste curso" });
+		expect(resumoDaEscolha(todos, new Set(["a.pdf", "b.pdf"]))).toEqual({ total: 2, escolhidos: 0, texto: "Nenhum material neste curso." });
+		// Um desmarcado que sumiu da pasta não conta.
+		expect(resumoDaEscolha(todos, new Set(["sumiu.pdf"])).escolhidos).toBe(2);
+		expect(resumoDaEscolha([material("c.pdf", "processando"), material("d.pdf", "erro")], new Set())).toEqual({ total: 0, escolhidos: 0, texto: "" });
+		expect(resumoDaEscolha([], new Set())).toEqual({ total: 0, escolhidos: 0, texto: "" });
 	});
 });
 

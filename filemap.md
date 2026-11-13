@@ -150,7 +150,9 @@ apps/desktop/src/estado-janela.test.ts — testes do estado da janela
 apps/desktop/src/reconectando.html — tela local enquanto o front não responde (o texto só aparece depois de 1 s)
 apps/desktop/assets/icone.ico — ícone do app (o professor, recortado de profiles/estudos/avatares/professor.png); icone.png é a mesma imagem em 512 px
 apps/web/ — @estudos/web: Vite + React na porta 7430, com proxy de /api e /ws para a 7431
-apps/web/vite.config.ts — porta e proxy do Vite
+apps/web/vite.config.ts — porta e proxy do Vite e o plugin semRecarregarAoVoltar
+apps/web/src/vite-sem-recarregar.ts — plugin do Vite (só no dev): a página não recarrega quando a conexão do Vite cai e volta com o mesmo servidor (notebook acordando); remenda o client.mjs do Vite 8.3.2 e serve o id do servidor em /__servidor-id, e só reinício de verdade recarrega
+apps/web/src/vite-sem-recarregar.test.ts — testes do remendo (o trecho trocado, o cliente do Vite instalado ainda tem o trecho, o ajudante recarrega só se o id mudou)
 apps/web/index.html — página do Vite (título APRNDR)
 apps/web/src/main.tsx — carrega os estilos (tokens.css e componentes.css do design system, estilo.css do @estudos/ui, estilo.css do app) e monta o App no #raiz
 apps/web/src/estilo.css — estilo do app por cima do design system: altura da página e a trava dela (html, body e #raiz sem rolagem nem elástico do overscroll; só rolam as áreas internas), cards da tela de perfis, tela de carregamento e o layout da janela do perfil

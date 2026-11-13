@@ -38,7 +38,7 @@ Este documento descreve a parte A. As partes B e C acrescentam as suas seções.
 - `etapa`: a primeira etapa ainda não confirmada (`basico`, `materiais`, `objetivo`, `mapa`, `diagnostico`, `esqueleto`), onde o guia reabre. Com todas confirmadas, `esqueleto`.
 - Cada etapa confirmada guarda o que foi escolhido nela; uma etapa não confirmada é `null` (ou ausente).
   - `basico`: `prazo` (AAAA-MM-DD, ou null = sem prazo), `prova` (o nome da prova da matéria escolhida, se veio de uma) e `horasPorSemana` (número de 1 a 60).
-  - `materiais`: os arquivos de `materias/<id>/materiais` que estavam prontos ao confirmar, com o hash do manifesto do `.extraido` (a foto que serve para saber se os materiais mudaram depois). Pular a etapa confirma com a lista do momento (pode ser vazia).
+  - `materiais`: os arquivos de `materias/<id>/materiais` que entram no curso: os que estavam prontos ao confirmar, menos os que o Breno desmarcou, com o hash do manifesto do `.extraido` (a foto que serve para saber se os materiais mudaram depois). Os desmarcados ficam em `excluidos` (só os caminhos, em ordem de caminho; o campo só existe quando há algum, e os cursos de antes não o têm). Um material pronto que não está em `arquivos` nem em `excluidos` chegou depois da confirmação. Pular a etapa confirma com todos os prontos do momento (a lista pode ser vazia, e desmarcar todos dá o mesmo).
   - `objetivo`: `escopo` (`so_material`, `material_base` ou `livre`), `tipo` (`teorico`, `aplicado` ou `misto`) e `motivo` (texto livre, pode ser vazio). `so_material` exige pelo menos um arquivo em `materiais`.
   - `mapa`: os ids dos conceitos do mapa da matéria que entram no curso, na ordem do mapa. Só conceitos de dentro do mapa (não `fora`); pelo menos um. Para confirmar, o mapa da matéria precisa estar `aprovado`.
   - `diagnostico` e `esqueleto`: partes B e C.
@@ -50,14 +50,26 @@ O guia só anda para a frente confirmando: "Continuar" grava a etapa e passa `et
 | etapa mudada | invalida |
 |---|---|
 | `basico` | `esqueleto` (o prazo e as horas mudam o calendário) |
-| `materiais` | `mapa`, `diagnostico`, `esqueleto` (e `objetivo` se a lista ficou vazia e o escopo confirmado é `so_material`) |
+| `materiais` | `mapa`, `diagnostico`, `esqueleto` (e `objetivo` se a lista ficou vazia e o escopo confirmado é `so_material`); marcar ou desmarcar um material já é mudar a etapa |
 | `objetivo` | `diagnostico`, `esqueleto` (e `mapa` se o escopo mudou de ou para `livre`) |
 | `mapa` | `diagnostico`, `esqueleto` |
 | `diagnostico` | `esqueleto` |
 
 Confirmar com exatamente o mesmo conteúdo não invalida nada. Uma função pura diz o que uma confirmação invalidaria, para a tela avisar antes ("Isto descarta o Mapa e o Diagnóstico. Continuar?").
 
-O que muda fora do guia não invalida sozinho: se os materiais prontos da matéria ou o mapa mudaram depois da confirmação, o guia mostra um aviso na etapa e você decide confirmar de novo.
+O que muda fora do guia não invalida sozinho: se os materiais prontos da matéria ou o mapa mudaram depois da confirmação, o guia mostra um aviso na etapa e você decide confirmar de novo. Para os materiais, mudar é: um material do curso que saiu ou mudou de hash, ou um pronto novo que não está em `arquivos` nem em `excluidos` (`materiaisMudaram`); um material desmarcado que mudou ou saiu não conta.
+
+### Escolher os materiais do curso
+
+Os materiais são da matéria, mas cada curso escolhe quais usa (2026-11-13, pedido do Breno: o curso vinha com todos, sem como tirar algum). Na etapa Materiais, cada material pronto tem uma marcação, todos marcados de saída; um que ainda está na fila ou processando não tem marcação (guarda o lugar dela) e entra marcado quando ficar pronto. A linha acima da lista diz "N materiais neste curso", "N de M materiais neste curso" ou, com nenhum, "Nenhum material neste curso." (com o primário "Continuar sem material"; o escopo "Só o material" fica indisponível no Objetivo, como com a lista vazia). A linha existe sempre, vazia ou não, para a lista não pular.
+
+Da tela para a extensão vai só o que ele tirou: `confirmar` da etapa Materiais leva `dados: {excluidos: [caminho, …]}` (sem o campo, nenhum). A extensão monta a lista com os prontos do disco menos esses (`escolherMateriais`, em `lib/curso-tipos.ts`); um caminho que não está pronto no disco sai de `excluidos`. A foto (hash) continua sendo a do disco, nunca a que a tela mandou.
+
+O que vale para as etapas seguintes:
+- Objetivo: `so_material` exige pelo menos um arquivo em `materiais.arquivos` (já valia), e o escopo padrão sem arquivos é `livre`;
+- Mapa: a etapa decide só os conceitos do mapa da matéria (o mapa continua um só, feito de todos os materiais da matéria); um conceito que só vem de material desmarcado continua no mapa, e o aviso de conceitos fora do mapa não muda;
+- Diagnóstico e módulos: os trechos do `.extraido` que vão para o modelo, os locais dos conceitos e os materiais usados saem só dos materiais que não estão em `excluidos` (as referências do mapa são da matéria toda; `materiaisExcluidos` filtra). Sem nenhum desmarcado, nada muda em relação a antes;
+- `ler_curso` (professor) diz quais materiais ele tirou do curso.
 
 ## Eventos (no eventos.jsonl da matéria)
 
@@ -74,7 +86,7 @@ Tela → extensão (`interface:acao`, painel `cursos`):
 - `listar {materia}`
 - `abrir {materia, curso}`
 - `comecar {materia, pedido, basico: {nome, prazo, prova?, horasPorSemana}}`: cria o rascunho com Básico já confirmado
-- `confirmar {materia, curso, pedido, etapa, dados}`: `dados` é o conteúdo da etapa; para `basico`, inclui `nome` (o nome do curso pode mudar; o id não muda)
+- `confirmar {materia, curso, pedido, etapa, dados}`: `dados` é o conteúdo da etapa; para `basico`, inclui `nome` (o nome do curso pode mudar; o id não muda); para `materiais`, só `{excluidos?: string[]}` (os desmarcados; a lista de arquivos é a do disco)
 - `descartar {materia, curso, pedido}`
 - `prontos {materia, curso}`: manda de novo o curso com os materiais prontos de agora; a tela pede quando muda quantos materiais prontos a matéria tem
 

@@ -17,6 +17,10 @@ export const PORTA_SERVIDOR = 7431;
 export const URL_APP = `http://localhost:${PORTA_WEB}`;
 export const URL_SAUDE = `http://localhost:${PORTA_SERVIDOR}/api/saude`;
 
+/** A janela própria do app (Electron, apps/desktop) e o executável que o pnpm instalou para ela. */
+export const PASTA_DESKTOP = join(RAIZ, "apps", "desktop");
+export const CAMINHO_ELECTRON = join(PASTA_DESKTOP, "node_modules", "electron", "dist", "electron.exe");
+
 /** %LOCALAPPDATA%\estudos-app, a mesma pasta local do servidor (fora da pasta de dados). */
 export const PASTA_APP = join(process.env.LOCALAPPDATA ?? join(homedir(), "AppData", "Local"), "estudos-app");
 export const PASTA_LOGS = join(PASTA_APP, "logs");

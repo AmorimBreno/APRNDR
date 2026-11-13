@@ -3,12 +3,19 @@
 // posição ainda cabe nas telas); quem lê e grava o arquivo é o main.mjs.
 
 export const LARGURA_PADRAO = 1400;
-export const ALTURA_PADRAO = 900;
+export const ALTURA_PADRAO = 820;
 export const LARGURA_MINIMA = 900;
 export const ALTURA_MINIMA = 600;
 
 /** Quanto da janela precisa aparecer numa tela para dar para pegá-la e arrastá-la. */
 const VISIVEL_MINIMO = { largura: 160, altura: 48 };
+
+/**
+ * Folga que a janela sem posição guardada deixa em volta, na primeira tela: uma janela do
+ * tamanho exato da área útil seria tomada por maximizada (isMaximized() no Windows, em janelas
+ * sem moldura) e abriria maximizada nas vezes seguintes.
+ */
+const FOLGA_PRIMEIRA_ABERTURA = 40;
 
 /**
  * @typedef {{ x: number, y: number, width: number, height: number }} Retangulo
@@ -57,7 +64,14 @@ function sobreposicao(a, b) {
  * @returns {EstadoJanela}
  */
 export function ajustarAsTelas(estado, areas) {
-	if (areas.length === 0 || estado.x === undefined || estado.y === undefined) return estado;
+	if (areas.length === 0) return estado;
+	if (estado.x === undefined || estado.y === undefined) {
+		// Primeira abertura (ou posição descartada): o tamanho cabe na primeira tela, com folga.
+		const [primeira] = areas;
+		const width = Math.min(estado.width, primeira.width - FOLGA_PRIMEIRA_ABERTURA);
+		const height = Math.min(estado.height, primeira.height - FOLGA_PRIMEIRA_ABERTURA);
+		return width === estado.width && height === estado.height ? estado : { ...estado, width, height };
+	}
 	const janela = { x: estado.x, y: estado.y, width: estado.width, height: estado.height };
 	const aparece = areas.some((area) => {
 		const { largura, altura } = sobreposicao(janela, area);
@@ -65,9 +79,5 @@ export function ajustarAsTelas(estado, areas) {
 	});
 	if (aparece) return estado;
 	const [primeira] = areas;
-	return {
-		width: Math.min(estado.width, primeira.width),
-		height: Math.min(estado.height, primeira.height),
-		maximizada: estado.maximizada,
-	};
+	return ajustarAsTelas({ width: estado.width, height: estado.height, maximizada: estado.maximizada }, areas);
 }

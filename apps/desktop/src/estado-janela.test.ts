@@ -42,9 +42,9 @@ describe("ajustarAsTelas", () => {
 		expect(ajustarAsTelas(estado, [...telas, { x: -1920, y: 0, width: 1920, height: 1040 }])).toBe(estado);
 	});
 
-	it("descarta a posição de um monitor que sumiu e limita o tamanho à primeira tela", () => {
+	it("descarta a posição de um monitor que sumiu e limita o tamanho à primeira tela, com folga", () => {
 		const estado = { x: 3000, y: 100, width: 2400, height: 1300, maximizada: true };
-		expect(ajustarAsTelas(estado, telas)).toEqual({ width: 1920, height: 1040, maximizada: true });
+		expect(ajustarAsTelas(estado, telas)).toEqual({ width: 1880, height: 1000, maximizada: true });
 	});
 
 	it("uma janela que só roça a borda da tela não conta como visível", () => {
@@ -52,8 +52,13 @@ describe("ajustarAsTelas", () => {
 		expect(ajustarAsTelas(estado, telas)).not.toHaveProperty("x");
 	});
 
-	it("sem posição guardada, não mexe", () => {
-		const estado = { width: 1400, height: 900, maximizada: false };
+	it("sem posição guardada e cabendo com folga, não mexe", () => {
+		const estado = { width: 1400, height: 820, maximizada: false };
 		expect(ajustarAsTelas(estado, telas)).toBe(estado);
+	});
+
+	it("sem posição guardada, nunca abre do tamanho exato da área útil (seria tomada por maximizada)", () => {
+		const estado = { width: 1400, height: 900, maximizada: false };
+		expect(ajustarAsTelas(estado, [{ x: 0, y: 0, width: 1536, height: 864 }])).toEqual({ width: 1400, height: 824, maximizada: false });
 	});
 });

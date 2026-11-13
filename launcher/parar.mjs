@@ -1,7 +1,8 @@
 // Encerra o app que o lançador subiu. Chamado pelo parar.vbs (atalho "Parar
 // Estudos") ou direto: node launcher\parar.mjs.
 //
-// Duas etapas:
+// Três etapas:
+// 0. A janela própria do app (Electron, apps/desktop), se estiver aberta.
 // 1. A árvore do pnpm dev: o iniciar.mjs grava o PID do cmd raiz em
 //    %LOCALAPPDATA%\estudos-app\lancador.pid.json. Antes de matar, confere que
 //    o PID ainda é aquele cmd do pnpm dev (o Windows reaproveita PIDs) e então
@@ -66,9 +67,40 @@ function topoDoApp(pid, todos) {
 	}
 }
 
+/**
+ * Fecha a janela própria do app (o electron.exe principal, o único sem --type= na
+ * linha de comando, desta pasta do repositório). Primeiro o pedido de fechamento
+ * normal, para a janela guardar tamanho e posição; se ela não sair em 3 s, à força.
+ */
+function fecharJanela() {
+	const processos = [...listarProcessos().values()].filter(
+		(p) => p.nome?.toLowerCase() === "electron.exe" && eDoRepositorio(p.comando) && !/--type=/.test(p.comando ?? ""),
+	);
+	if (processos.length === 0) {
+		registrar("nenhuma janela própria aberta.");
+		return;
+	}
+	for (const { pid } of processos) {
+		// Sem /T: só a janela principal recebe o pedido de fechamento (os filhos do Electron
+		// não têm janela e o taskkill se recusa a fechá-los sem /F); ao sair, ela leva os filhos.
+		registrar(`taskkill /PID ${pid} (janela própria; pedido de fechamento)`);
+		try {
+			execFileSync("taskkill.exe", ["/PID", String(pid)], { encoding: "utf8", windowsHide: true, stdio: "pipe" });
+		} catch (erro) {
+			registrar(`taskkill terminou com aviso: ${(erro.stdout || erro.stderr || erro.message).toString().trim()}`);
+		}
+	}
+	const limite = Date.now() + 3000;
+	while (Date.now() < limite && processos.some((p) => processoVivo(p.pid))) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 200);
+	for (const { pid } of processos) if (processoVivo(pid)) matarArvore(pid, "janela própria não fechou sozinha");
+}
+
 function principal() {
 	registrar("parar: início.");
 	let matouAlgo = false;
+
+	// 0. A janela primeiro, para ela não ficar mostrando "Reconectando…" com o servidor parado.
+	fecharJanela();
 
 	// 1. Árvore do pnpm dev gravada pelo lançador.
 	if (existsSync(ARQUIVO_PID)) {

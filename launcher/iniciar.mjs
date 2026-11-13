@@ -1,7 +1,8 @@
 // Lançador do app, chamado pelo iniciar.vbs (o atalho "Estudos" da área de
 // trabalho). Confere se o app já está no ar; se não, sobe o `pnpm dev` em
-// segundo plano, sem janela; espera a saúde responder; e abre o Edge em modo
-// app. Registra tudo em %LOCALAPPDATA%\estudos-app\logs\lancador-AAAA-MM-DD.log.
+// segundo plano, sem janela; espera a saúde responder; e abre a janela própria
+// do app (Electron, apps/desktop). Se o Electron não estiver instalado, abre o
+// Edge em modo app, como antes. Registra tudo em %LOCALAPPDATA%\estudos-app\logs\lancador-AAAA-MM-DD.log.
 //
 // Uso: node launcher\iniciar.mjs (ou wscript launcher\iniciar.vbs, sem janela).
 // Variáveis de ambiente opcionais:
@@ -27,7 +28,9 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { join } from "node:path";
 import {
 	ARQUIVO_PID,
+	CAMINHO_ELECTRON,
 	PASTA_APP,
+	PASTA_DESKTOP,
 	PASTA_LOGS,
 	RAIZ,
 	URL_APP,
@@ -107,14 +110,25 @@ function acharNavegador() {
 }
 
 /**
- * Abre o app. detached é obrigatório aqui: sem ele, o navegador entraria no job
- * do node e seria fechado quando este lançador saísse.
+ * Abre o app. detached é obrigatório aqui: sem ele, a janela entraria no job do
+ * node e seria fechada quando este lançador saísse. Com o app já aberto, o
+ * segundo Electron só avisa o primeiro (instância única) e sai: a janela que já
+ * existe vem para a frente, sem recarregar.
  */
 function abrirNavegador() {
 	if (process.env.ESTUDOS_SEM_NAVEGADOR === "1") {
 		registrar("ESTUDOS_SEM_NAVEGADOR=1: navegador não aberto.");
 		return;
 	}
+	if (existsSync(CAMINHO_ELECTRON)) {
+		registrar(`abrindo a janela própria (${CAMINHO_ELECTRON})`);
+		// ELECTRON_RUN_AS_NODE (herdado de um terminal de outro app Electron) faria o
+		// electron.exe rodar como Node puro, sem janela.
+		const { ELECTRON_RUN_AS_NODE: _, ...ambiente } = process.env;
+		spawn(CAMINHO_ELECTRON, [PASTA_DESKTOP], { detached: true, stdio: "ignore", env: ambiente }).unref();
+		return;
+	}
+	registrar("Electron não encontrado (rode pnpm install e, se faltar o binário, node apps/desktop/node_modules/electron/install.js); usando o Edge em modo app.");
 	const navegador = acharNavegador();
 	if (navegador) {
 		registrar(`abrindo ${navegador} --app=${URL_APP}`);

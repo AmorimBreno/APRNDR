@@ -35,7 +35,7 @@ Front: React com Vite.
 
 Comunicação entre front e servidor: WebSocket para eventos em tempo real (texto chegando, ferramenta chamada, ação de interface) e HTTP para operações simples.
 
-Atalho único: um atalho na área de trabalho aponta para um lançador que roda sem janela de terminal. O lançador verifica se o servidor já está rodando; se não estiver, inicia em segundo plano; espera o servidor responder num endpoint de saúde; e abre o Edge ou o Chrome em modo app (--app=http://localhost:PORTA), que parece um programa de desktop. Enquanto as sessões do pi carregam, a interface mostra uma tela de carregamento.
+Atalho único: um atalho na área de trabalho aponta para um lançador que roda sem janela de terminal. O lançador verifica se o servidor já está rodando; se não estiver, inicia em segundo plano; espera o servidor responder num endpoint de saúde; e abre a janela própria do app (Electron, apps/desktop, decisão 13.20), que carrega http://localhost:PORTA; sem o Electron instalado, abre o Edge ou o Chrome em modo app (--app=http://localhost:PORTA). Enquanto as sessões do pi carregam, a interface mostra uma tela de carregamento.
 
 Edição ao vivo: o front atualiza na hora pelo Vite. O servidor reinicia sozinho quando o código dele muda (tsx watch ou equivalente). Os perfis, extensões e skills são observados por um watcher de arquivos, e quando mudam, a sessão daquele perfil é recriada. Existe também um botão "recarregar perfil". Reiniciar o servidor interrompe uma resposta em andamento do agente, e isso é aceitável.
 
@@ -346,7 +346,7 @@ Fase 3, programação: não construir agora. Apenas garantir que nada na base im
 
 Tomadas ao montar o projeto num computador novo. Quando divergirem das seções anteriores, valem estas.
 
-13.1 Ambiente. Tudo roda no Windows nativo, sem WSL. O pi suporta Windows e usa o Git Bash para os comandos de shell. Como o app chama o pi pelo SDK, o tmux e o pi-interactive-subagents não são usados: o pesquisador e os desenhistas viram subagentes criados pelo próprio núcleo, como sessões filhas. O pi no terminal serve só para testar a configuração. O navegador do modo app e dos diagramas é o Edge.
+13.1 Ambiente. Tudo roda no Windows nativo, sem WSL. O pi suporta Windows e usa o Git Bash para os comandos de shell. Como o app chama o pi pelo SDK, o tmux e o pi-interactive-subagents não são usados: o pesquisador e os desenhistas viram subagentes criados pelo próprio núcleo, como sessões filhas. O pi no terminal serve só para testar a configuração. O navegador dos diagramas é o Edge; o app abre na janela própria do Electron (13.20).
 
 13.2 Pacote do pi. O nome atual é @earendil-works/pi-coding-agent, versão 1.2.0, fixada no packages/core.
 
@@ -418,3 +418,11 @@ Depois, anotado e fora da primeira entrega:
 Risco técnico. Hoje cada janela de perfil tem uma sessão só, e trocar de sessão zera as ações da ponte (TelaCaderno.tsx). Na mesa, a sessão é a conversa da matéria, e as abas da esquerda precisam pedir os dados de novo depois de cada troca (Nova, reabrir uma antiga).
 
 Reduzido em 2026-11-11 (o Breno: "é demais"). Do bloco "O professor e as notas" ficam só a criação de notas pelo professor (com a marca "do professor" na primeira linha, o link da conversa e o cartão com Abrir e Desfazer) e o "Guardar na nota" das respostas (já implementado). As sugestões nas notas do Breno e os atalhos do pé do chat saíram; nas notas do Breno o professor continua só lendo. O contrato está em docs/mesa-parte-d.md.
+
+13.20 Janela própria do app (2026-11-13, pedido do Breno). O app deixa de abrir numa aba do Edge em modo app (barra vermelha com o globo e o nome da página, sem como mudar) e passa a abrir numa janela própria, no estilo do VS Code e do Discord.
+
+Como. Um shell Electron mínimo, apps/desktop, que só abre uma janela carregando http://localhost:7430. O servidor, o Vite e o recarregamento ao vivo não mudam; o lançador continua subindo o pnpm dev e, depois que a saúde responde, abre o Electron no lugar do Edge (sem o Electron instalado, cai no Edge, como antes). A janela é sem moldura (titleBarStyle hidden com titleBarOverlay): o Windows desenha só os botões de minimizar, maximizar e fechar, e a barra de 32 px é do app (BarraDoApp, em apps/web, com a marca e a área de arrastar; só aparece quando o preload expõe window.estudosDesktop, então o navegador comum não muda). O ícone é o do professor (apps/desktop/assets).
+
+Comportamento. Instância única: abrir o atalho com o app aberto só traz a janela para a frente, sem recarregar. A janela abre já com o fundo certo e só aparece quando a página está pronta; tamanho, posição e maximizada ficam em %LOCALAPPDATA%\estudos-app\janela.json. Fechar a janela fecha só ela: o servidor segue no ar, como já era com o Edge; o "Parar Estudos" fecha a janela e depois o servidor. Se o front não responde (o Vite reiniciando), a janela mostra "Reconectando…" (só depois de 1 s) e volta sozinha. A janela só navega no front do app (links externos abrem no navegador padrão), com contextIsolation e sandbox, sem nodeIntegration e com todas as permissões negadas.
+
+Consequência. O perfil do Chromium do Electron (%LOCALAPPDATA%\estudos-app\electron) é outro que o do Edge: o que o front guarda no localStorage (por exemplo, os últimos blocos usados do menu "/") recomeça do zero. Nada disso é dado de estudo.

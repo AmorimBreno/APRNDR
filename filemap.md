@@ -45,6 +45,7 @@ docs/teste-etapa-5b.md — roteiro do item 5, parte B: o diagnóstico do guia de
 docs/teste-etapa-5c.md — roteiro do item 5, parte C: o esqueleto do guia de curso (Montar o esqueleto, os módulos, editar nome, objetivo, tipo e horas, o aviso das horas por semana, Mover para…, subir e descer, Módulo novo, apagar, Sair sem salvar?, F5, o calendário, Gerar de novo), Criar curso e a visão do curso, a lista com Pronto, Rever o guia, a linha do tempo, o curso.json e o professor com ler_curso; e o código, os vetores e as matrizes na conversa e nas questões em duas colunas
 docs/teste-etapa-6a.md — roteiro do item 6, parte A: o card do próximo módulo, o formulário Gerar módulo, gerar e acompanhar, Parar, fechar no meio e voltar, o card gerado e Gerar de novo, aguardando material e o aviso de material novo, material novo pelo formulário esperando o mapa, a linha do tempo, o m1.json e o professor com ler_modulo; e o Recalcular o calendário e o R$ na conversa
 docs/teste-etapa-6b.md — roteiro do item 6, parte B: o Abrir do card gerado, a aba do curso com a trilha e a Próxima lição, o índice das lições com o resumo, o aviso de visualização, o cabeçalho e os blocos com o rótulo pelo tipo e Além do material, código, fórmulas, vetores e R$, a régua, Ver resposta, Ver gabarito e Ver rubrica e resposta-modelo, as referências, Próxima e Lição anterior, o F5 numa lição, a trilha para outro módulo e as fichas na tela estreita
+docs/janela-propria.md — roteiro da janela própria do app (Electron): atalho e ícone, barra e botões do Windows, arrastar, encaixar, instância única, estado da janela, fechar e parar
 docs/teste-escrita.md — roteiro da escrita dos módulos: a tecla Escrita e o modal "Como o professor escreve" (vazio, regra nova, editar, a matéria, ligar e desligar, apagar), o link no índice do módulo, o Retorno no pé do bloco com Virar regra de escrita, Salvar e reescrever o bloco (Reescrevendo, Parar, Reescrito, a versão anterior e Versão 1 de 3), um módulo novo seguindo a regra, os arquivos e os eventos; e o código ao lado com o destaque
 docs/mesa-parte-d.md — contrato da parte D da mesa (notas do professor, escopo reduzido): a ferramenta criar_nota, a marca "do professor" na primeira linha com o link conversa:<id>, o cartão com Abrir e Desfazer (hash do arquivo), o clique no link da conversa, os eventos e os pacotes
 docs/teste-mesa-c.md — roteiro da parte C1 da mesa: o professor abrindo abas (prévia) e destacando trechos, Perguntar com citação, Ir ao trecho com o trecho mudado, Guardar na nota (nota aberta, lição com seletor, Nova nota, conflito, evento) e a conferência quadro a quadro
@@ -139,6 +140,15 @@ apps/server/src/observador.ts — watcher (fs.watch recursivo) de profiles/ (men
 apps/server/src/chaves.ts — lê OPENROUTER_API_KEY e TAVILY_API_KEY das variáveis de usuário do Windows quando faltam no processo
 apps/server/src/log.ts — log no console e em %LOCALAPPDATA%\estudos-app\logs\servidor-AAAA-MM-DD.log
 apps/server/src/servidor.test.ts — testes do servidor sem rede (rotas, mensagens com janela falsa, watcher, chaves)
+apps/desktop/ — @estudos/desktop: a janela própria do app (Electron). Sem script dev de propósito (o pnpm dev da raiz roda o dev de todo apps/*); o script é iniciar
+apps/desktop/package.json — electron com versão exata; main src/main.mjs
+apps/desktop/tsconfig.json — checkJs nos .mjs (noImplicitAny desligado)
+apps/desktop/src/main.mjs — processo principal: janela sem moldura (titleBarOverlay), instância única, estado da janela, tela "Reconectando…", navegação presa ao front, permissões negadas, atalhos (F5, Ctrl+R, F12, zoom), ESTUDOS_URL e ESTUDOS_CAPTURA
+apps/desktop/src/preload.cjs — expõe window.estudosDesktop (plataforma e altura da barra) ao front
+apps/desktop/src/estado-janela.mjs — lógica pura do janela.json: ler o arquivo e ajustar a posição às telas
+apps/desktop/src/estado-janela.test.ts — testes do estado da janela
+apps/desktop/src/reconectando.html — tela local enquanto o front não responde (o texto só aparece depois de 1 s)
+apps/desktop/assets/icone.ico — ícone do app (o professor, recortado de profiles/estudos/avatares/professor.png); icone.png é a mesma imagem em 512 px
 apps/web/ — @estudos/web: Vite + React na porta 7430, com proxy de /api e /ws para a 7431
 apps/web/vite.config.ts — porta e proxy do Vite
 apps/web/index.html — página do Vite (título APRNDR)
@@ -150,6 +160,9 @@ apps/web/src/telas/TelaCarregando.tsx — tela enquanto a sessão do perfil é m
 apps/web/src/telas/JanelaPerfil.tsx — janela do perfil: barra tijolo (Perfis, SeletorAgente, SeletorModelo, custo, recarregar, painéis), histórico, conversa como documento com os botões dos pedidos e a barra de pergunta, modal do pedido (abre sozinho, minimiza, revisa), avisos, erros, diagnósticos e área de painéis (abre sozinha quando um painel dela recebe algo)
 apps/web/src/telas/PainelConversa.tsx — o painel da conversa em dois modos: "cheio" (a coluna do meio da JanelaPerfil) e "embutido" (a mesa de estudo; hidden e inert quando fechado): documento, barra de pergunta com citação, modal dos pedidos com o voo, avisos, erros e diagnósticos Repassa `rodapeDaResposta` e `acoesDoBloco` (PropsConversaEmbutida) ao DocumentoConversa só no modo "embutido"; a tela cheia nunca recebe.
 apps/web/src/App.tsx — rotas por hash: #/ = perfis, #/perfil/<id> = tela inicial do perfil (se houver) ou conversa, #/perfil/<id>/conversa = conversa de perfil com tela inicial; as telas de um perfil ficam dentro do ProvedorImagens dele
+apps/web/src/BarraDoApp.tsx — a barra de título de 32 px (marca e área de arrastar) e a CascaDoApp, que só na janela própria empilha a barra e o conteúdo
+apps/web/src/desktop.ts — lê window.estudosDesktop (do preload do Electron) e liga --barra-app-janela; no navegador comum não há ambiente
+apps/web/src/desktop.test.ts — teste da leitura do ambiente da janela própria
 apps/web/src/App.test.ts — teste da leitura do hash
 apps/web/src/telas-iniciais.ts — registro das telas iniciais dos perfis (estudos = cadernos)
 apps/web/src/paineis.ts — registro de painéis do front: os do núcleo (pergunta), os do perfil de estudos (quiz) e o teste (PainelGenerico, com resumo do pedido); ids sem componente também usam o genérico
@@ -495,8 +508,8 @@ scripts/testar-reescrita.ts — verificação da reescrita de um bloco com uma c
 scripts/prova-cega/prova-cega.mjs — compara modelos de professor às cegas; grava em <dados>/comparacao
 
 launcher/iniciar.vbs — alvo do atalho "Estudos": roda o iniciar.mjs sem janela (avisa se faltar o node)
-launcher/iniciar.mjs — lançador: confere a saúde, sobe o pnpm dev escondido (Start-Process -WindowStyle Hidden), espera e abre o Edge --app; log lancador-*.log, saída dev-*.log, PID em %LOCALAPPDATA%\estudos-app\lancador.pid.json
+launcher/iniciar.mjs — lançador: confere a saúde, sobe o pnpm dev escondido (Start-Process -WindowStyle Hidden), espera e abre a janela do Electron (ou o Edge --app, se o Electron não estiver instalado); log lancador-*.log, saída dev-*.log, PID em %LOCALAPPDATA%\estudos-app\lancador.pid.json
 launcher/parar.vbs — alvo do atalho "Parar Estudos": roda o parar.mjs sem janela
-launcher/parar.mjs — encerra a árvore do pnpm dev gravada e os node do app nas portas 7430/7431; nunca toca em outros processos
+launcher/parar.mjs — fecha a janela própria (pedido de fechamento; à força só depois de 3 s), encerra a árvore do pnpm dev gravada e os node do app nas portas 7430/7431; nunca toca em outros processos
 launcher/comum.mjs — caminhos, portas, log, PowerShell e avisos comuns ao lançador
-scripts/criar-atalho.ps1 — cria os atalhos "Estudos" e "Parar Estudos" na área de trabalho (rodar com -ExecutionPolicy Bypass)
+scripts/criar-atalho.ps1 — cria os atalhos "Estudos" e "Parar Estudos" na área de trabalho (rodar com -ExecutionPolicy Bypass), com o ícone do professor

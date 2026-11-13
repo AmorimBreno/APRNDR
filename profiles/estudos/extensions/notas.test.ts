@@ -159,6 +159,39 @@ describe("ponte das notas", () => {
 		expect(recebidas("renomeada")[0]!.dados).toEqual({ materia, de: "Limites", para: "Limites laterais", mencoesAtualizadas: [] });
 		expect((recebidas("lista")[0]!.dados as { notas: Array<{ titulo: string }> }).notas.map((nota) => nota.titulo)).toEqual(["Limites laterais"]);
 	});
+
+	it("apaga para a lixeira, devolve o pedido, manda a lista sem a nota e grava apagou_nota", async () => {
+		await criarNota(dados, materia, "Limites");
+		await criarNota(dados, materia, "Derivadas");
+		acao("apagar", { titulo: "Limites", versao: versaoDe(""), pedido: "a1" });
+		await esperar(() => recebidas("lista").length > 0);
+		expect(recebidas("apagada")[0]!.dados).toEqual({ materia, titulo: "Limites", pedido: "a1" });
+		expect((recebidas("lista")[0]!.dados as { notas: Array<{ titulo: string }> }).notas.map((nota) => nota.titulo)).toEqual(["Derivadas"]);
+		expect(existsSync(arquivoNota(dados, materia, "Limites"))).toBe(false);
+		expect(recebidas("apagada")[0]).toMatchObject({ gravar: false });
+		expect(await verbos()).toContain("apagou_nota");
+	});
+
+	it("não apaga a nota que mudou fora do app: erro do apagar com o pedido, e o arquivo fica", async () => {
+		await criarNota(dados, materia, "Limites");
+		await writeFile(arquivoNota(dados, materia, "Limites"), "de fora\n", "utf8");
+		acao("apagar", { titulo: "Limites", versao: versaoDe(""), pedido: "a2" });
+		await esperar(() => recebidas("erro").length > 0);
+		expect(recebidas("erro")[0]!.dados).toMatchObject({ ao: "apagar", materia, titulo: "Limites", pedido: "a2", mensagem: expect.stringContaining("Nada foi apagado") });
+		expect(await readFile(arquivoNota(dados, materia, "Limites"), "utf8")).toBe("de fora\n");
+		expect(recebidas("apagada")).toHaveLength(0);
+	});
+
+	it("um salvamento antes do apagar entra na lixeira e um salvamento depois dele conflita em vez de recriar a nota", async () => {
+		await criarNota(dados, materia, "Limites");
+		acao("salvar", { titulo: "Limites", conteudo: "texto", versao: versaoDe(""), edicao: "e1", pedido: "p1" });
+		acao("apagar", { titulo: "Limites", versao: versaoDe("texto\n"), pedido: "a3" });
+		acao("salvar", { titulo: "Limites", conteudo: "tarde demais", versao: versaoDe("texto\n"), edicao: "e1", pedido: "p2" });
+		await esperar(() => recebidas("conflito").length > 0);
+		expect(recebidas("apagada")).toHaveLength(1);
+		expect(recebidas("conflito")[0]!.dados).toMatchObject({ pedido: "p2" });
+		expect(existsSync(arquivoNota(dados, materia, "Limites"))).toBe(false);
+	});
 });
 
 describe("guardar na nota (mesa, parte C1)", () => {

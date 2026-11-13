@@ -7,12 +7,14 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { lerEventos } from "./eventos.ts";
 import { criarMateria, ErroMaterias, eventosMateria } from "./materias.ts";
 import {
+	apagarNota,
 	arquivoNota,
 	conferirTitulo,
 	criarNota,
 	ErroConflito,
 	lerNota,
 	listarNotas,
+	pastaLixeira,
 	pastaNotas,
 	previaDaNota,
 	renomearNota,
@@ -171,6 +173,36 @@ describe("notas", () => {
 		await criarNota(dados, materia, "B");
 		await expect(renomearNota(dados, materia, "A", "b")).rejects.toThrow("Já existe");
 		await expect(renomearNota(dados, materia, "C", "D")).rejects.toThrow("Não achei");
+	});
+
+	it("apaga a nota para a lixeira, grava apagou_nota e a lista não a mostra mais", async () => {
+		await criarNota(dados, materia, "Limites");
+		const aberta = await criarNota(dados, materia, "Derivadas");
+		await salvarNota(dados, materia, "Derivadas", "texto que não pode se perder", { versao: aberta.versao });
+		const versao = (await lerNota(dados, materia, "Derivadas")).versao;
+		const { titulo, lixeira } = await apagarNota(dados, materia, "derivadas", { versao, sessao: "s3" });
+		expect(titulo).toBe("Derivadas");
+		expect(await readdir(pastaNotas(dados, materia))).toContain(".lixeira");
+		expect((await listarNotas(dados, materia)).notas.map((nota) => nota.titulo)).toEqual(["Limites"]);
+		expect(await readFile(join(pastaLixeira(dados, materia), lixeira), "utf8")).toBe("texto que não pode se perder\n");
+		const { eventos } = await lerEventos(eventosMateria(dados, materia));
+		expect(eventos.at(-1)).toMatchObject({ sessao: "s3", verbo: "apagou_nota", objeto: { materia, nota: "Derivadas" }, resultado: { lixeira } });
+		// Pode criar uma nota nova com o mesmo título, e apagar duas vezes não se atropela.
+		await criarNota(dados, materia, "Derivadas");
+		const nova = await lerNota(dados, materia, "Derivadas");
+		await apagarNota(dados, materia, "Derivadas", { versao: nova.versao });
+		expect(await readdir(pastaLixeira(dados, materia))).toHaveLength(2);
+	});
+
+	it("não apaga a nota que mudou fora do app, nem sem a versão, nem a que não existe", async () => {
+		const nota = await criarNota(dados, materia, "Limites");
+		await writeFile(arquivoNota(dados, materia, "Limites"), "mudei no Explorador\n", "utf8");
+		const erro = await apagarNota(dados, materia, "Limites", { versao: nota.versao }).catch((falha: unknown) => falha);
+		expect(erro).toBeInstanceOf(ErroConflito);
+		expect(await apagarNota(dados, materia, "Limites").catch((falha: unknown) => falha)).toBeInstanceOf(ErroConflito);
+		expect(await readFile(arquivoNota(dados, materia, "Limites"), "utf8")).toBe("mudei no Explorador\n");
+		expect(await verbos()).not.toContain("apagou_nota");
+		await expect(apagarNota(dados, materia, "Outra", { versao: nota.versao })).rejects.toThrow("Não achei");
 	});
 
 	it("a lista ignora arquivos escondidos e que não são .md, e põe a mais recente primeiro", async () => {

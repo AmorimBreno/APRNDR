@@ -235,6 +235,9 @@
 .editor-nota__voltar:hover { color: var(--amber); }
 .editor-nota__voltar:focus-visible { outline: none; border-radius: 2px; box-shadow: var(--focus-ring); }
 .editor-nota__situacao { color: var(--ink-muted); white-space: nowrap; }
+.editor-nota__acoes { display: flex; align-items: center; gap: var(--space-4); }
+/* A linha do erro do Apagar fica reservada, para o modal não crescer quando a recusa aparece. */
+.editor-nota__erro-apagar { min-height: 20px; margin: var(--space-3) 0 0; color: var(--brick-text); }
 .editor-nota__corpo { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-8) var(--space-4) 30vh; }
 .editor-nota__pagina { position: relative; display: flex; flex-direction: column; gap: var(--space-4); box-sizing: content-box; max-width: var(--largura-leitura-estudos); margin: 0 auto; padding: 0 var(--space-6) 0 56px; }
 /* Enquanto a nota carrega e os blocos especiais ainda não foram desenhados, a página fica escondida (ocupando o espaço). */

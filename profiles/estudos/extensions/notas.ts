@@ -37,7 +37,7 @@ import { ErroMaterias, eventosMateria } from "../lib/materias.ts";
 import { PAINEL_MESA } from "../lib/mesa-tipos.ts";
 import { arquivoContinuaIgual, hashDoArquivo, LIMITE_NOTA_DO_PROFESSOR, montarNotaDoProfessor } from "../lib/nota-do-professor.ts";
 import { conferirTitulo, temHtmlDesconhecido } from "../lib/nota-tipos.ts";
-import { arquivoNota, criarNota, ErroConflito, garantirMateria, lerNota, listarNotas, renomearNota, salvarNota, versaoDe } from "../lib/notas.ts";
+import { apagarNota, arquivoNota, criarNota, ErroConflito, garantirMateria, lerNota, listarNotas, renomearNota, salvarNota, versaoDe } from "../lib/notas.ts";
 
 const PAINEL = "notas";
 
@@ -271,6 +271,20 @@ export default function notas(pi: ExtensionAPI) {
 					void mostrarLista(dados, materia);
 				} catch (erro) {
 					mostrar("erro", { mensagem: mensagemDe(erro, "renomear"), ao: "renomear", materia, titulo: de });
+				}
+			});
+		} else if (acao === "apagar" && typeof dadosAcao.titulo === "string") {
+			// O botão Apagar do editor (as notas do Breno): vai para notas/.lixeira, na fila da nota, com a versão que a tela abriu.
+			const { titulo, pedido, versao } = dadosAcao;
+			naFila(`${materia}/${titulo.toLowerCase()}`, async () => {
+				try {
+					const apagada = await apagarNota(dados, materia, titulo, { ...(typeof versao === "string" ? { versao } : {}), ...daSessao });
+					mostrar("apagada", { materia, titulo: apagada.titulo, ...(pedido ? { pedido } : {}) });
+					// Sem esperar: a lista espera a fila, e esta tarefa ainda está nela.
+					void mostrarLista(dados, materia);
+				} catch (erro) {
+					const mensagem = erro instanceof ErroConflito ? `${erro.message} Nada foi apagado.` : mensagemDe(erro, "apagar");
+					mostrar("erro", { mensagem, ao: "apagar", materia, titulo, ...(pedido ? { pedido } : {}) });
 				}
 			});
 		} else if (acao === "desfazer_nota" && typeof dadosAcao.titulo === "string") {

@@ -167,6 +167,8 @@ export function descreverEvento(evento: Evento): { icone: IconName; texto: strin
 			return { icone: "file", texto: `Nota criada pelo professor: ${tituloDaNota(evento)}` };
 		case "desfez_nota_do_professor":
 			return { icone: "close", texto: `Nota do professor desfeita: ${tituloDaNota(evento)}` };
+		case "apagou_nota":
+			return { icone: "close", texto: `Nota apagada: ${nota}`, detalhe: "o arquivo está em notas/.lixeira" };
 		case "renomeou_nota":
 			return {
 				icone: "refresh",

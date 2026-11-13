@@ -20,6 +20,8 @@ export type VerboEvento =
 	| "criou_nota"
 	| "renomeou_nota"
 	| "editou_nota"
+	// O Breno apagou uma nota pelo botão Apagar do editor: o arquivo foi para notas/.lixeira/ (objeto: { materia, nota }, resultado: { lixeira }).
+	| "apagou_nota"
 	// Mesa de estudo, parte C1 (docs/mesa-parte-c.md, seção 5): o Breno clicou em "Guardar na nota"
 	// num bloco da resposta do professor. objeto: { materia, titulo, sessao, tamanho }.
 	| "guardou_na_nota"

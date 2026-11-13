@@ -28,6 +28,7 @@ import { AcoesDePergunta, BarraSelecao, useSelecaoDoDocumento } from "./BarraSel
 import { EditorFormula } from "./EditorFormula.tsx";
 import { idDoLinkDeConversa } from "./conversa-link.ts";
 import { useMesa } from "./mesa-ir.ts";
+import { RotuloEstado } from "./RotuloEstado.tsx";
 import { type ArquivoMencionavel, META_TITULOS, materialDoAlvo } from "./mencao.ts";
 import { PROIBIDOS_PADRAO, trechoDaBarra } from "./selecao.ts";
 import { useTrocaSessao } from "./troca-sessao.tsx";
@@ -42,6 +43,8 @@ const ESPERA_SALVAR = 1500;
 const PROIBIDOS_NOTA = PROIBIDOS_PADRAO.replace("[contenteditable=true],", "");
 /** Quanto a troca de sessão espera o salvamento terminar. */
 const PRAZO_ANTES_DE_TROCAR = 5000;
+/** Quanto o Apagar espera a resposta da extensão antes de soltar o modal. */
+const PRAZO_APAGAR = 15_000;
 const hora = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" });
 
 type Situacao =
@@ -224,6 +227,23 @@ function EditorDaNota(props: PropsEditorNota & { rotuloInicial?: string | undefi
 	arquivosAgora.current = props.arquivos;
 	/** A menção clicada para uma nota que não existe: o modal oferece criar. */
 	const [criarMencao, setCriarMencao] = useState<{ alvo: string; criando: boolean; erro?: string } | undefined>(undefined);
+	/** O botão Apagar do cabeçalho: o modal de confirmação, o pedido em andamento e o erro da recusa. */
+	const [confirmandoApagar, setConfirmandoApagar] = useState(false);
+	const [apagando, setApagando] = useState(false);
+	const [erroApagar, setErroApagar] = useState<string | undefined>(undefined);
+	/** O pedido `apagar` que espera resposta (a resposta da ponte traz o mesmo `pedido`). */
+	const apagarPedido = useRef<string | undefined>(undefined);
+	const prazoApagar = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+	/** A nota foi (ou está sendo) apagada: nada mais salva, nem ao sair, senão o salvamento recriaria o arquivo. */
+	const apagada = useRef(false);
+	const vivo = useRef(true);
+	useEffect(() => {
+		vivo.current = true;
+		return () => {
+			vivo.current = false;
+			clearTimeout(prazoApagar.current);
+		};
+	}, []);
 	/** A fórmula aberta no modal (EditorFormula). */
 	const [formula, setFormula] = useState<{ tipo: TipoFormula; posicao: number; latex: string; nova: boolean } | undefined>(undefined);
 
@@ -246,7 +266,7 @@ function EditorDaNota(props: PropsEditorNota & { rotuloInicial?: string | undefi
 
 	const salvarAgora = (forcar = false) => {
 		clearTimeout(temporizador.current);
-		if (!editor || base.current === undefined || somenteLeitura) return;
+		if (!editor || base.current === undefined || somenteLeitura || apagada.current) return;
 		if (emVoo.current || renomeando.current) {
 			pendente.current = true;
 			return;
@@ -293,6 +313,7 @@ function EditorDaNota(props: PropsEditorNota & { rotuloInicial?: string | undefi
 	const salvarEEsperar = async () => {
 		const prazo = Date.now() + PRAZO_ANTES_DE_TROCAR;
 		while (Date.now() < prazo) {
+			if (apagada.current) return;
 			if (!emVoo.current && !renomeando.current) {
 				if (!mudouDoSalvo() || emConflito.current || somenteLeitura) return;
 				salvarAgora();
@@ -316,6 +337,58 @@ function EditorDaNota(props: PropsEditorNota & { rotuloInicial?: string | undefi
 			if (existente) props.abrirNota(existente);
 			else if (props.titulos) setCriarMencao({ alvo, criando: false });
 		},
+	};
+
+	const mesa = useMesa();
+	const mesaAgora = useRef(mesa);
+	mesaAgora.current = mesa;
+	const invalidarCopia = useVendoOpcional()?.invalidarCopia;
+
+	/** A recusa (ou a falta de resposta) do Apagar: o modal fica aberto com a mensagem e tudo volta a salvar. */
+	const falhouApagar = (mensagem: string, esquecerPedido = true) => {
+		if (esquecerPedido) apagarPedido.current = undefined;
+		clearTimeout(prazoApagar.current);
+		apagada.current = false;
+		setApagando(false);
+		setErroApagar(mensagem);
+	};
+
+	/** A extensão apagou: a aba da nota fecha (a mesa leva para a vizinha) ou, sem mesa, volta para a lista. */
+	const terminarApagar = async () => {
+		apagarPedido.current = undefined;
+		clearTimeout(prazoApagar.current);
+		clearTimeout(temporizador.current);
+		apagada.current = true;
+		setApagando(true);
+		const rota = `caderno/${materiaId}/notas/${tituloAtual.current}`;
+		// A cópia que o Vendo guardava da nota ficou velha.
+		invalidarCopia?.(rota);
+		await mesaAgora.current?.fecharAbaDaNota?.(rota);
+		// Ainda aqui (sem mesa, ou a aba já não existia): volta para a lista.
+		if (vivo.current) props.voltar();
+	};
+
+	/** O "Apagar" do modal: salva o que falta (a lixeira fica com o que foi escrito), manda o pedido e espera a resposta. */
+	const apagarAgora = async () => {
+		if (apagando || !nota) return;
+		setApagando(true);
+		setErroApagar(undefined);
+		clearTimeout(temporizador.current);
+		await logica.current.salvarEEsperar();
+		if (!vivo.current) return;
+		if (emVoo.current || renomeando.current) return falhouApagar("A nota ainda está sendo salva. Tente de novo em instantes.");
+		const pedido = crypto.randomUUID();
+		apagarPedido.current = pedido;
+		apagada.current = true;
+		acoes
+			.acaoDaInterface(PAINEL_NOTAS, "apagar", { materia: materiaId, titulo: tituloAtual.current, ...(versao.current ? { versao: versao.current } : {}), pedido })
+			.catch((falha: unknown) => {
+				if (apagarPedido.current === pedido) falhouApagar(`Não consegui falar com a sessão: ${(falha as Error).message}`);
+			});
+		// Sem resposta em 15 s o modal não pode ficar preso; se a resposta chegar depois, o pedido guardado ainda a reconhece.
+		prazoApagar.current = setTimeout(() => {
+			if (apagarPedido.current === pedido && vivo.current) falhouApagar("A sessão não respondeu. Confira na lista de notas se ela foi apagada.", false);
+		}, PRAZO_APAGAR);
 	};
 
 	/** Cria a nota da menção e vai para ela (a resposta "criada" chega pela ponte). */
@@ -489,9 +562,14 @@ function EditorDaNota(props: PropsEditorNota & { rotuloInicial?: string | undefi
 					salvarAgora();
 				}
 				return;
+			case "apagada":
+				if (apagarPedido.current && resposta.dados.pedido === apagarPedido.current) void terminarApagar();
+				return;
 			case "erro": {
 				const { ao, pedido, mensagem, titulo } = resposta.dados;
-				if (ao === "abrir" && esperandoAbrir.current && mesmoTitulo(titulo, tituloAtual.current)) {
+				if (ao === "apagar" && pedido && pedido === apagarPedido.current) {
+					falhouApagar(mensagem);
+				} else if (ao === "abrir"&& esperandoAbrir.current && mesmoTitulo(titulo, tituloAtual.current)) {
 					esperandoAbrir.current = false;
 					setErroAbrir(mensagem);
 				} else if (ao === "salvar" && pedido && pedido === emVoo.current?.pedido) {
@@ -516,7 +594,7 @@ function EditorDaNota(props: PropsEditorNota & { rotuloInicial?: string | undefi
 	const salvarAoSair = useRef<() => void>(() => {});
 	salvarAoSair.current = () => {
 		clearTimeout(temporizador.current);
-		if (!editor || editor.isDestroyed || base.current === undefined || somenteLeitura || emConflito.current) return;
+		if (!editor || editor.isDestroyed || base.current === undefined || somenteLeitura || emConflito.current || apagada.current) return;
 		const conteudo = markdownDaNota(editor);
 		if (conteudo === base.current) return;
 		// Com um salvamento ainda sem resposta, a versão que temos já ficou velha: este grava por cima dele.
@@ -639,8 +717,13 @@ function EditorDaNota(props: PropsEditorNota & { rotuloInicial?: string | undefi
 					<Icon name="arrow-left" size={14} strokeWidth={2.5} />
 					Notas{props.materiaNome ? ` · ${props.materiaNome}` : ""}
 				</button>
-				<span className="data editor-nota__situacao" aria-live="polite">
-					{rotuloVisivel}
+				<span className="editor-nota__acoes">
+					<span className="data editor-nota__situacao" aria-live="polite">
+						{rotuloVisivel}
+					</span>
+					<Button variant="ghost" size="sm" icon="close" disabled={!nota} onClick={() => { setErroApagar(undefined); setConfirmandoApagar(true); }}>
+						Apagar
+					</Button>
 				</span>
 			</header>
 			{/* Na mesa de estudo, as abas das notas e lições abertas ficam aqui, dentro do cartão e abaixo do voltar. */}
@@ -780,6 +863,34 @@ function EditorDaNota(props: PropsEditorNota & { rotuloInicial?: string | undefi
 					Ainda não existe a nota <strong>{criarMencao?.alvo}</strong> neste caderno. Ela é criada vazia em notas/ e abre no lugar desta (o que você escreveu aqui já foi salvo).
 				</p>
 				{criarMencao?.erro ? <p className="body-sm editor-nota__erro-titulo">{criarMencao.erro}</p> : null}
+			</Modal>
+			<Modal
+				open={confirmandoApagar}
+				onClose={() => {
+					if (!apagando) setConfirmandoApagar(false);
+				}}
+				kicker="Nota"
+				title="Apagar esta nota?"
+				size="sm"
+				tone="brick"
+				dismissible={!apagando}
+				footer={
+					<>
+						<Button variant="ghost" onClick={() => setConfirmandoApagar(false)} disabled={apagando}>
+							Cancelar
+						</Button>
+						<Button variant="danger" icon="close" onClick={() => void apagarAgora()} disabled={apagando} aria-busy={apagando}>
+							<RotuloEstado ocupado={apagando} repouso="Apagar nota" passageiro="Apagando…" />
+						</Button>
+					</>
+				}
+			>
+				<p className="body">
+					Apagar <strong>{tituloVigente}</strong>? O arquivo sai do caderno e vai para a pasta <code>notas/.lixeira</code>, de onde você ainda pode recuperá-lo pelo Explorador de Arquivos. As menções a ela em outras notas ficam sem destino.
+				</p>
+				<p className="body-sm editor-nota__erro-apagar" role="alert">
+					{erroApagar ?? ""}
+				</p>
 			</Modal>
 			<EditorFormula
 				{...(formula ? { formula: { tipo: formula.tipo, latex: formula.latex, nova: formula.nova } } : {})}

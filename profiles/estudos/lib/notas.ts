@@ -204,6 +204,37 @@ export async function renomearNota(
 	return { titulo: para, mencoesAtualizadas };
 }
 
+/** A lixeira das notas: notas/.lixeira/. Fica dentro de uma pasta, então a lista de notas nunca a enxerga. */
+export const pastaLixeira = (dados: string, id: string) => join(pastaNotas(dados, id), ".lixeira");
+
+/**
+ * Apaga a nota do Breno: o arquivo vai para notas/.lixeira/<Título> (apagada <data>).md, de onde dá para
+ * recuperar no Explorador, e grava apagou_nota. Leva a versão que a tela abriu, como o salvar: se o arquivo
+ * mudou fora do app, nada é apagado (ErroConflito). As menções [[Título]] nas outras notas ficam como estão
+ * (viram a menção tracejada de uma nota que não existe).
+ */
+export async function apagarNota(
+	dados: string,
+	id: string,
+	bruto: string,
+	opcoes: { versao?: string; sessao?: string } = {},
+): Promise<{ titulo: string; lixeira: string }> {
+	await garantirMateria(dados, id);
+	const titulo = await tituloNoDisco(dados, id, tituloValido(bruto));
+	if (!titulo) throw new ErroMaterias(`Não achei a nota "${bruto.trim()}". Ela já foi apagada ou mudou de nome.`);
+	const origem = arquivoNota(dados, id, titulo);
+	const atual = versaoDe(await readFile(origem, "utf8"));
+	if (atual !== opcoes.versao) throw new ErroConflito(atual);
+	await mkdir(pastaLixeira(dados, id), { recursive: true });
+	const lixeira = `${titulo} (apagada ${new Date().toISOString().replace(/[:.]/g, "-")}).md`;
+	await renomearComInsistencia(origem, join(pastaLixeira(dados, id), lixeira));
+	await acrescentarEvento(
+		eventosMateria(dados, id),
+		criarEvento({ ...(opcoes.sessao ? { sessao: opcoes.sessao } : {}), verbo: "apagou_nota", objeto: { materia: id, nota: titulo }, resultado: { lixeira } }),
+	);
+	return { titulo, lixeira };
+}
+
 /** [[Título]] com o título dado (sem diferença de maiúsculas; espaços nas pontas tolerados). */
 const mencaoDe = (titulo: string) => new RegExp(`\\[\\[\\s*${titulo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\]\\]`, "gi");
 

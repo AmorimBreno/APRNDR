@@ -9,7 +9,8 @@
 //   "curso", "descartado" e "erro", sempre passageiros (gravar: false). Uma
 //   trava por matéria para todo ler-mudar-gravar dos cursos. Na etapa
 //   Materiais, a lista de arquivos é a dos materiais prontos na hora
-//   (materiaisProntos): o que a tela mandar é ignorado; toda mensagem "curso"
+//   (materiaisProntos) menos os que a tela diz que o Breno tirou do curso
+//   (excluidos; escolherMateriais): o resto do que a tela mandar é ignorado; toda mensagem "curso"
 //   leva os materiais prontos de agora (prontos), para a tela avisar quando
 //   eles mudaram desde a etapa Materiais;
 // - o diagnóstico (parte B): autoavaliar, gerar_diagnostico, responder,
@@ -48,11 +49,13 @@ import {
 	type Curso,
 	descartarCurso,
 	ErroCurso,
+	escolherMateriais,
 	ETAPAS,
 	type Escopo,
 	type Etapa,
 	lerCurso,
 	listarCursos,
+	materiaisExcluidos,
 	materiaisMudaram,
 	materiaisProntos,
 	type MensagensCursos,
@@ -174,6 +177,14 @@ interface DadosAcao {
 	texto?: unknown;
 	tempoMs?: unknown;
 	modulos?: unknown;
+}
+
+/** Os materiais que a tela diz que o Breno tirou do curso (dados.excluidos da etapa Materiais); sem o campo, nenhum. */
+function excluidosDaTela(dados: unknown): string[] {
+	const bruto = typeof dados === "object" && dados !== null ? (dados as { excluidos?: unknown }).excluidos : undefined;
+	if (bruto === undefined || bruto === null) return [];
+	if (!Array.isArray(bruto) || bruto.some((item) => typeof item !== "string")) throw new ErroCurso("Os materiais fora do curso precisam ser uma lista de caminhos.");
+	return bruto as string[];
 }
 
 const FRASES: Record<AcaoDaTela | "ler", string> = {
@@ -815,6 +826,7 @@ export function textoDoCurso(curso: Curso, extra: { mapa?: MapaConteudo; prontos
 	linhas.push("", "## Materiais");
 	if (curso.materiais) {
 		linhas.push(curso.materiais.arquivos.length ? curso.materiais.arquivos.map((item) => `- ${item.arquivo}`).join("\n") : "Nenhum material (o curso não usa arquivos).");
+		if (curso.materiais.excluidos?.length) linhas.push(`Materiais da matéria que o aluno tirou deste curso (não valem aqui): ${curso.materiais.excluidos.join(", ")}.`);
 		if (extra.prontos && materiaisMudaram(curso, extra.prontos)) linhas.push("Aviso: os materiais prontos da matéria mudaram depois desta confirmação.");
 	} else linhas.push(`(${naoConfirmada})`);
 
@@ -1002,7 +1014,16 @@ export default function cursos(pi: ExtensionAPI, opcoes: OpcoesCursos = {}) {
 			const pedidosIds = new Set([...pedidos.alternativas, ...pedidos.dissertativas]);
 			if (pedidosIds.size === 0) throw new ErroDiagnostico("Nenhum conceito do curso está no mapa da matéria. Confirme a etapa Mapa de novo.");
 			const escolhidos = doCurso.filter((conceito) => pedidosIds.has(conceito.id));
-			const trechos = objetivo.escopo === "livre" ? undefined : await trechosDosConceitos(dados, materia, escolhidos);
+			// Os materiais que o Breno tirou do curso não entram nos trechos (as referências do mapa são da matéria toda).
+			const fora = materiaisExcluidos(atual);
+			const trechos =
+				objetivo.escopo === "livre"
+					? undefined
+					: await trechosDosConceitos(
+							dados,
+							materia,
+							escolhidos.map((conceito) => ({ id: conceito.id, referencias: conceito.referencias.filter((referencia) => !fora.has(referencia.arquivo)) })),
+						);
 			// As regras de escrita que valem para a matéria (só leitura: quem grava o escrita.json é a extensão dos módulos, de uma vez).
 			// Um escrita.json ilegível é erro: as questões não saem sem as regras do Breno.
 			const regras = secaoDasRegras(regrasQueValem((await lerEscrita(dados)).regras, materia));
@@ -1222,9 +1243,9 @@ export default function cursos(pi: ExtensionAPI, opcoes: OpcoesCursos = {}) {
 						const etapa = dadosAcao.etapa as Parameters<typeof confirmarNoDisco>[3];
 						// O esqueleto só se confirma por criar_curso (o calendário de hoje e o evento criou_curso).
 						if (etapa === "esqueleto") throw new ErroEsqueleto('O esqueleto é confirmado por "Criar curso".');
-						// A foto dos materiais é a do disco na hora, nunca a que a tela mandou.
+						// A foto dos materiais é a do disco na hora, nunca a que a tela mandou: da tela vem só quais o Breno tirou do curso.
 						const prontos = await materiaisProntos(dados, materia);
-						const entrada = etapa === "materiais" ? { arquivos: prontos } : dadosAcao.dados;
+						const entrada = etapa === "materiais" ? escolherMateriais(prontos, excluidosDaTela(dadosAcao.dados)) : dadosAcao.dados;
 						const resultado = await confirmarNoDisco(dados, materia, curso, etapa, entrada, daSessao());
 						await mostrarCurso(dados, materia, resultado.curso, { invalidadas: resultado.invalidadas, ...comPedido, prontos });
 					});

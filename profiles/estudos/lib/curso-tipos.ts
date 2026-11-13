@@ -53,9 +53,15 @@ export interface ArquivoDoCurso {
 	hash: string;
 }
 
-/** A etapa Materiais: os arquivos prontos ao confirmar, em ordem de caminho (pode ser vazia). */
+/**
+ * A etapa Materiais: os arquivos do curso, em ordem de caminho (pode ser vazia).
+ * São os materiais prontos da matéria ao confirmar, menos os que o Breno
+ * desmarcou (`excluidos`, só os caminhos, em ordem; só aparece quando tem algum).
+ * Um material pronto que não está em nenhuma das duas listas chegou depois.
+ */
 export interface DadosMateriais {
 	arquivos: ArquivoDoCurso[];
+	excluidos?: string[];
 }
 
 /** A etapa Objetivo. */
@@ -92,8 +98,10 @@ export interface EntradaBasico extends DadosBasico {
 }
 
 /** O que a tela manda para confirmar cada etapa. */
-export interface EntradasDasEtapas extends Omit<DadosDasEtapas, "basico"> {
+export interface EntradasDasEtapas extends Omit<DadosDasEtapas, "basico" | "materiais"> {
 	basico: EntradaBasico;
+	/** Da tela vem só `excluidos` (os que ele desmarcou): a extensão monta a lista com os prontos do disco (escolherMateriais). */
+	materiais: Partial<DadosMateriais>;
 }
 
 /** O curso.json. Uma etapa não confirmada é null. */
@@ -337,7 +345,34 @@ function validarMateriais(dados: Record<string, unknown>): DadosMateriais {
 		if (!arquivo || !hash) throw new ErroCurso(`Cada material precisa do caminho e do hash do extraído (veio ${mostrar(item)}).`);
 		if (!porArquivo.has(arquivo)) porArquivo.set(arquivo, { arquivo, hash });
 	}
-	return { arquivos: [...porArquivo.values()].sort((a, b) => a.arquivo.localeCompare(b.arquivo)) };
+	const arquivos = [...porArquivo.values()].sort((a, b) => a.arquivo.localeCompare(b.arquivo));
+	if (dados.excluidos === undefined || dados.excluidos === null) return { arquivos };
+	if (!Array.isArray(dados.excluidos)) throw new ErroCurso("Os materiais fora do curso precisam ser uma lista de caminhos.");
+	const excluidos = new Set<string>();
+	for (const item of dados.excluidos as unknown[]) {
+		const caminho = typeof item === "string" ? item.trim() : "";
+		if (!caminho) throw new ErroCurso(`Cada material fora do curso precisa do caminho (veio ${mostrar(item)}).`);
+		if (porArquivo.has(caminho)) throw new ErroCurso(`O material "${caminho}" não pode estar no curso e fora dele ao mesmo tempo.`);
+		excluidos.add(caminho);
+	}
+	return { arquivos, ...(excluidos.size ? { excluidos: [...excluidos].sort((a, b) => a.localeCompare(b)) } : {}) };
+}
+
+/** Os materiais que o Breno tirou do curso (vazio quando não tirou nenhum). */
+export function materiaisExcluidos(curso: Pick<Curso, "materiais"> | null | undefined): ReadonlySet<string> {
+	return new Set(curso?.materiais?.excluidos ?? []);
+}
+
+/**
+ * Escolhe os materiais do curso: dos prontos da matéria, os que não estão em
+ * `desmarcados`. Os desmarcados que não estão mais prontos saem da lista. A
+ * foto (hash) é a dos prontos, nunca a que a tela viu.
+ */
+export function escolherMateriais(prontos: readonly ArquivoDoCurso[], desmarcados: Iterable<string>): DadosMateriais {
+	const fora = new Set(desmarcados);
+	const arquivos = prontos.filter((item) => !fora.has(item.arquivo));
+	const excluidos = prontos.filter((item) => fora.has(item.arquivo)).map((item) => item.arquivo);
+	return { arquivos, ...(excluidos.length ? { excluidos } : {}) };
 }
 
 function validarObjetivo(dados: Record<string, unknown>, contexto: ContextoValidacao): DadosObjetivo {
@@ -652,7 +687,14 @@ export function normalizar(etapa: Etapa, dados: unknown): unknown {
 		valor = resto;
 	} else if (etapa === "materiais" && Array.isArray(valor.arquivos)) {
 		const chave = (item: unknown) => (ehObjeto(item) && typeof item.arquivo === "string" ? item.arquivo.trim() : "");
-		valor = { ...valor, arquivos: [...(valor.arquivos as unknown[])].sort((a, b) => chave(a).localeCompare(chave(b))) };
+		const { excluidos, ...resto } = valor;
+		const fora = Array.isArray(excluidos) ? ([...excluidos] as unknown[]).map((item) => (typeof item === "string" ? item.trim() : "")).sort((a, b) => a.localeCompare(b)) : [];
+		valor = {
+			...resto,
+			arquivos: [...(valor.arquivos as unknown[])].sort((a, b) => chave(a).localeCompare(chave(b))),
+			// Sem excluídos é o mesmo que a lista vazia (os cursos antigos não têm o campo).
+			...(fora.length ? { excluidos: fora } : {}),
+		};
 	}
 	return canonico(valor);
 }
@@ -785,14 +827,17 @@ export function resumoDoCurso(curso: Curso): ResumoCurso {
 
 /**
  * Se os materiais prontos da matéria agora não são os que a etapa Materiais
- * confirmou (arquivo a mais, a menos ou com outro hash), para o aviso da
- * tela. Com Materiais não confirmada, false.
+ * confirmou, para o aviso da tela: um material do curso que saiu ou mudou de
+ * hash, ou um pronto que não está no curso nem entre os que o Breno tirou
+ * (chegou depois). Um material que ele tirou do curso e mudou não conta.
+ * Com Materiais não confirmada, false.
  */
 export function materiaisMudaram(curso: Curso, prontos: readonly ArquivoDoCurso[]): boolean {
 	const confirmados = curso.materiais?.arquivos;
 	if (!confirmados) return false;
 	const antes = new Map(confirmados.map((item) => [item.arquivo, item.hash]));
-	const agora = new Map(prontos.map((item) => [item.arquivo, item.hash]));
+	const fora = materiaisExcluidos(curso);
+	const agora = new Map(prontos.filter((item) => !fora.has(item.arquivo)).map((item) => [item.arquivo, item.hash]));
 	if (antes.size !== agora.size) return true;
 	for (const [arquivo, hash] of agora) if (antes.get(arquivo) !== hash) return true;
 	return false;

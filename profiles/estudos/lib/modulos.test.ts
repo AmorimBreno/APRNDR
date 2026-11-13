@@ -1044,6 +1044,13 @@ describe("no disco", () => {
 			expect(entrada.materiaisUsados).toEqual([{ arquivo: "aula.pdf", hash: "h-aula" }]);
 		});
 
+		it("um material que o Breno tirou do curso não aparece nos locais dos conceitos nem nos materiais usados", async () => {
+			const semAula = { ...cursoPronto(), materiais: { arquivos: [], excluidos: ["aula.pdf"] } };
+			const entrada = await entradaDoModelo(dados, materia, semAula, "m1");
+			expect(entrada.plano.conceitos.map((conceito) => conceito.locais)).toEqual([[], []]);
+			expect(entrada.materiaisUsados).toEqual([]);
+		});
+
 		it("com o plano: uma mensagem por lição, com os níveis, os trechos dos conceitos dela e as referências para validarLicao", async () => {
 			const plano = validarPlano(
 				{ licoes: [{ titulo: "Um", objetivo: "", conceitos: ["c-a"], roteiro: ROTEIRO }, { titulo: "Dois", objetivo: "", conceitos: ["c-b"], roteiro: ROTEIRO }] },

@@ -15,6 +15,7 @@ import {
 	type Curso,
 	descartarCurso,
 	ErroCurso,
+	escolherMateriais,
 	ETAPAS,
 	type Etapa,
 	etapaDoCurso,
@@ -23,6 +24,7 @@ import {
 	iguais,
 	lerCurso,
 	listarCursos,
+	materiaisExcluidos,
 	materiaisMudaram,
 	materiaisProntos,
 	nomeDaEtapa,
@@ -118,6 +120,30 @@ describe("validarEtapa", () => {
 		expect(() => validarEtapa("materiais", {})).toThrow(/lista de arquivos/);
 	});
 
+	it("Materiais: os que ele tirou do curso (excluidos) vão em ordem, sem espaços; só aparecem quando há", () => {
+		const arquivos = [{ arquivo: "a.pdf", hash: "ha" }];
+		expect(validarEtapa("materiais", { arquivos, excluidos: [" c.pdf ", "b.pdf", "c.pdf"] })).toEqual({ arquivos, excluidos: ["b.pdf", "c.pdf"] });
+		expect(validarEtapa("materiais", { arquivos, excluidos: [] })).toEqual({ arquivos });
+		expect(validarEtapa("materiais", { arquivos, excluidos: null })).toEqual({ arquivos });
+		expect(() => validarEtapa("materiais", { arquivos, excluidos: "b.pdf" })).toThrow(/lista de caminhos/);
+		expect(() => validarEtapa("materiais", { arquivos, excluidos: [3] })).toThrow(/precisa do caminho/);
+		expect(() => validarEtapa("materiais", { arquivos, excluidos: ["a.pdf"] })).toThrow(/ao mesmo tempo/);
+	});
+
+	it("escolherMateriais: os prontos menos os desmarcados; o desmarcado que não está mais pronto some; a foto é a dos prontos", () => {
+		const prontos = [
+			{ arquivo: "a.pdf", hash: "1" },
+			{ arquivo: "b.pdf", hash: "2" },
+			{ arquivo: "c.pdf", hash: "3" },
+		];
+		expect(escolherMateriais(prontos, [])).toEqual({ arquivos: prontos });
+		expect(escolherMateriais(prontos, ["b.pdf", "sumiu.pdf"])).toEqual({ arquivos: [prontos[0], prontos[2]], excluidos: ["b.pdf"] });
+		expect(escolherMateriais(prontos, new Set(["a.pdf", "b.pdf", "c.pdf"]))).toEqual({ arquivos: [], excluidos: ["a.pdf", "b.pdf", "c.pdf"] });
+		expect(escolherMateriais([], ["a.pdf"])).toEqual({ arquivos: [] });
+		expect(materiaisExcluidos(null)).toEqual(new Set());
+		expect(materiaisExcluidos({ materiais: { arquivos: [], excluidos: ["b.pdf"] } })).toEqual(new Set(["b.pdf"]));
+	});
+
 	it("Objetivo: escopo e tipo conhecidos; só o material precisa de materiais confirmados", () => {
 		expect(validarEtapa("objetivo", { escopo: "livre", tipo: "teorico" })).toEqual({ escopo: "livre", tipo: "teorico", motivo: "" });
 		expect(() => validarEtapa("objetivo", { ...OBJETIVO, escopo: "tudo" })).toThrow(/escopo/);
@@ -157,6 +183,10 @@ describe("iguais", () => {
 		expect(iguais("basico", { ...BASICO, nome: "Outro" }, { prazo: "2026-11-20", prova: "P1", horasPorSemana: 4 })).toBe(true);
 		expect(iguais("basico", { prazo: null, horasPorSemana: 4, prova: "" }, { prazo: null, horasPorSemana: 4 })).toBe(true);
 		expect(iguais("materiais", { arquivos: [{ arquivo: "b", hash: "1" }, { arquivo: "a", hash: "2" }] }, { arquivos: [{ arquivo: "a", hash: "2" }, { arquivo: "b", hash: "1" }] })).toBe(true);
+		// Sem excluidos é o mesmo que a lista vazia (os cursos de antes não têm o campo); com outros, é outra coisa.
+		expect(iguais("materiais", { arquivos: [{ arquivo: "a", hash: "1" }] }, { arquivos: [{ arquivo: "a", hash: "1" }], excluidos: [] })).toBe(true);
+		expect(iguais("materiais", { arquivos: [{ arquivo: "a", hash: "1" }], excluidos: ["c", "b"] }, { arquivos: [{ arquivo: "a", hash: "1" }], excluidos: ["b", "c"] })).toBe(true);
+		expect(iguais("materiais", { arquivos: [{ arquivo: "a", hash: "1" }] }, { arquivos: [{ arquivo: "a", hash: "1" }], excluidos: ["b"] })).toBe(false);
 		expect(iguais("mapa", { conceitos: ["c-a", "c-b"] }, { conceitos: ["c-b", "c-a"] })).toBe(false);
 		expect(iguais("basico", BASICO, { ...BASICO, horasPorSemana: 5 })).toBe(false);
 		expect(iguais("mapa", null, undefined)).toBe(true);
@@ -298,6 +328,33 @@ describe("resumo e avisos", () => {
 		expect(materiaisMudaram(curso, [{ arquivo: "a", hash: "1" }])).toBe(true);
 		expect(materiaisMudaram(curso, [{ arquivo: "a", hash: "1" }, { arquivo: "b", hash: "2" }, { arquivo: "c", hash: "4" }])).toBe(true);
 		expect(materiaisMudaram(novoCurso("p1", "m", BASICO, AGORA), [{ arquivo: "a", hash: "1" }])).toBe(false);
+	});
+
+	it("materiaisMudaram com materiais tirados do curso: o tirado, mesmo mudado ou removido, não conta; um pronto novo conta", () => {
+		const base = novoCurso("p1", "m", BASICO, AGORA);
+		const curso = confirmarEtapa(base, "materiais", { arquivos: [{ arquivo: "a", hash: "1" }], excluidos: ["b"] }, AGORA).curso;
+		expect(materiaisMudaram(curso, [{ arquivo: "a", hash: "1" }, { arquivo: "b", hash: "2" }])).toBe(false);
+		expect(materiaisMudaram(curso, [{ arquivo: "a", hash: "1" }, { arquivo: "b", hash: "outro" }])).toBe(false);
+		expect(materiaisMudaram(curso, [{ arquivo: "a", hash: "1" }])).toBe(false);
+		expect(materiaisMudaram(curso, [{ arquivo: "a", hash: "9" }, { arquivo: "b", hash: "2" }])).toBe(true);
+		expect(materiaisMudaram(curso, [{ arquivo: "a", hash: "1" }, { arquivo: "b", hash: "2" }, { arquivo: "c", hash: "3" }])).toBe(true);
+		expect(materiaisMudaram(curso, [{ arquivo: "b", hash: "2" }])).toBe(true);
+	});
+
+	it("escolher outros materiais invalida as etapas seguintes; os mesmos tirados não invalidam nada", () => {
+		const completo = cursoCompleto();
+		const tirando = { arquivos: [], excluidos: ["aula-04.pdf"] };
+		// Tirar o único material: mapa, diagnóstico e esqueleto caem.
+		expect(oQueInvalida(completo, "materiais", tirando)).toEqual(["mapa", "diagnostico", "esqueleto"]);
+		const { curso } = confirmarEtapa(completo, "materiais", tirando, DEPOIS);
+		expect(curso.materiais).toEqual(tirando);
+		expect(curso.etapa).toBe("mapa");
+		// Confirmar de novo com a mesma escolha não muda nada.
+		const mesma = confirmarEtapa({ ...curso, mapa: MAPA }, "materiais", { arquivos: [], excluidos: ["aula-04.pdf"] }, DEPOIS);
+		expect(mesma.invalidadas).toEqual([]);
+		expect(mesma.curso.alteradoEm).toBe(curso.alteradoEm);
+		// Voltar a marcar o material também é uma mudança.
+		expect(oQueInvalida({ ...curso, mapa: MAPA }, "materiais", MATERIAIS)).toEqual(["mapa"]);
 	});
 
 	it("conceitosForaDoMapa: os que saíram ou foram tirados", () => {

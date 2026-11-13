@@ -288,6 +288,44 @@ describe("ponte", () => {
 		expect((await lerCurso(dados, materia, id)).mapa).toBeNull();
 	});
 
+	it("escolher materiais: só os marcados entram, com o hash do disco; os tirados ficam em excluidos e a escolha invalida o resto", async () => {
+		await extrair("aula-01.pdf");
+		await extrair("aula-02.pdf");
+		await extrair("aula-03.pdf");
+		await gravarMapa(dados, materia, mapaDeTeste("aprovado"));
+		const { id } = await comecar();
+		// A tela manda só o que tirou; o que não está pronto no disco (inventado) é ignorado.
+		await confirmar(id, "materiais", { excluidos: ["aula-02.pdf", "inventado.pdf"] }, "p1");
+		expect(cursoDe("p1")).toMatchObject({
+			invalidadas: [],
+			curso: {
+				etapa: "objetivo",
+				materiais: { arquivos: [{ arquivo: "aula-01.pdf", hash: "h-aula-01.pdf" }, { arquivo: "aula-03.pdf", hash: "h-aula-03.pdf" }], excluidos: ["aula-02.pdf"] },
+			},
+		});
+		// Os prontos que vão com o curso são todos (a tela compara com o que ela marcou).
+		expect(cursoDe("p1")!.prontos!.map((item) => item.arquivo)).toEqual(["aula-01.pdf", "aula-02.pdf", "aula-03.pdf"]);
+		expect((await lerCurso(dados, materia, id)).materiais!.excluidos).toEqual(["aula-02.pdf"]);
+		await confirmar(id, "objetivo", { escopo: "so_material", tipo: "misto", motivo: "" }, "p2");
+		await confirmar(id, "mapa", { conceitos: ["c-1"] }, "p3");
+		// A mesma escolha: nada invalidado.
+		await confirmar(id, "materiais", { excluidos: ["aula-02.pdf"] }, "p4");
+		expect(cursoDe("p4")).toMatchObject({ invalidadas: [], curso: { etapa: "diagnostico" } });
+		// Marcar a aula 2 de volta muda a lista e derruba o Mapa.
+		await confirmar(id, "materiais", {}, "p5");
+		expect(cursoDe("p5")).toMatchObject({ invalidadas: ["mapa"], curso: { etapa: "mapa", mapa: null } });
+		expect(cursoDe("p5")!.curso.materiais).toEqual({ arquivos: ["aula-01.pdf", "aula-02.pdf", "aula-03.pdf"].map((arquivo) => ({ arquivo, hash: `h-${arquivo}` })) });
+		// Tirar todos: lista vazia, e o Objetivo "só o material" cai junto.
+		await confirmar(id, "mapa", { conceitos: ["c-1"] }, "p6");
+		await confirmar(id, "materiais", { excluidos: ["aula-01.pdf", "aula-02.pdf", "aula-03.pdf"] }, "p7");
+		expect(cursoDe("p7")).toMatchObject({ invalidadas: ["objetivo", "mapa"], curso: { etapa: "objetivo", objetivo: null, materiais: { arquivos: [] } } });
+		expect(cursoDe("p7")!.curso.materiais!.excluidos).toHaveLength(3);
+		// Os excluídos têm de ser uma lista de caminhos.
+		await confirmar(id, "materiais", { excluidos: "aula-01.pdf" }, "p8");
+		expect(String(erroDe("p8")!.mensagem)).toContain("lista de caminhos");
+		expect((await lerCurso(dados, materia, id)).materiais!.excluidos).toHaveLength(3);
+	});
+
 	it("erro de validação volta com o pedido, a matéria e o curso", async () => {
 		const { id } = await comecar();
 		await confirmar(id, "basico", { ...BASICO, horasPorSemana: 0 }, "p1");
@@ -414,14 +452,14 @@ const mapaDoDiagnostico = (): MapaConteudo => ({
 });
 
 /** Um curso com as etapas até o Mapa confirmadas pela ponte (etapa diagnostico), com 3 conceitos. */
-async function cursoNoDiagnostico(escopo = "so_material"): Promise<string> {
+async function cursoNoDiagnostico(escopo = "so_material", excluidos: string[] = []): Promise<string> {
 	await extrairTrechos("aula.pdf", [
 		["página 1", "pagina-001", "Regressão linear ajusta uma reta aos dados."],
 		["página 2", "pagina-002", "O resíduo é o observado menos o previsto."],
 	]);
 	await gravarMapa(dados, materia, mapaDoDiagnostico());
 	const { id } = await comecar("p-c");
-	await confirmar(id, "materiais", {}, "p-mat");
+	await confirmar(id, "materiais", excluidos.length ? { excluidos } : {}, "p-mat");
 	await confirmar(id, "objetivo", { escopo, tipo: "misto", motivo: "Passar na P1." }, "p-obj");
 	await confirmar(id, "mapa", { conceitos: ["c-1", "c-2", "c-3"] }, "p-mapa");
 	return id;
@@ -671,6 +709,42 @@ describe("diagnóstico", () => {
 		expect(String(erroDe("g2")!.mensagem)).toMatch(/^Não consegui ler os ajustes do método .*dissertativa\.md/);
 		expect(chamadas).toHaveLength(1);
 		expect(await readFile(caminhoDosAjustes(dados, "dissertativa.md"), "utf8")).toBe("texto solto\n");
+	});
+
+	it("os trechos de um material que o Breno tirou do curso não vão para o modelo; os dos outros vão", async () => {
+		// Dois materiais: aula.pdf (c-1 e c-2) e extra.pdf (também citado por c-2). O curso tira o extra.pdf.
+		await extrairTrechos("extra.pdf", [["página 1", "pagina-001", "Texto do material que foi tirado do curso."]]);
+		const mapa = mapaDoDiagnostico();
+		mapa.conceitos[1]!.referencias.push({ arquivo: "extra.pdf", local: "página 1", trecho: "pagina-001" });
+		const gerarComExcluidos = async (excluidos: string[]) => {
+			chamadas.length = 0;
+			const id = await cursoNoDiagnostico("so_material", excluidos);
+			await gravarMapa(dados, materia, mapa);
+			acao("autoavaliar", { curso: id, pedido: "a1", niveis: NIVEIS });
+			await respondeu("a1");
+			respostas.push(QUESTOES);
+			acao("gerar_diagnostico", { curso: id, pedido: "g1" });
+			await respondeu("g1");
+			expect(erroDe("g1")).toBeUndefined();
+			return textoDaChamada(chamadas[0]!);
+		};
+		const tirando = await gerarComExcluidos(["extra.pdf"]);
+		expect(tirando).toContain("O resíduo é o observado menos o previsto.");
+		expect(tirando).not.toContain("Texto do material que foi tirado do curso.");
+	});
+
+	it("sem tirar nenhum material, os trechos de todos vão para o modelo", async () => {
+		await extrairTrechos("extra.pdf", [["página 1", "pagina-001", "Texto do material que foi tirado do curso."]]);
+		const mapa = mapaDoDiagnostico();
+		mapa.conceitos[1]!.referencias.push({ arquivo: "extra.pdf", local: "página 1", trecho: "pagina-001" });
+		const id = await cursoNoDiagnostico();
+		await gravarMapa(dados, materia, mapa);
+		acao("autoavaliar", { curso: id, pedido: "a1", niveis: NIVEIS });
+		await respondeu("a1");
+		respostas.push(QUESTOES);
+		acao("gerar_diagnostico", { curso: id, pedido: "g1" });
+		await respondeu("g1");
+		expect(textoDaChamada(chamadas[0]!)).toContain("Texto do material que foi tirado do curso.");
 	});
 
 	it("gerar com outro em andamento no mesmo curso dá erro; no escopo livre não vão trechos", async () => {

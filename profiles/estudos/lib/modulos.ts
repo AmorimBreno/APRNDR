@@ -11,7 +11,7 @@ import type { Dirent } from "node:fs";
 import { mkdir, readdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { gravarDeUmaVez } from "./arquivos.ts";
-import { type ArquivoDoCurso, type ContextoCurso, type Curso, ehIdModulo, type Escopo, lerCurso, materiaisProntos, pastaDoCurso, type TipoCurso } from "./cursos.ts";
+import { type ArquivoDoCurso, type ContextoCurso, type Curso, ehIdModulo, type Escopo, lerCurso, materiaisExcluidos, materiaisProntos, pastaDoCurso, type TipoCurso } from "./cursos.ts";
 import { type PromptUsado, type TrechosDoConceito, trechosDosConceitos } from "./diagnostico.ts";
 import type { Modulo as ModuloDoEsqueleto, TipoModulo } from "./esqueleto-tipos.ts";
 import { acrescentarEvento, criarEvento } from "./eventos.ts";
@@ -436,7 +436,9 @@ export async function entradaDoModelo(dados: string, materia: string, curso: str
 	const mapa = await lerMapa(dados, materia);
 	const doMapa = new Map(mapa.conceitos.map((conceito) => [conceito.id, conceito]));
 	const niveis = niveisDoModulo(atual.diagnostico, doEsqueleto);
-	const referenciasDe = (id: string): Referencia[] => (comMaterial ? (doMapa.get(id)?.referencias ?? []) : []);
+	// Os materiais que o Breno tirou do curso não entram (as referências do mapa são da matéria toda).
+	const fora = materiaisExcluidos(atual);
+	const referenciasDe = (id: string): Referencia[] => (comMaterial ? (doMapa.get(id)?.referencias ?? []).filter((referencia) => !fora.has(referencia.arquivo)) : []);
 	const conceitos: ConceitoDoModulo[] = doEsqueleto.conceitos.map((id) => {
 		const conceito = doMapa.get(id);
 		const locais: LocalDoConceito[] = [];

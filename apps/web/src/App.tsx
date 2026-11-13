@@ -12,6 +12,8 @@
 import { comTransicao, type EntradaTelaInicial, type PropsConversaEmbutida, ProvedorImagens, usePerfis } from "@estudos/ui";
 import { MotionConfig } from "motion/react";
 import { type ComponentType, useEffect, useRef, useState } from "react";
+import { CascaDoApp } from "./BarraDoApp.tsx";
+import type { AmbienteDesktop } from "./desktop.ts";
 import { telasIniciais } from "./telas-iniciais.ts";
 import { JanelaPerfil } from "./telas/JanelaPerfil.tsx";
 import { PainelConversa } from "./telas/PainelConversa.tsx";
@@ -121,10 +123,12 @@ function TelaInicial({ perfilId, caminho }: { perfilId: string; caminho: string 
 }
 
 /** Com "reduzir movimento" no Windows, as animações da Motion param de se mover. */
-export function App() {
+export function App({ desktop }: { desktop?: AmbienteDesktop }) {
 	return (
 		<MotionConfig reducedMotion="user">
-			<Rotas />
+			<CascaDoApp desktop={desktop}>
+				<Rotas />
+			</CascaDoApp>
 		</MotionConfig>
 	);
 }

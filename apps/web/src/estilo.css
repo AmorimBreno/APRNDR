@@ -18,7 +18,19 @@ body, #raiz { overflow: clip; }
 /* Escala do app (design-system/ESTUDOS.md): os tamanhos do manual ficaram grandes na tela do
  * Breno; 90% foi o que ficou bom. No body, para valer também nos modais (que vão para o body).
  * O Edge resolve as alturas de 100% com o zoom aplicado: a tela continua cheia. */
-body { zoom: 0.9; }
+body { zoom: var(--zoom-app); }
+:root { --zoom-app: 0.9; }
+
+/* Barra de título da janela própria (apps/desktop, BarraDoApp.tsx). O main.tsx põe a altura
+ * da barra, em pixels da janela, em --barra-app-janela; aqui ela vira pixels do app (o zoom do
+ * body encolhe tudo por --zoom-app, então 32 px da janela são 32 / 0.9 px de CSS). No navegador
+ * comum a variável não existe e --barra-app vale 0: nada muda. */
+:root { --barra-app: calc(var(--barra-app-janela, 0px) / var(--zoom-app)); }
+.casca-app { display: flex; flex-direction: column; height: 100%; }
+.casca-app__conteudo { flex: 1 1 0; min-height: 0; overflow: clip; }
+/* Área de arrastar a janela (o duplo clique maximiza); os botões do Windows ficam por cima, à direita.
+ * Fora das View Transitions: a barra não muda na troca de tela, então não anima com ela. */
+.barra-app { flex: none; display: flex; align-items: center; height: var(--barra-app); padding: 0 var(--space-4); background: var(--surface-ground); color: var(--ink-muted); user-select: none; -webkit-app-region: drag; view-transition-name: barra-app; }
 
 /* ── Tela de perfis: um card quadrado por perfil ── */
 

@@ -1052,7 +1052,7 @@
  * altura máxima é a da área que rola (--altura-codigo-lado, medida no CodigoCitado.tsx); sem a medida, a
  * da janela (o vh é medido antes do zoom 0,9 do body, por isso a divisão) menos a CourseBar e os respiros. */
 .modulo__explicacao--lado-a-lado { display: grid; grid-template-columns: minmax(0, 56fr) minmax(0, 44fr); align-items: start; gap: var(--space-8); }
-.modulo__codigo-lado { position: sticky; top: 0; display: flex; flex-direction: column; gap: var(--space-4); max-height: var(--altura-codigo-lado, calc(100vh / 0.9 - var(--course-bar) - var(--space-6) - var(--space-8))); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+.modulo__codigo-lado { position: sticky; top: 0; display: flex; flex-direction: column; gap: var(--space-4); max-height: var(--altura-codigo-lado, calc(100vh / 0.9 - var(--barra-app, 0px) - var(--course-bar) - var(--space-6) - var(--space-8))); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
 .modulo__codigo-lado > .codigo { flex: none; margin: 0; }
 /* No código ao lado (coluna estreita), as linhas longas quebram em vez de rolar para o lado: um trecho citado no fim de
  * uma linha não fica escondido. A continuação fica recuada depois do número da linha. */

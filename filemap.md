@@ -512,4 +512,4 @@ launcher/iniciar.mjs — lançador: confere a saúde, sobe o pnpm dev escondido 
 launcher/parar.vbs — alvo do atalho "Parar Estudos": roda o parar.mjs sem janela
 launcher/parar.mjs — fecha a janela própria (pedido de fechamento; à força só depois de 3 s), encerra a árvore do pnpm dev gravada e os node do app nas portas 7430/7431; nunca toca em outros processos
 launcher/comum.mjs — caminhos, portas, log, PowerShell e avisos comuns ao lançador
-scripts/criar-atalho.ps1 — cria os atalhos "Estudos" e "Parar Estudos" na área de trabalho (rodar com -ExecutionPolicy Bypass), com o ícone do professor
+scripts/criar-atalho.ps1 — cria os atalhos "Estudos" e "Parar Estudos" na área de trabalho e "APRNDR" e "Parar APRNDR" no Menu Iniciar (é o que a pesquisa do Windows acha), com o ícone do professor (rodar com -ExecutionPolicy Bypass)

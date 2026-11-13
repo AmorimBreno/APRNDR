@@ -1,6 +1,8 @@
-﻿# Cria na área de trabalho os atalhos do app:
-#   Estudos.lnk        -> wscript.exe launcher\iniciar.vbs (sobe o app sem janela e abre a janela própria)
-#   Parar Estudos.lnk  -> wscript.exe launcher\parar.vbs   (encerra o app)
+﻿# Cria os atalhos do app, na área de trabalho e no Menu Iniciar:
+#   Estudos.lnk / APRNDR.lnk              -> wscript.exe launcher\iniciar.vbs (sobe o app sem janela e abre a janela própria)
+#   Parar Estudos.lnk / Parar APRNDR.lnk  -> wscript.exe launcher\parar.vbs   (encerra o app)
+# Os do Menu Iniciar (pasta Programas do usuário) são o que a pesquisa do Windows
+# encontra: digitar "aprndr" abre o app. Os da área de trabalho mantêm o nome antigo.
 #
 # Como rodar (não precisa mudar a política de execução do Windows):
 #   powershell -ExecutionPolicy Bypass -File scripts\criar-atalho.ps1
@@ -19,6 +21,7 @@ $ErrorActionPreference = "Stop"
 $raiz = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $wscript = Join-Path $env:SystemRoot "System32\wscript.exe"
 $areaDeTrabalho = [Environment]::GetFolderPath("Desktop")
+$menuIniciar = [Environment]::GetFolderPath("Programs")
 
 $icone = Join-Path $raiz "apps\desktop\assets\icone.ico"
 
@@ -27,10 +30,10 @@ $edge = @(
 	(Join-Path $env:ProgramFiles "Microsoft\Edge\Application\msedge.exe")
 ) | Where-Object { Test-Path $_ } | Select-Object -First 1
 
-function Criar-Atalho($nome, $vbs, $descricao) {
+function Criar-Atalho($nome, $vbs, $descricao, $pasta = $areaDeTrabalho) {
 	$caminhoVbs = Join-Path $raiz "launcher\$vbs"
 	if (-not (Test-Path $caminhoVbs)) { throw "Não encontrei $caminhoVbs" }
-	$destino = Join-Path $areaDeTrabalho "$nome.lnk"
+	$destino = Join-Path $pasta "$nome.lnk"
 	$atalho = (New-Object -ComObject WScript.Shell).CreateShortcut($destino)
 	$atalho.TargetPath = $wscript
 	# Aspas no caminho do .vbs: a pasta do repositório pode ter espaços.
@@ -46,3 +49,5 @@ function Criar-Atalho($nome, $vbs, $descricao) {
 
 Criar-Atalho "Estudos" "iniciar.vbs" "Abre o app de estudos (sobe o servidor se preciso)"
 Criar-Atalho "Parar Estudos" "parar.vbs" "Encerra o app de estudos (servidor e Vite)"
+Criar-Atalho "APRNDR" "iniciar.vbs" "Abre o APRNDR (sobe o servidor se preciso)" $menuIniciar
+Criar-Atalho "Parar APRNDR" "parar.vbs" "Encerra o APRNDR (servidor e Vite)" $menuIniciar

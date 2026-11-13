@@ -31,9 +31,13 @@ const COR_FUNDO = "#0f0e0d";
 const COR_SIMBOLOS = "#e9e4db";
 const ALTURA_BARRA = 32;
 
+/** A identidade do app no Windows: a janela e o atalho do Menu Iniciar usam a mesma. */
+const ID_DO_APP = "br.estudos-ia.aprndr";
+const ARQUIVO_ICONE = join(AQUI, "..", "assets", "icone.ico");
+
 app.setName("APRNDR");
-// Windows: identidade própria na barra de tarefas (o ícone e o agrupamento deixam de ser os do Electron).
-app.setAppUserModelId("br.estudos-ia.aprndr");
+// Windows: identidade própria na barra de tarefas (o agrupamento deixa de ser o do Electron).
+app.setAppUserModelId(ID_DO_APP);
 // O perfil do Chromium (localStorage, cache) fica junto do resto dos dados locais do app.
 app.setPath("userData", join(PASTA_APP, "electron"));
 
@@ -58,7 +62,10 @@ if (!app.requestSingleInstanceLock()) {
 		}
 		if (origem === ORIGEM_APP) sairDoApp();
 	});
-	app.whenReady().then(abrirJanela);
+	app.whenReady().then(() => {
+		garantirAtalhoDoMenuIniciar();
+		abrirJanela();
+	});
 	app.on("window-all-closed", () => app.quit());
 }
 
@@ -84,6 +91,38 @@ function guardarEstado(janela) {
 		writeFileSync(ARQUIVO_JANELA, JSON.stringify({ x, y, width, height, maximizada: janela.isMaximized() }, null, 2) + "\n");
 	} catch (erro) {
 		console.warn("não consegui guardar o estado da janela:", erro);
+	}
+}
+
+/**
+ * O atalho "APRNDR" do Menu Iniciar, com a identidade do app (AppUserModelID). Sem um atalho com a
+ * mesma identidade, fixar a janela na barra de tarefas cria um item que aponta para o electron.exe
+ * solto (ícone do Electron, e abre o Electron vazio). Com ele, o item fixado é este atalho: abre o
+ * app pelo lançador e mostra o ícone do professor. Só reescreve se faltar ou estiver diferente.
+ */
+function garantirAtalhoDoMenuIniciar() {
+	if (process.platform !== "win32") return;
+	try {
+		const arquivo = join(app.getPath("appData"), "Microsoft", "Windows", "Start Menu", "Programs", "APRNDR.lnk");
+		const desejado = {
+			target: join(process.env.SystemRoot ?? "C:\Windows", "System32", "wscript.exe"),
+			args: `"${join(RAIZ, "launcher", "iniciar.vbs")}"`,
+			cwd: RAIZ,
+			description: "Abre o APRNDR (sobe o servidor se preciso)",
+			icon: ARQUIVO_ICONE,
+			iconIndex: 0,
+			appUserModelId: ID_DO_APP,
+		};
+		let atual;
+		try {
+			atual = shell.readShortcutLink(arquivo);
+		} catch {
+			// Não existe ainda.
+		}
+		const igual = atual && Object.entries(desejado).every(([chave, valor]) => String(atual[chave] ?? "").toLowerCase() === String(valor).toLowerCase());
+		if (!igual) shell.writeShortcutLink(arquivo, "create", desejado);
+	} catch (erro) {
+		console.warn("não consegui garantir o atalho do Menu Iniciar:", erro);
 	}
 }
 
@@ -128,7 +167,7 @@ function abrirJanela() {
 		show: false,
 		backgroundColor: COR_FUNDO,
 		title: "APRNDR",
-		icon: join(AQUI, "..", "assets", "icone.ico"),
+		icon: ARQUIVO_ICONE,
 		// Sem a moldura do sistema: a barra é do app (BarraDoApp no front) e o Windows
 		// desenha só os botões de minimizar, maximizar e fechar por cima dela.
 		titleBarStyle: "hidden",

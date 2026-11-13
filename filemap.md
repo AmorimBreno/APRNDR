@@ -143,7 +143,7 @@ apps/server/src/servidor.test.ts — testes do servidor sem rede (rotas, mensage
 apps/desktop/ — @estudos/desktop: a janela própria do app (Electron). Sem script dev de propósito (o pnpm dev da raiz roda o dev de todo apps/*); o script é iniciar
 apps/desktop/package.json — electron com versão exata; main src/main.mjs
 apps/desktop/tsconfig.json — checkJs nos .mjs (noImplicitAny desligado)
-apps/desktop/src/main.mjs — processo principal: janela sem moldura (titleBarOverlay), instância única, estado da janela, tela "Reconectando…", "Sair do app" (IPC estudos:sair: guarda a janela e roda o launcher/parar.mjs solto, com o electron.exe como Node), navegação presa ao front, permissões negadas, atalhos (F5, Ctrl+R, F12, zoom), ESTUDOS_URL e ESTUDOS_CAPTURA
+apps/desktop/src/main.mjs — processo principal: janela sem moldura (titleBarOverlay), instância única, estado da janela, tela "Reconectando…", atalho APRNDR do Menu Iniciar regravado com o AppUserModelID (para o item fixado na barra de tarefas ter o ícone do professor), "Sair do app" (IPC estudos:sair: guarda a janela e roda o launcher/parar.mjs solto, com o electron.exe como Node), navegação presa ao front, permissões negadas, atalhos (F5, Ctrl+R, F12, zoom), ESTUDOS_URL e ESTUDOS_CAPTURA
 apps/desktop/src/preload.cjs — expõe window.estudosDesktop (plataforma, altura da barra e sair(), que pede ao main para fechar a janela e rodar o parar.mjs) ao front
 apps/desktop/src/estado-janela.mjs — lógica pura do janela.json: ler o arquivo e ajustar a posição às telas
 apps/desktop/src/estado-janela.test.ts — testes do estado da janela

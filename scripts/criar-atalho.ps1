@@ -2,6 +2,8 @@
 #   Estudos.lnk (área de trabalho) e APRNDR.lnk (Menu Iniciar) -> wscript.exe launcher\iniciar.vbs
 #       (sobe o app sem janela e abre a janela própria)
 #   Parar Estudos.lnk (só na área de trabalho)                 -> wscript.exe launcher\parar.vbs
+# O app, ao abrir, regrava o APRNDR.lnk do Menu Iniciar com a identidade dele (AppUserModelID, em
+# apps/desktop/src/main.mjs): é o que faz o item fixado na barra de tarefas ter o ícone do professor.
 # O do Menu Iniciar (pasta Programas do usuário) é o que a pesquisa do Windows encontra:
 # digitar "aprndr" abre o app. Não há "Parar" no Menu Iniciar: o app sempre abre e, para sair
 # de verdade (janela e servidor), o botão "Sair do app" da tela de perfis faz o que o parar faz.

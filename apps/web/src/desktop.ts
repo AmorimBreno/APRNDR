@@ -6,6 +6,8 @@ export interface AmbienteDesktop {
 	plataforma: string;
 	/** Altura, em pixels da janela, da barra de título que o sistema reserva para os botões. */
 	alturaBarra: number;
+	/** Sai do app de verdade: fecha a janela e encerra o servidor. */
+	sair(): Promise<void>;
 }
 
 declare global {
@@ -18,9 +20,10 @@ declare global {
 export function lerAmbienteDesktop(janela: { estudosDesktop?: unknown }): AmbienteDesktop | undefined {
 	const bruto = janela.estudosDesktop;
 	if (!bruto || typeof bruto !== "object") return undefined;
-	const { plataforma, alturaBarra } = bruto as { plataforma?: unknown; alturaBarra?: unknown };
+	const { plataforma, alturaBarra, sair } = bruto as { plataforma?: unknown; alturaBarra?: unknown; sair?: unknown };
 	if (typeof plataforma !== "string" || typeof alturaBarra !== "number" || !Number.isFinite(alturaBarra) || alturaBarra <= 0) return undefined;
-	return { plataforma, alturaBarra };
+	if (typeof sair !== "function") return undefined;
+	return { plataforma, alturaBarra, sair: () => sair() as Promise<void> };
 }
 
 /**

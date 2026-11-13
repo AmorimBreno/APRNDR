@@ -9,7 +9,8 @@
 //   ESTUDOS_URL=...        outro endereço do front (padrão http://localhost:7430);
 //   ESTUDOS_CAPTURA=ARQ    grava um PNG da janela depois de carregar e encerra.
 
-import { app, BrowserWindow, Menu, screen, session, shell } from "electron";
+import { spawn } from "node:child_process";
+import { app, BrowserWindow, ipcMain, Menu, screen, session, shell } from "electron";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -19,6 +20,7 @@ import { ajustarAsTelas, ALTURA_MINIMA, LARGURA_MINIMA, lerEstado } from "./esta
 const AQUI = dirname(fileURLToPath(import.meta.url));
 const URL_APP = process.env.ESTUDOS_URL ?? "http://localhost:7430";
 const ORIGEM_APP = new URL(URL_APP).origin;
+const RAIZ = join(AQUI, "..", "..", "..");
 
 /** Mesma pasta local do servidor e do lançador (fora da pasta de dados e do Drive). */
 const PASTA_APP = join(process.env.LOCALAPPDATA ?? join(homedir(), "AppData", "Local"), "estudos-app");
@@ -45,6 +47,16 @@ if (!app.requestSingleInstanceLock()) {
 		if (janela.isMinimized()) janela.restore();
 		janela.show();
 		janela.focus();
+	});
+	ipcMain.handle("estudos:sair", (evento) => {
+		// Só a página do próprio app pode pedir (não uma página aberta por engano na janela).
+		let origem;
+		try {
+			origem = new URL(evento.senderFrame?.url ?? "").origin;
+		} catch {
+			return;
+		}
+		if (origem === ORIGEM_APP) sairDoApp();
 	});
 	app.whenReady().then(abrirJanela);
 	app.on("window-all-closed", () => app.quit());
@@ -73,6 +85,22 @@ function guardarEstado(janela) {
 	} catch (erro) {
 		console.warn("não consegui guardar o estado da janela:", erro);
 	}
+}
+
+/**
+ * "Sair do app" (o botão da tela de perfis): fecha a janela e encerra o servidor, o mesmo que o
+ * launcher/parar.mjs faz. O parar roda separado e solto, porque este processo vai sair junto com a
+ * janela; o próprio electron.exe, com ELECTRON_RUN_AS_NODE, serve de Node para ele (não depende do
+ * node estar no PATH).
+ */
+function sairDoApp() {
+	spawn(process.execPath, [join(RAIZ, "launcher", "parar.mjs")], {
+		detached: true,
+		stdio: "ignore",
+		windowsHide: true,
+		env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
+	}).unref();
+	app.quit();
 }
 
 /** O front responde? (o Vite pode estar reiniciando) */

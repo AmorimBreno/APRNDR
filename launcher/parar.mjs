@@ -69,12 +69,13 @@ function topoDoApp(pid, todos) {
 
 /**
  * Fecha a janela própria do app (o electron.exe principal, o único sem --type= na
- * linha de comando, desta pasta do repositório). Primeiro o pedido de fechamento
+ * linha de comando, desta pasta do repositório; o próprio parar, quando o app o roda pelo botão
+ * "Sair do app" com o electron.exe como Node, fica de fora). Primeiro o pedido de fechamento
  * normal, para a janela guardar tamanho e posição; se ela não sair em 3 s, à força.
  */
 function fecharJanela() {
 	const processos = [...listarProcessos().values()].filter(
-		(p) => p.nome?.toLowerCase() === "electron.exe" && eDoRepositorio(p.comando) && !/--type=/.test(p.comando ?? ""),
+		(p) => p.nome?.toLowerCase() === "electron.exe" && eDoRepositorio(p.comando) && !/--type=/.test(p.comando ?? "") && p.pid !== process.pid,
 	);
 	if (processos.length === 0) {
 		registrar("nenhuma janela própria aberta.");

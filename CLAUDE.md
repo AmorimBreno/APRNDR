@@ -15,7 +15,7 @@ Stack: TypeScript, monorepo pnpm, Node 24 com o SDK do pi (@earendil-works/pi-co
 - pnpm typecheck: tsc --noEmit em todos os pacotes.
 - pnpm test: roda os testes com o vitest.
 - pnpm --filter @estudos/desktop iniciar: abre só a janela do Electron (o app precisa estar no ar). ESTUDOS_CAPTURA=arquivo.png grava um PNG da página e encerra; ESTUDOS_URL=... abre outro endereço (por exemplo, com um #/perfil/...). A janela de verdade não aparece em captura de página: os botões do Windows são desenhados pelo sistema.
-- Lançador: wscript launcher\iniciar.vbs sobe o pnpm dev escondido se preciso e abre a janela própria do app (Electron, apps/desktop; sem ele, o Edge em modo app; ESTUDOS_SEM_NAVEGADOR=1 não abre janela nenhuma); wscript launcher\parar.vbs (ou node launcher\parar.mjs) encerra o app; powershell -ExecutionPolicy Bypass -File scripts\criar-atalho.ps1 cria os atalhos "Estudos" e "Parar Estudos" na área de trabalho e "APRNDR" e "Parar APRNDR" no Menu Iniciar (a pesquisa do Windows acha "aprndr"). Logs em %LOCALAPPDATA%\estudos-app\logs (lancador-*.log e dev-*.log).
+- Lançador: wscript launcher\iniciar.vbs sobe o pnpm dev escondido se preciso e abre a janela própria do app (Electron, apps/desktop; sem ele, o Edge em modo app; ESTUDOS_SEM_NAVEGADOR=1 não abre janela nenhuma); wscript launcher\parar.vbs (ou node launcher\parar.mjs) encerra o app; powershell -ExecutionPolicy Bypass -File scripts\criar-atalho.ps1 cria os atalhos "Estudos" e "Parar Estudos" na área de trabalho e "APRNDR" no Menu Iniciar (a pesquisa do Windows acha "aprndr"). O botão "Sair do app" da tela de perfis (só na janela própria) faz o que o parar faz. Logs em %LOCALAPPDATA%\estudos-app\logs (lancador-*.log e dev-*.log).
 
 ## Convenções
 

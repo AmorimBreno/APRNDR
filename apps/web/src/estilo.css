@@ -36,6 +36,7 @@ body { zoom: var(--zoom-app); }
 
 .perfis { display: flex; flex-direction: column; gap: var(--space-6); height: 100%; padding: var(--space-6) var(--space-8) var(--space-8); box-sizing: border-box; }
 .perfis__cabeca { flex: none; display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-4); }
+.perfis__acoes { display: flex; align-items: center; gap: var(--space-3); }
 .perfis__marca { display: flex; flex-direction: column; gap: var(--space-2); }
 .perfis__marca h1 { margin: 0; color: var(--ink-muted); }
 .perfis__recarregar { display: inline-flex; align-items: center; gap: var(--space-2); height: var(--control-md); padding: 0 var(--space-4); border: var(--border-control) solid var(--line-strong); border-radius: var(--radius-md); background: transparent; color: var(--ink); cursor: pointer; }

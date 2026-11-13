@@ -1,8 +1,10 @@
 ﻿# Cria os atalhos do app, na área de trabalho e no Menu Iniciar:
-#   Estudos.lnk / APRNDR.lnk              -> wscript.exe launcher\iniciar.vbs (sobe o app sem janela e abre a janela própria)
-#   Parar Estudos.lnk / Parar APRNDR.lnk  -> wscript.exe launcher\parar.vbs   (encerra o app)
-# Os do Menu Iniciar (pasta Programas do usuário) são o que a pesquisa do Windows
-# encontra: digitar "aprndr" abre o app. Os da área de trabalho mantêm o nome antigo.
+#   Estudos.lnk (área de trabalho) e APRNDR.lnk (Menu Iniciar) -> wscript.exe launcher\iniciar.vbs
+#       (sobe o app sem janela e abre a janela própria)
+#   Parar Estudos.lnk (só na área de trabalho)                 -> wscript.exe launcher\parar.vbs
+# O do Menu Iniciar (pasta Programas do usuário) é o que a pesquisa do Windows encontra:
+# digitar "aprndr" abre o app. Não há "Parar" no Menu Iniciar: o app sempre abre e, para sair
+# de verdade (janela e servidor), o botão "Sair do app" da tela de perfis faz o que o parar faz.
 #
 # Como rodar (não precisa mudar a política de execução do Windows):
 #   powershell -ExecutionPolicy Bypass -File scripts\criar-atalho.ps1
@@ -50,4 +52,3 @@ function Criar-Atalho($nome, $vbs, $descricao, $pasta = $areaDeTrabalho) {
 Criar-Atalho "Estudos" "iniciar.vbs" "Abre o app de estudos (sobe o servidor se preciso)"
 Criar-Atalho "Parar Estudos" "parar.vbs" "Encerra o app de estudos (servidor e Vite)"
 Criar-Atalho "APRNDR" "iniciar.vbs" "Abre o APRNDR (sobe o servidor se preciso)" $menuIniciar
-Criar-Atalho "Parar APRNDR" "parar.vbs" "Encerra o APRNDR (servidor e Vite)" $menuIniciar

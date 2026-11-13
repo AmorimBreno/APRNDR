@@ -143,8 +143,8 @@ apps/server/src/servidor.test.ts — testes do servidor sem rede (rotas, mensage
 apps/desktop/ — @estudos/desktop: a janela própria do app (Electron). Sem script dev de propósito (o pnpm dev da raiz roda o dev de todo apps/*); o script é iniciar
 apps/desktop/package.json — electron com versão exata; main src/main.mjs
 apps/desktop/tsconfig.json — checkJs nos .mjs (noImplicitAny desligado)
-apps/desktop/src/main.mjs — processo principal: janela sem moldura (titleBarOverlay), instância única, estado da janela, tela "Reconectando…", navegação presa ao front, permissões negadas, atalhos (F5, Ctrl+R, F12, zoom), ESTUDOS_URL e ESTUDOS_CAPTURA
-apps/desktop/src/preload.cjs — expõe window.estudosDesktop (plataforma e altura da barra) ao front
+apps/desktop/src/main.mjs — processo principal: janela sem moldura (titleBarOverlay), instância única, estado da janela, tela "Reconectando…", "Sair do app" (IPC estudos:sair: guarda a janela e roda o launcher/parar.mjs solto, com o electron.exe como Node), navegação presa ao front, permissões negadas, atalhos (F5, Ctrl+R, F12, zoom), ESTUDOS_URL e ESTUDOS_CAPTURA
+apps/desktop/src/preload.cjs — expõe window.estudosDesktop (plataforma, altura da barra e sair(), que pede ao main para fechar a janela e rodar o parar.mjs) ao front
 apps/desktop/src/estado-janela.mjs — lógica pura do janela.json: ler o arquivo e ajustar a posição às telas
 apps/desktop/src/estado-janela.test.ts — testes do estado da janela
 apps/desktop/src/reconectando.html — tela local enquanto o front não responde (o texto só aparece depois de 1 s)
@@ -512,4 +512,4 @@ launcher/iniciar.mjs — lançador: confere a saúde, sobe o pnpm dev escondido 
 launcher/parar.vbs — alvo do atalho "Parar Estudos": roda o parar.mjs sem janela
 launcher/parar.mjs — fecha a janela própria (pedido de fechamento; à força só depois de 3 s), encerra a árvore do pnpm dev gravada e os node do app nas portas 7430/7431; nunca toca em outros processos
 launcher/comum.mjs — caminhos, portas, log, PowerShell e avisos comuns ao lançador
-scripts/criar-atalho.ps1 — cria os atalhos "Estudos" e "Parar Estudos" na área de trabalho e "APRNDR" e "Parar APRNDR" no Menu Iniciar (é o que a pesquisa do Windows acha), com o ícone do professor (rodar com -ExecutionPolicy Bypass)
+scripts/criar-atalho.ps1 — cria os atalhos "Estudos" e "Parar Estudos" na área de trabalho e "APRNDR" no Menu Iniciar (é o que a pesquisa do Windows acha), com o ícone do professor (rodar com -ExecutionPolicy Bypass)

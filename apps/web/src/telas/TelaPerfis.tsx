@@ -12,6 +12,7 @@ import { EmptyState, Icon, ORNAMENT_MEANINGS, type OrnamentGlyph, pad2, Wordmark
 import { type ErroPerfil, type ResumoPerfil, semMovimento, useValorEstavel, usePerfis } from "@estudos/ui";
 import { motion, useMotionValue, useSpring, useTransform } from "motion/react";
 import type { CSSProperties, PointerEvent } from "react";
+import { lerAmbienteDesktop } from "../desktop.ts";
 
 /** Até quantos cards ficam numa linha só, com a altura da tela. */
 const LIMITE_NUMA_LINHA = 4;
@@ -114,6 +115,8 @@ function CartaoErro({ invalido }: { invalido: ErroPerfil }) {
 
 export function TelaPerfis() {
 	const { lista, erro, carregando, recarregar } = usePerfis();
+	// "Sair do app" só existe na janela própria; no navegador comum, fechar a aba basta.
+	const desktop = lerAmbienteDesktop(window);
 	const perfis = lista?.perfis ?? [];
 	const invalidos = lista?.erros ?? [];
 	const cartoes = perfis.length + invalidos.length;
@@ -164,10 +167,18 @@ export function TelaPerfis() {
 					<Wordmark size={32} />
 					<h1 className="overline">Escolha um perfil · {mesAno.format(new Date())}</h1>
 				</div>
-				<button type="button" className="perfis__recarregar button" onClick={recarregar} disabled={recarregando}>
-					<Icon name="refresh" size={18} strokeWidth={2.25} />
-					Recarregar
-				</button>
+				<div className="perfis__acoes">
+					{desktop ? (
+						<button type="button" className="perfis__recarregar button" onClick={() => void desktop.sair()}>
+							<Icon name="close" size={18} strokeWidth={2.25} />
+							Sair do app
+						</button>
+					) : null}
+					<button type="button" className="perfis__recarregar button" onClick={recarregar} disabled={recarregando}>
+						<Icon name="refresh" size={18} strokeWidth={2.25} />
+						Recarregar
+					</button>
+				</div>
 			</header>
 			<main className="perfis__corpo">{corpo}</main>
 		</div>

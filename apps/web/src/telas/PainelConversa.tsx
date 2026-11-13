@@ -359,29 +359,39 @@ export function PainelConversa({
 		.filter((registro) => registro.estado === "pendente" && !idsDasChamadas.has(registro.id))
 		.sort((a, b) => a.ordem - b.ordem);
 
-	const documento = (
-		<DocumentoConversa
-			conversa={estado.conversa}
-			pedidoDaChamada={(id) => (registros[id] ? botaoDoPedido(registros[id]) : undefined)}
-			autorDaResposta={autorDaResposta}
-			{...(aguardando ? { aguardando } : {})}
-			{...(voo ? { voo } : {})}
-			aoPousar={() => setVoo(undefined)}
-			// Os ganchos do perfil valem só no painel embutido: a conversa em tela cheia não muda em nada.
-			{...(embutido && rodapeDaResposta ? { rodapeDaResposta } : {})}
-			{...(embutido && acoesDoBloco ? { acoesDoBloco } : {})}
-			depois={soltos.map((registro) => (
-				<div key={registro.id} className="documento__pedido">
-					{botaoDoPedido(registro)}
-				</div>
-			))}
-			vazio={
-				<EmptyState glyph="問" tone="moss" title="Conversa nova">
-					Escreva abaixo para começar. As respostas aparecem aqui como uma página, bloco a bloco, e as ferramentas que o agente usar ficam entre
-					eles.
-				</EmptyState>
-			}
-		/>
+	// O documento não depende do que está sendo digitado. O texto do campo é estado deste painel, então
+	// cada tecla refaz este render; sem memorizar, cada tecla reprocessaria o markdown (fórmulas, blocos)
+	// de todas as respostas da conversa e o campo travaria por segundos. Como elemento memorizado, o
+	// React nem entra nele. As dependências são tudo o que o documento lê de fora (estado da sessão,
+	// pedidos, perfil e os ganchos do perfil); o texto do campo e as funções só de estado (setVoo,
+	// abrirPedido) ficam de fora de propósito.
+	const documento = useMemo(
+		() => (
+			<DocumentoConversa
+				conversa={estado.conversa}
+				pedidoDaChamada={(id) => (registros[id] ? botaoDoPedido(registros[id]) : undefined)}
+				autorDaResposta={autorDaResposta}
+				{...(aguardando ? { aguardando } : {})}
+				{...(voo ? { voo } : {})}
+				aoPousar={() => setVoo(undefined)}
+				// Os ganchos do perfil valem só no painel embutido: a conversa em tela cheia não muda em nada.
+				{...(embutido && rodapeDaResposta ? { rodapeDaResposta } : {})}
+				{...(embutido && acoesDoBloco ? { acoesDoBloco } : {})}
+				depois={soltos.map((registro) => (
+					<div key={registro.id} className="documento__pedido">
+						{botaoDoPedido(registro)}
+					</div>
+				))}
+				vazio={
+					<EmptyState glyph="問" tone="moss" title="Conversa nova">
+						Escreva abaixo para começar. As respostas aparecem aqui como uma página, bloco a bloco, e as ferramentas que o agente usar ficam entre
+						eles.
+					</EmptyState>
+				}
+			/>
+		),
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- ver o comentário acima
+		[estado, registros, numeros, perfil, agenteAtual, atividade, voo, embutido, rodapeDaResposta, acoesDoBloco],
 	);
 
 	const barra = (

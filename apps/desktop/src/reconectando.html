@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="pt-BR">
+	<head>
+		<meta charset="UTF-8" />
+		<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'" />
+		<title>APRNDR</title>
+		<style>
+			html, body { height: 100%; margin: 0; background: #0f0e0d; color: #a8a299; font: 14px/1.4 "Segoe UI", system-ui, sans-serif; }
+			body { display: grid; place-items: center; -webkit-app-region: drag; }
+			/* Estado passageiro: só aparece se durar mais de 1 s (docs/padroes-de-interface.md). */
+			p { margin: 0; opacity: 0; animation: aparecer 150ms ease-out 1s forwards; }
+			@keyframes aparecer { to { opacity: 1; } }
+			@media (prefers-reduced-motion: reduce) { p { animation-duration: 1ms; } }
+		</style>
+	</head>
+	<body>
+		<p>Reconectando ao app…</p>
+	</body>
+</html>

@@ -1,0 +1,15 @@
+{
+	"name": "@estudos/desktop",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"description": "Janela própria do app (Electron): carrega o front em http://localhost:7430. Sem script dev de propósito: o `pnpm dev` da raiz roda o dev de todo apps/*.",
+	"main": "src/main.mjs",
+	"scripts": {
+		"iniciar": "electron .",
+		"typecheck": "tsc --noEmit"
+	},
+	"devDependencies": {
+		"electron": "45.3.1"
+	}
+}

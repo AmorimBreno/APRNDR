@@ -1,0 +1,80 @@
+# O professor flutuante, a voz pelo atalho e o protótipo de tinta (contrato, versão 1)
+
+Decisão de origem: ESPECIFICACAO.md, 13.21 ("O professor ao lado"). Fases 3, 4 e 6a no docs/PLANO.md, "Novo rumo: o professor ao lado". O Breno anota à mão no Samsung Notes (Windows, S Pen); o professor fica numa bolinha por cima de tudo, abre um chat compacto da mesma conversa, ouve pelo atalho e vê a página quando pedido. Decisões dele: o atalho primeiro (a palavra "professor" é a Fase 5), a resposta em texto (sem voz), o caderno de caneta só depois de um protótipo.
+
+Regras de sempre: o núcleo não sabe o que é matéria, nota ou plano (o cabeçalho do chat compacto vem do perfil); docs/padroes-de-interface.md vale em toda tela; nada de áudio guardado; a chave do OpenRouter só do ambiente; nada de teste na pasta de dados do Breno.
+
+
+## 1. Requisitos
+
+Fase 3, o professor flutuante:
+- R1 Bolinha: uma janela própria do Electron, sem moldura, transparente, sempre por cima (inclusive do Samsung Notes), fora da barra de tarefas, com a foto do professor (64 px). Arrastável; a posição fica lembrada (%LOCALAPPDATA%\estudos-app\flutuante.json) e sempre dentro de uma tela visível. Aparece sem roubar o foco (showInactive).
+- R2 A bolinha mostra o estado: parada, pensando, escrevendo e ouvindo (um anel que pulsa; com movimento reduzido, só a cor muda).
+- R3 Chat compacto: o clique na bolinha (sem arrastar) abre o chat compacto (420 × 620, a mesma janela crescendo a partir da bolinha), sempre por cima. É a MESMA conversa que está aberta no app (a mesma sessão do servidor, sem trocar nada): o que se pergunta nele aparece na mesa e vice-versa. O topo vem do perfil (no de estudos: a matéria da conversa e o seletor de plano). "Recolher" volta para a bolinha.
+- R4 Atalho global Ctrl+Alt+P: abre e recolhe o chat compacto de qualquer lugar do Windows. Fechar a janela principal não fecha a bolinha (o app continua no ar com ela); a bolinha tem "Abrir o app" e "Esconder a bolinha". Sem janela nenhuma, o Electron sai. O "Sair do app" fecha as duas.
+- R5 "Olha minha página": um botão no chat compacto captura a tela onde a bolinha está, escondendo a bolinha e o chat durante a captura (lado maior até 2000 px, JPEG 85), e a imagem vai junto da próxima mensagem (aparece como um chip "Captura da tela" com X antes de mandar). O professor (GPT-6.1 Sol, que aceita imagem: conferido no catálogo do pi) lê a anotação. No núcleo, a mensagem aceita imagens (genérico).
+- R6 A bolinha se liga e desliga (lembrado em flutuante.json): pelo menu da bolinha ("Esconder a bolinha") e por um botão na tela de perfis ("Mostrar o professor flutuante"), só na janela própria.
+
+Fase 4, a voz pelo atalho:
+- R7 Ctrl+Alt+Espaço (global) ou o botão de microfone do chat compacto começa a gravar; de novo, para. Gravando, a bolinha (ou o botão) pulsa e mostra o tempo; para sozinha em 60 s. Se o chat estava recolhido, ele abre.
+- R8 O áudio (WAV 16 kHz mono, convertido no front) vai ao servidor, que transcreve pela API do OpenRouter (POST https://openrouter.ai/api/v1/audio/transcriptions, JSON com input_audio {data, format: "wav"}, language "pt"), com a OPENROUTER_API_KEY do ambiente. O modelo vem do profile.json (transcricao.modelo; padrão openai/whisper-large-v3). O áudio não é gravado em disco nem nos logs; o log diz só a duração e o custo.
+- R9 O texto aparece no campo do chat compacto e é enviado sozinho depois de 2 s, com "Cancelar" e com a edição parando a contagem. A resposta vem em texto.
+- R10 O Electron libera o microfone (permissão "media", só áudio) só para o front do app; as outras continuam negadas. Microfone negado ou sem dispositivo: aviso claro no chat ("Não consegui usar o microfone").
+
+Fase 6a, o protótipo de tinta:
+- R11 Uma tela à parte, #/perfil/estudos/tinta-teste (sem botão na interface; o roteiro diz o endereço), com uma página pautada no rosa das notas do Breno: caneta com pressão (perfect-freehand), 4 cores (preto, vermelho, azul, amarelo), marca-texto (amarelo translúcido, atrás da tinta), borracha (o botão da S Pen, pointer buttons 32, ou a ferramenta), desfazer (Ctrl+Z e botão); desenhar só com pointerType "pen" (e mouse, para testar), o toque rola a página e a palma é ignorada; canvas com desynchronized; o traço é desenhado direto no canvas a cada pointermove (coalesced events), e os traços prontos ficam numa camada já desenhada. Um medidor mostra a latência média (do evento ao quadro) e os quadros por segundo. Nada é gravado em disco (só na memória da tela).
+
+
+## 2. Contratos entre os pacotes
+
+2.1 Mensagem com imagens (núcleo, WP-A):
+
+    // packages/core/src/protocolo.ts
+    ImagemMensagem { tipo: "image/png" | "image/jpeg" | "image/webp"; dados: string }   // base64 sem "data:"
+    pedido "enviar": { tipo, perfil, texto, contextosTela?, imagens?: ImagemMensagem[] }   // até 3, cada uma até 8 MB de base64
+
+    JanelaPerfil.enviar(texto, contextosTela?, imagens?) -> a fila própria guarda as imagens junto; prompt(texto, { images: [{ type: "image", data, mimeType }] }).
+    Evento "mensagem_usuario" ganha imagens?: number (quantas); converterHistorico conta as imagens da mensagem do usuário.
+    packages/ui: AcoesJanela.enviar(texto, contextosTela?, imagens?); ItemUsuarioConversa.imagens?: number; a nota do usuário na conversa mostra um chip "1 imagem" (ou "N imagens"). O log do servidor registra só quantas imagens e o tamanho, nunca os dados.
+
+2.2 Transcrição (servidor, WP-A):
+
+    POST /api/transcrever  body { perfil: string; audio: string (base64 de um WAV); formato: "wav" }  (até 10 MB)
+    200 { texto: string; segundos?: number; custo?: number }
+    4xx/5xx { erro: string }   // frase para a tela, em português
+    O modelo: perfil.transcricao?.modelo (profile.json "transcricao": { "modelo": "openai/whisper-large-v3" }), validado no esquema do perfil.
+
+2.3 A ponte do Electron (WP-B implementa no preload; WP-C usa):
+
+    window.estudosDesktop (já existe: plataforma, alturaBarra, sair) ganha:
+      flutuante?: {
+        // só na janela da bolinha
+        modo(): Promise<"bolinha" | "chat">;
+        expandir(): Promise<void>;            // vira chat compacto
+        recolher(): Promise<void>;            // volta a bolinha
+        moverPara(x: number, y: number): void; // posição da janela em pixels da tela (arrastar a bolinha)
+        capturarTela(): Promise<{ tipo: "image/jpeg"; dados: string; largura: number; altura: number } | null>;
+        abrirApp(): Promise<void>;
+        esconder(): Promise<void>;            // "Esconder a bolinha" (grava ligado: false)
+        aoMudarModo(cb: (modo: "bolinha" | "chat") => void): () => void;
+        aoAlternarVoz(cb: () => void): () => void;   // o atalho Ctrl+Alt+Espaço
+      };
+      // em qualquer janela do app
+      bolinha?: { ligada(): Promise<boolean>; ligar(ligada: boolean): Promise<void> };
+
+    A janela da bolinha carrega URL_APP + "/#/flutuante/estudos" (o perfil vem da rota), com o mesmo preload (o argumento --estudos-janela=flutuante diz ao preload que é ela). Fundo transparente: a página da rota flutuante não pinta o fundo no modo bolinha.
+
+2.4 A tela flutuante (WP-C):
+
+    apps/web: rota "#/flutuante/<perfil>" -> TelaFlutuante (genérica). Usa useJanelaPerfil(perfil) (abre o perfil sem sessaoId: entra na conversa aberta no servidor).
+    packages/ui/telas-iniciais.ts: EntradaTelaInicial ganha cabecalhoFlutuante?: ComponentType<{ janela: JanelaPerfilHook }>.
+    profiles/estudos/paineis: CabecalhoFlutuante (a matéria da conversa, pela chave "materia:<id>" do contexto, e o SeletorPlano dela; sem matéria, "Conversa geral").
+
+
+## 3. Pacotes (arquivos exclusivos; paralelo)
+
+- WP-A (Sonnet), núcleo e servidor: packages/core (protocolo, janela-perfil, eventos, perfis/esquema do profile.json), packages/ui (use-janela-perfil, estado-janela, a nota do usuário na Conversa), apps/server (a passagem das imagens, a rota /api/transcrever, o log), profiles/estudos/profile.json (transcricao), e os testes.
+- WP-B (Sonnet), Electron: apps/desktop/src (main.mjs, preload.cjs, um módulo novo para a bolinha e o estado dela, os testes puros), docs/janela-propria.md (as mudanças de comportamento).
+- WP-C (Sonnet), a tela flutuante e a voz no front: apps/web/src (a rota, TelaFlutuante, a gravação e o WAV, o chip da captura, o botão da tela de perfis), packages/ui/src/telas-iniciais.ts (só o campo cabecalhoFlutuante), profiles/estudos/paineis/src (CabecalhoFlutuante.tsx e o registro em index.ts), e os testes. Usa as assinaturas de 2.1 a 2.4 mesmo antes de WP-A e WP-B terminarem.
+- WP-D (Sonnet), o protótipo de tinta: profiles/estudos/paineis/src (TintaTeste.tsx, tinta.ts, o CSS e a rota "tinta-teste" em TelaEstudos.tsx), a dependência perfect-freehand no package.json do paineis, e os testes puros.
+- Depois: revisão por diff, pnpm typecheck e pnpm test, um commit por pacote; conferência de verdade (a janela do Electron com captura, uma transcrição real com um WAV gerado, uma mensagem com imagem ao modelo numa pasta temporária); roteiros docs/teste-flutuante.md e docs/teste-tinta.md; code-review.

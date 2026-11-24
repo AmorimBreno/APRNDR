@@ -229,3 +229,20 @@ describe("notas", () => {
 		expect(porTitulo["Do Breno"]!.doProfessor).toBe(false);
 	});
 });
+
+describe("salvar ao mesmo tempo (a trava por arquivo)", () => {
+	it("duas gravações com a mesma versão, lado a lado: uma grava e a outra cai no conflito, nunca as duas", async () => {
+		await criarNota(dados, materia, "Plano");
+		const v0 = versaoDe("");
+		const resultados = await Promise.allSettled([
+			salvarNota(dados, materia, "Plano", "do editor\n", { versao: v0 }),
+			salvarNota(dados, materia, "Plano", "do professor\n", { versao: v0 }),
+		]);
+		const gravadas = resultados.filter((resultado) => resultado.status === "fulfilled");
+		const conflitos = resultados.filter((resultado) => resultado.status === "rejected" && resultado.reason instanceof ErroConflito);
+		expect(gravadas).toHaveLength(1);
+		expect(conflitos).toHaveLength(1);
+		const final = await readFile(arquivoNota(dados, materia, "Plano"), "utf8");
+		expect(["do editor\n", "do professor\n"]).toContain(final);
+	});
+});

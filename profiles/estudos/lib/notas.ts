@@ -139,8 +139,32 @@ export interface OpcoesSalvar {
 }
 
 /**
+ * Uma trava por arquivo de nota, para a conferência da versão e a gravação acontecerem juntas: a extensão de notas
+ * (o editor) e a dos planos (o professor) gravam a mesma nota por filas diferentes, e sem a trava as duas passavam
+ * pela conferência e a última apagava a outra. Fica no globalThis porque cada extensão pode carregar a própria cópia
+ * deste módulo; a chave é o caminho em minúsculas (o Windows não diferencia).
+ */
+const TRAVAS_NOTAS = Symbol.for("estudos.travas-das-notas");
+type MapaDeTravas = Map<string, Promise<unknown>>;
+
+export function comTravaDaNota<T>(arquivo: string, tarefa: () => Promise<T>): Promise<T> {
+	const registro = globalThis as unknown as Record<symbol, MapaDeTravas | undefined>;
+	const travas = (registro[TRAVAS_NOTAS] ??= new Map());
+	const chave = arquivo.toLowerCase();
+	const anterior = travas.get(chave) ?? Promise.resolve();
+	const proxima = anterior.then(tarefa, tarefa);
+	const marcador = proxima.catch(() => undefined);
+	travas.set(chave, marcador);
+	void marcador.then(() => {
+		if (travas.get(chave) === marcador) travas.delete(chave);
+	});
+	return proxima;
+}
+
+/**
  * Salva o conteúdo da nota. O arquivo termina com uma quebra de linha. Se a
  * versão do arquivo não é a que a tela abriu, lança ErroConflito e não grava.
+ * A conferência e a gravação ficam na trava do arquivo (comTravaDaNota).
  */
 export async function salvarNota(dados: string, id: string, bruto: string, conteudo: string, opcoes: OpcoesSalvar = {}): Promise<{ versao: string; modificadaEm: string }> {
 	await garantirMateria(dados, id);
@@ -148,10 +172,15 @@ export async function salvarNota(dados: string, id: string, bruto: string, conte
 	const noDisco = await tituloNoDisco(dados, id, pedido);
 	const titulo = noDisco ?? pedido;
 	const arquivo = arquivoNota(dados, id, titulo);
+	return comTravaDaNota(arquivo, () => salvarNaTrava(dados, id, titulo, arquivo, conteudo, opcoes));
+}
+
+async function salvarNaTrava(dados: string, id: string, titulo: string, arquivo: string, conteudo: string, opcoes: OpcoesSalvar): Promise<{ versao: string; modificadaEm: string }> {
 	if (!opcoes.forcar) {
 		let atual: string | undefined;
 		try {
-			atual = noDisco ? versaoDe(await readFile(arquivo, "utf8")) : undefined;
+			// Lido dentro da trava: o que vale é o arquivo de agora, não o de antes de esperar a vez.
+			atual = versaoDe(await readFile(arquivo, "utf8"));
 		} catch (erro) {
 			if ((erro as NodeJS.ErrnoException).code !== "ENOENT") throw erro;
 		}

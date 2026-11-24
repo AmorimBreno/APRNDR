@@ -254,7 +254,12 @@ function Chat({ perfilId, janela, janelaPura, cabecalho: Cabecalho, ponte, rascu
 	useEffect(() => {
 		const caixa = raiz.current;
 		if (!caixa) return;
+		// A posição de antes, copiada já: ao montar, a conversa rola sozinha até o fim, e esse scroll (que não é do Breno)
+		// seria gravado por cima antes de a posição ser devolvida (relato do Breno: continuava indo ao fim).
+		const salvo = new Map(rolagensDoChat);
+		let devolvendo = true;
 		const guardar = (evento: Event) => {
+			if (devolvendo) return;
 			const alvo = evento.target;
 			if (!(alvo instanceof HTMLElement) || !alvo.className) return;
 			// Ao recolher, o Electron encolhe a janela ao tamanho da bolinha antes de a tela trocar: a conversa fica com
@@ -267,7 +272,7 @@ function Chat({ perfilId, janela, janelaPura, cabecalho: Cabecalho, ponte, rascu
 		// devolve o que estava, algumas vezes nos primeiros quadros, até a janela ter o tamanho do chat.
 		const devolver = () => {
 			if (window.innerHeight < ALTURA_MINIMA_DO_CHAT) return;
-			for (const [classe, rolagem] of rolagensDoChat) {
+			for (const [classe, rolagem] of salvo) {
 				if (rolagem.noFim) continue;
 				const elemento = [...caixa.querySelectorAll<HTMLElement>("*")].find((item) => item.className === classe);
 				if (elemento && Math.abs(elemento.scrollTop - rolagem.topo) > 1) elemento.scrollTop = rolagem.topo;
@@ -275,6 +280,10 @@ function Chat({ perfilId, janela, janelaPura, cabecalho: Cabecalho, ponte, rascu
 		};
 		const quadro = requestAnimationFrame(devolver);
 		const tempos = [60, 150, 300].map((ms) => setTimeout(devolver, ms));
+		// Depois disso, a rolagem volta a ser do Breno e é guardada de novo.
+		tempos.push(setTimeout(() => {
+			devolvendo = false;
+		}, 350));
 		return () => {
 			cancelAnimationFrame(quadro);
 			for (const tempo of tempos) clearTimeout(tempo);

@@ -291,6 +291,29 @@ describe("o chat compacto", () => {
 		expect(botao("Gravar a voz")).not.toBeNull();
 	});
 
+	it("recolher e abrir de novo volta à rolagem em que o Breno estava, mesmo com a conversa rolando sozinha ao fim", async () => {
+		const rolagem = () => container.querySelector<HTMLElement>(".painel-conversa__rolagem");
+		const alturas = (elemento: HTMLElement) => {
+			Object.defineProperty(elemento, "clientHeight", { configurable: true, get: () => 321 });
+			Object.defineProperty(elemento, "scrollHeight", { configurable: true, get: () => 5000 });
+		};
+		desenhar();
+		await ate(() => rolagem() !== null);
+		await new Promise((pronto) => setTimeout(pronto, 400));
+		alturas(rolagem()!);
+		rolagem()!.scrollTop = 1000;
+		rolagem()!.dispatchEvent(new Event("scroll"));
+		ponte.mudarModo("bolinha");
+		await ate(() => bolinha() !== null);
+		ponte.mudarModo("chat");
+		await ate(() => rolagem() !== null);
+		// A conversa remontada vai ao fim sozinha (e esse scroll não pode ser gravado como do Breno).
+		alturas(rolagem()!);
+		rolagem()!.scrollTop = 4679;
+		rolagem()!.dispatchEvent(new Event("scroll"));
+		await ate(() => rolagem()!.scrollTop === 1000);
+	});
+
 	it("recolher e expandir não perdem o rascunho", async () => {
 		desenhar();
 		await ate(() => campo() !== null);

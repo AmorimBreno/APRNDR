@@ -303,6 +303,34 @@ async function capturarTela() {
 	}
 }
 
+// --- arrasto ----------------------------------------------------------------
+
+/** @type {{ inicio: { x: number, y: number }, janela: { x: number, y: number }, arrastou: boolean, relogio: ReturnType<typeof setInterval> } | null} */
+let arrasto = null;
+
+/** Quantos pixels o cursor anda antes de virar arrasto (menos que isso é um clique). */
+const LIMITE_ARRASTO = 4;
+
+function pararArrasto() {
+	if (arrasto) clearInterval(arrasto.relogio);
+	arrasto = null;
+}
+
+function passoDoArrasto() {
+	const atual = vivaOuNula();
+	if (!arrasto || !atual || modo !== "bolinha") return pararArrasto();
+	const cursor = screen.getCursorScreenPoint();
+	const dx = cursor.x - arrasto.inicio.x;
+	const dy = cursor.y - arrasto.inicio.y;
+	if (!arrasto.arrastou && Math.hypot(dx, dy) < LIMITE_ARRASTO) return;
+	arrasto.arrastou = true;
+	const area = screen.getDisplayNearestPoint(cursor).workArea;
+	const nova = limitarNaArea(arrasto.janela.x + dx, arrasto.janela.y + dy, TAMANHO_BOLINHA, area);
+	if (nova.x === posicao.x && nova.y === posicao.y) return;
+	posicao = nova;
+	atual.setBounds(boundsBolinha());
+}
+
 // --- IPC ------------------------------------------------------------------
 
 function origemDe(url) {
@@ -342,6 +370,22 @@ function registrarIpc() {
 		posicao = limitarNaArea(x, y, TAMANHO_BOLINHA, area);
 		atual.setBounds(boundsBolinha());
 		gravarDepois();
+	});
+	// O arrasto conduzido daqui (relato do Breno: com o moverPara, a bolinha piscava entre o canto e o dedo). As
+	// coordenadas do ponteiro na página mudam enquanto a própria janela anda, e o cálculo oscilava; aqui a posição sai do
+	// cursor real da tela (o toque e a caneta também o movem no Windows), num passo a cada 16 ms, até o fim.
+	ipcMain.handle("estudos:flutuante:arrasto-inicio", (evento) => {
+		if (!daBolinha(evento) || modo !== "bolinha") return;
+		pararArrasto();
+		arrasto = { inicio: screen.getCursorScreenPoint(), janela: { x: posicao.x, y: posicao.y }, arrastou: false, relogio: setInterval(passoDoArrasto, 16) };
+	});
+	ipcMain.handle("estudos:flutuante:arrasto-fim", (evento) => {
+		if (!daBolinha(evento) || !arrasto) return { arrastou: false };
+		passoDoArrasto();
+		const { arrastou } = arrasto;
+		pararArrasto();
+		if (arrastou) gravarDepois();
+		return { arrastou };
 	});
 	ipcMain.handle("estudos:flutuante:capturar", (evento) => (daBolinha(evento) ? capturarTela() : null));
 	ipcMain.handle("estudos:flutuante:abrir-app", (evento) => {

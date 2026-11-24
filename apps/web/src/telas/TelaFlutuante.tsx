@@ -89,7 +89,7 @@ interface PropsBolinha {
 function Bolinha({ nome, avatar, estado, segundos, ponte }: PropsBolinha) {
 	const [menu, setMenu] = useState(false);
 	/** O gesto em andamento: onde a janela está em relação ao ponteiro e se já virou arrasto. */
-	const gesto = useRef<{ id: number; x0: number; y0: number; dx: number; dy: number; arrastou: boolean } | undefined>(undefined);
+	const gesto = useRef<{ id: number; x0: number; y0: number; dx: number; dy: number; arrastou: boolean; nativo: boolean } | undefined>(undefined);
 	const proximo = useRef<{ x: number; y: number } | undefined>(undefined);
 	const quadro = useRef<number | undefined>(undefined);
 
@@ -110,12 +110,14 @@ function Bolinha({ nome, avatar, estado, segundos, ponte }: PropsBolinha) {
 	const descer = (evento: EventoPonteiro<HTMLDivElement>) => {
 		if (evento.button !== 0) return;
 		setMenu(false);
-		gesto.current = { id: evento.pointerId, x0: evento.screenX, y0: evento.screenY, dx: evento.clientX, dy: evento.clientY, arrastou: false };
+		gesto.current = { id: evento.pointerId, x0: evento.screenX, y0: evento.screenY, dx: evento.clientX, dy: evento.clientY, arrastou: false, nativo: Boolean(ponte?.arrastoInicio) };
 		evento.currentTarget.setPointerCapture?.(evento.pointerId);
+		// Com a ponte, quem arrasta é o Electron, pelo cursor da tela (as coordenadas da página mudam com a janela andando).
+		if (ponte?.arrastoInicio) void ponte.arrastoInicio();
 	};
 	const andar = (evento: EventoPonteiro<HTMLDivElement>) => {
 		const atual = gesto.current;
-		if (!atual || atual.id !== evento.pointerId) return;
+		if (!atual || atual.id !== evento.pointerId || atual.nativo) return;
 		if (!atual.arrastou) {
 			if (Math.hypot(evento.screenX - atual.x0, evento.screenY - atual.y0) < LIMITE_ARRASTO) return;
 			atual.arrastou = true;
@@ -129,6 +131,12 @@ function Bolinha({ nome, avatar, estado, segundos, ponte }: PropsBolinha) {
 		if (!atual || atual.id !== evento.pointerId) return;
 		gesto.current = undefined;
 		evento.currentTarget.releasePointerCapture?.(evento.pointerId);
+		if (atual.nativo && ponte?.arrastoFim) {
+			void ponte.arrastoFim().then((fim) => {
+				if (!fim?.arrastou) void ponte.expandir();
+			});
+			return;
+		}
 		if (atual.arrastou) {
 			// O último ponto não pode ficar para o próximo quadro.
 			if (quadro.current !== undefined) cancelAnimationFrame(quadro.current);
@@ -138,7 +146,9 @@ function Bolinha({ nome, avatar, estado, segundos, ponte }: PropsBolinha) {
 		void ponte?.expandir();
 	};
 	const cancelar = (evento: EventoPonteiro<HTMLDivElement>) => {
-		if (gesto.current?.id === evento.pointerId) gesto.current = undefined;
+		if (gesto.current?.id !== evento.pointerId) return;
+		if (gesto.current.nativo) void ponte?.arrastoFim?.();
+		gesto.current = undefined;
 	};
 
 	const escolher = (acao: "abrir" | "esconder") => {

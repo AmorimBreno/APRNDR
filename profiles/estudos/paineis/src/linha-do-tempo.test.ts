@@ -119,6 +119,16 @@ describe("descreverEvento: as notas da mesa (partes C1 e D)", () => {
 		expect(desfez).toEqual({ icone: "close", texto: "Nota do professor desfeita: Resumo" });
 	});
 
+	it("os verbos dos planos de estudos têm rótulo e ícone próprios, com o título no objeto ou no resultado", () => {
+		const verbo = (nome: string, objeto: Record<string, unknown>) => descreverEvento(eventoDaAgenda(nome as Evento["verbo"], objeto));
+		expect(verbo("criou_plano", { materia: "calculo", titulo: "Prova final", itens: 5, hash: "abc" })).toEqual({ icone: "checklist", texto: "Plano criado: Prova final", detalhe: "5 itens" });
+		expect(verbo("seguiu_plano", { materia: "calculo", titulo: "Prova final" })).toEqual({ icone: "checklist", texto: "Plano seguido: Prova final" });
+		expect(verbo("seguiu_plano", { materia: "calculo", titulo: null }).texto).toBe("Conversa sem plano");
+		expect(verbo("ligou_plano", { materia: "calculo", titulo: "Prova final", conversa: "abc12345" }).texto).toBe("Conversa ligada ao plano: Prova final");
+		expect(verbo("atualizou_plano", { materia: "calculo", titulo: "Prova final", operacoes: [{ tipo: "marcar", item: 1 }] })).toEqual({ icone: "check", texto: "Plano atualizado: Prova final", detalhe: "1 mudança" });
+		expect(verbo("desfez_plano", { materia: "calculo", titulo: "Prova final" })).toEqual({ icone: "close", texto: "Plano desfeito: Prova final" });
+	});
+
 	it("sem título no evento, diz 'uma nota'", () => {
 		expect(descreverEvento(eventoDaAgenda("guardou_na_nota", { materia: "calculo" })).texto).toBe("Trecho guardado na nota: uma nota");
 	});

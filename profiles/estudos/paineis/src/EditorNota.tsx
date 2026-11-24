@@ -27,6 +27,8 @@ import { BarraFormatacao } from "./BarraFormatacao.tsx";
 import { AcoesDePergunta, BarraSelecao, useSelecaoDoDocumento } from "./BarraSelecao.tsx";
 import { EditorFormula } from "./EditorFormula.tsx";
 import { idDoLinkDeConversa } from "./conversa-link.ts";
+import { FaixaDoPlano } from "./FaixaDoPlano.tsx";
+import { comecaComATag, dadosDaFaixa, mesmaFaixa } from "./plano-faixa.ts";
 import { useMesa } from "./mesa-ir.ts";
 import { RotuloEstado } from "./RotuloEstado.tsx";
 import { type ArquivoMencionavel, META_TITULOS, materialDoAlvo } from "./mencao.ts";
@@ -458,6 +460,28 @@ function EditorDaNota(props: PropsEditorNota & { rotuloInicial?: string | undefi
 		setSituacao({ tipo: "limpa", salvaEm: aberta.modificadaEm });
 	};
 
+	/**
+	 * O professor gravou nesta nota (a ação `mudou_fora`, docs/planos-de-estudo.md, seção 3). Com o editor limpo (sem mudança
+	 * por salvar, sem salvamento em voo nem renomeação, sem conflito) carrega o conteúdo e a versão novos, fora do desfazer
+	 * (carregarNoEditor) e sem esconder a página (nada some na troca). Sujo, ignora: o salvamento dele cai no conflito que
+	 * já existe ("Recarregar a do arquivo" ou "Manter a minha"). Devolve se recarregou.
+	 */
+	const recarregarDeFora = (dados: { titulo: string; versao: string; conteudo: string }): boolean => {
+		if (!editor || editor.isDestroyed || !nota || base.current === undefined || apagada.current) return false;
+		if (!mesmoTitulo(dados.titulo, tituloAtual.current)) return false;
+		if (emVoo.current || renomeando.current || emConflito.current || pendente.current || mudouDoSalvo()) return false;
+		if (dados.versao === versao.current) return false;
+		clearTimeout(temporizador.current);
+		const soLeitura = temHtmlDesconhecido(dados.conteudo);
+		carregarNoEditor(editor, dados.conteudo);
+		editor.setEditable(!soLeitura, false);
+		base.current = markdownDaNota(editor);
+		versao.current = dados.versao;
+		setSomenteLeitura(soLeitura);
+		setNota({ ...nota, conteudo: dados.conteudo, versao: dados.versao });
+		return true;
+	};
+
 	const enviarRenomear = (para: string) => {
 		renomeando.current = true;
 		semEsperarFalha(acoes.acaoDaInterface(PAINEL_NOTAS, "renomear", { materia: materiaId, de: tituloAtual.current, para }), (mensagem) => {
@@ -536,6 +560,9 @@ function EditorDaNota(props: PropsEditorNota & { rotuloInicial?: string | undefi
 				}
 				return;
 			}
+			case "mudou_fora":
+				recarregarDeFora(resposta.dados);
+				return;
 			case "conflito":
 				if (resposta.dados.pedido !== emVoo.current?.pedido) return;
 				emVoo.current = undefined;
@@ -701,6 +728,21 @@ function EditorDaNota(props: PropsEditorNota & { rotuloInicial?: string | undefi
 		salvarAgora(true);
 	};
 
+	// A faixa do plano de estudos: o progresso e as conversas, ao vivo do que está no editor (mesmo sem salvar). A conferência
+	// barata (o primeiro texto não vazio é a tag?) evita serializar o documento a cada transação das notas comuns.
+	const faixaDoPlano = useEditorState({
+		editor,
+		selector: ({ editor: atual }) => {
+			if (!atual || atual.isDestroyed) return undefined;
+			let primeiro: string | undefined;
+			atual.state.doc.forEach((bloco) => {
+				if (primeiro === undefined && bloco.textContent.trim() !== "") primeiro = bloco.textContent.trim();
+			});
+			return comecaComATag(primeiro) ? dadosDaFaixa(markdownDaNota(atual)) : undefined;
+		},
+		equalityFn: mesmaFaixa,
+	});
+
 	const passageiro = !somenteLeitura && (situacao.tipo === "abrindo" || situacao.tipo === "suja" || situacao.tipo === "salvando");
 	// Estados passageiros só depois de 1 s; o último rótulo da nota anterior fica até lá (docs/padroes-de-interface.md).
 	const rotuloVisivel = useValorEstavel(rotuloSituacao(situacao, somenteLeitura), passageiro, props.rotuloInicial);
@@ -732,6 +774,8 @@ function EditorDaNota(props: PropsEditorNota & { rotuloInicial?: string | undefi
 				{/* A página, como no Notion: uma coluna de leitura no meio, com o título grande no topo. */}
 				<div ref={setPagina} className={`editor-nota__pagina${pronta ? "" : " editor-nota__pagina--carregando"}`}>
 				<AlcaBlocos editor={editor} pagina={pagina} editavel={Boolean(nota) && !somenteLeitura} />
+				{/* A faixa do plano fica dentro da página: aparece junto com ela, já desenhada (a página só some enquanto carrega). */}
+				{faixaDoPlano ? <FaixaDoPlano faixa={faixaDoPlano} {...(abrirConversa ? { abrirConversa } : {})} /> : null}
 				<textarea
 					ref={campoTitulo}
 					className="editor-nota__titulo"

@@ -50,6 +50,40 @@ function tituloDaNota(evento: Evento): string {
 	return texto(evento.objeto.titulo) ?? texto(evento.objeto.nota) ?? "uma nota";
 }
 
+/**
+ * As frases dos eventos dos planos de estudos (docs/planos-de-estudo.md, seção 6). O verbo é lido como texto: quem
+ * grava é a extensão dos planos, e os dados (título, itens, operações) vêm no objeto ou no resultado do evento.
+ */
+function descreverPlano(evento: Evento): { icone: IconName; texto: string; detalhe?: string } | undefined {
+	const verbo: string = evento.verbo;
+	if (!verbo.endsWith("_plano")) return undefined;
+	const resultado = (evento.resultado ?? {}) as Record<string, unknown>;
+	const dado = (campo: string): unknown => evento.objeto[campo] ?? resultado[campo];
+	const titulo = texto(dado("titulo"));
+	switch (verbo) {
+		case "criou_plano": {
+			const itens = typeof dado("itens") === "number" ? (dado("itens") as number) : Array.isArray(dado("itens")) ? (dado("itens") as unknown[]).length : undefined;
+			return { icone: "checklist", texto: `Plano criado: ${titulo ?? "um plano"}`, ...(itens !== undefined ? { detalhe: `${itens} ${itens === 1 ? "item" : "itens"}` } : {}) };
+		}
+		case "seguiu_plano":
+			return titulo ? { icone: "checklist", texto: `Plano seguido: ${titulo}` } : { icone: "checklist", texto: "Conversa sem plano" };
+		case "ligou_plano":
+			return { icone: "checklist", texto: `Conversa ligada ao plano: ${titulo ?? "um plano"}` };
+		case "atualizou_plano": {
+			const operacoes = Array.isArray(dado("operacoes")) ? (dado("operacoes") as unknown[]).length : undefined;
+			return {
+				icone: "check",
+				texto: `Plano atualizado: ${titulo ?? "um plano"}`,
+				...(operacoes ? { detalhe: `${operacoes} ${operacoes === 1 ? "mudança" : "mudanças"}` } : {}),
+			};
+		}
+		case "desfez_plano":
+			return { icone: "close", texto: `Plano desfeito: ${titulo ?? "um plano"}` };
+		default:
+			return undefined;
+	}
+}
+
 /** As frases dos eventos de tarefa (docs/agenda.md, "Eventos"). */
 function descreverTarefa(evento: Evento): { icone: IconName; texto: string; detalhe?: string } {
 	const resultado = (evento.resultado ?? {}) as Record<string, unknown>;
@@ -121,6 +155,8 @@ export function descreverEvento(evento: Evento): { icone: IconName; texto: strin
 	const resultado = (evento.resultado ?? {}) as Record<string, unknown>;
 	const arquivo = typeof evento.objeto.arquivo === "string" ? evento.objeto.arquivo : "um arquivo";
 	const nota = typeof evento.objeto.nota === "string" ? evento.objeto.nota : "uma nota";
+	const plano = descreverPlano(evento);
+	if (plano) return plano;
 	switch (evento.verbo) {
 		case "criou_materia":
 			return { icone: "notebook", texto: "Caderno criado", ...(typeof resultado.nome === "string" ? { detalhe: resultado.nome } : {}) };

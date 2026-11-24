@@ -5,6 +5,7 @@
 import type { AcaoRecebida } from "@estudos/ui";
 import { useEffect, useRef } from "react";
 import type { ListaNotas } from "../../lib/nota-tipos.ts";
+import type { DadosMudouFora } from "../../lib/plano-tipos.ts";
 
 export const PAINEL_NOTAS = "notas";
 
@@ -22,6 +23,8 @@ export interface RespostasNotas {
 	apagada: { materia: string; titulo: string; pedido?: string };
 	/** O Desfazer do cartão "Nota criada" apagou a nota (parte D, extensions/notas.ts). */
 	desfeita: { materia: string; titulo: string; pedido?: string };
+	/** O professor gravou na nota de um plano (extensions/planos.ts): o arquivo como ficou (docs/planos-de-estudo.md, seção 3). */
+	mudou_fora: DadosMudouFora;
 	erro: { mensagem: string; ao?: string; materia?: string; titulo?: string; pedido?: string };
 }
 

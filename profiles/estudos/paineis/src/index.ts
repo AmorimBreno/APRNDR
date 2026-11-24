@@ -15,6 +15,7 @@ import { PAINEL_ESCRITA } from "./escrita-ponte.ts";
 import { PAINEL_MAPA } from "./mapa-ponte.ts";
 import { PAINEL_MODULOS } from "./modulos-ponte.ts";
 import { PAINEL_NOTAS } from "./notas-ponte.ts";
+import { PAINEL_PLANOS } from "./planos-ponte.ts";
 import { TelaEstudos } from "./TelaEstudos.tsx";
 
 export { PainelQuiz } from "./PainelQuiz.tsx";
@@ -48,6 +49,8 @@ export const paineisEstudos: RegistroPaineis = {
 	[PAINEL_MODULOS]: { componente: () => null, titulo: "Módulos", foraDaArea: true },
 	// A ponte de "Como o professor escreve" com a extensão dos módulos: as regras de escrita são do modal.
 	[PAINEL_ESCRITA]: { componente: () => null, titulo: "Regras de escrita", foraDaArea: true },
+	// A ponte do seletor de plano (cabeçalho do professor) com a extensão dos planos: as listas são da tela, nunca viram card.
+	[PAINEL_PLANOS]: { componente: () => null, titulo: "Planos de estudos", foraDaArea: true },
 	// Os comandos do professor para a mesa (abrir uma aba, destacar um trecho; docs/mesa-parte-c.md): nunca viram card.
 	[PAINEL_MESA]: { componente: () => null, titulo: "Mesa", foraDaArea: true },
 	// A ponte da agenda com a extensão da agenda: as tarefas são do calendário e da tela da agenda.

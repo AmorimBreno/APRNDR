@@ -4,6 +4,7 @@
 // - acoesDoBloco: "Guardar na nota" em cada bloco de primeiro nível da resposta pronta.
 // Parte D (docs/mesa-parte-d.md, seção 2): o mesmo rodapé mostra um cartão "Nota criada" (NotaCriada.tsx) por nota
 // que o professor criou nesse turno, ligado pela chamada da ferramenta (nota-criada.ts).
+// Planos (docs/planos-de-estudo.md, seção 7): o mesmo rodapé mostra o cartão "Plano criado" (PlanoCriado.tsx), ligado pela chamada do criar_plano.
 // O núcleo (packages/ui) só chama os ganchos: nota, lição e "guardar" ficam aqui.
 //
 // Os dois devolvem componentes (não conteúdo pronto): eles rodam dentro da árvore da mesa e leem os
@@ -18,6 +19,9 @@ import { GuardarNaNota } from "./GuardarNaNota.tsx";
 import { useMesa } from "./mesa-ir.ts";
 import { cartoesDoTurno, contarDesfeitas, contarNotasCriadas, haNotaCriada } from "./nota-criada.ts";
 import { NotaCriada } from "./NotaCriada.tsx";
+import { cartoesDePlanoDoTurno, contarPlanosCriados } from "./plano-criado.ts";
+import { PlanoCriado } from "./PlanoCriado.tsx";
+import { PAINEL_PLANOS } from "./planos-ponte.ts";
 import { PAINEL_NOTAS } from "./notas-ponte.ts";
 
 /** "Ir ao trecho": leva à aba e ao trecho de onde a pergunta saiu, pela porta única da mesa (irPara). */
@@ -75,18 +79,33 @@ export function useGanchosDaConversa({ janela, materiaId, chaveFoco }: EntradaGa
 		semEsperar(janelaRef.current.acoes.acaoDaInterface(PAINEL_NOTAS, "listar", { materia: materiaId }));
 	}, [sessaoId, haCartoes, criadas, desfeitas, materiaId]);
 
+	// O mesmo para os planos: a lista de planos mantém o cartão "Plano criado" ("O plano não existe mais") em dia.
+	const planosCriados = contarPlanosCriados(janela.estado.acoesPorPainel[PAINEL_MESA], materiaId);
+	const planoListadoEm = useRef<string | undefined>(undefined);
+	useEffect(() => {
+		if (!sessaoId || planosCriados === 0) return;
+		const marca = `${sessaoId}|${planosCriados}`;
+		if (planoListadoEm.current === marca) return;
+		planoListadoEm.current = marca;
+		semEsperar(janelaRef.current.acoes.acaoDaInterface(PAINEL_PLANOS, "listar", { materia: materiaId }));
+	}, [sessaoId, planosCriados, materiaId]);
+
 	return {
 		rodapeDaResposta: (resposta, perguntaAnterior) => {
 			if (!ultimaRespostaDoTurno(janela.estado.conversa, resposta.chave, janela.estado.executando)) return null;
 			const alvo = alvoDoIrAoTrecho(perguntaAnterior, materiaId);
 			const cartoes = cartoesDoTurno(janela.estado.conversa, resposta.chave, janela.estado.acoesPorPainel[PAINEL_MESA], materiaId);
-			if (!alvo && cartoes.length === 0) return null;
+			const cartoesDePlano = cartoesDePlanoDoTurno(janela.estado.conversa, resposta.chave, janela.estado.acoesPorPainel[PAINEL_MESA], materiaId);
+			if (!alvo && cartoes.length === 0 && cartoesDePlano.length === 0) return null;
 			return (
 				<>
 					{alvo ? <RodapeIrAoTrecho alvo={alvo} /> : null}
 					{/* A chave leva a sessão: o cartão de uma conversa não é reaproveitado por outra (regra 4 dos padrões). */}
 					{cartoes.map((cartao) => (
 						<NotaCriada key={`${sessaoId ?? ""}:${cartao.chamada}`} cartao={cartao} janela={janela} />
+					))}
+					{cartoesDePlano.map((cartao) => (
+						<PlanoCriado key={`${sessaoId ?? ""}:${cartao.chamada}`} cartao={cartao} janela={janela} />
 					))}
 				</>
 			);

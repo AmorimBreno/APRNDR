@@ -7,6 +7,8 @@
 // resposta, ou a conversa da matéria está abrindo. É o `cabecalho` que a
 // MesaEstudo passa à conversa embutida (PropsConversaEmbutida.cabecalho).
 //
+// Uma segunda linha traz o seletor do plano de estudos (SeletorPlano.tsx).
+//
 // Nova e o seletor trocam a sessão fora da entrada no caderno; por isso pedem
 // confirmação se o professor está respondendo, e chamam executarAntesDeTrocar()
 // (salvar a nota aberta) antes de trocar.
@@ -16,6 +18,7 @@ import { guardarSessaoDoPerfil, type JanelaPerfilHook, MenuSuspenso, type OpcaoM
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Materia } from "../../lib/materia-tipos.ts";
 import { contextoDaMateria } from "./comum.ts";
+import { SeletorPlano } from "./SeletorPlano.tsx";
 import { useTrocaSessao } from "./troca-sessao.tsx";
 
 type ListaSessoes = Awaited<ReturnType<JanelaPerfilHook["acoes"]["listarSessoes"]>>;
@@ -202,6 +205,8 @@ export function CabecalhoProfessor({ janela, perfilId, materia, abrirConversa }:
 					<Button variant="ghost" size="sm" iconOnly icon="arrow-up-right" title="Tela cheia" aria-label="Abrir a conversa na tela cheia" onClick={abrirNaTelaCheia} />
 				) : null}
 			</div>
+			{/* A segunda linha: o plano de estudos que esta conversa segue (SeletorPlano.tsx). */}
+			{materia ? <SeletorPlano janela={janela} materiaId={materia.id} desligado={desligado} /> : null}
 			{confirmando ? (
 				<div className="mesa__aviso mesa__aviso--acao" role="alertdialog" aria-label="Confirmar a troca de conversa">
 					<span>O professor está respondendo. Trocar mesmo assim?</span>

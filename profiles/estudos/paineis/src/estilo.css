@@ -242,6 +242,17 @@
 .editor-nota__pagina { position: relative; display: flex; flex-direction: column; gap: var(--space-4); box-sizing: content-box; max-width: var(--largura-leitura-estudos); margin: 0 auto; padding: 0 var(--space-6) 0 56px; }
 /* Enquanto a nota carrega e os blocos especiais ainda não foram desenhados, a página fica escondida (ocupando o espaço). */
 .editor-nota__pagina--carregando { visibility: hidden; }
+/* A faixa do plano de estudos no topo da nota (FaixaDoPlano.tsx): altura fixa em todos os estados; as conversas cortam com reticências. */
+.faixa-plano { display: flex; align-items: center; gap: var(--space-3); box-sizing: border-box; min-width: 0; height: 28px; padding: 0 var(--space-3); border-radius: var(--radius-sm); background: var(--surface-well); box-shadow: inset 0 0 0 var(--border-hair) var(--line); color: var(--ink-muted); overflow: hidden; }
+.faixa-plano__progresso { flex: none; color: var(--ink); white-space: nowrap; }
+.faixa-plano__trilho { position: relative; flex: 0 0 56px; height: 4px; overflow: hidden; border-radius: var(--radius-full); background: var(--line); }
+.faixa-plano__barra { position: absolute; inset: 0; border-radius: inherit; background: var(--amber); transform-origin: left center; transition: transform .15s ease-out; }
+.faixa-plano__conversas { display: flex; flex: 1 1 auto; align-items: center; gap: var(--space-2); min-width: 0; overflow: hidden; white-space: nowrap; }
+.faixa-plano__rotulo { flex: none; }
+.faixa-plano__conversa { flex: 0 1 auto; min-width: 0; max-width: 12ch; overflow: hidden; padding: 0 var(--space-1); border: 0; border-radius: var(--radius-xs); background: none; color: var(--ink-muted); font: inherit; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.faixa-plano__conversa:hover { color: var(--amber); }
+.faixa-plano__conversa:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+@media (prefers-reduced-motion: reduce) { .faixa-plano__barra { transition: none; } }
 .editor-nota__titulo { display: block; width: 100%; margin: 0 0 var(--space-2); padding: 0; overflow: hidden; border: 0; background: none; color: var(--ink); font-family: var(--font-sans); font-size: 36px; line-height: 44px; font-weight: 750; letter-spacing: -.01em; resize: none; }
 .editor-nota__titulo::placeholder { color: var(--ink-subtle); }
 .editor-nota__titulo:focus { outline: none; }

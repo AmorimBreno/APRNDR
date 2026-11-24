@@ -11,6 +11,7 @@ import { motion } from "motion/react";
 import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 import { conferirTitulo, type ListaNotas, TAMANHO_TITULO } from "../../lib/nota-tipos.ts";
 import { RotuloEstado } from "./RotuloEstado.tsx";
+import { TagDoPlano } from "./TagDoPlano.tsx";
 import { TagDoProfessor } from "./TagDoProfessor.tsx";
 import { useAnimarEntrada } from "./comum.ts";
 import { FixoERolagem } from "./FixoERolagem.tsx";
@@ -164,6 +165,7 @@ export function SecaoNotas(props: PropsSecaoNotas) {
 								<span className="notas__linha">
 									<span className="body-strong notas__titulo">{nota.titulo}</span>
 									{nota.doProfessor ? <TagDoProfessor /> : null}
+									{nota.plano ? <TagDoPlano plano={nota.plano} /> : null}
 								</span>
 								<span className="body-sm notas__previa">{nota.previa || "Nota vazia"}</span>
 							</span>

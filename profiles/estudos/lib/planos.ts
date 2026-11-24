@@ -10,7 +10,7 @@ import { acrescentarEvento, criarEvento, lerEventos, type VerboEvento } from "./
 import { ErroMaterias, eventosMateria } from "./materias.ts";
 import { arquivoContinuaIgual, hashDoArquivo } from "./nota-do-professor.ts";
 import { conferirTitulo, type NotaAberta, temHtmlDesconhecido } from "./nota-tipos.ts";
-import { arquivoNota, criarNota, ErroConflito, garantirMateria, lerNota, listarNotas, salvarNota, versaoDe } from "./notas.ts";
+import { arquivoNota, comTravaDaNota, criarNota, ErroConflito, garantirMateria, lerNota, listarNotas, salvarNota, versaoDe } from "./notas.ts";
 import {
 	acrescentarConversa,
 	aplicarOperacoes,
@@ -118,6 +118,9 @@ export interface PlanoGravado {
 	plano: PlanoLido;
 	/** false: as operações não mudavam nada (o item já estava assim) e nada foi gravado. */
 	mudou: boolean;
+	/** O hash do arquivo antes e depois da gravação (iguais quando nada mudou): a cadeia que o Desfazer confere. */
+	hashAntes: string;
+	hash: string;
 }
 
 /** Lê, transforma e grava com a versão lida; se a nota mudou no meio, relê e refaz, até TENTATIVAS vezes. */
@@ -133,12 +136,13 @@ async function gravarNoPlano(
 		const resultado = transformar(nota.conteudo);
 		if ("erro" in resultado) throw new ErroMaterias(`${resultado.erro} Nada foi mudado.`);
 		if (resultado.markdown === nota.conteudo) {
-			return { titulo: nota.titulo, versao: nota.versao, modificadaEm: nota.modificadaEm, conteudo: nota.conteudo, plano: lerPlano(nota.conteudo)!, mudou: false };
+			const hash = hashDoArquivo(nota.conteudo);
+			return { titulo: nota.titulo, versao: nota.versao, modificadaEm: nota.modificadaEm, conteudo: nota.conteudo, plano: lerPlano(nota.conteudo)!, mudou: false, hashAntes: hash, hash };
 		}
 		try {
 			const salva = await salvarNota(dados, materia, nota.titulo, resultado.markdown, { versao: nota.versao, ...(sessao ? { sessao } : {}) });
 			const conteudo = resultado.markdown === "" || resultado.markdown.endsWith("\n") ? resultado.markdown : `${resultado.markdown}\n`;
-			return { titulo: nota.titulo, versao: salva.versao, modificadaEm: salva.modificadaEm, conteudo, plano: lerPlano(conteudo)!, mudou: true };
+			return { titulo: nota.titulo, versao: salva.versao, modificadaEm: salva.modificadaEm, conteudo, plano: lerPlano(conteudo)!, mudou: true, hashAntes: hashDoArquivo(nota.conteudo), hash: hashDoArquivo(conteudo) };
 		} catch (erro) {
 			if (!(erro instanceof ErroConflito)) throw erro;
 			if (tentativa >= TENTATIVAS) {
@@ -157,7 +161,7 @@ export async function atualizarPlano(dados: string, materia: string, titulo: str
 		}
 	}
 	const gravado = await gravarNoPlano(dados, materia, titulo, contexto.sessao, (markdown) => aplicarOperacoes(markdown, operacoes));
-	if (gravado.mudou) await registrarEventoPlano(dados, materia, contexto.sessao, "atualizou_plano", { titulo: gravado.titulo, operacoes });
+	if (gravado.mudou) await registrarEventoPlano(dados, materia, contexto.sessao, "atualizou_plano", { titulo: gravado.titulo, operacoes, antes: gravado.hashAntes, hash: gravado.hash });
 	return gravado;
 }
 
@@ -168,42 +172,63 @@ export async function atualizarPlano(dados: string, materia: string, titulo: str
 export async function acrescentarConversaNoPlano(dados: string, materia: string, titulo: string, sessao: string, em: Date = new Date()): Promise<PlanoGravado> {
 	const idCurto = idCurtoDaConversa(sessao);
 	const gravado = await gravarNoPlano(dados, materia, titulo, sessao, (markdown) => ({ markdown: acrescentarConversa(markdown, idCurto, dataLocal(em)) }));
-	if (gravado.mudou) await registrarEventoPlano(dados, materia, sessao, "ligou_plano", { titulo: gravado.titulo, conversa: idCurto });
+	if (gravado.mudou) await registrarEventoPlano(dados, materia, sessao, "ligou_plano", { titulo: gravado.titulo, conversa: idCurto, antes: gravado.hashAntes, hash: gravado.hash });
 	return gravado;
 }
 
-const VERBOS_DE_CRIACAO = new Set<string>(["criou_plano", "desfez_plano"]);
+const mesmo = (a: unknown, b: string) => typeof a === "string" && a.toLowerCase() === b.toLowerCase();
 
 /**
- * Desfaz um plano criado pelo professor: só apaga o arquivo se o último evento do título é um criou_plano e o arquivo
- * ainda tem o hash dele (o Breno não mexeu). Depois grava desfez_plano. Devolve o título. Lança ErroMaterias com a
- * razão (e "Nada foi apagado.") quando recusa.
+ * Desfaz um plano criado pelo professor. `tituloPedido` é o título com que ele foi criado (o do cartão). A partir do
+ * último criou_plano com esse título, segue os eventos da matéria: renomeou_nota troca o título (o Breno renomeou),
+ * e atualizou_plano e ligou_plano são gravações do professor, cada uma com o hash do arquivo antes e depois. Só apaga
+ * se a cadeia não tem buraco (cada gravação do professor partiu do arquivo que a anterior deixou: nenhuma edição do
+ * Breno no meio) e o arquivo de agora é o que a última deixou. Depois grava desfez_plano. Devolve o título de agora.
+ * Lança ErroMaterias com a razão (e "Nada foi apagado.") quando recusa.
  */
 export async function desfazerPlano(dados: string, materia: string, tituloPedido: string, sessao: string): Promise<string> {
 	await garantirMateria(dados, materia);
 	const { eventos } = await lerEventos(eventosMateria(dados, materia));
-	const procurado = tituloPedido.toLowerCase();
-	let ultimo: (typeof eventos)[number] | undefined;
-	for (const evento of eventos) {
-		const titulo = evento.objeto.titulo;
-		if (!VERBOS_DE_CRIACAO.has(evento.verbo) || evento.objeto.materia !== materia || typeof titulo !== "string" || titulo.toLowerCase() !== procurado) continue;
-		ultimo = evento;
+	const daMateria = eventos.filter((evento) => evento.objeto.materia === materia);
+	let inicio = -1;
+	for (let i = 0; i < daMateria.length; i++) if (daMateria[i]!.verbo === "criou_plano" && mesmo(daMateria[i]!.objeto.titulo, tituloPedido)) inicio = i;
+	if (inicio < 0) throw new ErroMaterias("Este plano não foi criado pelo professor. Nada foi apagado.");
+	const criacao = daMateria[inicio]!;
+	let titulo = typeof criacao.objeto.titulo === "string" ? criacao.objeto.titulo : "";
+	let hash = typeof criacao.objeto.hash === "string" ? criacao.objeto.hash : undefined;
+	let mexido = false;
+	for (const evento of daMateria.slice(inicio + 1)) {
+		if (evento.verbo === "renomeou_nota") {
+			const { de, para } = (evento.resultado ?? {}) as { de?: unknown; para?: unknown };
+			if (mesmo(de, titulo) && typeof para === "string") titulo = para;
+			continue;
+		}
+		if (!mesmo(evento.objeto.titulo, titulo)) continue;
+		if (evento.verbo === "desfez_plano") throw new ErroMaterias("Este plano já foi desfeito. Nada foi apagado.");
+		if (evento.verbo === "atualizou_plano" || evento.verbo === "ligou_plano") {
+			const { antes, hash: depois } = evento.objeto as { antes?: unknown; hash?: unknown };
+			// Sem os hashes (eventos de antes da cadeia) ou partindo de outro arquivo: houve mudança que não é do professor.
+			if (typeof antes !== "string" || typeof depois !== "string" || antes !== hash) mexido = true;
+			else hash = depois;
+		}
 	}
-	if (!ultimo) throw new ErroMaterias("Este plano não foi criado pelo professor. Nada foi apagado.");
-	if (ultimo.verbo === "desfez_plano") throw new ErroMaterias("Este plano já foi desfeito. Nada foi apagado.");
-	const { titulo: tituloGravado, hash } = ultimo.objeto;
-	const conferido = typeof tituloGravado === "string" ? conferirTitulo(tituloGravado) : { erro: "título ausente" };
-	if ("erro" in conferido || typeof hash !== "string") throw new ErroMaterias("O registro da criação deste plano está incompleto. Nada foi apagado.");
+	const conferido = conferirTitulo(titulo);
+	if ("erro" in conferido || hash === undefined) throw new ErroMaterias("O registro da criação deste plano está incompleto. Nada foi apagado.");
+	if (mexido) throw new ErroMaterias("Você mudou o plano depois que o professor o criou; por isso não o apaguei. Nada foi apagado.");
 	const arquivo = arquivoNota(dados, materia, conferido.titulo);
-	let bytes: Buffer;
-	try {
-		bytes = await readFile(arquivo);
-	} catch (erro) {
-		if ((erro as NodeJS.ErrnoException).code === "ENOENT") throw new ErroMaterias("O plano não existe mais (foi apagado ou mudou de nome). Nada foi apagado.");
-		throw erro;
-	}
-	if (!arquivoContinuaIgual(bytes, hash)) throw new ErroMaterias("O plano foi alterado depois de criado; por isso não o apaguei. Nada foi apagado.");
-	await rm(arquivo, { maxRetries: 5, retryDelay: 50 });
+	const esperado = hash;
+	// Na trava do arquivo: um salvamento do editor não entra entre a conferência e o apagar.
+	await comTravaDaNota(arquivo, async () => {
+		let bytes: Buffer;
+		try {
+			bytes = await readFile(arquivo);
+		} catch (erro) {
+			if ((erro as NodeJS.ErrnoException).code === "ENOENT") throw new ErroMaterias("O plano não existe mais (foi apagado). Nada foi apagado.");
+			throw erro;
+		}
+		if (!arquivoContinuaIgual(bytes, esperado)) throw new ErroMaterias("Você mudou o plano depois que o professor o criou; por isso não o apaguei. Nada foi apagado.");
+		await rm(arquivo, { maxRetries: 5, retryDelay: 50 });
+	});
 	await registrarEventoPlano(dados, materia, sessao, "desfez_plano", { titulo: conferido.titulo });
 	return conferido.titulo;
 }

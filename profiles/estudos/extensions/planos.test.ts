@@ -11,7 +11,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { lerEventos } from "../lib/eventos.ts";
 import { criarMateria, eventosMateria } from "../lib/materias.ts";
-import { arquivoNota, criarNota } from "../lib/notas.ts";
+import { arquivoNota, criarNota, salvarNota, versaoDe } from "../lib/notas.ts";
 import { ACAO_MUDOU_FORA, ACAO_PLANO_CRIADO, lerPlano, planoSeguido, TIPO_ENTRADA_PLANO, TIPO_MENSAGEM_PLANO } from "../lib/plano-tipos.ts";
 import { idCurtoDaConversa } from "../lib/trecho-guardado.ts";
 import planos from "./planos.ts";
@@ -400,7 +400,11 @@ describe("ponte dos planos", () => {
 
 	it("desfazer_plano com o plano alterado, sessão de outra conversa, título ruim ou sem criou_plano: erro e nada é apagado", async () => {
 		await criar("Prova final", ["a"]);
-		await ferramenta("atualizar_plano", { operacoes: [{ tipo: "marcar", item: 1 }] });
+		// O Breno escreve no plano (o salvamento do editor): o Desfazer passa a recusar.
+		const arquivo = arquivoNota(dados, materia, "Prova final");
+		const atual = await readFile(arquivo, "utf8");
+		await salvarNota(dados, materia, "Prova final", `${atual}Uma linha minha.
+`, { versao: versaoDe(atual) });
 		await criarNota(dados, materia, "Do Breno");
 		await assentar();
 		mostrados.length = 0;
@@ -411,7 +415,7 @@ describe("ponte dos planos", () => {
 		await esperar(() => recebidas("erro").length === 4);
 		expect(recebidas("erro").map((mensagem) => mensagem.dados.pedido).sort()).toEqual(["p1", "p2", "p3", "p4"]);
 		expect(recebidas("erro").every((mensagem) => mensagem.dados.ao === "desfazer_plano")).toBe(true);
-		expect(recebidas("erro").find((mensagem) => mensagem.dados.pedido === "p1")!.dados.mensagem).toContain("alterado depois de criado");
+		expect(recebidas("erro").find((mensagem) => mensagem.dados.pedido === "p1")!.dados.mensagem).toContain("Você mudou o plano");
 		expect(existsSync(arquivoNota(dados, materia, "Prova final"))).toBe(true);
 		expect(existsSync(arquivoNota(dados, materia, "Do Breno"))).toBe(true);
 		expect(recebidas("desfeito")).toEqual([]);

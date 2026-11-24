@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { lerEventos } from "./eventos.ts";
 import { criarMateria, eventosMateria } from "./materias.ts";
 import { hashDoArquivo } from "./nota-do-professor.ts";
-import { arquivoNota, criarNota, listarNotas, versaoDe } from "./notas.ts";
+import { arquivoNota, criarNota, listarNotas, renomearNota, salvarNota, versaoDe } from "./notas.ts";
 import { lerPlano } from "./plano-tipos.ts";
 import { acrescentarConversaNoPlano, atualizarPlano, criarPlano, desfazerPlano, lerPlanoDaNota, listarPlanos } from "./planos.ts";
 import { idCurtoDaConversa } from "./trecho-guardado.ts";
@@ -128,7 +128,7 @@ describe("atualizarPlano", () => {
 		expect(gravado.versao).toBe(versaoDe(gravado.conteudo));
 		const evento = (await eventos()).filter((e) => e.verbo === "atualizou_plano");
 		expect(evento).toHaveLength(1);
-		expect(evento[0]!.objeto).toEqual({ materia, titulo: "Prova final", operacoes: [{ tipo: "marcar", item: 1, texto: "Q1" }] });
+		expect(evento[0]!.objeto).toEqual({ materia, titulo: "Prova final", operacoes: [{ tipo: "marcar", item: 1, texto: "Q1" }], antes: expect.any(String), hash: expect.any(String) });
 	});
 
 	it("o que o Breno escreveu fica como está (subitens, texto, CRLF)", async () => {
@@ -198,7 +198,7 @@ describe("acrescentarConversaNoPlano", () => {
 		expect(segunda.mudou).toBe(false);
 		const ligou = (await eventos()).filter((evento) => evento.verbo === "ligou_plano");
 		expect(ligou).toHaveLength(1);
-		expect(ligou[0]!.objeto).toEqual({ materia, titulo: "Prova final", conversa: idCurtoDaConversa("sessao-2") });
+		expect(ligou[0]!.objeto).toEqual({ materia, titulo: "Prova final", conversa: idCurtoDaConversa("sessao-2"), antes: expect.any(String), hash: expect.any(String) });
 	});
 
 	it("nota sem tag é recusada", async () => {
@@ -208,12 +208,32 @@ describe("acrescentarConversaNoPlano", () => {
 });
 
 describe("desfazerPlano", () => {
-	it("recusa se o plano mudou depois de criado (o Breno ou o professor marcaram), e nada é apagado", async () => {
+	it("as gravações do professor (marcar, a conversa no histórico) não impedem o Desfazer", async () => {
 		await criar();
+		await atualizarPlano(dados, materia, "Prova final", [{ tipo: "marcar", item: 1 }], { sessao: "sessao-1" });
+		await acrescentarConversaNoPlano(dados, materia, "Prova final", "01a20dee-32cd-7337-956f-b57bc81ec7ca");
+		await expect(desfazerPlano(dados, materia, "Prova final", "sessao-1")).resolves.toBe("Prova final");
+		expect(await verbos()).toContain("desfez_plano");
+	});
+
+	it("recusa se o Breno mudou o plano (antes ou entre as gravações do professor), e nada é apagado", async () => {
+		const criado = await criar();
+		await salvarNota(dados, materia, "Prova final", `${criado.conteudo}Uma linha minha.
+`, { versao: criado.versao });
+		await expect(desfazerPlano(dados, materia, "Prova final", "sessao-1")).rejects.toThrow(/Você mudou o plano.*Nada foi apagado/);
+		// O professor marca depois da edição do Breno: a cadeia tem um buraco e continua recusando.
 		await atualizarPlano(dados, materia, "Prova final", [{ tipo: "marcar", item: 1 }]);
-		await expect(desfazerPlano(dados, materia, "Prova final", "sessao-1")).rejects.toThrow(/foi alterado depois de criado.*Nada foi apagado/);
-		expect(await lerArquivo("Prova final")).toContain("- [x] Q1");
+		await expect(desfazerPlano(dados, materia, "Prova final", "sessao-1")).rejects.toThrow(/Você mudou o plano/);
+		expect(await lerArquivo("Prova final")).toContain("Uma linha minha.");
 		expect(await verbos()).not.toContain("desfez_plano");
+	});
+
+	it("acompanha a troca de nome: o cartão guarda o título da criação e o Desfazer apaga o arquivo de agora", async () => {
+		await criar();
+		await renomearNota(dados, materia, "Prova final", "Prova de dezembro");
+		await atualizarPlano(dados, materia, "Prova de dezembro", [{ tipo: "marcar", item: 2 }]);
+		await expect(desfazerPlano(dados, materia, "Prova final", "sessao-1")).resolves.toBe("Prova de dezembro");
+		await expect(lerArquivo("Prova de dezembro")).rejects.toThrow();
 	});
 
 	it("recusa plano que não foi criado pelo professor, o que já foi desfeito e o que sumiu", async () => {

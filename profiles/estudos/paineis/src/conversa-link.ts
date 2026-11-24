@@ -2,7 +2,7 @@
 // professor" escrevem nas notas. Clicar nele abre a conversa pelo id curto (lib/trecho-guardado.ts). As partes puras:
 // reconhecer o link num clique e achar a sessão pelo id curto, sem prefixo. Quem reabre a conversa é abrir-conversa.tsx.
 
-import { idCurtoDaConversa } from "../../lib/trecho-guardado.ts";
+import { idCurtoAntigoDaConversa, idCurtoDaConversa } from "../../lib/trecho-guardado.ts";
 
 /** O esquema dos links de conversa nas notas. */
 export const ESQUEMA_CONVERSA = "conversa:";
@@ -23,19 +23,22 @@ export interface SessaoParaIdCurto {
 
 /**
  * A sessão cujo id curto é `idCurto`, ou undefined. A comparação é exata (`idCurtoDaConversa(id) === idCurto`),
- * nunca por prefixo: os primeiros dígitos de um UUID v7 são o relógio, e duas conversas do mesmo minuto começam
- * iguais. Se duas sessões tivessem o mesmo id curto (8 caracteres da parte aleatória: quase impossível), vale a
- * mais recente.
+ * nunca por prefixo. O id curto de hoje (o relógio em milissegundos) vale primeiro; se nenhuma sessão tem ele, vale
+ * o id antigo (idCurtoAntigoDaConversa, dos links escritos antes de 2026-11-24), que podia se repetir entre
+ * conversas do mesmo servidor: aí vale a mais recente.
  */
 export function sessaoPorIdCurto<T extends SessaoParaIdCurto>(sessoes: readonly T[], idCurto: string): T | undefined {
 	const procurado = idCurto.trim().toLowerCase();
 	if (procurado === "") return undefined;
-	let achada: T | undefined;
-	for (const sessao of sessoes) {
-		if (idCurtoDaConversa(sessao.id) !== procurado) continue;
-		if (!achada || (sessao.modificadaEm ?? "") > (achada.modificadaEm ?? "")) achada = sessao;
-	}
-	return achada;
+	const maisRecente = (casa: (sessao: T) => boolean) => {
+		let achada: T | undefined;
+		for (const sessao of sessoes) {
+			if (!casa(sessao)) continue;
+			if (!achada || (sessao.modificadaEm ?? "") > (achada.modificadaEm ?? "")) achada = sessao;
+		}
+		return achada;
+	};
+	return maisRecente((sessao) => idCurtoDaConversa(sessao.id) === procurado) ?? maisRecente((sessao) => idCurtoAntigoDaConversa(sessao.id) === procurado);
 }
 
 export const AVISO_CONVERSA_SUMIU = "Essa conversa não existe mais.";

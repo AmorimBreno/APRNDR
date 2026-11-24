@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatarTrechoGuardado, idCurtoDaConversa } from "./trecho-guardado.ts";
+import { formatarTrechoGuardado, idCurtoAntigoDaConversa, idCurtoDaConversa } from "./trecho-guardado.ts";
 
 // Contrato do WP0 (docs/mesa-parte-c.md, seção 5), implementado no WP1.
 const SESSAO = "019a6c1e-3f2b-7d4a-9c8e-5b1f0a2d3e4c";
@@ -52,19 +52,27 @@ describe("formatarTrechoGuardado", () => {
 
 describe("idCurtoDaConversa", () => {
 	it("é estável para a mesma sessão e diferente para sessões diferentes", () => {
-		const outra = "019a6c1e-3f2b-7d4a-9c8e-7777aaaabbbb";
+		const outra = "019a6c1e-3f2c-7d4a-9c8e-7777aaaabbbb";
 		expect(idCurtoDaConversa(SESSAO)).toBe(idCurtoDaConversa(SESSAO));
 		expect(idCurtoDaConversa(SESSAO)).not.toBe(idCurtoDaConversa(outra));
 	});
 
-	it("tem 8 caracteres e vem da parte aleatória do UUID v7, não do relógio que começa igual", () => {
+	it("tem 8 caracteres e vem dos dígitos de baixo do relógio (5º ao 12º), que mudam a cada milissegundo", () => {
 		const depois = "019a6c1e-3f2c-7aaa-8123-456789abcdef";
 		const id = idCurtoDaConversa(SESSAO);
-		expect(id).toHaveLength(8);
+		expect(id).toBe("6c1e3f2b");
 		expect(id).toMatch(/^[0-9a-f]{8}$/);
 		// Duas sessões abertas no mesmo minuto têm o começo igual e não podem ter o id curto igual.
 		expect(SESSAO.slice(0, 8)).toBe(depois.slice(0, 8));
 		expect(idCurtoDaConversa(depois)).not.toBe(id);
+	});
+
+	it("separa as conversas abertas no mesmo servidor, que o pi gera com a mesma parte aleatória (achado de 2026-11-24)", () => {
+		const primeira = "01a20ded-9979-7337-956f-b579dd9bd0f0";
+		const segunda = "01a20dee-32cd-7337-956f-b57bc81ec7ca";
+		expect(idCurtoAntigoDaConversa(primeira)).toBe(idCurtoAntigoDaConversa(segunda));
+		expect(idCurtoDaConversa(primeira)).not.toBe(idCurtoDaConversa(segunda));
+		expect(idCurtoAntigoDaConversa("Sessão-1")).toBeUndefined();
 	});
 
 	it("num id que não é UUID, vale o começo dele, só letras e números", () => {

@@ -27,14 +27,22 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * O id curto da conversa: 8 caracteres, estáveis para a mesma sessão. Num UUID v7 os
- * primeiros 12 dígitos são o relógio em milissegundos (duas conversas abertas no mesmo
- * minuto começam igual), então o id curto sai da parte aleatória, depois do dígito de
- * versão. Num id que não é UUID, vale o começo dele (só letras e números, em minúsculas).
+ * primeiros 12 dígitos são o relógio em milissegundos; o id curto são os 8 dígitos de
+ * baixo do relógio (do 5º ao 12º), que mudam a cada milissegundo. Não sai da parte
+ * "aleatória": o pi gera os ids de um mesmo processo em sequência (monotônicos), e ela
+ * se repete entre as conversas abertas no mesmo servidor (achado em 2026-11-24; o id
+ * antigo está em idCurtoAntigoDaConversa, para os links já escritos nas notas). Num id
+ * que não é UUID, vale o começo dele (só letras e números, em minúsculas).
  */
 export function idCurtoDaConversa(sessao: string): string {
-	if (UUID.test(sessao)) return sessao.replace(/-/g, "").toLowerCase().slice(13, 21);
+	if (UUID.test(sessao)) return sessao.replace(/-/g, "").toLowerCase().slice(4, 12);
 	const limpo = sessao.replace(/[^\p{L}\p{N}]/gu, "").toLowerCase();
 	return limpo.slice(0, 8) || "semid";
+}
+
+/** O id curto de antes de 2026-11-24 (a parte depois do dígito de versão), só para achar a conversa dos links antigos. */
+export function idCurtoAntigoDaConversa(sessao: string): string | undefined {
+	return UUID.test(sessao) ? sessao.replace(/-/g, "").toLowerCase().slice(13, 21) : undefined;
 }
 
 const doisDigitos = (numero: number) => String(numero).padStart(2, "0");

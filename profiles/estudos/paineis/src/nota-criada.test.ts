@@ -4,7 +4,7 @@
 
 import type { AcaoRecebida, ItemConversa } from "@estudos/ui";
 import { describe, expect, it } from "vitest";
-import { idCurtoDaConversa } from "../../lib/trecho-guardado.ts";
+import { idCurtoAntigoDaConversa, idCurtoDaConversa } from "../../lib/trecho-guardado.ts";
 import { AVISO_CONVERSA_SUMIU, idDoLinkDeConversa, sessaoPorIdCurto } from "./conversa-link.ts";
 import { cartoesDoTurno, chamadasDoTurno, estadoDoCartao, foiDesfeita, haNotaCriada, lerNotaCriada, ordemDaChave, respostaDoDesfazer, sumiuDaLista, textoDoCartao } from "./nota-criada.ts";
 
@@ -148,10 +148,11 @@ describe("a resposta ao Desfazer", () => {
 });
 
 describe("o id curto do link da conversa", () => {
-	// Três UUID v7 do mesmo milissegundo: os primeiros 12 dígitos (o relógio) são iguais, só a parte aleatória difere.
-	const A = "019e0000-0000-7000-8000-e119b2a5aaaa";
-	const B = "019e0000-0000-7000-8000-0123456789ab";
-	const C = "019e0000-0000-7000-9000-e119b2a5ffff";
+	// Três UUID v7 de milissegundos diferentes; A e C têm a mesma parte "aleatória" (o pi gera os ids de um processo
+	// em sequência), como as conversas abertas no mesmo servidor.
+	const A = "019e0000-0001-7000-8000-e119b2a5aaaa";
+	const B = "019e0000-0002-7000-8000-0123456789ab";
+	const C = "019e0000-0003-7000-8000-e119b2a5aaaa";
 
 	it("acha a sessão pelo id curto exato", () => {
 		const sessoes = [{ id: B }, { id: A }, { id: C }];
@@ -160,10 +161,10 @@ describe("o id curto do link da conversa", () => {
 		expect(sessaoPorIdCurto(sessoes, idCurtoDaConversa(C))?.id).toBe(C);
 	});
 
-	it("nunca por prefixo: o começo do UUID (o relógio) é igual nas três e não acha nenhuma", () => {
+	it("nunca por prefixo: o começo do UUID é igual nas três e não acha nenhuma", () => {
 		const sessoes = [{ id: A }, { id: B }, { id: C }];
 		expect(sessaoPorIdCurto(sessoes, "019e0000")).toBeUndefined();
-		expect(sessaoPorIdCurto(sessoes, "019e0000-0000-7000")).toBeUndefined();
+		expect(sessaoPorIdCurto(sessoes, "019e0000-0001-7000")).toBeUndefined();
 		// Um prefixo do próprio id curto também não vale.
 		expect(sessaoPorIdCurto(sessoes, idCurtoDaConversa(A).slice(0, 5))).toBeUndefined();
 		expect(sessaoPorIdCurto(sessoes, "")).toBeUndefined();
@@ -174,6 +175,18 @@ describe("o id curto do link da conversa", () => {
 		expect(sessaoPorIdCurto([{ id: B }], idCurtoDaConversa(A))).toBeUndefined();
 		expect(sessaoPorIdCurto([], idCurtoDaConversa(A))).toBeUndefined();
 		expect(AVISO_CONVERSA_SUMIU.length).toBeGreaterThan(0);
+	});
+
+	it("o link antigo (a parte depois do dígito de versão) ainda acha a conversa; repetido, vale a mais recente", () => {
+		const sessoes = [
+			{ id: A, modificadaEm: "2026-11-01T10:00:00.000Z" },
+			{ id: B, modificadaEm: "2026-11-02T10:00:00.000Z" },
+			{ id: C, modificadaEm: "2026-11-03T10:00:00.000Z" },
+		];
+		expect(sessaoPorIdCurto(sessoes, idCurtoAntigoDaConversa(B)!)?.id).toBe(B);
+		// A e C têm o mesmo id antigo: vale a mais recente. O id de hoje separa as duas.
+		expect(sessaoPorIdCurto(sessoes, idCurtoAntigoDaConversa(A)!)?.id).toBe(C);
+		expect(idCurtoDaConversa(A)).not.toBe(idCurtoDaConversa(C));
 	});
 
 	it("com dois ids curtos iguais (quase impossível), vale a conversa mais recente", () => {

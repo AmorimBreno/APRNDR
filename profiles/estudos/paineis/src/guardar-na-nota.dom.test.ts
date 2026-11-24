@@ -239,7 +239,7 @@ describe("Guardar na nota com a nota aberta no editor", () => {
 		expect(inserir).toHaveBeenCalledTimes(1);
 		const markdown = inserir.mock.calls[0]![0];
 		expect(markdown.startsWith("> A série **geométrica** converge.\n>\n> — Professor, [conversa de ")).toBe(true);
-		expect(markdown.endsWith("(conversa:e119b2a5)")).toBe(true);
+		expect(markdown.endsWith("(conversa:f3a27c4d)")).toBe(true);
 		expect(controle.enviadas).toEqual([{ painel: "notas", acao: "guardou", dados: { materia: MATERIA, titulo: "Séries", sessao: SESSAO, tamanho: markdown.length } }]);
 		await ate(() => botoesGuardar()[0]!.closest(".guardar-nota")!.getAttribute("data-fase") === "guardado");
 		expect(statusDoGuardar()).toBe("Guardado");

@@ -145,7 +145,7 @@ describe("o texto que entra na nota", () => {
 
 	it("a fonte do bloco vira citação com acentos, dinheiro e a linha da fonte, sem mexer no que o professor escreveu", () => {
 		const texto = formatarTrechoGuardado({ texto: "A série converge: custa R$ 20 e US$ 0,03.", em, sessao });
-		expect(texto).toBe(["> A série converge: custa R$ 20 e US$ 0,03.", ">", "> — Professor, [conversa de 11/11/2026](conversa:e119b2a5)"].join("\n"));
+		expect(texto).toBe(["> A série converge: custa R$ 20 e US$ 0,03.", ">", "> — Professor, [conversa de 11/11/2026](conversa:f3a27c4d)"].join("\n"));
 	});
 
 	it("fórmula em bloco, lista, tabela e código: toda linha ganha o '> '", () => {
@@ -161,7 +161,7 @@ describe("o texto que entra na nota", () => {
 
 	it("termina com o link que liga a conversa e nunca com linha em branco sobrando", () => {
 		const texto = formatarTrechoGuardado({ texto: "\n\nUm parágrafo.\n\n", em, sessao });
-		expect(texto.endsWith("(conversa:e119b2a5)")).toBe(true);
+		expect(texto.endsWith("(conversa:f3a27c4d)")).toBe(true);
 		expect(texto.startsWith("> Um parágrafo.")).toBe(true);
 	});
 });

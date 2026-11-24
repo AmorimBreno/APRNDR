@@ -26,7 +26,7 @@ const rotaDa = (titulo: string) => `caderno/${MATERIA}/notas/${titulo}`;
 
 // Duas conversas da matéria no mesmo milissegundo (o relógio do UUID v7 é igual): só a parte aleatória difere.
 const CONVERSA_A = "019e0000-0000-7000-8000-e119b2a5aaaa";
-const CONVERSA_B = "019e0000-0000-7000-8000-0123456789ab";
+const CONVERSA_B = "019e0000-1111-7000-8000-0123456789ab";
 const CONTEXTO = { chave: `materia:${MATERIA}`, rotulo: "Cálculo" };
 const resumo = (id: string, extra: Record<string, unknown> = {}) => ({ id, arquivo: `${id}.jsonl`, criadaEm: "2026-11-10T10:00:00.000Z", modificadaEm: "2026-11-10T10:00:00.000Z", titulo: id, mensagens: 2, contexto: CONTEXTO, ...extra });
 
@@ -190,7 +190,7 @@ beforeEach(() => {
 		executando: false,
 		enviadas: [],
 		abasNoEnvio: [],
-		sessoes: [resumo(CONVERSA_A), resumo(CONVERSA_B), resumo("019e0000-0000-7000-8000-ffffffffffff", { contexto: { chave: "materia:fisica", rotulo: "Física" } })],
+		sessoes: [resumo(CONVERSA_A), resumo(CONVERSA_B), resumo("019e0000-2222-7000-8000-ffffffffffff", { contexto: { chave: "materia:fisica", rotulo: "Física" } })],
 		abrirSessao: vi.fn(async (id: string) => ({ sessaoId: id })),
 		salvamentos: 0,
 		antesDeTrocar: vi.fn(),

@@ -749,7 +749,7 @@ function MesaInterna(props: PropsMesaEstudo) {
 							aberta={aberto}
 							aoPedidoPendente={setPendente}
 							obterContextos={obterContextos}
-							cabecalho={<CabecalhoProfessor janela={props.janela} perfilId={perfilId} {...(props.materia ? { materia: props.materia } : {})} {...(props.abrirConversa ? { abrirConversa: props.abrirConversa } : {})} />}
+							cabecalho={<CabecalhoProfessor janela={props.janela} perfilId={perfilId} obterContextos={obterContextos} {...(props.materia ? { materia: props.materia } : {})} {...(props.abrirConversa ? { abrirConversa: props.abrirConversa } : {})} />}
 							rodapeDaResposta={ganchos.rodapeDaResposta}
 							acoesDoBloco={ganchos.acoesDoBloco}
 							acimaDoCampo={<ChipVendo abas={pilulas} chaveFoco={chaveAtiva} selecionadas={selecionadas} alternar={alternarSelecao} />}

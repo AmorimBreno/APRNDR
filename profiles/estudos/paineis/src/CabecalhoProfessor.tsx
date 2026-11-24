@@ -14,7 +14,7 @@
 // (salvar a nota aberta) antes de trocar.
 
 import { Button, Icon } from "@estudos/design-system";
-import { guardarSessaoDoPerfil, type JanelaPerfilHook, MenuSuspenso, type OpcaoMenu, semEsperar } from "@estudos/ui";
+import { type ContextoTela, guardarSessaoDoPerfil, type JanelaPerfilHook, MenuSuspenso, type OpcaoMenu, semEsperar } from "@estudos/ui";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Materia } from "../../lib/materia-tipos.ts";
 import { contextoDaMateria } from "./comum.ts";
@@ -42,9 +42,11 @@ export interface PropsCabecalhoProfessor {
 	materia?: Materia;
 	/** Abre a conversa do perfil na tela cheia (props.abrirConversa da tela do caderno); sem ele o botão não aparece. */
 	abrirConversa?(): void;
+	/** O contexto da tela da mesa (o que o professor vê), para as mensagens que o seletor de plano manda. */
+	obterContextos?(): Promise<ContextoTela[]>;
 }
 
-export function CabecalhoProfessor({ janela, perfilId, materia, abrirConversa }: PropsCabecalhoProfessor) {
+export function CabecalhoProfessor({ janela, perfilId, materia, abrirConversa, obterContextos }: PropsCabecalhoProfessor) {
 	const { estado, acoes } = janela;
 	const troca = useTrocaSessao();
 	const sessaoId = estado.sessao?.sessaoId;
@@ -206,7 +208,7 @@ export function CabecalhoProfessor({ janela, perfilId, materia, abrirConversa }:
 				) : null}
 			</div>
 			{/* A segunda linha: o plano de estudos que esta conversa segue (SeletorPlano.tsx). */}
-			{materia ? <SeletorPlano janela={janela} materiaId={materia.id} desligado={desligado} /> : null}
+			{materia ? <SeletorPlano janela={janela} materiaId={materia.id} desligado={desligado} {...(obterContextos ? { obterContextos } : {})} /> : null}
 			{confirmando ? (
 				<div className="mesa__aviso mesa__aviso--acao" role="alertdialog" aria-label="Confirmar a troca de conversa">
 					<span>O professor está respondendo. Trocar mesmo assim?</span>

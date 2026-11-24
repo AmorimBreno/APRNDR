@@ -1,7 +1,7 @@
 // O seletor do plano de estudos, a segunda linha do topo do painel do professor (docs/planos-de-estudo.md, seção 7):
 // "Plano: <título> · 2 de 5". Lista os planos da matéria com o progresso ("concluído" quando for o caso), "Nenhum" e
 // "Criar plano nesta conversa". Escolher um plano manda `seguir` pela ponte "planos" e, com a resposta ok, manda ao
-// professor `Vamos seguir o plano "<título>".` (a aula começa sozinha). "Criar plano nesta conversa" só manda a
+// professor `Vamos seguir o plano "<título>".` com o contexto da tela, como o campo da mesa (a aula começa sozinha). "Criar plano nesta conversa" só manda a
 // mensagem, sem seguir nada. "Nenhum" só solta, sem mensagem.
 //
 // Padrões de interface (docs/padroes-de-interface.md): fica desligado com o professor respondendo, com fila ou pedido
@@ -10,7 +10,7 @@
 // o seletor só desliga enquanto a extensão responde, sem trocar o texto.
 
 import { Icon } from "@estudos/design-system";
-import { type JanelaPerfilHook, MenuSuspenso, type OpcaoMenu, semEsperar } from "@estudos/ui";
+import { type ContextoTela, type JanelaPerfilHook, MenuSuspenso, type OpcaoMenu, semEsperar } from "@estudos/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { planoPorTitulo, progressoDoPlano, usePlanos } from "./planos-ponte.ts";
 
@@ -26,9 +26,14 @@ export interface PropsSeletorPlano {
 	materiaId: string;
 	/** Desligado de fora (a troca de conversa em andamento). */
 	desligado?: boolean;
+	/**
+	 * O contexto da tela da mesa (as abas e o olho), como as mensagens digitadas no campo levam. Se falhar, a mensagem
+	 * vai sem ele (o professor ainda sabe a matéria pela sessão).
+	 */
+	obterContextos?(): Promise<ContextoTela[]>;
 }
 
-export function SeletorPlano({ janela, materiaId, desligado = false }: PropsSeletorPlano) {
+export function SeletorPlano({ janela, materiaId, desligado = false, obterContextos }: PropsSeletorPlano) {
 	const { estado, acoes } = janela;
 	const { planos, seguindo, seguir } = usePlanos(janela, materiaId);
 	const [trabalhando, setTrabalhando] = useState(false);
@@ -56,11 +61,17 @@ export function SeletorPlano({ janela, materiaId, desligado = false }: PropsSele
 	const atual = seguindo ? `${PREFIXO_PLANO}${planoPorTitulo(planos, seguindo)?.titulo ?? seguindo}` : ID_NENHUM_PLANO;
 	const resumoAtual = planoPorTitulo(planos, seguindo);
 
+	/** Manda ao professor com o contexto da tela, como o campo da mesa; sem contexto se ele não vier. */
+	const enviarComContexto = async (texto: string) => {
+		const contextos = obterContextos ? await obterContextos().catch(() => undefined) : undefined;
+		return contextos && contextos.length > 0 ? acoes.enviar(texto, contextos) : acoes.enviar(texto);
+	};
+
 	const escolher = (id: string) => {
 		setErro(undefined);
 		if (id === ID_CRIAR_PLANO) {
 			semEsperar(
-				acoes.enviar(TEXTO_CRIAR_PLANO).catch(() => {
+				enviarComContexto(TEXTO_CRIAR_PLANO).catch(() => {
 					if (vivo.current) setErro("Não consegui mandar a mensagem ao professor.");
 				}),
 			);
@@ -79,7 +90,7 @@ export function SeletorPlano({ janela, materiaId, desligado = false }: PropsSele
 			}
 			if (titulo === null) return;
 			try {
-				await acoes.enviar(mensagemSeguirPlano(titulo));
+				await enviarComContexto(mensagemSeguirPlano(titulo));
 			} catch {
 				if (vivo.current) setErro("O plano foi escolhido, mas não consegui mandar a mensagem ao professor.");
 			}

@@ -42,8 +42,11 @@ interface Controle {
 	mensagens: string[];
 	/** O que a "extensão" faz com um `seguir`: responde, recusa ou não responde. */
 	aoSeguir: "ok" | "erro" | "mudo";
-	enviar: (texto: string) => Promise<"iniciada">;
+	enviar: (texto: string, contextos?: unknown[]) => Promise<"iniciada">;
 	receber(acao: string, dados: unknown): void;
+	/** Os contextos da tela que a mesa daria (undefined: o seletor fica sem obterContextos). */
+	contextos?: unknown[];
+	contextosEnviados: Array<unknown[] | undefined>;
 }
 
 let controle: Controle;
@@ -72,14 +75,15 @@ function Bancada() {
 				}, 5);
 			}
 		},
-		enviar: (texto: string) => controle.enviar(texto),
+		enviar: (texto: string, contextos?: unknown[]) => controle.enviar(texto, contextos),
 	}));
 	const janela = {
 		estado: { perfil: "estudos", sessao: controle.sessao ? { sessaoId: controle.sessao } : undefined, acoesPorPainel, conversa: [], executando: controle.executando, fila: [], pedidos: [], registrosPedidos: {} },
 		conexao: "aberta",
 		acoes,
 	} as unknown as JanelaPerfilHook;
-	return createElement(SeletorPlano, { janela, materiaId: MATERIA });
+	const contextos = controle.contextos;
+	return createElement(SeletorPlano, { janela, materiaId: MATERIA, ...(contextos ? { obterContextos: async () => contextos as never } : {}) });
 }
 
 const plano = (titulo: string, feitos: number, total: number): Resumo => ({ titulo, feitos, total, concluido: total > 0 && feitos === total });
@@ -108,10 +112,12 @@ beforeEach(() => {
 		enviadas: [],
 		mensagens: [],
 		aoSeguir: "ok",
-		enviar: async (texto) => {
+		enviar: async (texto, contextos) => {
 			controle.mensagens.push(texto);
+			controle.contextosEnviados.push(contextos);
 			return "iniciada";
 		},
+		contextosEnviados: [],
 		receber: () => {},
 	};
 	vi.stubGlobal("matchMedia", (query: string) => ({ matches: query.includes("prefers-reduced-motion"), media: query, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, onchange: null, dispatchEvent: () => false }));
@@ -150,6 +156,17 @@ describe("o seletor do plano", () => {
 		expect(controle.mensagens).toEqual(['Vamos seguir o plano "Revisão".']);
 		await ate(() => rotuloDoBotao()?.includes("Plano: Revisão") === true);
 		expect(rotuloDoBotao()).toContain("concluído");
+	});
+
+	it("a mensagem vai com o contexto da tela que a mesa dá, como as digitadas no campo", async () => {
+		const vendo = [{ tipo: "nota", rotulo: "Aula dia 20 de outubro", foco: true }];
+		controle.contextos = vendo;
+		root.render(createElement(Bancada));
+		await ate(() => rotuloDoBotao()?.includes("Prova final") === true);
+		await abrirMenu();
+		escolher("Revisão");
+		await ate(() => controle.mensagens.length === 1);
+		expect(controle.contextosEnviados).toEqual([vendo]);
 	});
 
 	it("'Nenhum' só solta: manda seguir com null e nenhuma mensagem", async () => {

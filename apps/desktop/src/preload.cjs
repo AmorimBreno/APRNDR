@@ -25,6 +25,8 @@ const flutuante = {
 	capturarTela: () => ipcRenderer.invoke("estudos:flutuante:capturar"),
 	abrirApp: () => ipcRenderer.invoke("estudos:flutuante:abrir-app"),
 	esconder: () => ipcRenderer.invoke("estudos:flutuante:esconder"),
+	/** O menu nativo do clique direito na bolinha (Abrir o chat, Abrir o app, Esconder o professor). */
+	menu: () => ipcRenderer.invoke("estudos:flutuante:menu"),
 	aoMudarModo: (cb) => ouvir("estudos:flutuante:modo-mudou", cb),
 	aoAlternarVoz: (cb) => ouvir("estudos:flutuante:alternar-voz", () => cb()),
 };

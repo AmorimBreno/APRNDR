@@ -346,6 +346,18 @@ function registrarIpc() {
 	ipcMain.handle("estudos:flutuante:esconder", (evento) => {
 		if (daBolinha(evento)) ligar(false);
 	});
+	// O menu do clique direito na bolinha: nativo do Windows (a bolinha tem 76 px; um menu desenhado nela não cabe).
+	ipcMain.handle("estudos:flutuante:menu", (evento) => {
+		if (!daBolinha(evento)) return;
+		const atual = janela;
+		if (!atual || atual.isDestroyed()) return;
+		Menu.buildFromTemplate([
+			{ label: "Abrir o chat", click: () => expandir() },
+			{ label: "Abrir o app", click: () => ctx.mostrarPrincipal() },
+			{ type: "separator" },
+			{ label: "Esconder o professor", click: () => ligar(false) },
+		]).popup({ window: atual });
+	});
 	ipcMain.handle("estudos:bolinha:ligada", (evento) => (doApp(evento) ? estado.ligada : false));
 	ipcMain.handle("estudos:bolinha:ligar", (evento, ligada) => {
 		if (doApp(evento)) ligar(ligada === true);

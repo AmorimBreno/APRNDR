@@ -23,6 +23,8 @@ export interface PonteFlutuante {
 	abrirApp(): Promise<void>;
 	/** "Esconder a bolinha" (grava ligado: false). */
 	esconder(): Promise<void>;
+	/** O menu nativo do clique direito (opcional: sem ele, a tela desenha o próprio menu). */
+	menu?(): Promise<void>;
 	aoMudarModo(cb: (modo: ModoFlutuante) => void): () => void;
 	/** O atalho Ctrl+Alt+Espaço. */
 	aoAlternarVoz(cb: () => void): () => void;

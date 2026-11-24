@@ -177,7 +177,9 @@ function Bolinha({ nome, avatar, estado, segundos, ponte }: PropsBolinha) {
 				onContextMenu={(evento) => {
 					evento.preventDefault();
 					gesto.current = undefined;
-					setMenu(true);
+					// O menu nativo do Windows, quando a ponte tem; senão, o desenhado na tela.
+					if (ponte?.menu) void ponte.menu();
+					else setMenu(true);
 				}}
 			>
 				<span className="bolinha__anel" aria-hidden="true" />

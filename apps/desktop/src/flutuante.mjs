@@ -76,6 +76,11 @@ export function iniciarFlutuante(dados) {
 	app.on("will-quit", () => globalShortcut.unregisterAll());
 }
 
+/** Há como o Breno voltar ao app sem janela principal (o ícone da bandeja ou a bolinha à vista)? */
+export function temPresenca() {
+	return !!bandeja || !!vivaOuNula()?.isVisible();
+}
+
 // --- estado em disco ------------------------------------------------------
 
 function areas() {
@@ -222,13 +227,12 @@ function recolher() {
 	modo = "bolinha";
 	atual.setBounds(boundsBolinha());
 	atual.setHasShadow(false);
-	// Tira o foco antes de deixar de aceitá-lo: o Windows passa a ativação à janela de baixo.
-	try {
-		atual.blur();
-	} catch {
-		// Sem blur: só não focar.
-	}
 	atual.setFocusable(false);
+	// Devolve o foco ao app em que o Breno estava (o Samsung Notes): esconder a janela ativa faz o Windows ativar a
+	// janela anterior; depois ela volta como bolinha, sem foco. (O blur() ativava a próxima na ordem Z, que podia ser
+	// a janela principal do APRNDR; achado do code-review.)
+	atual.hide();
+	atual.showInactive();
 	avisarModo();
 }
 

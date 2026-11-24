@@ -21,6 +21,7 @@ import { getAgentDir } from "@estudos/core";
 import { serve } from "@hono/node-server";
 import type { MensagemServidor } from "@estudos/core/protocolo";
 import { WebSocketServer, type WebSocket } from "ws";
+import { ehEnderecoLocal, origemPermitida } from "./acesso-local.ts";
 import { criarApp } from "./app.ts";
 import { carregarChaves } from "./chaves.ts";
 import { CHAVES_API, ESPERA_WATCHER_MS, PASTA_LOGS, PASTA_PERFIS, PORTA_SERVIDOR } from "./config.ts";
@@ -69,13 +70,23 @@ servidorWs.on("connection", (socket: WebSocket) => {
 	socket.on("error", (erro) => log.erro(`conexão ${conexao.id}`, erro));
 });
 
-const servidor = serve({ fetch: app.fetch, port: PORTA_SERVIDOR }, (info) => {
-	log.info(`Servidor em http://localhost:${info.port}`);
-});
+// Só este computador: um pedido HTTP vindo de outro endereço da rede recebe 403 (acesso-local.ts).
+const servidor = serve(
+	{
+		fetch: (pedido: Request, ambiente: unknown) =>
+			ehEnderecoLocal((ambiente as { incoming?: IncomingMessage } | undefined)?.incoming?.socket?.remoteAddress) ? app.fetch(pedido, ambiente as never) : new Response("Só este computador.", { status: 403 }),
+		port: PORTA_SERVIDOR,
+	},
+	(info) => {
+		log.info(`Servidor em http://localhost:${info.port}`);
+	},
+);
 
 servidor.on("upgrade", (requisicao: IncomingMessage, socket: Duplex, cabeca: Buffer) => {
 	const caminho = new URL(requisicao.url ?? "/", "http://localhost").pathname;
-	if (caminho !== "/ws") {
+	// Só o WebSocket deste computador e de páginas deste computador (não um site qualquer aberto no navegador).
+	if (caminho !== "/ws" || !ehEnderecoLocal(requisicao.socket.remoteAddress) || !origemPermitida(requisicao.headers.origin)) {
+		if (caminho === "/ws") log.aviso(`WebSocket recusado (endereço ${requisicao.socket.remoteAddress ?? "?"}, origem ${requisicao.headers.origin ?? "nenhuma"})`);
 		socket.destroy();
 		return;
 	}

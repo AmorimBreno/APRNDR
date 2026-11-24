@@ -145,9 +145,12 @@ apps/server/src/conexao.ts — trata cada mensagem do WebSocket (validação, ch
 apps/server/src/observador.ts — watcher (fs.watch recursivo) de profiles/ (menos node_modules e profiles/<id>/paineis) e ~/.pi/agent/extensions, com filtro por data de modificação e espera de 300 ms
 apps/server/src/chaves.ts — lê OPENROUTER_API_KEY e TAVILY_API_KEY das variáveis de usuário do Windows quando faltam no processo
 apps/server/src/transcricao.ts — transcrição de voz pelo OpenRouter (POST /api/transcrever): monta o pedido e lê a resposta, com o fetch injetável
+apps/server/src/acesso-local.ts — só este computador fala com o servidor: endereço de loopback no HTTP e no WebSocket, e a origem do WebSocket só de páginas locais (com o teste ao lado)
 apps/server/src/transcricao.test.ts — testes da transcrição com fetch falso
 apps/server/src/log.ts — log no console e em %LOCALAPPDATA%\estudos-app\logs\servidor-AAAA-MM-DD.log
 apps/server/src/servidor.test.ts — testes do servidor sem rede (rotas, mensagens com janela falsa, watcher, chaves)
+apps/desktop/src/flutuante.mjs — o professor flutuante no Electron (docs/professor-flutuante.md): a janela da bolinha (sem foco no modo bolinha; chat compacto 420 x 620), o IPC, a captura da tela, Ctrl+Alt+P e Ctrl+Alt+Espaço, o ícone da bandeja e o atalho de inicialização
+apps/desktop/src/estado-flutuante.mjs — as partes puras da bolinha: o flutuante.json, a posição da bolinha e do chat dentro da área útil, os argumentos (--bandeja) e o atalho de inicialização (testes em estado-flutuante.test.ts e iniciar-argumentos.test.ts)
 apps/desktop/ — @estudos/desktop: a janela própria do app (Electron). Sem script dev de propósito (o pnpm dev da raiz roda o dev de todo apps/*); o script é iniciar
 apps/desktop/package.json — electron com versão exata; main src/main.mjs
 apps/desktop/tsconfig.json — checkJs nos .mjs (noImplicitAny desligado)

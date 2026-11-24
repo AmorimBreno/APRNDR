@@ -16,7 +16,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { iniciarFlutuante } from "./flutuante.mjs";
+import { iniciarFlutuante, temPresenca } from "./flutuante.mjs";
 import { ARGUMENTO_BANDEJA } from "./estado-flutuante.mjs";
 import { ajustarAsTelas, ALTURA_MINIMA, LARGURA_MINIMA, lerEstado } from "./estado-janela.mjs";
 
@@ -84,8 +84,11 @@ if (!app.requestSingleInstanceLock()) {
 		}
 		if (!process.argv.includes(ARGUMENTO_BANDEJA) || process.env.ESTUDOS_CAPTURA) abrirJanela();
 	});
-	// Sem janela aberta o Electron continua vivo na bandeja; só o "Sair do app" encerra.
-	app.on("window-all-closed", () => {});
+	// Sem janela aberta o Electron continua vivo na bandeja; só o "Sair do app" encerra. Sem bandeja (ela falhou ao
+	// nascer) e sem a bolinha à vista, não haveria como voltar: aí sai.
+	app.on("window-all-closed", () => {
+		if (!temPresenca()) app.quit();
+	});
 }
 
 function lerEstadoSalvo() {

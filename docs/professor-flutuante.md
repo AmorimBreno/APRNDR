@@ -1,6 +1,8 @@
-# O professor flutuante, a voz pelo atalho e o protótipo de tinta (contrato, versão 1)
+# O professor flutuante, a voz pelo atalho e a bandeja do Windows (contrato, versão 2)
 
 Decisão de origem: ESPECIFICACAO.md, 13.21 ("O professor ao lado"). Fases 3, 4 e 6a no docs/PLANO.md, "Novo rumo: o professor ao lado". O Breno anota à mão no Samsung Notes (Windows, S Pen); o professor fica numa bolinha por cima de tudo, abre um chat compacto da mesma conversa, ouve pelo atalho e vê a página quando pedido. Decisões dele: o atalho primeiro (a palavra "professor" é a Fase 5), a resposta em texto (sem voz), o caderno de caneta só depois de um protótipo.
+
+Versão 2 (2026-11-24, pedido do Breno): o protótipo de tinta (R11, Fase 6a) sai por enquanto; entram o ícone nos ícones ocultos da barra de tarefas (R12) e o app subindo com o Windows só com esse ícone (R13), para ele ligar o professor flutuante sem abrir o app. Ele também pediu para conferir que a bolinha e o chat não atrapalham a escrita (o foco da caneta no Samsung Notes).
 
 Regras de sempre: o núcleo não sabe o que é matéria, nota ou plano (o cabeçalho do chat compacto vem do perfil); docs/padroes-de-interface.md vale em toda tela; nada de áudio guardado; a chave do OpenRouter só do ambiente; nada de teste na pasta de dados do Breno.
 
@@ -21,9 +23,13 @@ Fase 4, a voz pelo atalho:
 - R9 O texto aparece no campo do chat compacto e é enviado sozinho depois de 2 s, com "Cancelar" e com a edição parando a contagem. A resposta vem em texto.
 - R10 O Electron libera o microfone (permissão "media", só áudio) só para o front do app; as outras continuam negadas. Microfone negado ou sem dispositivo: aviso claro no chat ("Não consegui usar o microfone").
 
-Fase 6a, o protótipo de tinta:
+Fase 6a, o protótipo de tinta (FORA DESTA RODADA, versão 2):
 - R11 Uma tela à parte, #/perfil/estudos/tinta-teste (sem botão na interface; o roteiro diz o endereço), com uma página pautada no rosa das notas do Breno: caneta com pressão (perfect-freehand), 4 cores (preto, vermelho, azul, amarelo), marca-texto (amarelo translúcido, atrás da tinta), borracha (o botão da S Pen, pointer buttons 32, ou a ferramenta), desfazer (Ctrl+Z e botão); desenhar só com pointerType "pen" (e mouse, para testar), o toque rola a página e a palma é ignorada; canvas com desynchronized; o traço é desenhado direto no canvas a cada pointermove (coalesced events), e os traços prontos ficam numa camada já desenhada. Um medidor mostra a latência média (do evento ao quadro) e os quadros por segundo. Nada é gravado em disco (só na memória da tela).
 
+
+A bandeja do Windows (versão 2):
+- R12 Um ícone do app (o do professor, apps/desktop/assets/icone.ico) na bandeja do Windows (os ícones ocultos ao lado do relógio), sempre que o Electron está no ar. Clique esquerdo: liga e mostra a bolinha, ou esconde se ela está à vista (grava ligada). Menu do clique direito: "Mostrar o professor" / "Esconder o professor", "Abrir o app", "Iniciar com o Windows" (caixa de marcar), "Sair do app" (o mesmo sairDoApp). Dica do ícone: "APRNDR · professor". Com a bandeja, fechar a janela principal não sai do app: o Electron fica vivo na bandeja (window-all-closed não sai mais); só o "Sair do app" encerra.
+- R13 Iniciar com o Windows: um atalho "APRNDR (bandeja)" na pasta Inicializar do usuário (shell:startup, %APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup) que roda wscript launcher\iniciar.vbs com o argumento --bandeja; o iniciar.vbs repassa os argumentos ao iniciar.mjs; com --bandeja, o lançador sobe o pnpm dev escondido como sempre e abre o Electron com --bandeja (sem a janela principal: só a bandeja e a bolinha, se ligada). Abrir o atalho "Estudos" com o Electron já na bandeja mostra a janela principal (second-instance). A caixa "Iniciar com o Windows" cria ou apaga esse atalho (shell.writeShortcutLink); ligada por padrão na primeira vez que o Electron abre (grava em flutuante.json que a escolha já foi feita, para não recriar se o Breno desligar).
 
 ## 2. Contratos entre os pacotes
 
@@ -74,7 +80,8 @@ Fase 6a, o protótipo de tinta:
 ## 3. Pacotes (arquivos exclusivos; paralelo)
 
 - WP-A (Sonnet), núcleo e servidor: packages/core (protocolo, janela-perfil, eventos, perfis/esquema do profile.json), packages/ui (use-janela-perfil, estado-janela, a nota do usuário na Conversa), apps/server (a passagem das imagens, a rota /api/transcrever, o log), profiles/estudos/profile.json (transcricao), e os testes.
-- WP-B (Sonnet), Electron: apps/desktop/src (main.mjs, preload.cjs, um módulo novo para a bolinha e o estado dela, os testes puros), docs/janela-propria.md (as mudanças de comportamento).
+- WP-B (Sonnet), Electron e lançador: apps/desktop/src (main.mjs, preload.cjs, um módulo novo para a bolinha e o estado dela, a bandeja, os testes puros), launcher/iniciar.vbs e launcher/iniciar.mjs (o --bandeja), docs/janela-propria.md (as mudanças de comportamento).
 - WP-C (Sonnet), a tela flutuante e a voz no front: apps/web/src (a rota, TelaFlutuante, a gravação e o WAV, o chip da captura, o botão da tela de perfis), packages/ui/src/telas-iniciais.ts (só o campo cabecalhoFlutuante), profiles/estudos/paineis/src (CabecalhoFlutuante.tsx e o registro em index.ts), e os testes. Usa as assinaturas de 2.1 a 2.4 mesmo antes de WP-A e WP-B terminarem.
-- WP-D (Sonnet), o protótipo de tinta: profiles/estudos/paineis/src (TintaTeste.tsx, tinta.ts, o CSS e a rota "tinta-teste" em TelaEstudos.tsx), a dependência perfect-freehand no package.json do paineis, e os testes puros.
+- WP-D, o protótipo de tinta: fora desta rodada (versão 2).
+- (antigo WP-D) profiles/estudos/paineis/src (TintaTeste.tsx, tinta.ts, o CSS e a rota "tinta-teste" em TelaEstudos.tsx), a dependência perfect-freehand no package.json do paineis, e os testes puros.
 - Depois: revisão por diff, pnpm typecheck e pnpm test, um commit por pacote; conferência de verdade (a janela do Electron com captura, uma transcrição real com um WAV gerado, uma mensagem com imagem ao modelo numa pasta temporária); roteiros docs/teste-flutuante.md e docs/teste-tinta.md; code-review.

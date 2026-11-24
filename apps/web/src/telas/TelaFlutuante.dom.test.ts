@@ -271,11 +271,12 @@ describe("a bolinha", () => {
 });
 
 describe("o chat compacto", () => {
-	it("mostra o topo do perfil, Recolher e Abrir o app, e põe o foco no campo", async () => {
+	it("mostra o topo do perfil, Recolher e Abrir o app, sem pôr o foco no campo (o teclado virtual não abre sozinho)", async () => {
 		desenhar({ cabecalho: Cabecalho });
 		await ate(() => campo() !== null);
 		expect(container.querySelector(".cab-teste")?.textContent).toBe("cabecalho:estudos");
-		await ate(() => document.activeElement === campo());
+		await new Promise((pronto) => setTimeout(pronto, 50));
+		expect(document.activeElement).not.toBe(campo());
 		botaoTexto("Recolher")!.click();
 		expect(ponte.recolher).toHaveBeenCalledTimes(1);
 		botaoTexto("Abrir o app")!.click();

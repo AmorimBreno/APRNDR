@@ -235,14 +235,40 @@ interface PropsChat {
 	limparAviso(): void;
 }
 
+/** A rolagem do chat entre um abrir e outro (o chat é desmontado na bolinha), pela classe do elemento que rola. */
+const rolagensDoChat = new Map<string, { topo: number; noFim: boolean }>();
+
 function Chat({ perfilId, janela, janelaPura, cabecalho: Cabecalho, ponte, rascunho, captura, removerCaptura, capturar, capturando, voz, aviso, limparAviso }: PropsChat) {
 	const perfis = usePerfis();
 	const perfil = perfis.lista?.perfis.find((item) => item.id === perfilId);
 	const raiz = useRef<HTMLDivElement>(null);
 
-	// Ao entrar no modo chat, o foco vai para o campo.
+	// Sem foco automático no campo: no notebook com tela de toque, o foco abre o teclado virtual mesmo sem o Breno querer
+	// digitar (pedido dele). Ele toca no campo quando for escrever.
+
+	// A rolagem da conversa volta para onde estava: o chat é desmontado quando vira bolinha, e a conversa remontada
+	// começaria no fim. Guarda a rolagem de cada elemento que rola (pela classe) a cada scroll, e devolve ao abrir.
 	useEffect(() => {
-		raiz.current?.querySelector("textarea")?.focus();
+		const caixa = raiz.current;
+		if (!caixa) return;
+		const guardar = (evento: Event) => {
+			const alvo = evento.target;
+			if (!(alvo instanceof HTMLElement) || !alvo.className) return;
+			rolagensDoChat.set(alvo.className, { topo: alvo.scrollTop, noFim: alvo.scrollHeight - alvo.scrollTop - alvo.clientHeight < 40 });
+		};
+		caixa.addEventListener("scroll", guardar, true);
+		// Depois do primeiro desenho da conversa (que vai ao fim por conta própria): devolve o que estava.
+		const quadro = requestAnimationFrame(() => {
+			for (const [classe, rolagem] of rolagensDoChat) {
+				if (rolagem.noFim) continue;
+				const elemento = [...caixa.querySelectorAll<HTMLElement>("*")].find((item) => item.className === classe);
+				if (elemento) elemento.scrollTop = rolagem.topo;
+			}
+		});
+		return () => {
+			cancelAnimationFrame(quadro);
+			caixa.removeEventListener("scroll", guardar, true);
+		};
 	}, []);
 
 	const transcrevendoVisivel = useValorEstavel(voz.fase === "transcrevendo", voz.fase === "transcrevendo", false);

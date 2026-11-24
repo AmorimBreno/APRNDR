@@ -5,6 +5,7 @@
 // vir e aparece como texto.
 
 import { createContext, useContext, useState, type ReactNode } from "react";
+import { BotaoCopiarImagem, pngDaUrl } from "./BotaoCopiarImagem.tsx";
 
 const ContextoImagens = createContext<string | null>(null);
 
@@ -41,6 +42,7 @@ export function ImagemDoPerfil({ caminho, largura, altura, alturaMaxima }: { cam
 				onError={() => setFalhou(url)}
 				{...(alturaMaxima ? { style: { maxHeight: alturaMaxima, width: "auto" } } : {})}
 			/>
+			<BotaoCopiarImagem obterPng={() => pngDaUrl(url)} rotulo={`Copiar imagem ${caminho}`} />
 		</span>
 	);
 }

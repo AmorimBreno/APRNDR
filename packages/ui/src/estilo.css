@@ -396,6 +396,8 @@ a.linha:hover .linha__texto .overline, a.linha:focus-visible .linha__texto .over
 
 .codigo { display: block; max-width: 100%; margin: 0 0 1em; overflow: hidden; border: var(--border-hair) solid var(--codigo-borda); border-radius: var(--radius-sm); background: var(--codigo-fundo); color: var(--codigo-texto); }
 /* O diagrama do mermaid (DiagramaMermaid.tsx): a mesma caixa do código, com o desenho centrado; rola de lado se for mais largo que a coluna. */
+.diagrama-caixa { position: relative; margin: 0 0 1em; }
+.diagrama-caixa > .diagrama { margin: 0; }
 .diagrama { display: block; max-width: 100%; margin: 0 0 1em; padding: var(--space-4); overflow-x: auto; border: var(--border-hair) solid var(--codigo-borda); border-radius: var(--radius-sm); background: var(--codigo-fundo); scrollbar-width: thin; color-scheme: dark; }
 .diagrama svg { display: block; max-width: 100%; height: auto; margin: 0 auto; }
 .codigo__barra { display: block; padding: 4px var(--space-4); border-bottom: var(--border-hair) solid var(--codigo-borda); background: var(--codigo-barra-fundo); color: var(--codigo-barra-texto); font-family: var(--font-mono); font-size: 11px; line-height: 16px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; }
@@ -488,3 +490,17 @@ code.codigo-em-linha, .ap-prose code.codigo-em-linha { padding: .1em .35em; bord
 .folha__corpo::-webkit-scrollbar-track, .seletor__lista::-webkit-scrollbar-track, .ap-prose .katex-display::-webkit-scrollbar-track { background: transparent; }
 .folha__corpo::-webkit-scrollbar-thumb, .seletor__lista::-webkit-scrollbar-thumb, .ap-prose .katex-display::-webkit-scrollbar-thumb { border-radius: var(--radius-full); background: var(--line); }
 .folha__corpo:hover::-webkit-scrollbar-thumb, .seletor__lista:hover::-webkit-scrollbar-thumb, .ap-prose .katex-display:hover::-webkit-scrollbar-thumb { background: var(--line-strong); }
+
+/* Botão "Copiar imagem" (BotaoCopiarImagem.tsx): num canto da imagem ou do diagrama. Aparece ao passar o mouse
+   ou focar; em tela de toque (sem hover) fica sempre visível. Os textos ficam empilhados na mesma célula, então o
+   botão tem sempre a largura do mais longo e não muda de tamanho quando o retorno troca o texto. */
+.imagem-perfil { position: relative; display: inline-block; max-width: 100%; vertical-align: bottom; }
+.imagem-perfil--falta { display: inline; }
+.botao-copiar-imagem { position: absolute; top: var(--space-2); right: var(--space-2); display: inline-grid; padding: var(--space-1) var(--space-3); border: var(--border-hair) solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-raised); color: var(--ink); line-height: 1.3; cursor: pointer; opacity: 0; transition: opacity .16s ease-out, background-color .16s ease-out; }
+.botao-copiar-imagem__texto { grid-area: 1 / 1; text-align: center; white-space: nowrap; }
+.botao-copiar-imagem__texto[data-ativo="false"] { visibility: hidden; }
+.imagem-perfil:hover .botao-copiar-imagem, .diagrama-caixa:hover .botao-copiar-imagem, .botao-copiar-imagem:focus-visible { opacity: 1; }
+.botao-copiar-imagem:hover { background: var(--surface-hover); }
+.botao-copiar-imagem:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+@media (hover: none) { .botao-copiar-imagem { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .botao-copiar-imagem { transition: none; } }

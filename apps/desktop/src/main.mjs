@@ -248,10 +248,26 @@ function prenderNavegacao(janela) {
 	});
 }
 
-/** Sem permissões extras (câmera, microfone, localização...): o app não usa nenhuma. */
+/**
+ * Sem permissões extras (câmera, microfone, localização...). A única liberada é escrever na área de
+ * transferência ("Copiar imagem" dos diagramas da conversa, para colar no Samsung Notes), e só para o
+ * front do app (ORIGEM_APP). Ler a área de transferência continua negado.
+ */
+const PERMISSOES_DO_APP = new Set(["clipboard-sanitized-write"]);
+
+function origemDe(url) {
+	try {
+		return new URL(url).origin;
+	} catch {
+		return "";
+	}
+}
+
 function protegerSessao() {
-	session.defaultSession.setPermissionRequestHandler((_contents, _permissao, resposta) => resposta(false));
-	session.defaultSession.setPermissionCheckHandler(() => false);
+	session.defaultSession.setPermissionRequestHandler((contents, permissao, resposta, detalhes) =>
+		resposta(PERMISSOES_DO_APP.has(permissao) && origemDe(detalhes?.requestingUrl ?? contents?.getURL() ?? "") === ORIGEM_APP),
+	);
+	session.defaultSession.setPermissionCheckHandler((_contents, permissao, origem) => PERMISSOES_DO_APP.has(permissao) && origemDe(origem) === ORIGEM_APP);
 }
 
 /** Sem o menu padrão, os atalhos de navegador que o Breno usa precisam ser ligados à mão. */

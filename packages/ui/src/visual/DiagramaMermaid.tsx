@@ -12,7 +12,8 @@
 // Segurança: securityLevel "strict" (o padrão do mermaid) tira script e links do SVG, e o
 // SVG só entra na página depois disso.
 
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
+import { BotaoCopiarImagem, pngDoSvg } from "./BotaoCopiarImagem.tsx";
 
 type Mermaid = typeof import("mermaid").default;
 
@@ -131,6 +132,14 @@ function useSvgMermaid(fonte: string): string | undefined {
 /** `children` é o bloco de código comum, o que aparece enquanto não há diagrama. */
 export function DiagramaMermaid({ fonte, children }: { fonte: string; children: ReactNode }) {
 	const svg = useSvgMermaid(fonte);
+	const caixa = useRef<HTMLDivElement>(null);
 	if (svg === undefined) return <>{children}</>;
-	return <div className="diagrama" role="img" aria-label="Diagrama" dangerouslySetInnerHTML={{ __html: svg }} />;
+	// O fundo do PNG é o do próprio bloco (o tema), nunca transparente.
+	const fundo = () => (caixa.current ? getComputedStyle(caixa.current).backgroundColor : "") || token("--surface-raised", "#24221f");
+	return (
+		<div className="diagrama-caixa">
+			<div ref={caixa} className="diagrama" role="img" aria-label="Diagrama" dangerouslySetInnerHTML={{ __html: svg }} />
+			<BotaoCopiarImagem obterPng={() => pngDoSvg(svg, fundo())} rotulo="Copiar diagrama como imagem" />
+		</div>
+	);
 }

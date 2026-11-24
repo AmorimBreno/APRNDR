@@ -7,9 +7,11 @@ Este documento descreve o que o app deve ser, como ele é organizado e em que or
 
 Um aplicativo pessoal, de uso só do Breno, rodando localmente no Windows. O "cérebro" é o pi (agente de código), usado como biblioteca. O app é uma interface própria, parecida com o Claude Desktop, organizada em perfis. Cada perfil abre uma janela com as suas próprias ferramentas e painéis.
 
-O primeiro perfil é o de estudos: cadernos por matéria, cursos gerados com IA a partir dos materiais das aulas, sessões de estudo com explicações que se adaptam a ele, questionários, respostas dissertativas e avaliações. Um perfil de programação virá no futuro e não deve ser construído agora, mas a estrutura precisa permitir que ele seja adicionado sem mexer no núcleo.
+O primeiro perfil é o de estudos: cadernos por matéria com as notas do Breno e um professor que dá a aula, responde às perguntas e segue um plano de estudos quando há um. Um perfil de programação virá no futuro e não deve ser construído agora, mas a estrutura precisa permitir que ele seja adicionado sem mexer no núcleo.
 
-O diferencial do app é que a forma de explicar melhora com o uso, com base em evidências do que de fato funcionou para ele (seção 9).
+O diferencial do app é a conversa com o professor durante a aula: ele ensina e tira as dúvidas enquanto o Breno anota, inclusive flutuando por cima de outro app de notas e ouvindo por voz (decisão 13.21). A forma de explicar continua podendo melhorar com o uso, com base em evidências (seção 9).
+
+Desde 2026-11-24 (decisão 13.21), os cursos gerados (8.3) e a sessão de estudo por lições (8.4) estão pausados: o código e os dados ficam, mas saem da interface.
 
 
 ## 2. Princípios
@@ -426,3 +428,20 @@ Como. Um shell Electron mínimo, apps/desktop, que só abre uma janela carregand
 Comportamento. Instância única: abrir o atalho com o app aberto só traz a janela para a frente, sem recarregar. A janela abre já com o fundo certo e só aparece quando a página está pronta; tamanho, posição e maximizada ficam em %LOCALAPPDATA%\estudos-app\janela.json. Fechar a janela (o X) fecha só ela: o servidor segue no ar, como já era com o Edge, e o app abre rápido da próxima vez. Para sair de verdade há o botão "Sair do app" na tela de perfis (só na janela própria), que fecha a janela e encerra o servidor; não existe atalho de parar no Menu Iniciar, para o app sempre abrir ao ser procurado ("aprndr" na pesquisa do Windows). O "Parar Estudos" da área de trabalho e o launcher/parar.mjs continuam servindo para a linha de comando. Se o front não responde (o Vite reiniciando), a janela mostra "Reconectando…" (só depois de 1 s) e volta sozinha. A janela só navega no front do app (links externos abrem no navegador padrão), com contextIsolation e sandbox, sem nodeIntegration e com todas as permissões negadas.
 
 Consequência. O perfil do Chromium do Electron (%LOCALAPPDATA%\estudos-app\electron) é outro que o do Edge: o que o front guarda no localStorage (por exemplo, os últimos blocos usados do menu "/") recomeça do zero. Nada disso é dado de estudo.
+
+13.21 O professor ao lado e os planos de estudos (2026-11-24, conversa com o Breno). Substitui os cursos (8.3) e a sessão de estudo por lições (8.4) como o centro do app.
+
+Motivo. Os cursos não saíam como o Breno queria, e o formato de curso funciona melhor em vídeo. O estudo que mais rendeu foi outro: com a lista dos temas da prova de Ciência de Dados, ele foi perguntando a um chat, que explicava e tirava as dúvidas, e anotou à mão no Samsung Notes com a S Pen (títulos por questão, cores, marca-texto, as figuras da conversa coladas, setas de dúvida). Ler só não prende; anotar prende e faz surgir as dúvidas. O diferencial do app passa a ser o professor que dá a aula e responde enquanto ele anota.
+
+Cursos pausados. A faixa dos cursos, o guia, a visão do curso e a do módulo saem da interface, e as extensões de cursos e de módulos deixam de ser carregadas. O código, os testes e os dados (as pastas cursos/ no Drive) ficam como estão, para voltar se um dia fizer sentido. Os experimentos do método (13.17), que rodam ao concluir um módulo, ficam parados. A mesa (13.19) fica com as notas e o professor. O perfil do aprendiz continua, porque lê os eventos.
+
+A aula. O professor ensina do jeito de sempre: não divide o conteúdo em trechos curtos e não espera o Breno anotar. Ele dá o conteúdo e responde às perguntas.
+
+Planos de estudos. São notas comuns da matéria marcadas com a tag "plano de estudos" na primeira linha (no modelo da marca "do professor"); pode haver vários por matéria. O plano é uma checklist dos assuntos, com o objetivo no alto e a lista das conversas que o seguiram no fim; não há anotações do professor nos itens. Uma conversa pode seguir um plano, escolhido num seletor do painel do professor, ou o professor cria o plano no começo da conversa e continua nele; o plano é opcional. Com um plano ligado, o professor recebe um resumo dele em cada mensagem, segue os itens em ordem, marca o item quando termina de ensiná-lo, propõe itens novos e, numa conversa nova, recomeça pelo primeiro não marcado. O professor só grava nas notas com a tag; nas outras notas do Breno continua só lendo. A ligação fica no próprio plano (o link conversa: na seção Conversas). Contrato em docs/planos-de-estudo.md.
+
+O professor ao lado. Na ordem decidida pelo Breno:
+- o professor flutuante: uma janela pequena do Electron, sempre por cima, com a foto do professor; o clique abre um chat compacto da mesma conversa; um atalho global mostra e esconde; "Olha minha página" manda uma captura da tela para o professor ler a anotação à mão;
+- a voz pelo atalho: o Breno fala, a transcrição vai pela API de transcrição do OpenRouter (a mesma chave) e a resposta vem em texto no chat flutuante, sem voz;
+- depois, a palavra "professor" detectada no próprio PC (um teste antes de virar padrão);
+- por último, o caderno de caneta no app (S Pen, páginas pautadas, cores, marca-texto, imagens), começando por um protótipo para julgar a latência no aparelho dele.
+Enquanto a voz não existe, o ditado do Windows (Win+H) funciona no campo do professor.

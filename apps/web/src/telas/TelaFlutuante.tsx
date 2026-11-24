@@ -235,6 +235,9 @@ interface PropsChat {
 	limparAviso(): void;
 }
 
+/** Abaixo desta altura a janela ainda é (ou já é) a bolinha: a rolagem não é guardada nem devolvida. */
+const ALTURA_MINIMA_DO_CHAT = 300;
+
 /** A rolagem do chat entre um abrir e outro (o chat é desmontado na bolinha), pela classe do elemento que rola. */
 const rolagensDoChat = new Map<string, { topo: number; noFim: boolean }>();
 
@@ -254,19 +257,27 @@ function Chat({ perfilId, janela, janelaPura, cabecalho: Cabecalho, ponte, rascu
 		const guardar = (evento: Event) => {
 			const alvo = evento.target;
 			if (!(alvo instanceof HTMLElement) || !alvo.className) return;
+			// Ao recolher, o Electron encolhe a janela ao tamanho da bolinha antes de a tela trocar: a conversa fica com
+			// poucos pixels, o navegador rola para caber e esse scroll falso apagaria a posição guardada (relato do Breno).
+			if (window.innerHeight < ALTURA_MINIMA_DO_CHAT || alvo.clientHeight < 80) return;
 			rolagensDoChat.set(alvo.className, { topo: alvo.scrollTop, noFim: alvo.scrollHeight - alvo.scrollTop - alvo.clientHeight < 40 });
 		};
 		caixa.addEventListener("scroll", guardar, true);
-		// Depois do primeiro desenho da conversa (que vai ao fim por conta própria): devolve o que estava.
-		const quadro = requestAnimationFrame(() => {
+		// Depois que a conversa se desenha (ela vai ao fim por conta própria, no primeiro quadro e quando a janela cresce):
+		// devolve o que estava, algumas vezes nos primeiros quadros, até a janela ter o tamanho do chat.
+		const devolver = () => {
+			if (window.innerHeight < ALTURA_MINIMA_DO_CHAT) return;
 			for (const [classe, rolagem] of rolagensDoChat) {
 				if (rolagem.noFim) continue;
 				const elemento = [...caixa.querySelectorAll<HTMLElement>("*")].find((item) => item.className === classe);
-				if (elemento) elemento.scrollTop = rolagem.topo;
+				if (elemento && Math.abs(elemento.scrollTop - rolagem.topo) > 1) elemento.scrollTop = rolagem.topo;
 			}
-		});
+		};
+		const quadro = requestAnimationFrame(devolver);
+		const tempos = [60, 150, 300].map((ms) => setTimeout(devolver, ms));
 		return () => {
 			cancelAnimationFrame(quadro);
+			for (const tempo of tempos) clearTimeout(tempo);
 			caixa.removeEventListener("scroll", guardar, true);
 		};
 	}, []);

@@ -53,11 +53,13 @@ describe("o estado do cartão", () => {
 		expect(estadoDoCartaoDePlano(cartao, [], undefined, true)).toEqual({ tipo: "desfeita" });
 	});
 
-	it("não existe mais: a lista nova não tem o plano; com ele, continua criado", () => {
+	it("uma lista sem o plano não muda o cartão (pode ter sido renomeado): quem diz se sumiu é a resposta ao Desfazer", () => {
 		const sem = doPlanos("i12", "lista", { materia: MATERIA, sessao: "s1", planos: [], seguindo: null });
-		const com = doPlanos("i13", "lista", { materia: MATERIA, sessao: "s1", planos: [{ titulo: "Prova final", feitos: 0, total: 2, concluido: false }], seguindo: "Prova final" });
-		expect(estadoDoCartaoDePlano(cartao, [sem])).toEqual({ tipo: "inexistente" });
-		expect(estadoDoCartaoDePlano(cartao, [sem, com])).toEqual({ tipo: "criada" });
+		expect(estadoDoCartaoDePlano(cartao, [sem])).toEqual({ tipo: "criada" });
+		expect(estadoDoCartaoDePlano(cartao, [sem], "O plano não existe mais (foi apagado). Nada foi apagado.")).toEqual({
+			tipo: "recusada",
+			mensagem: "O plano não existe mais (foi apagado). Nada foi apagado.",
+		});
 	});
 
 	it("recusado leva a mensagem; os textos de cada estado", () => {

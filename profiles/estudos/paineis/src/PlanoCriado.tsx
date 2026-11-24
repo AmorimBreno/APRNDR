@@ -70,7 +70,7 @@ export function PlanoCriado({ cartao, janela }: PropsPlanoCriado) {
 
 	const abrir = () => entrada.current.mesa?.irPara({ origem: cartao.rota, quem: "usuario" });
 
-	/** Pede a lista de novo: depois de uma recusa, ela diz se o plano ainda existe (o cartão vira "não existe mais"). */
+	/** Pede a lista de novo depois de uma recusa (o seletor e a tag ficam em dia). */
 	const pedirLista = () => {
 		void enviarComRetentativa(() => entrada.current.janela.acoes.acaoDaInterface(PAINEL_PLANOS, "listar", { materia: entrada.current.cartao.materia })).catch(() => {});
 	};

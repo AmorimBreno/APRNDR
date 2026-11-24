@@ -7,7 +7,6 @@ import type { AcaoRecebida, ItemConversa } from "@estudos/ui";
 import { ACAO_PLANO_CRIADO, type DadosPlanoCriado } from "../../lib/plano-tipos.ts";
 import { type EstadoCartao, chamadasDoTurno, ordemDaChave } from "./nota-criada.ts";
 import { mesmoTitulo } from "./notas-ponte.ts";
-import { ultimaListaDePlanos } from "./planos-ponte.ts";
 
 export { ACAO_PLANO_CRIADO };
 
@@ -57,18 +56,13 @@ export function planoFoiDesfeito(cartao: CartaoPlano, acoesDePlanos: readonly Ac
 	});
 }
 
-/** O plano sumiu? Só uma lista que chegou DEPOIS da criação do cartão vale; sem lista nova, o plano é dado como existente. */
-export function planoSumiuDaLista(cartao: CartaoPlano, acoesDePlanos: readonly AcaoRecebida[] | undefined): boolean {
-	const criadoEm = ordemDaChave(cartao.chave);
-	const depois = (acoesDePlanos ?? []).filter((recebida) => ordemDaChave(recebida.chave) > criadoEm);
-	const lista = ultimaListaDePlanos(depois, cartao.materia);
-	return lista !== undefined && !lista.planos.some((plano) => mesmoTitulo(plano.titulo, cartao.titulo));
-}
-
-/** O estado do cartão. Vale a ordem: desfeito, não existe mais, recusado (a extensão recusou o Desfazer), criado. */
+/**
+ * O estado do cartão. Vale a ordem: desfeito, recusado (a extensão recusou o Desfazer, inclusive com "o plano não
+ * existe mais"), criado. A lista de planos não decide "não existe mais": o Breno pode ter renomeado o plano, e o
+ * Desfazer segue a troca de nome (lib/planos.ts, desfazerPlano); quem diz se o plano sumiu é a resposta ao Desfazer.
+ */
 export function estadoDoCartaoDePlano(cartao: CartaoPlano, acoesDePlanos: readonly AcaoRecebida[] | undefined, recusa?: string, desfeitoLocal = false): EstadoCartao {
 	if (desfeitoLocal || planoFoiDesfeito(cartao, acoesDePlanos)) return { tipo: "desfeita" };
-	if (planoSumiuDaLista(cartao, acoesDePlanos)) return { tipo: "inexistente" };
 	if (recusa) return { tipo: "recusada", mensagem: recusa };
 	return { tipo: "criada" };
 }

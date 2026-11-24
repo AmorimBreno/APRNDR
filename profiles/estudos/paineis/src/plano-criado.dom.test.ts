@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 // O cartão "Plano criado" (PlanoCriado.tsx) no DOM, com uma janela falsa em que a ponte "planos" responde como a extensão:
-// Abrir, a confirmação do Desfazer no próprio cartão, "Plano desfeito", a recusa e "O plano não existe mais". O cartão
+// Abrir, a confirmação do Desfazer no próprio cartão, "Plano desfeito", a recusa (inclusive "não existe mais"). O cartão
 // tem o mesmo tamanho em todos os estados (as classes e o CSS são os do cartão "Nota criada"). Nada aqui toca a pasta
 // de dados nem a rede.
 
@@ -141,12 +141,13 @@ describe("o cartão 'Plano criado'", () => {
 		expect(cartao()?.getAttribute("data-estado")).toBe("recusada");
 	});
 
-	it("uma lista nova sem o plano vira 'O plano não existe mais' (sem botões)", async () => {
+	it("uma lista nova sem o plano (renomeado, por exemplo) não tira o Desfazer do cartão", async () => {
 		root.render(createElement(Bancada));
 		await ate(() => cartao() !== null);
 		controle.receber("lista", { materia: MATERIA, sessao: SESSAO, planos: [], seguindo: null });
-		await ate(() => texto() === "O plano não existe mais");
-		expect(botoes()).toEqual([]);
+		await new Promise((pronto) => setTimeout(pronto, 50));
+		expect(texto()).toBe("Plano criado: Prova final");
+		expect(botoes()).toContain("Desfazer");
 	});
 
 	it("o cartão ocupa a linha do rodapé (a mesma classe do 'Nota criada': 32 px, texto em até 2 linhas)", async () => {

@@ -17,6 +17,9 @@
 // (`len(x)`) ganha a classe codigo-em-linha. As cores ficam nas variáveis
 // --codigo-* do estilo.css.
 //
+// Diagramas: um bloco ```mermaid``` válido é desenhado pelo mermaid, no tema do app
+// (DiagramaMermaid.tsx); enquanto não está pronto, ou se não for válido, fica o código.
+//
 // Vetores e matrizes: um bloco ```vetor``` ou ```matriz``` com uma lista no
 // estilo Python/JSON ("[6, 3, 8, 12, 11]", "['a', 'b']", "[[1, 2], [3, 4]]";
 // números, strings com aspas simples ou duplas, true/false/None) é desenhado
@@ -45,6 +48,7 @@ import rehypeHighlight from "rehype-highlight";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
+import { DiagramaMermaid } from "./DiagramaMermaid.tsx";
 import { DesenhoDaEstrutura } from "./Estrutura.tsx";
 import { ImagemDoPerfil } from "./ImagemDoPerfil.tsx";
 import { lerEstrutura } from "./ler-estrutura.ts";
@@ -136,7 +140,7 @@ function BlocoDeCodigo({ no, emLinha, children }: { no: NoHast | undefined; emLi
 	const linhas = codigo?.children?.filter((filho) => filho.type === "element" && (filho.properties?.className as unknown[] | undefined)?.includes(CLASSE_LINHA)).length ?? 1;
 	// --digitos: a largura da coluna dos números de linha, em caracteres.
 	const estilo = { "--digitos": String(Math.max(1, linhas)).length } as CSSProperties;
-	return (
+	const caixa = (
 		<Caixa className="codigo">
 			{linguagem ? <Caixa className="codigo__barra">{linguagem}</Caixa> : null}
 			<pre className="codigo__pre" style={estilo}>
@@ -144,6 +148,9 @@ function BlocoDeCodigo({ no, emLinha, children }: { no: NoHast | undefined; emLi
 			</pre>
 		</Caixa>
 	);
+	// Mermaid vira diagrama quando é válido; até lá (e se não for), fica a caixa de código.
+	if (codigo && linguagem === "mermaid" && !emLinha) return <DiagramaMermaid fonte={textoDe(codigo)}>{caixa}</DiagramaMermaid>;
+	return caixa;
 }
 
 /**

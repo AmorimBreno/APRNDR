@@ -39,6 +39,21 @@ A fórmula na linha, então, começa com o $ colado no primeiro caractere da con
 O embed do Obsidian mostra uma imagem da pasta de dados do perfil: `![[nome.png]]`, `![[nome.png|650]]` (largura) ou `![[nome.png|650x300]]` (largura e altura). Vale para png, jpg, jpeg, webp e svg. O caminho é relativo à pasta de dados, ou só o nome (procurado nas pastas de imagens do profile.json). Imagem comum do markdown, `![texto](https://...)`, também funciona.
 
 
+## Diagrama (mermaid)
+
+Um bloco com a linguagem `mermaid` é desenhado como diagrama, no tema do app (visual/DiagramaMermaid.tsx; o mermaid carrega só quando aparece o primeiro bloco):
+
+````
+```mermaid
+flowchart TD
+    A["Dados"] --> B["Modelo"]
+    B --> C["Avaliação"]
+```
+````
+
+Enquanto o desenho não está pronto, o bloco aparece como código. Com a resposta ainda chegando, só se desenha depois de 0,4 s sem mudança no bloco, e o desenho anterior continua na tela até o novo ficar pronto. Se o mermaid recusar a sintaxe, o bloco continua como código (sem mensagem de erro). Em linha (rótulos de opção) o bloco não vira diagrama. O texto do diagrama é SVG puro, sem HTML, e o mermaid roda no modo estrito (sem script nem link).
+
+
 ## Código
 
 Código em linha, entre crases (`` `len(x)` ``), aparece em letra mono, com fundo e cor próprios, sem quebrar a frase.

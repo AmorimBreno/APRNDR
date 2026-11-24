@@ -8,8 +8,8 @@ import type { IconName } from "@estudos/design-system";
 /**
  * Os cursos e os módulos na interface (ESPECIFICACAO 13.21: pausados desde 2026-11-24). Desligada, o caderno não mostra
  * a faixa dos cursos, as rotas do guia, do curso e do módulo abrem as Notas, a mesa só abre notas e a tela de cadernos
- * não tem a tecla Escrita. O código e os dados ficam; para voltar, ligue esta chave e devolva extensions/cursos.ts e
- * extensions/modulos.ts ao profile.json.
+ * não tem a tecla Escrita. O código e os dados ficam; para voltar, ligue esta chave, devolva extensions/cursos.ts e
+ * extensions/modulos.ts ao profile.json e acrescente ler_curso e ler_modulo ao tools de agents/professor.md.
  */
 export const CURSOS_NA_INTERFACE: boolean = false;
 

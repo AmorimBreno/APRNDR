@@ -9,7 +9,7 @@ Antes: abra o app pelo atalho, como sempre.
 3. Abrir o caderno não pisca: a lista entra pronta e não muda de tamanho.
 4. "Continuar de onde parei", se você tinha parado numa lição: abre o caderno nas Notas, sem erro, e a lição não aparece entre as abas da mesa.
 5. Abra uma nota: ela abre na mesa, com o professor ao lado, como antes.
-6. Na conversa da matéria, pergunte ao professor "quais ferramentas você tem para cursos ou módulos?". Ele não deve citar ler_curso nem ler_modulo.
+6. Numa conversa nova da matéria, pergunte ao professor "o que você consegue fazer?". Ele não deve citar cursos, módulos ou aulas, nem executar comandos, criar ou editar arquivos, nem o painel de teste; na mesa, só notas.
 7. Peça ao professor para abrir outra nota sua na mesa ("abre a nota Aula dia 20 de outubro"). Ela abre como aba.
 8. No Explorador, confira que G:\Meu Drive\estudos-dados\materias\ciencia-de-dados\cursos continua com as pastas dos cursos (nada foi apagado).
 

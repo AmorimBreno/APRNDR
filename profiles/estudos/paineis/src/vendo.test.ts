@@ -2,6 +2,16 @@ import { describe, expect, it, vi } from "vitest";
 import { type FonteVendo, LIMITE_CONTEUDO_VENDO } from "./vendo.ts";
 import { type AbaDaBancada, comAncoraNoFoco, contextoDaFonte, fonteServeARota, LIMITE_SOMA_VENDO, lerFonte, montarContextos } from "./vendo.tsx";
 
+// Estes testes cobrem as lições, que só existem com os cursos na interface (pausados desde 2026-11-24,
+// ESPECIFICACAO 13.21): aqui a chave fica ligada, e os testes da pausa a desligam (chaveCursos.ligada = false).
+const chaveCursos = vi.hoisted(() => ({ ligada: true }));
+vi.mock("./painel-caderno.ts", async (original) => ({
+	...(await original<typeof import("./painel-caderno.ts")>()),
+	get CURSOS_NA_INTERFACE() {
+		return chaveCursos.ligada;
+	},
+}));
+
 describe("fonteServeARota (parte C1)", () => {
 	it("nota: a mesma aba, sem diferença de caixa, ignorando a âncora", () => {
 		expect(fonteServeARota({ origem: "caderno/calc/notas/Séries" }, "caderno/calc/notas/séries?bloco=x")).toBe(true);

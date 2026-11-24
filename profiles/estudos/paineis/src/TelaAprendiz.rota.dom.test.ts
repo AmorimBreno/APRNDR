@@ -156,7 +156,9 @@ describe("o botão na tela de cadernos", () => {
 		act(() => root.render(createElement(TelaCadernos, { ...props(""), janela: montarJanela(), escolher: vi.fn() })));
 		const botao = [...container.querySelectorAll("button")].find((b) => b.textContent?.includes("Perfil do aprendiz"));
 		expect(botao).toBeDefined();
-		expect(botao?.className).toBe(([...container.querySelectorAll("button")].find((b) => b.textContent?.includes("Escrita")) as HTMLElement).className);
+		expect(botao?.className).toBe(([...container.querySelectorAll("button")].find((b) => b.textContent?.includes("Materiais")) as HTMLElement).className);
+		// Com os cursos pausados (ESPECIFICACAO 13.21), a tecla Escrita (regras dos módulos) não aparece.
+		expect([...container.querySelectorAll("button")].some((b) => b.textContent?.includes("Escrita"))).toBe(false);
 		await act(async () => botao!.click());
 		await vi.waitFor(() => expect(navegar).toHaveBeenCalledWith("aprendiz/indicadores"));
 	});

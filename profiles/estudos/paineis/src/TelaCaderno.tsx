@@ -13,7 +13,8 @@
 // o painel rola; abaixo de 1100 px os dois vão lado a lado embaixo da lista, e
 // abaixo de 700 px tudo fica numa coluna):
 // - Cursos: os cursos da matéria em cards lado a lado e "Novo curso"
-//   (FaixaCursos, item 5), que rolam para o lado;
+//   (FaixaCursos, item 5), que rolam para o lado; só com os cursos na
+//   interface (CURSOS_NA_INTERFACE, pausados desde 2026-11-24, ESPECIFICACAO 13.21);
 // - a lista com o seletor de tags em cima: Notas (SecaoNotas), Materiais (a
 //   área de soltar e a lista do serviço de materiais) e Mapa de conteúdo, os
 //   conceitos dos materiais para revisar e aprovar (SecaoMapa, item 4.4). A
@@ -31,6 +32,8 @@
 // caderno/<matéria>/cursos/<curso> abre a visão do curso pronto (TelaCurso), do
 // mesmo jeito; caderno/<matéria>/cursos/<curso>/modulos/<módulo>[/<lição>]
 // abre a visão do módulo gerado (TelaModulo), com a CourseBar no lugar da aba.
+// Com os cursos pausados, TelaEstudos não passa guia, curso nem módulo, e as
+// rotas de curso abrem as Notas.
 
 import { Button, EmptyState, Icon, NotebookCover, type OrnamentGlyph, pad2 } from "@estudos/design-system";
 import { AvatarAgente, type DadosAvatarAgente, type JanelaPerfilHook, type PropsTelaInicial, semEsperar, semMovimento } from "@estudos/ui";
@@ -52,7 +55,7 @@ import { useAgenda } from "./agenda-ponte.ts";
 import { BaixoDoCaderno } from "./BaixoDoCaderno.tsx";
 import { FaixaCursos } from "./FaixaCursos.tsx";
 import { ModalLinhaDoTempo, NOMES_TIPO } from "./LinhaDoTempo.tsx";
-import { rotaDaTag, type TagCaderno, tagDaRota } from "./painel-caderno.ts";
+import { CURSOS_NA_INTERFACE, rotaDaTag, type TagCaderno, tagDaRota } from "./painel-caderno.ts";
 import { idDaAba, idDoPainel, SeletorTags } from "./SeletorTags.tsx";
 import { TelaCurso } from "./TelaCurso.tsx";
 import { TelaGuiaCurso } from "./TelaGuiaCurso.tsx";
@@ -124,7 +127,7 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 	const mapa = useMapa(props.janela, materiaId);
 	// Os cursos (a faixa e o guia); de novo ao trocar de tela (voltar do guia traz a lista nova).
 	const guia = props.guia;
-	const cursos = useCursos(props.janela, materiaId, `${tag}/${guia ? (guia.curso ?? "novo") : ""}/${props.curso ?? ""}`);
+	const cursos = useCursos(props.janela, materiaId, `${tag}/${guia ? (guia.curso ?? "novo") : ""}/${props.curso ?? ""}`, CURSOS_NA_INTERFACE);
 	// A agenda das colunas de baixo fica aqui, e não em AgendaDoCaderno: a agenda conhecida sobrevive quando as colunas
 	// são remontadas (voltar de uma nota). Pedida de novo ao trocar de tag e depois de editar a matéria (as provas).
 	const ponteAgenda = useAgenda(props.janela, `${tag}/${editando}`);
@@ -330,6 +333,7 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 				<div className="tela-caderno__painel" hidden={mostraNota}>
 						{/* layoutScroll: o painel só rola se a janela for baixa; a lista de dentro de cada seção (FixoERolagem) também tem layoutScroll, e o arrasto do mapa de conteúdo (Reorder) mede certo com qualquer um rolado. */}
 						<motion.div className="painel-caderno" layoutScroll>
+							{CURSOS_NA_INTERFACE ? (
 							<div className="painel-caderno__bloco">
 								<FaixaCursos
 									cursos={cursos}
@@ -341,6 +345,7 @@ export function TelaCaderno(props: PropsTelaCaderno) {
 									abrir={(curso) => props.navegar(`caderno/${materiaId}/cursos/${curso.id}`)}
 								/>
 							</div>
+							) : null}
 							<BaixoDoCaderno>
 							<section className="painel-caderno__bloco painel-caderno__lista" aria-label="Notas, materiais e mapa de conteúdo">
 								<header className="painel-caderno__seletor">

@@ -283,15 +283,16 @@ export interface CursosDaMateria {
  * seção traz a lista nova). Trocar de sessão zera as ações da ponte; até a
  * nova lista chegar, vale a última.
  */
-export function useCursos(janela: JanelaPerfilHook, materiaId: string, vez?: string): CursosDaMateria {
+export function useCursos(janela: JanelaPerfilHook, materiaId: string, vez?: string, ativo = true): CursosDaMateria {
 	const { estado, acoes } = janela;
 	const sessaoId = estado.sessao?.sessaoId;
 	const listar = useCallback(() => {
 		semEsperar(acoes.acaoDaInterface(PAINEL_CURSOS, "listar", { materia: materiaId } satisfies AcoesCursos["listar"]));
 	}, [acoes, materiaId]);
+	// Inativo (os cursos fora da interface, ESPECIFICACAO 13.21), não pede nada: a extensão dos cursos nem está carregada.
 	useEffect(() => {
-		if (sessaoId) listar();
-	}, [sessaoId, listar, vez]);
+		if (sessaoId && ativo) listar();
+	}, [sessaoId, listar, vez, ativo]);
 	const recebidas = estado.acoesPorPainel[PAINEL_CURSOS];
 	const lido = useMemo(() => lerCursos(recebidas ?? [], materiaId), [recebidas, materiaId]);
 	const ultima = useRef<{ materia: string; lista: ResumoCurso[] } | undefined>(undefined);

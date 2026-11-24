@@ -7,7 +7,8 @@
 // = o guia de criação de curso, dentro do caderno; "caderno/<matéria>/cursos/<curso>"
 // = a visão do curso pronto, dentro do caderno;
 // "caderno/<matéria>/cursos/<curso>/modulos/<módulo>[/<lição>]" = a visão do
-// módulo gerado, com a CourseBar no lugar da aba do caderno.
+// módulo gerado, com a CourseBar no lugar da aba do caderno. Com os cursos pausados
+// (CURSOS_NA_INTERFACE, ESPECIFICACAO 13.21), essas rotas de curso abrem as Notas.
 // "agenda/<aba>[/<matéria>]" = a tela da agenda (calendario, tarefas ou quadro), filtrada pela matéria.
 // "aprendiz/<aba>[/<matéria>][?evento=<id>|?hipotese=<id>]" = a tela "Perfil do aprendiz" (abas indicadores, hipoteses e
 // historico), filtrada pela matéria; depois do "?", o evento ou a hipótese a destacar.
@@ -26,6 +27,7 @@ import { lerRotaDoAprendiz } from "./aprendiz-tela.ts";
 import { contextoDaMateria, lerAcoes, PAINEL_CADERNOS, prepararConversa } from "./comum.ts";
 import { gravarCaminho, gravarSessao, lerMemoria } from "./memoria-mesa.ts";
 import { rotaDoModulo } from "./modulo-tela.ts";
+import { CURSOS_NA_INTERFACE } from "./painel-caderno.ts";
 import { chaveDaMateria, decidirSessao, type SituacaoMesa } from "./sessao-materia.ts";
 import { TelaAgenda } from "./TelaAgenda.tsx";
 import { TelaAprendiz } from "./TelaAprendiz.tsx";
@@ -40,17 +42,19 @@ export function TelaEstudos(props: PropsTelaInicial) {
 	const nota = secao === "notas" && resto.length ? resto.join("/") : undefined;
 	// "caderno/<matéria>/materiais/<arquivo>": a seção Materiais com o arquivo em destaque (o nome pode ter pastas).
 	const material = secao === "materiais" && resto.length ? resto.join("/") : undefined;
+	// As rotas dos cursos só valem com eles na interface (CURSOS_NA_INTERFACE); pausados, "caderno/<matéria>/cursos/..." abre as Notas (tagDaRota).
+	const deCurso = CURSOS_NA_INTERFACE && secao === "cursos";
 	// "caderno/<matéria>/cursos/novo" ou "caderno/<matéria>/cursos/<curso>/guia[/<etapa>]": o guia de criação de curso.
 	const guia =
-		secao === "cursos" && resto[1] === "guia" && resto[0]
+		deCurso && resto[1] === "guia" && resto[0]
 			? { curso: resto[0], ...(resto[2] ? { etapa: resto[2] } : {}) }
-			: secao === "cursos" && resto.length === 1 && resto[0] === "novo"
+			: deCurso && resto.length === 1 && resto[0] === "novo"
 				? {}
 				: undefined;
 	// "caderno/<matéria>/cursos/<curso>": a visão do curso pronto.
-	const cursoPronto = secao === "cursos" && resto.length === 1 && resto[0] && resto[0] !== "novo" ? resto[0] : undefined;
+	const cursoPronto = deCurso && resto.length === 1 && resto[0] && resto[0] !== "novo" ? resto[0] : undefined;
 	// "caderno/<matéria>/cursos/<curso>/modulos/<módulo>[/<lição>]": a visão do módulo gerado.
-	const modulo = secao === "cursos" ? rotaDoModulo(resto) : undefined;
+	const modulo = deCurso ? rotaDoModulo(resto) : undefined;
 	const noCaderno = tipo === "caderno" && Boolean(materiaId);
 	// A matéria do meio da roda: voltar de um caderno cai nele.
 	const [escolhida, setEscolhida] = useState<string | undefined>(undefined);

@@ -1,5 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { type AbaMesa, abaDoCaminho, abrirAba, abrirPrevia, fecharAba, fixarAba, guardarRolagem, LIMITE_ABAS_MESA, mudarCaminho } from "./abas-mesa.ts";
+
+// Estes testes cobrem as lições, que só existem com os cursos na interface (pausados desde 2026-11-24,
+// ESPECIFICACAO 13.21): aqui a chave fica ligada, e os testes da pausa a desligam (chaveCursos.ligada = false).
+const chaveCursos = vi.hoisted(() => ({ ligada: true }));
+vi.mock("./painel-caderno.ts", async (original) => ({
+	...(await original<typeof import("./painel-caderno.ts")>()),
+	get CURSOS_NA_INTERFACE() {
+		return chaveCursos.ligada;
+	},
+}));
 
 const nota = (titulo: string): AbaMesa => ({ chave: `caderno/calc/notas/${titulo}`, caminho: `caderno/calc/notas/${titulo}`, tipo: "nota", rotulo: titulo });
 
@@ -12,6 +22,16 @@ describe("abaDoCaminho", () => {
 	it("lição: a chave é o módulo, com ou sem a lição", () => {
 		expect(abaDoCaminho("caderno/calc/cursos/c1/modulos/m2/l3")).toEqual({ tipo: "licao", chave: "caderno/calc/cursos/c1/modulos/m2" });
 		expect(abaDoCaminho("caderno/calc/cursos/c1/modulos/m2")).toEqual({ tipo: "licao", chave: "caderno/calc/cursos/c1/modulos/m2" });
+	});
+
+	it("com os cursos pausados, a lição não vira aba (e as lembradas somem ao ler)", () => {
+		chaveCursos.ligada = false;
+		try {
+			expect(abaDoCaminho("caderno/calc/cursos/c1/modulos/m2/l3")).toBeUndefined();
+			expect(abaDoCaminho("caderno/calc/notas/Limites")).toEqual({ tipo: "nota", chave: "caderno/calc/notas/Limites" });
+		} finally {
+			chaveCursos.ligada = true;
+		}
 	});
 
 	it("as outras rotas não viram aba", () => {

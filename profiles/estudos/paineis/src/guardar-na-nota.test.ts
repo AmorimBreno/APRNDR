@@ -1,7 +1,7 @@
 // "Ir ao trecho" e "Guardar na nota": as decisões puras (guardar-na-nota.ts).
 
 import type { AcaoRecebida, ItemConversa } from "@estudos/ui";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { formatarTrechoGuardado } from "../../lib/trecho-guardado.ts";
 import { formatarOrigem } from "./origem-mesa.ts";
 import {
@@ -15,6 +15,16 @@ import {
 	respostaDoPedido,
 	ultimaRespostaDoTurno,
 } from "./guardar-na-nota.ts";
+
+// Estes testes cobrem as lições, que só existem com os cursos na interface (pausados desde 2026-11-24,
+// ESPECIFICACAO 13.21): aqui a chave fica ligada, e os testes da pausa a desligam (chaveCursos.ligada = false).
+const chaveCursos = vi.hoisted(() => ({ ligada: true }));
+vi.mock("./painel-caderno.ts", async (original) => ({
+	...(await original<typeof import("./painel-caderno.ts")>()),
+	get CURSOS_NA_INTERFACE() {
+		return chaveCursos.ligada;
+	},
+}));
 
 type Usuario = Extract<ItemConversa, { tipo: "usuario" }>;
 

@@ -7,6 +7,7 @@
 // de agora, para voltar à mesma lição.
 
 import { rotaDaOrigem } from "./origem-mesa.ts";
+import { CURSOS_NA_INTERFACE } from "./painel-caderno.ts";
 
 export type TipoAbaMesa = "nota" | "licao";
 
@@ -42,7 +43,8 @@ export function abaDoCaminho(origem: string): { tipo: TipoAbaMesa; chave: string
 	const partes = caminho.split("/");
 	if (partes[0] !== "caderno" || !partes[1]) return undefined;
 	if (partes[2] === "notas" && partes.length > 3 && partes.slice(3).every(Boolean)) return { tipo: "nota", chave: caminho };
-	if (partes[2] === "cursos" && partes[3] && partes[4] === "modulos" && partes[5] && partes.length <= 7) {
+	// Com os cursos pausados (CURSOS_NA_INTERFACE), a lição não vira aba: as lembradas somem ao ler (AbasMesa.tsx).
+	if (CURSOS_NA_INTERFACE && partes[2] === "cursos" && partes[3] && partes[4] === "modulos" && partes[5] && partes.length <= 7) {
 		return { tipo: "licao", chave: partes.slice(0, 6).join("/") };
 	}
 	return undefined;

@@ -1,5 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { trocaSemTransicao } from "./transicoes.ts";
+
+// Estes testes cobrem as lições, que só existem com os cursos na interface (pausados desde 2026-11-24,
+// ESPECIFICACAO 13.21): aqui a chave fica ligada, e os testes da pausa a desligam (chaveCursos.ligada = false).
+const chaveCursos = vi.hoisted(() => ({ ligada: true }));
+vi.mock("./painel-caderno.ts", async (original) => ({
+	...(await original<typeof import("./painel-caderno.ts")>()),
+	get CURSOS_NA_INTERFACE() {
+		return chaveCursos.ligada;
+	},
+}));
 
 describe("trocaSemTransicao", () => {
 	it("tags do painel do mesmo caderno não animam a página", () => {

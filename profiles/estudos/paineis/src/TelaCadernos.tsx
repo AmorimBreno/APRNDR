@@ -4,7 +4,8 @@
 // cor e no ideograma dela. "Abrir" leva ao caderno (TelaCaderno); a última
 // linha, "Nova matéria", abre o modal de criar; a tecla Materiais abre os
 // materiais da matéria do meio da roda, e a tecla Escrita, "Como o professor
-// escreve" (as regras de escrita, ModalEscrita.tsx, docs/escrita.md).
+// escreve" (as regras de escrita, ModalEscrita.tsx, docs/escrita.md), só com os
+// cursos na interface (CURSOS_NA_INTERFACE): as regras só valem para os módulos.
 //
 // A sessão do perfil vem da TelaEstudos; a lista vem da extensão de matérias
 // (extensions/materias.ts) pela ponte, no painel "cadernos".
@@ -22,6 +23,7 @@ import { TITULO_ESCRITA } from "./escrita-tela.ts";
 import { ModalEscrita } from "./ModalEscrita.tsx";
 import { ModalMateria } from "./ModalMateria.tsx";
 import { ModalMateriais } from "./ModalMateriais.tsx";
+import { CURSOS_NA_INTERFACE } from "./painel-caderno.ts";
 import { RotuloEstado } from "./RotuloEstado.tsx";
 
 const mesAno = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" });
@@ -203,10 +205,12 @@ export function TelaCadernos(props: PropsTelaCadernos) {
 							<Icon name="paperclip" size={18} strokeWidth={2.25} />
 							Materiais
 						</button>
-						<button type="button" className="tecla-papel button" title={TITULO_ESCRITA} onClick={() => setVendoEscrita(true)}>
-							<Icon name="book" size={18} strokeWidth={2.25} />
-							Escrita
-						</button>
+						{CURSOS_NA_INTERFACE ? (
+							<button type="button" className="tecla-papel button" title={TITULO_ESCRITA} onClick={() => setVendoEscrita(true)}>
+								<Icon name="book" size={18} strokeWidth={2.25} />
+								Escrita
+							</button>
+						) : null}
 						<button type="button" className="tecla-papel button" title={TITULO_APRENDIZ} onClick={() => sairE(() => props.navegar(rotaDoAprendiz()))()}>
 							<Icon name="chart" size={18} strokeWidth={2.25} />
 							Perfil do aprendiz

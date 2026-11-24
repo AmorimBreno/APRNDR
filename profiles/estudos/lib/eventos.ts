@@ -30,6 +30,13 @@ export type VerboEvento =
 	// apagou essa nota no Desfazer do cartão, com o arquivo ainda igual ao hash (objeto: { materia, titulo }).
 	| "criou_nota_do_professor"
 	| "desfez_nota_do_professor"
+	// Planos de estudos (docs/planos-de-estudo.md, seção 6): criou_plano { materia, titulo, itens, hash }, seguiu_plano { materia, titulo | null },
+	// ligou_plano { materia, titulo, conversa }, atualizou_plano { materia, titulo, operacoes } e desfez_plano { materia, titulo }.
+	| "criou_plano"
+	| "seguiu_plano"
+	| "ligou_plano"
+	| "atualizou_plano"
+	| "desfez_plano"
 	// Mapa de conteúdo (item 4.4): docs/mapa-conteudo.md, "Eventos".
 	| "mapeou_material"
 	| "atualizou_mapa"

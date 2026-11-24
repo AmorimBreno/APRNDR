@@ -143,3 +143,22 @@ Nota do professor · [conversa de 11/11/2026](conversa:abc12345)
 ```
 
 É o mesmo link `conversa:<id curto>` do "Guardar na nota" (o id vem de `idCurtoDaConversa`, em lib/trecho-guardado.ts). Uma nota é "do professor" (`ehNotaDoProfessor`, em lib/nota-tipos.ts) quando a primeira linha não vazia começa com `Nota do professor · ` e traz um link `conversa:`. A lista de notas mostra a tag "do professor" nela e a prévia começa depois da marca. Se o Breno apagar a linha, a nota passa a ser dele: a tag some e o Desfazer do cartão não a apaga mais (o arquivo deixa de ser igual ao que o professor gravou). O resto do arquivo segue o formato acima.
+
+
+## Plano de estudos
+
+Um plano de estudos (docs/planos-de-estudo.md) é uma nota comum com uma tag na primeira linha, uma checklist dos assuntos e o histórico das conversas que o seguiram:
+
+```
+Plano de estudos · criado em 24/11/2026
+**Objetivo:** prova final de 26/11
+
+## Itens
+- [x] **Q1 · k-means e clusterização hierárquica**
+- [ ] **Q2 · PCA**
+
+## Conversas
+- [24/11/2026](conversa:abc12345)
+```
+
+É um plano (`ehPlanoDeEstudos`, em lib/plano-tipos.ts) quando a primeira linha não vazia começa com `Plano de estudos · `. Os itens são as tarefas de primeiro nível da seção `## Itens` (`- [ ]` e `- [x]`; as recuadas são do Breno e não contam), numerados na ordem do arquivo. A seção `## Conversas` só cresce: cada conversa que seguiu o plano entra com o mesmo link `conversa:<id curto>` do "Guardar na nota". O professor só marca, desmarca e acrescenta itens e conversas; o resto da nota é do Breno. A lista de notas mostra a tag "plano de estudos" com o progresso, e a prévia começa depois da tag. Se o Breno apagar a primeira linha, a nota deixa de ser plano.

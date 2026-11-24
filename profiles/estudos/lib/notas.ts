@@ -16,6 +16,7 @@ import { join } from "node:path";
 import { gravarDeUmaVez, renomearComInsistencia } from "./arquivos.ts";
 import { acrescentarEvento, criarEvento } from "./eventos.ts";
 import { ErroMaterias, arquivoMateria, eventosMateria, pastaMateria } from "./materias.ts";
+import { lerPlano } from "./plano-tipos.ts";
 import { conferirTitulo, ehNotaDoProfessor, type ListaNotas, type NotaAberta, previaDaNota, type ResumoNota } from "./nota-tipos.ts";
 
 export { conferirTitulo, ehNotaDoProfessor, type ListaNotas, type NotaAberta, pastaNotasRelativa, previaDaNota, type ResumoNota, temHtmlDesconhecido } from "./nota-tipos.ts";
@@ -78,7 +79,15 @@ export async function listarNotas(dados: string, id: string): Promise<ListaNotas
 		const arquivo = arquivoNota(dados, id, titulo);
 		try {
 			const [info, conteudo] = await Promise.all([stat(arquivo), readFile(arquivo, "utf8")]);
-			notas.push({ titulo, modificadaEm: info.mtime.toISOString(), tamanho: info.size, previa: previaDaNota(conteudo), doProfessor: ehNotaDoProfessor(conteudo) });
+			const plano = lerPlano(conteudo);
+			notas.push({
+				titulo,
+				modificadaEm: info.mtime.toISOString(),
+				tamanho: info.size,
+				previa: previaDaNota(conteudo),
+				doProfessor: ehNotaDoProfessor(conteudo),
+				...(plano ? { plano: { feitos: plano.feitos, total: plano.total } } : {}),
+			});
 		} catch {
 			// Sumiu entre a lista e a leitura (o Drive sincronizando): fica de fora desta vez.
 		}

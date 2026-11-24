@@ -24,6 +24,7 @@ describe("perfil estudos real", () => {
 			join(pastaPerfis, "estudos", "extensions", "quiz-web.ts"),
 			join(pastaPerfis, "estudos", "extensions", "materias.ts"),
 			join(pastaPerfis, "estudos", "extensions", "notas.ts"),
+			join(pastaPerfis, "estudos", "extensions", "planos.ts"),
 			join(pastaPerfis, "estudos", "extensions", "mapa.ts"),
 			join(pastaPerfis, "estudos", "extensions", "agenda.ts"),
 			join(pastaPerfis, "estudos", "extensions", "mesa.ts"),

@@ -267,6 +267,8 @@ export default function notas(pi: ExtensionAPI) {
 				try {
 					const { titulo, mencoesAtualizadas } = await renomearNota(dados, materia, de, para, daSessao);
 					mostrar("renomeada", { materia, de, para: titulo, mencoesAtualizadas: mencoesAtualizadas ?? [] });
+						// A extensão dos planos escuta: se a conversa segue esta nota (um plano de estudos), passa a seguir o título novo.
+						pi.events.emit("notas:renomeada", { materia, de, para: titulo });
 					// Sem esperar: a lista espera a fila, e esta tarefa ainda está nela.
 					void mostrarLista(dados, materia);
 				} catch (erro) {
@@ -369,7 +371,7 @@ export default function notas(pi: ExtensionAPI) {
 		name: "listar_notas",
 		label: "Listar notas",
 		description:
-			"List the user's personal notes in a subject's notebook: title, last change and a short preview. In a notebook conversation, the subject is the conversation's. Notes are the user's own writing: read them to understand what they wrote, never write or change them (notes you created yourself with criar_nota are marked [do professor] in the list).",
+			"List the user's personal notes in a subject's notebook: title, last change and a short preview. In a notebook conversation, the subject is the conversation's. Notes are the user's own writing: read them to understand what they wrote, never write or change them (notes you created yourself with criar_nota are marked [do professor] in the list; notes marked [plano de estudos] are study plans, which you read with ler_plano and update only with the plan tools).",
 		parameters: Type.Object({
 			materia: Type.Optional(Type.String({ description: "Subject id (from listar_materias). Not needed in a notebook conversation." })),
 		}),
@@ -378,7 +380,7 @@ export default function notas(pi: ExtensionAPI) {
 			if ("erro" in escolha) return { content: [{ type: "text", text: escolha.erro }], details: undefined, isError: true };
 			try {
 				const lista = await listarNotas(ctx.cwd, escolha.materia);
-				const linhas = lista.notas.map((nota) => `- ${nota.titulo}${nota.doProfessor ? " [do professor]" : ""} (mudou em ${nota.modificadaEm.slice(0, 10)})${nota.previa ? `: ${nota.previa}` : ""}`);
+				const linhas = lista.notas.map((nota) => `- ${nota.titulo}${nota.doProfessor ? " [do professor]" : ""}${nota.plano ? " [plano de estudos]" : ""} (mudou em ${nota.modificadaEm.slice(0, 10)})${nota.previa ? `: ${nota.previa}` : ""}`);
 				const texto = linhas.length ? `Notas de ${escolha.materia}:\n${linhas.join("\n")}` : `O caderno ${escolha.materia} ainda não tem notas.`;
 				return { content: [{ type: "text", text: texto }], details: lista };
 			} catch (erro) {

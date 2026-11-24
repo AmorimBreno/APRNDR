@@ -160,6 +160,18 @@ describe("ponte das notas", () => {
 		expect((recebidas("lista")[0]!.dados as { notas: Array<{ titulo: string }> }).notas.map((nota) => nota.titulo)).toEqual(["Limites laterais"]);
 	});
 
+	it("depois de renomear, avisa a extensão dos planos (notas:renomeada); renomear que falha não avisa", async () => {
+		const avisos: unknown[] = [];
+		barramento.on("notas:renomeada", (aviso) => avisos.push(aviso));
+		await criarNota(dados, materia, "Limites");
+		acao("renomear", { de: "Limites", para: "a/b" });
+		await esperar(() => recebidas("erro").length > 0);
+		expect(avisos).toEqual([]);
+		acao("renomear", { de: "Limites", para: "Limites laterais" });
+		await esperar(() => recebidas("renomeada").length > 0);
+		expect(avisos).toEqual([{ materia, de: "Limites", para: "Limites laterais" }]);
+	});
+
 	it("apaga para a lixeira, devolve o pedido, manda a lista sem a nota e grava apagou_nota", async () => {
 		await criarNota(dados, materia, "Limites");
 		await criarNota(dados, materia, "Derivadas");
@@ -559,6 +571,17 @@ describe("notas do professor (mesa, parte D)", () => {
 		expect(existe("Resumo")).toBe(true);
 		expect(await desfeitos()).toHaveLength(0);
 		expect(recebidas("desfeita")).toHaveLength(0);
+	});
+
+	it("listar_notas marca [plano de estudos] nas notas com a tag e a prévia não traz a tag", async () => {
+		await criarNota(dados, materia, "Prova final");
+		await writeFile(arquivoNota(dados, materia, "Prova final"), "Plano de estudos · criado em 24/11/2026\n\n## Itens\n- [x] a\n- [ ] b\n", "utf8");
+		await criarNota(dados, materia, "Comum");
+		const lista = await ferramentas.listar_notas!.execute("1", {}, undefined, undefined, ctx);
+		expect(lista.content[0]!.text).toMatch(/- Prova final \[plano de estudos\] \(mudou/);
+		expect(lista.content[0]!.text).not.toContain("Plano de estudos ·");
+		expect(lista.content[0]!.text).toMatch(/- Comum \(mudou/);
+		expect((lista.details as { notas: Array<{ titulo: string; plano?: unknown }> }).notas.find((nota) => nota.titulo === "Prova final")!.plano).toEqual({ feitos: 1, total: 2 });
 	});
 
 	it("listar_notas mostra [do professor] nas notas criadas por ele", async () => {

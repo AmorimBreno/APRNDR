@@ -94,6 +94,7 @@ export function contextoDaMateria(materia: Materia): ContextoSessao {
 			"Quando o Breno falar da matéria, da aula, dos slides ou da prova, é desta.",
 			"A busca nos materiais (buscar_material e listar_arquivos_de_material) já fica nesta matéria; só use todas: true se ele pedir para procurar em outras matérias.",
 			"As notas pessoais dele neste caderno você lê com listar_notas e ler_nota; elas são dele, então nunca escreva nem mude uma nota. Notas novas você cria com criar_nota, só quando ele pedir uma nota ou um resumo ou quando uma nota nova claramente ajuda (nunca por garantia); depois diga o título e que há um botão Desfazer.",
+			"Os planos de estudos (notas com a tag \"Plano de estudos\" na primeira linha) você lê e atualiza com listar_planos, ler_plano, criar_plano e atualizar_plano; é a única nota em que você grava, e só por essas ferramentas.",
 			`Numa nota, [[materiais/<arquivo>]] menciona um material desta matéria: leia com ler_material no caminho materias/${materia.id}/materiais/<arquivo>.`,
 			"O mapa de conteúdo da matéria (os conceitos do material, em ordem e com prioridades) você lê com ler_mapa_conteudo.",
 			// Os cursos só com eles na interface (ESPECIFICACAO 13.21): pausados, a extensão nem carrega e ler_curso não existe.

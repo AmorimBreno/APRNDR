@@ -2,7 +2,7 @@
 // importa daqui, e notas.ts reexporta. Cada nota é o arquivo
 // materias/<id>/notas/<Título>.md; o título é o nome do arquivo.
 
-import type { ProgressoPlano } from "./plano-tipos.ts";
+import { ehPlanoDeEstudos, type ProgressoPlano } from "./plano-tipos.ts";
 
 /** Uma nota na lista do caderno. */
 export interface ResumoNota {
@@ -143,9 +143,9 @@ export function ehNotaDoProfessor(markdown: string): boolean {
 	return primeira !== undefined && primeira.linha.startsWith(INICIO_MARCA_PROFESSOR) && LINK_CONVERSA.test(primeira.linha);
 }
 
-/** O começo do texto sem a marcação do markdown, para a lista de notas. A linha da marca "do professor" não entra. */
+/** O começo do texto sem a marcação do markdown, para a lista de notas. A linha da marca "do professor" e a da tag de plano de estudos não entram. */
 export function previaDaNota(markdown: string, tamanho = 140): string {
-	const semMarca = ehNotaDoProfessor(markdown) ? (primeiraLinha(markdown)?.resto ?? "") : markdown;
+	const semMarca = ehNotaDoProfessor(markdown) || ehPlanoDeEstudos(markdown) ? (primeiraLinha(markdown)?.resto ?? "") : markdown;
 	const texto = semMarca
 		.replace(/^ {0,3}(`{3,}|~{3,}).*$/gm, "")
 		.replace(/^\s{0,3}(#{1,6}\s+|>\s?|[-*+]\s+(\[[ xX]\]\s+)?|\d+[.)]\s+)/gm, "")

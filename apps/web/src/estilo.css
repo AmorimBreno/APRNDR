@@ -241,3 +241,63 @@ a.cartao:hover .cartao__carregar .overline, a.cartao:focus-visible .cartao__carr
 .perfis__corpo::-webkit-scrollbar-track, .cartao__mensagem::-webkit-scrollbar-track, .painel-carregando::-webkit-scrollbar-track, .aviso-erro.aviso--compacto::-webkit-scrollbar-track, .coluna::-webkit-scrollbar-track { background: transparent; }
 .perfis__corpo::-webkit-scrollbar-thumb, .cartao__mensagem::-webkit-scrollbar-thumb, .painel-carregando::-webkit-scrollbar-thumb, .aviso-erro.aviso--compacto::-webkit-scrollbar-thumb, .coluna::-webkit-scrollbar-thumb { border-radius: var(--radius-full); background: var(--line); }
 .perfis__corpo:hover::-webkit-scrollbar-thumb, .cartao__mensagem:hover::-webkit-scrollbar-thumb, .painel-carregando:hover::-webkit-scrollbar-thumb, .aviso-erro.aviso--compacto:hover::-webkit-scrollbar-thumb, .coluna:hover::-webkit-scrollbar-thumb { background: var(--line-strong); }
+
+/* ── O professor flutuante (docs/professor-flutuante.md; TelaFlutuante.tsx) ── */
+
+/* Botão da tela de perfis: os dois rótulos na mesma célula, o mais comprido dá a largura. */
+.perfis__flutuante-rotulos { display: inline-grid; }
+.perfis__flutuante-rotulos > span { grid-area: 1 / 1; white-space: nowrap; }
+
+/* A janela da bolinha nasce transparente; no modo chat (classe flutuante-chat) volta o fundo de sempre.
+ * Na bolinha o zoom do app não vale: a janela tem 76 px e a foto 64, em pixels de verdade. */
+html.rota-flutuante:not(.flutuante-chat), html.rota-flutuante:not(.flutuante-chat) body, html.rota-flutuante:not(.flutuante-chat) #raiz { background: transparent; }
+html.rota-flutuante:not(.flutuante-chat) body { zoom: 1; }
+
+.flutuante-aguarda { width: 100%; height: 100%; }
+
+/* A bolinha: o círculo de 64 px dentro de 76; o anel fica nos 6 px de folga. */
+.bolinha { position: relative; width: 76px; height: 76px; display: grid; place-items: center; user-select: none; }
+.bolinha__corpo { position: relative; width: 64px; height: 64px; border-radius: 50%; cursor: grab; touch-action: none; outline: none; }
+.bolinha__corpo:active { cursor: grabbing; }
+.bolinha__anel { position: absolute; inset: -5px; border-radius: 50%; border: 3px solid transparent; pointer-events: none; }
+.bolinha[data-estado="pensando"] .bolinha__anel { border-color: var(--steel); animation: bolinha-pulso 1.6s ease-in-out infinite; }
+.bolinha[data-estado="escrevendo"] .bolinha__anel { border-color: var(--sage); animation: bolinha-pulso 1.6s ease-in-out infinite; }
+.bolinha[data-estado="ouvindo"] .bolinha__anel { border-color: var(--amber); animation: bolinha-pulso 1s ease-in-out infinite; }
+@keyframes bolinha-pulso { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+.bolinha__tempo { position: absolute; left: 50%; bottom: -8px; transform: translateX(-50%); padding: 0 var(--space-2); border-radius: var(--radius-full); background: var(--amber); color: var(--on-amber); font-size: 11px; line-height: 16px; white-space: nowrap; }
+/* O menu do clique direito cobre a bolinha (a janela só tem 76 px): dois botões empilhados. */
+.bolinha__menu { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 2px; padding: 2px; border-radius: var(--radius-md); background: var(--surface-raised); box-shadow: inset 0 0 0 var(--border-hair) var(--line-strong); }
+.bolinha__item { flex: 1; min-height: 0; padding: 0 var(--space-1); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink); font: inherit; font-size: 11px; line-height: 13px; cursor: pointer; }
+.bolinha__item:hover, .bolinha__item:focus-visible { background: var(--amber); color: var(--on-amber); outline: none; }
+
+/* O chat compacto: 420 px, sem rolagem lateral. */
+.flutuante { display: flex; flex-direction: column; width: 100%; height: 100%; min-width: 0; overflow: hidden; background: var(--surface-panel); color: var(--ink); }
+.flutuante__topo { flex: none; display: flex; align-items: flex-start; gap: var(--space-2); min-width: 0; padding: var(--space-2) var(--space-3); border-bottom: var(--border-hair) solid var(--line); }
+.flutuante__cabecalho { flex: 1 1 0; min-width: 0; }
+.flutuante__acoes { flex: none; display: flex; align-items: center; gap: var(--space-1); }
+.flutuante__botao-texto { display: inline-flex; align-items: center; gap: var(--space-1); height: var(--control-sm); padding: 0 var(--space-2); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink-muted); font: inherit; white-space: nowrap; cursor: pointer; }
+.flutuante__botao-texto:hover { background: var(--surface-hover); color: var(--ink); }
+.flutuante__botao-texto:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.flutuante__conversa { flex: 1 1 0; min-height: 0; min-width: 0; }
+/* Os chips e os botões acima do campo: a faixa tem sempre a mesma altura, com ou sem chips. */
+.flutuante__faixa { flex: 1 1 100%; display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-width: 0; min-height: var(--control-sm); }
+.flutuante__chips { flex: 1 1 0; display: flex; align-items: center; gap: var(--space-2); min-width: 0; overflow: hidden; }
+.flutuante__botoes { flex: none; display: flex; align-items: center; gap: var(--space-1); }
+.flutuante__chip { flex: 0 1 auto; display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; height: var(--control-sm); padding: 0 var(--space-3); border-radius: var(--radius-full); background: var(--surface-raised); box-shadow: inset 0 0 0 var(--border-hair) var(--line-strong); }
+.flutuante__chip-texto { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.flutuante__chip--erro { box-shadow: inset 0 0 0 var(--border-hair) var(--brick); }
+.flutuante__chip--gravando { box-shadow: inset 0 0 0 var(--border-hair) var(--amber); }
+.flutuante__miniatura { flex: none; width: 24px; height: 20px; border-radius: 3px; object-fit: cover; }
+.flutuante__ponto { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--amber); animation: bolinha-pulso 1s ease-in-out infinite; }
+.flutuante__chip-acao { flex: none; padding: 0; border: 0; background: none; color: var(--amber); font: inherit; text-decoration: underline; cursor: pointer; }
+.flutuante__chip-acao:focus-visible, .flutuante__chip-x:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.flutuante__chip-x { flex: none; display: inline-grid; place-items: center; width: 20px; height: 20px; margin-right: -6px; padding: 0; border: 0; border-radius: var(--radius-full); background: none; color: var(--ink-muted); cursor: pointer; }
+.flutuante__chip-x:hover { background: var(--surface-hover); color: var(--ink); }
+.flutuante__botao { flex: none; display: inline-grid; place-items: center; width: var(--control-sm); height: var(--control-sm); padding: 0; border: 0; border-radius: var(--radius-sm); background: var(--surface-well); color: var(--ink-muted); cursor: pointer; box-shadow: inset 0 0 0 var(--border-hair) var(--line); }
+.flutuante__botao:hover { background: var(--surface-hover); color: var(--ink); }
+.flutuante__botao:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.flutuante__botao:disabled { opacity: var(--opacity-disabled); cursor: not-allowed; }
+.flutuante__botao--gravando, .flutuante__botao--gravando:hover { background: var(--amber); color: var(--on-amber); animation: bolinha-pulso 1s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+	.bolinha__anel, .flutuante__ponto, .flutuante__botao--gravando { animation: none !important; }
+}

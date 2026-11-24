@@ -15,6 +15,7 @@ import { type ComponentType, useEffect, useRef, useState } from "react";
 import { CascaDoApp } from "./BarraDoApp.tsx";
 import type { AmbienteDesktop } from "./desktop.ts";
 import { telasIniciais } from "./telas-iniciais.ts";
+import { TelaFlutuante } from "./telas/TelaFlutuante.tsx";
 import { JanelaPerfil } from "./telas/JanelaPerfil.tsx";
 import { PainelConversa } from "./telas/PainelConversa.tsx";
 import { TelaPerfis } from "./telas/TelaPerfis.tsx";
@@ -24,9 +25,13 @@ interface Rota {
 	conversa: boolean;
 	/** Subtela da tela inicial, sem barras nas pontas ("caderno/calculo/notas"). */
 	caminho?: string;
+	/** "#/flutuante/<perfil>": a janela da bolinha do professor (docs/professor-flutuante.md). */
+	flutuante?: boolean;
 }
 
 export function rotaDoHash(hash: string): Rota {
+	const flutuante = /^#\/flutuante\/([^/]+)\/?$/.exec(hash);
+	if (flutuante) return { perfil: decodeURIComponent(flutuante[1]!), conversa: false, flutuante: true };
 	const achado = /^#\/perfil\/([^/]+)(?:\/(.+?))?\/?$/.exec(hash);
 	if (!achado) return { conversa: false };
 	const perfil = decodeURIComponent(achado[1]!);
@@ -124,11 +129,17 @@ function TelaInicial({ perfilId, caminho }: { perfilId: string; caminho: string 
 
 /** Com "reduzir movimento" no Windows, as animações da Motion param de se mover. */
 export function App({ desktop }: { desktop?: AmbienteDesktop }) {
+	// A janela da bolinha não tem a barra do app e nunca navega: a rota vale pela vida da janela.
+	const [flutuante] = useState(() => rotaDoHash(window.location.hash).flutuante === true);
 	return (
 		<MotionConfig reducedMotion="user">
-			<CascaDoApp desktop={desktop}>
+			{flutuante ? (
 				<Rotas />
-			</CascaDoApp>
+			) : (
+				<CascaDoApp desktop={desktop}>
+					<Rotas />
+				</CascaDoApp>
+			)}
 		</MotionConfig>
 	);
 }
@@ -157,8 +168,16 @@ function Rotas() {
 		return () => window.removeEventListener("hashchange", mudou);
 	}, []);
 
-	const { perfil, conversa, caminho = "" } = rotaDoHash(hash);
+	const { perfil, conversa, caminho = "", flutuante } = rotaDoHash(hash);
 	if (!perfil) return <TelaPerfis />;
+	if (flutuante) {
+		const cabecalho = Object.hasOwn(telasIniciais, perfil) ? telasIniciais[perfil]?.cabecalhoFlutuante : undefined;
+		return (
+			<ProvedorImagens perfilId={perfil}>
+				<TelaFlutuante key={perfil} perfilId={perfil} {...(cabecalho ? { cabecalho } : {})} />
+			</ProvedorImagens>
+		);
+	}
 	const inicial = Object.hasOwn(telasIniciais, perfil) ? telasIniciais[perfil] : undefined;
 	// key só pelo perfil: trocar de subtela não remonta a tela inicial (ela guarda a sessão aberta).
 	// As imagens da pasta de dados (embeds da conversa, painéis) vêm do perfil aberto.

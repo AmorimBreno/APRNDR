@@ -11,8 +11,8 @@
 import { EmptyState, Icon, ORNAMENT_MEANINGS, type OrnamentGlyph, pad2, Wordmark } from "@estudos/design-system";
 import { type ErroPerfil, type ResumoPerfil, semMovimento, useValorEstavel, usePerfis } from "@estudos/ui";
 import { motion, useMotionValue, useSpring, useTransform } from "motion/react";
-import type { CSSProperties, PointerEvent } from "react";
-import { lerAmbienteDesktop } from "../desktop.ts";
+import { type CSSProperties, type PointerEvent, useEffect, useState } from "react";
+import { lerAmbienteDesktop, type PonteBolinha } from "../desktop.ts";
 
 /** Até quantos cards ficam numa linha só, com a altura da tela. */
 const LIMITE_NUMA_LINHA = 4;
@@ -113,6 +113,51 @@ function CartaoErro({ invalido }: { invalido: ErroPerfil }) {
 	);
 }
 
+/**
+ * "Mostrar/Esconder o professor flutuante" (R6): liga e desliga a bolinha, só na janela própria. Os dois
+ * rótulos ficam na mesma célula, o mais comprido dá a largura: o botão não muda de tamanho. Enquanto a ponte
+ * responde o botão só desliga, sem trocar o texto (docs/padroes-de-interface.md).
+ */
+export function BotaoProfessorFlutuante({ bolinha }: { bolinha: PonteBolinha }) {
+	const [ligada, setLigada] = useState<boolean | undefined>(undefined);
+	const [trabalhando, setTrabalhando] = useState(false);
+	useEffect(() => {
+		let vivo = true;
+		bolinha.ligada().then(
+			(valor) => vivo && setLigada(valor),
+			() => {},
+		);
+		return () => {
+			vivo = false;
+		};
+	}, [bolinha]);
+	const alternar = async () => {
+		if (ligada === undefined || trabalhando) return;
+		setTrabalhando(true);
+		try {
+			await bolinha.ligar(!ligada);
+			setLigada(!ligada);
+		} catch {
+			// a bolinha não mudou: o botão continua como estava
+		} finally {
+			setTrabalhando(false);
+		}
+	};
+	return (
+		<button type="button" className="perfis__recarregar perfis__flutuante button" onClick={() => void alternar()} disabled={ligada === undefined || trabalhando}>
+			<Icon name="message" size={18} strokeWidth={2.25} />
+			<span className="perfis__flutuante-rotulos">
+				<span aria-hidden={ligada === true} style={{ visibility: ligada ? "hidden" : "visible" }}>
+					Mostrar o professor flutuante
+				</span>
+				<span aria-hidden={ligada !== true} style={{ visibility: ligada ? "visible" : "hidden" }}>
+					Esconder o professor flutuante
+				</span>
+			</span>
+		</button>
+	);
+}
+
 export function TelaPerfis() {
 	const { lista, erro, carregando, recarregar } = usePerfis();
 	// "Sair do app" só existe na janela própria; no navegador comum, fechar a aba basta.
@@ -168,6 +213,7 @@ export function TelaPerfis() {
 					<h1 className="overline">Escolha um perfil · {mesAno.format(new Date())}</h1>
 				</div>
 				<div className="perfis__acoes">
+					{desktop?.bolinha ? <BotaoProfessorFlutuante bolinha={desktop.bolinha} /> : null}
 					{desktop ? (
 						<button type="button" className="perfis__recarregar button" onClick={() => void desktop.sair()}>
 							<Icon name="close" size={18} strokeWidth={2.25} />

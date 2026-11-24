@@ -2183,3 +2183,9 @@ button.apz-ev:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 @media (prefers-reduced-motion: reduce) {
 	.apz-ev { transition: none; }
 }
+
+/* O topo do chat do professor flutuante (CabecalhoFlutuante.tsx): a matéria e o seletor de plano, em 420 px. */
+.flutuante-cab { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.flutuante-cab__materia { display: flex; align-items: center; gap: var(--space-2); min-width: 0; min-height: var(--control-sm); }
+.flutuante-cab__ponto { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--ink-muted); }
+.flutuante-cab__nome { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }

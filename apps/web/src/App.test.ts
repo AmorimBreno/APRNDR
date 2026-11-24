@@ -14,6 +14,15 @@ describe("rotaDoHash", () => {
 		expect(rotaDoHash("#/perfil/estudos/caderno/c%C3%A1lculo/notas/")).toEqual({ perfil: "estudos", conversa: false, caminho: "caderno/cálculo/notas" });
 		expect(rotaDoHash("#/outra")).toEqual({ conversa: false });
 	});
+
+	it("a janela da bolinha do professor: #/flutuante/<perfil>", () => {
+		expect(rotaDoHash("#/flutuante/estudos")).toEqual({ perfil: "estudos", conversa: false, flutuante: true });
+		expect(rotaDoHash("#/flutuante/meu%20perfil/")).toEqual({ perfil: "meu perfil", conversa: false, flutuante: true });
+		// Sem o perfil, ou com mais caminho, não é a rota da bolinha.
+		expect(rotaDoHash("#/flutuante")).toEqual({ conversa: false });
+		expect(rotaDoHash("#/flutuante/")).toEqual({ conversa: false });
+		expect(rotaDoHash("#/flutuante/estudos/outra")).toEqual({ conversa: false });
+	});
 });
 
 // Contrato do WP3 (docs/mesa-de-estudo.md, 2.9).

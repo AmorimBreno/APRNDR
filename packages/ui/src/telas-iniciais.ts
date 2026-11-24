@@ -94,6 +94,12 @@ export interface EntradaTelaInicial {
 	 * para a conversa ao lado não piscar). Sem ele, toda troca anima.
 	 */
 	semTransicao?(de: string, para: string): boolean;
+	/**
+	 * O topo do chat compacto do professor flutuante (docs/professor-flutuante.md, 2.4): o
+	 * perfil mostra o que for útil ali (no de estudos, a matéria da conversa e o seletor de
+	 * plano). Recebe a mesma janela da conversa. Sem ele, o chat não tem topo do perfil.
+	 */
+	cabecalhoFlutuante?: ComponentType<{ janela: JanelaPerfilHook }>;
 }
 
 /** Rótulo e cor de agora de cada contexto, pela chave. */

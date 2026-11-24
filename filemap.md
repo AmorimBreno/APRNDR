@@ -142,6 +142,8 @@ apps/server/src/janelas.ts — Janelas: uma JanelaPerfil por perfil, compartilha
 apps/server/src/conexao.ts — trata cada mensagem do WebSocket (validação, chamada à janela, resposta com pedidoId) e o resumo para o log
 apps/server/src/observador.ts — watcher (fs.watch recursivo) de profiles/ (menos node_modules e profiles/<id>/paineis) e ~/.pi/agent/extensions, com filtro por data de modificação e espera de 300 ms
 apps/server/src/chaves.ts — lê OPENROUTER_API_KEY e TAVILY_API_KEY das variáveis de usuário do Windows quando faltam no processo
+apps/server/src/transcricao.ts — transcrição de voz pelo OpenRouter (POST /api/transcrever): monta o pedido e lê a resposta, com o fetch injetável
+apps/server/src/transcricao.test.ts — testes da transcrição com fetch falso
 apps/server/src/log.ts — log no console e em %LOCALAPPDATA%\estudos-app\logs\servidor-AAAA-MM-DD.log
 apps/server/src/servidor.test.ts — testes do servidor sem rede (rotas, mensagens com janela falsa, watcher, chaves)
 apps/desktop/ — @estudos/desktop: a janela própria do app (Electron). Sem script dev de propósito (o pnpm dev da raiz roda o dev de todo apps/*); o script é iniciar
@@ -171,6 +173,10 @@ apps/web/src/desktop.ts — lê window.estudosDesktop (do preload do Electron) e
 apps/web/src/desktop.test.ts — teste da leitura do ambiente da janela própria
 apps/web/src/App.test.ts — teste da leitura do hash
 apps/web/src/telas-iniciais.ts — registro das telas iniciais dos perfis (estudos = cadernos)
+apps/web/src/telas/TelaFlutuante.tsx — a janela da bolinha do professor (rota #/flutuante/<perfil>): modo bolinha (foto de 64 px, anel de estado, arrastar contra clicar, menu do botão direito, nunca pede foco) e modo chat de 420 px (topo do perfil, Recolher, Abrir o app, chips da captura e da voz, câmera "Olha minha página" e microfone); testes em TelaFlutuante.dom.test.ts
+apps/web/src/useVoz.ts — a voz do flutuante: grava (ScriptProcessor), converte, POST /api/transcrever, texto no campo e envio automático em 2 s com Cancelar; limite de 60 s
+apps/web/src/voz-wav.ts — funções puras: reamostrar para 16 kHz, PCM de 16 bits, cabeçalho do WAV e base64 (voz-wav.test.ts)
+apps/web/src/telas/BotaoProfessorFlutuante.dom.test.ts — o botão "Mostrar/Esconder o professor flutuante" da tela de perfis (BotaoProfessorFlutuante, em TelaPerfis.tsx)
 apps/web/src/paineis.ts — registro de painéis do front: os do núcleo (pergunta), os do perfil de estudos (quiz) e o teste (PainelGenerico, com resumo do pedido); ids sem componente também usam o genérico
 
 pi-global/ — fonte versionada do que vai para ~/.pi/agent (instalar com scripts/instalar-pi-global.mjs)
@@ -335,6 +341,7 @@ profiles/estudos/paineis/src/abrir-conversa.tsx — useAbrirConversa e AvisoDaCo
 profiles/estudos/paineis/src/TagDoProfessor.tsx — a tag pequena "do professor" (tamanho fixo) dos itens de nota com `doProfessor` na seção Notas e no seletor do Guardar
 profiles/estudos/paineis/src/planos-ponte.ts — a ponte "planos" na tela (docs/planos-de-estudo.md, seção 7): a última `lista` da matéria (com a última conhecida até a nova chegar), o hook usePlanos (listar, seguir, desfazer com pedido e resposta) e o texto do progresso; os testes em planos-ponte.test.ts
 profiles/estudos/paineis/src/SeletorPlano.tsx — a segunda linha do topo do professor: "Plano: <título> · 2 de 5" (MenuSuspenso); escolher manda `seguir` e depois a mensagem "Vamos seguir o plano ..."; "Criar plano nesta conversa" só manda a mensagem; desligado quando ocupado; teste em seletor-plano.dom.test.ts
+profiles/estudos/paineis/src/CabecalhoFlutuante.tsx — o topo do chat do professor flutuante: a matéria da conversa (chave "materia:<id>" do contexto da sessão) e o seletor de plano dela; sem matéria, "Conversa geral"; teste em cabecalho-flutuante.dom.test.ts
 profiles/estudos/paineis/src/TagDoPlano.tsx — a tag "plano de estudos · 2 de 5" da lista de notas (estilo da tag "do professor")
 profiles/estudos/paineis/src/plano-faixa.ts, FaixaDoPlano.tsx — a faixa fina no topo da nota de plano: o progresso ao vivo do markdown do editor (lerPlano) e as conversas do histórico (abrem a conversa); partes puras em plano-faixa.ts (teste plano-faixa.test.ts); a mudou_fora e a faixa no DOM em plano-notas.dom.test.ts
 profiles/estudos/paineis/src/plano-criado.ts, PlanoCriado.tsx — o cartão "Plano criado: <título>" com Abrir e Desfazer no rodapé da resposta (ação `plano_criado` da mesa, ligada pela `chamada`; Desfazer manda `desfazer_plano` no painel "planos"); testes plano-criado.test.ts e plano-criado.dom.test.ts

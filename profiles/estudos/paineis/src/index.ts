@@ -9,6 +9,7 @@ import { PAINEL_MESA } from "../../lib/mesa-tipos.ts";
 import { PAINEL_AGENDA } from "./agenda-ponte.ts";
 import { PAINEL_APRENDIZ } from "./aprendiz-ponte.ts";
 import { ehRotaDoAprendiz } from "./aprendiz-tela.ts";
+import { CabecalhoFlutuante } from "./CabecalhoFlutuante.tsx";
 import { PAINEL_CADERNOS, usarAparenciaMaterias } from "./comum.ts";
 import { PAINEL_CURSOS } from "./cursos-ponte.ts";
 import { PAINEL_ESCRITA } from "./escrita-ponte.ts";
@@ -33,6 +34,8 @@ export const telaInicialEstudos: EntradaTelaInicial = {
 	// Trocas dentro do mesmo lugar (tags do caderno, abas da mesa, abas da agenda, abas e filtro do aprendiz) não animam a página inteira:
 	// só a parte que muda é refeita (transicoes.ts).
 	semTransicao: trocaSemTransicao,
+	// O topo do chat do professor flutuante: a matéria da conversa e o seletor de plano.
+	cabecalhoFlutuante: CabecalhoFlutuante,
 };
 
 export const paineisEstudos: RegistroPaineis = {

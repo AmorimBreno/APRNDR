@@ -9,10 +9,11 @@ import "./estilo.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App.tsx";
-import { prepararDesktop } from "./desktop.ts";
+import { marcarRotaFlutuante, prepararDesktop } from "./desktop.ts";
 
 // Antes do primeiro desenho: na janela própria, a barra do app já nasce com a altura certa.
 const desktop = prepararDesktop();
+marcarRotaFlutuante();
 
 createRoot(document.getElementById("raiz")!).render(
 	<StrictMode>

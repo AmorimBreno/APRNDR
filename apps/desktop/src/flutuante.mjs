@@ -117,6 +117,15 @@ function gravarDepois() {
 
 // --- a janela da bolinha --------------------------------------------------
 
+/** Onde o chat ficou depois de arrastado pelo topo (só nesta execução do app). */
+/** @type {{ x: number, y: number } | null} */
+let posicaoChat = null;
+
+/** O chat inteiro cabe na área útil de alguma tela? */
+function cabeEmAlgumaTela(canto) {
+	return screen.getAllDisplays().some(({ workArea: a }) => canto.x >= a.x && canto.y >= a.y && canto.x + TAMANHO_CHAT.width <= a.x + a.width && canto.y + TAMANHO_CHAT.height <= a.y + a.height);
+}
+
 function boundsBolinha() {
 	return { ...posicao, ...TAMANHO_BOLINHA };
 }
@@ -167,6 +176,12 @@ function criarJanela() {
 	nova.once("ready-to-show", () => {
 		if (!nova.isDestroyed() && estado.ligada && modo === "bolinha") nova.showInactive();
 	});
+	// O chat arrastado pelo topo (arrasto nativo): lembra onde ficou, para abrir ali da próxima vez.
+	nova.on("moved", () => {
+		if (modo !== "chat" || nova.isDestroyed()) return;
+		const { x, y } = nova.getBounds();
+		posicaoChat = { x, y };
+	});
 	nova.on("closed", () => {
 		if (janela === nova) janela = null;
 	});
@@ -211,7 +226,8 @@ function areaDaBolinha() {
 function expandir() {
 	const atual = vivaOuNula();
 	if (!atual || modo === "chat") return;
-	const canto = posicaoDoChat(posicao, areaDaBolinha());
+	// Onde o Breno deixou o chat da última vez (arrastado pelo topo), se ainda cabe numa tela; senão, junto da bolinha.
+	const canto = posicaoChat && cabeEmAlgumaTela(posicaoChat) ? posicaoChat : posicaoDoChat(posicao, areaDaBolinha());
 	modo = "chat";
 	atual.setHasShadow(true);
 	atual.setFocusable(true);

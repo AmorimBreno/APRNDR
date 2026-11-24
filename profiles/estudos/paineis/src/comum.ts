@@ -6,6 +6,7 @@ import { type AcaoRecebida, type AparenciaContextos, type ContextoSessao, guarda
 import { useEffect, useMemo, useRef } from "react";
 import type { Evento } from "../../lib/eventos.ts";
 import type { ListaMaterias, Materia } from "../../lib/materia-tipos.ts";
+import { CURSOS_NA_INTERFACE } from "./painel-caderno.ts";
 
 /** O painel da ponte que a extensão de matérias (extensions/materias.ts) atende. */
 export const PAINEL_CADERNOS = "cadernos";
@@ -95,7 +96,10 @@ export function contextoDaMateria(materia: Materia): ContextoSessao {
 			"As notas pessoais dele neste caderno você lê com listar_notas e ler_nota; elas são dele, então nunca escreva nem mude uma nota. Notas novas você cria com criar_nota, só quando ele pedir uma nota ou um resumo ou quando uma nota nova claramente ajuda (nunca por garantia); depois diga o título e que há um botão Desfazer.",
 			`Numa nota, [[materiais/<arquivo>]] menciona um material desta matéria: leia com ler_material no caminho materias/${materia.id}/materiais/<arquivo>.`,
 			"O mapa de conteúdo da matéria (os conceitos do material, em ordem e com prioridades) você lê com ler_mapa_conteudo.",
-			"Os cursos da matéria (os planos de estudo, inclusive os rascunhos do guia de criação, com prazo, objetivo e os conceitos do mapa de cada um) você lê com ler_curso.",
+			// Os cursos só com eles na interface (ESPECIFICACAO 13.21): pausados, a extensão nem carrega e ler_curso não existe.
+			...(CURSOS_NA_INTERFACE
+				? ["Os cursos da matéria (os planos de estudo, inclusive os rascunhos do guia de criação, com prazo, objetivo e os conceitos do mapa de cada um) você lê com ler_curso."]
+				: []),
 			"A agenda do Breno (tarefas com data, o quadro de colunas e as provas das matérias) você lê com ler_agenda; ela é dele, então nunca crie nem mude tarefas.",
 		].join(" "),
 		escopoMateriais: `materias/${materia.id}`,

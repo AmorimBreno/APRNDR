@@ -14,6 +14,10 @@
 // e devolve ao modelo "pedido enviado à tela". Não espera a tela. Os títulos, os
 // ids e os trechos vêm do modelo: nada vira caminho por concatenação, tudo passa
 // pelas conferências das libs.
+//
+// Com os cursos pausados (CURSOS_NA_INTERFACE, ESPECIFICACAO 13.21), as duas só
+// aceitam notas: uma lição é recusada com uma frase para o modelo, e as descrições
+// não falam de lições.
 import { randomUUID } from "node:crypto";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
@@ -24,6 +28,7 @@ import { lerModulo, type Licao, type ModuloGerado } from "../lib/modulos.ts";
 import { garantirMateria, lerNota, previaDaNota } from "../lib/notas.ts";
 import { textoDaLicao } from "../paineis/src/licao-texto.ts";
 import { rotaDaOrigem } from "../paineis/src/origem-mesa.ts";
+import { CURSOS_NA_INTERFACE } from "../paineis/src/painel-caderno.ts";
 import { materiaDaConversa } from "./notas.ts";
 
 /** customType da mensagem custom com o contexto da tela, gravada pelo núcleo (packages/core/src/contexto-tela.ts). */
@@ -134,6 +139,7 @@ async function conferirAlvo(dados: string, materia: string, alvo: Alvo): Promise
 		const nota = await lerNota(dados, materia, alvo.titulo);
 		return { tipo: "nota", caminho: `caderno/${materia}/notas/${nota.titulo}`, rotulo: nota.titulo, texto: nota.conteudo };
 	}
+	if (!CURSOS_NA_INTERFACE) throw new ErroMesa("As lições estão pausadas (os cursos saíram do app): na mesa só abrem notas.");
 	const { cursoId, nomeDoModulo, modulo } = await acharModulo(dados, materia, alvo);
 	let licoes: Licao[] = modulo.licoes;
 	let rotulo = nomeDoModulo;
@@ -170,8 +176,9 @@ export default function mesa(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "abrir_na_mesa",
 		label: "Abrir na mesa",
-		description:
-			"Open one of the user's notes or one lesson as a tab on the study table, in the screen on the left of this conversation. Only in a subject's conversation. Use it only when what you are talking about is in a note or lesson that is not open yet; never to open things 'just in case'. For a note, give its title (as listar_notas shows it). For a lesson, give the module id (m1, m2…) and the lesson id (l1, l2…), and the course id when the subject has more than one course with that module. The request is checked against the disk first and sent to the screen; the screen may show it as a preview tab, and you get no confirmation of what happened there.",
+		description: !CURSOS_NA_INTERFACE
+			? "Open one of the user's notes as a tab on the study table, in the screen on the left of this conversation. Only in a subject's conversation. Use it only when what you are talking about is in a note that is not open yet; never to open things 'just in case'. Give tipo \"nota\" and the note title (as listar_notas shows it). The request is checked against the disk first and sent to the screen; the screen may show it as a preview tab, and you get no confirmation of what happened there."
+			: "Open one of the user's notes or one lesson as a tab on the study table, in the screen on the left of this conversation. Only in a subject's conversation. Use it only when what you are talking about is in a note or lesson that is not open yet; never to open things 'just in case'. For a note, give its title (as listar_notas shows it). For a lesson, give the module id (m1, m2…) and the lesson id (l1, l2…), and the course id when the subject has more than one course with that module. The request is checked against the disk first and sent to the screen; the screen may show it as a preview tab, and you get no confirmation of what happened there.",
 		parameters: Type.Object({
 			tipo: Type.Union([Type.Literal("nota"), Type.Literal("licao")], { description: '"nota" to open a note, "licao" to open a lesson.' }),
 			titulo: Type.Optional(Type.String({ description: 'Note title (tipo "nota").' })),
@@ -204,7 +211,9 @@ export default function mesa(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "destacar_trecho",
 		label: "Destacar trecho",
-		description: `Highlight a passage of a note or lesson on the study table, in the screen on the left of this conversation, so the user sees what you are pointing at. Only in a subject's conversation. Use it only when the user asked to see something, or when pointing at a specific passage really helps; never in every answer. The passage must be text that is really in the note or lesson (copy it exactly, at most ${LIMITE_TRECHO_DESTAQUE} characters; it is checked on the disk, ignoring extra spaces and letter case). \`aba\` is the note title, or module/lesson (m1/l2); without it, the tab the user has in focus. With so_rolar the screen only scrolls to the passage, without highlighting (good for section titles). You get no confirmation of what the screen did.`,
+		description: !CURSOS_NA_INTERFACE
+			? `Highlight a passage of a note on the study table, in the screen on the left of this conversation, so the user sees what you are pointing at. Only in a subject's conversation. Use it only when the user asked to see something, or when pointing at a specific passage really helps; never in every answer. The passage must be text that is really in the note (copy it exactly, at most ${LIMITE_TRECHO_DESTAQUE} characters; it is checked on the disk, ignoring extra spaces and letter case). \`aba\` is the note title; without it, the tab the user has in focus. With so_rolar the screen only scrolls to the passage, without highlighting (good for section titles). You get no confirmation of what the screen did.`
+			: `Highlight a passage of a note or lesson on the study table, in the screen on the left of this conversation, so the user sees what you are pointing at. Only in a subject's conversation. Use it only when the user asked to see something, or when pointing at a specific passage really helps; never in every answer. The passage must be text that is really in the note or lesson (copy it exactly, at most ${LIMITE_TRECHO_DESTAQUE} characters; it is checked on the disk, ignoring extra spaces and letter case). \`aba\` is the note title, or module/lesson (m1/l2); without it, the tab the user has in focus. With so_rolar the screen only scrolls to the passage, without highlighting (good for section titles). You get no confirmation of what the screen did.`,
 		parameters: Type.Object({
 			trecho: Type.String({ description: `The exact text to point at, copied from the note or lesson (up to ${LIMITE_TRECHO_DESTAQUE} characters).` }),
 			aba: Type.Optional(Type.String({ description: "Note title, or module/lesson such as m1/l2 (or course/module/lesson). Without it, the tab in focus on the user's screen." })),

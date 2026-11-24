@@ -7,7 +7,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { confirmarEtapa, type Curso, gravarCurso, novoCurso } from "../lib/cursos.ts";
 import type { Diagnostico } from "../lib/diagnostico.ts";
 import { calcularCalendario, type Modulo as ModuloDoEsqueleto } from "../lib/esqueleto.ts";
@@ -16,6 +16,16 @@ import { ACAO_COMANDO_MESA, LIMITE_TRECHO_DESTAQUE, PAINEL_MESA } from "../lib/m
 import { gravarModulo, type Licao, type ModuloGerado, VERSAO_MODULO } from "../lib/modulos.ts";
 import { arquivoNota, criarNota } from "../lib/notas.ts";
 import mesa, { abaEmFocoDaConversa } from "./mesa.ts";
+
+// Estes testes cobrem as lições, que só existem com os cursos na interface (pausados desde 2026-11-24,
+// ESPECIFICACAO 13.21): aqui a chave fica ligada, e os testes da pausa a desligam (chaveCursos.ligada = false).
+const chaveCursos = vi.hoisted(() => ({ ligada: true }));
+vi.mock("../paineis/src/painel-caderno.ts", async (original) => ({
+	...(await original<typeof import("../paineis/src/painel-caderno.ts")>()),
+	get CURSOS_NA_INTERFACE() {
+		return chaveCursos.ligada;
+	},
+}));
 
 type Resultado = { content: Array<{ text: string }>; details: unknown; isError?: boolean };
 type Entrada = { type: string; customType?: string; data?: unknown; details?: unknown };
@@ -154,6 +164,21 @@ describe("abrir_na_mesa", () => {
 			{ cmd: "abrir", tipo: "licao", caminho: `caderno/${materia}/cursos/${CURSO}/modulos/m1`, rotulo: "Pesos dos termos" },
 		]);
 		expect(mostrados.every((mostrado) => mostrado.gravar === false)).toBe(true);
+	});
+
+	it("com os cursos pausados, a lição é recusada com uma frase clara e nada é emitido; a nota continua abrindo", async () => {
+		chaveCursos.ligada = false;
+		try {
+			for (const resposta of [await abrir({ tipo: "licao", modulo: "m1", licao: "l2" }), await destacar({ trecho: "frequência", aba: "m1/l2" })]) {
+				expect(resposta.isError).toBe(true);
+				expect(resposta.content[0]!.text).toContain("lições estão pausadas");
+			}
+			expect(mostrados).toHaveLength(0);
+			await abrir({ tipo: "nota", titulo: "Limites" });
+			expect(mostrados.map((mostrado) => mostrado.dados)).toMatchObject([{ cmd: "abrir", tipo: "nota" }]);
+		} finally {
+			chaveCursos.ligada = true;
+		}
 	});
 
 	it("cada comando leva um id diferente", async () => {

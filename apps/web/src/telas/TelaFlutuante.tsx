@@ -88,67 +88,69 @@ interface PropsBolinha {
 
 function Bolinha({ nome, avatar, estado, segundos, ponte }: PropsBolinha) {
 	const [menu, setMenu] = useState(false);
-	/** O gesto em andamento: onde a janela está em relação ao ponteiro e se já virou arrasto. */
-	const gesto = useRef<{ id: number; x0: number; y0: number; dx: number; dy: number; arrastou: boolean; nativo: boolean } | undefined>(undefined);
-	const proximo = useRef<{ x: number; y: number } | undefined>(undefined);
-	const quadro = useRef<number | undefined>(undefined);
+	/**
+	 * O gesto em andamento. O arrasto não usa o screenX do evento nem o cursor do sistema: no Electron, com a janela
+	 * andando, o screenX do toque oscilava (a bolinha piscava entre o canto e o dedo), e o toque do Windows não move o
+	 * cursor. O alvo é a posição da janela que a página conhece (window.screenX/Y) mais o ponto do ponteiro dentro dela,
+	 * menos o ponto em que pegou a bolinha: as duas partes vêm da mesma visão da página, então o atraso de uma cancela o
+	 * da outra. Um pedido por vez ao Electron; o alvo mais novo que chegar no meio vai logo depois da confirmação.
+	 */
+	const gesto = useRef<{ id: number; gx: number; gy: number; arrastou: boolean } | undefined>(undefined);
+	const emVoo = useRef(false);
+	const pendente = useRef<{ x: number; y: number } | undefined>(undefined);
+	const enviado = useRef<{ x: number; y: number } | undefined>(undefined);
 
-	useEffect(
-		() => () => {
-			if (quadro.current !== undefined) cancelAnimationFrame(quadro.current);
-		},
-		[],
-	);
-
-	const mover = () => {
-		quadro.current = undefined;
-		const alvo = proximo.current;
-		proximo.current = undefined;
-		if (alvo) ponte?.moverPara(alvo.x, alvo.y);
+	const despachar = () => {
+		const alvo = pendente.current;
+		if (emVoo.current || !alvo || !ponte) return;
+		pendente.current = undefined;
+		if (enviado.current && enviado.current.x === alvo.x && enviado.current.y === alvo.y) return;
+		enviado.current = alvo;
+		emVoo.current = true;
+		void Promise.resolve(ponte.moverPara(alvo.x, alvo.y)).finally(() => {
+			emVoo.current = false;
+			despachar();
+		});
 	};
+
+	const alvoDo = (evento: EventoPonteiro<HTMLDivElement>, atual: { gx: number; gy: number }) => ({
+		x: Math.round(window.screenX + evento.clientX - atual.gx),
+		y: Math.round(window.screenY + evento.clientY - atual.gy),
+	});
 
 	const descer = (evento: EventoPonteiro<HTMLDivElement>) => {
 		if (evento.button !== 0) return;
 		setMenu(false);
-		gesto.current = { id: evento.pointerId, x0: evento.screenX, y0: evento.screenY, dx: evento.clientX, dy: evento.clientY, arrastou: false, nativo: Boolean(ponte?.arrastoInicio) };
+		gesto.current = { id: evento.pointerId, gx: evento.clientX, gy: evento.clientY, arrastou: false };
+		enviado.current = undefined;
 		evento.currentTarget.setPointerCapture?.(evento.pointerId);
-		// Com a ponte, quem arrasta é o Electron, pelo cursor da tela (as coordenadas da página mudam com a janela andando).
-		if (ponte?.arrastoInicio) void ponte.arrastoInicio();
 	};
 	const andar = (evento: EventoPonteiro<HTMLDivElement>) => {
 		const atual = gesto.current;
-		if (!atual || atual.id !== evento.pointerId || atual.nativo) return;
+		if (!atual || atual.id !== evento.pointerId) return;
 		if (!atual.arrastou) {
-			if (Math.hypot(evento.screenX - atual.x0, evento.screenY - atual.y0) < LIMITE_ARRASTO) return;
+			// A janela ainda não andou: a distância dentro dela é a distância do dedo.
+			if (Math.hypot(evento.clientX - atual.gx, evento.clientY - atual.gy) < LIMITE_ARRASTO) return;
 			atual.arrastou = true;
 		}
-		// Um pedido por quadro: o ponteiro manda muito mais eventos do que a janela consegue andar.
-		proximo.current = { x: evento.screenX - atual.dx, y: evento.screenY - atual.dy };
-		quadro.current ??= requestAnimationFrame(mover);
+		pendente.current = alvoDo(evento, atual);
+		despachar();
 	};
 	const subir = (evento: EventoPonteiro<HTMLDivElement>) => {
 		const atual = gesto.current;
 		if (!atual || atual.id !== evento.pointerId) return;
 		gesto.current = undefined;
 		evento.currentTarget.releasePointerCapture?.(evento.pointerId);
-		if (atual.nativo && ponte?.arrastoFim) {
-			void ponte.arrastoFim().then((fim) => {
-				if (!fim?.arrastou) void ponte.expandir();
-			});
-			return;
-		}
 		if (atual.arrastou) {
-			// O último ponto não pode ficar para o próximo quadro.
-			if (quadro.current !== undefined) cancelAnimationFrame(quadro.current);
-			mover();
+			// O último ponto vai também (logo, ou depois do pedido que estiver a caminho).
+			pendente.current = alvoDo(evento, atual);
+			despachar();
 			return;
 		}
 		void ponte?.expandir();
 	};
 	const cancelar = (evento: EventoPonteiro<HTMLDivElement>) => {
-		if (gesto.current?.id !== evento.pointerId) return;
-		if (gesto.current.nativo) void ponte?.arrastoFim?.();
-		gesto.current = undefined;
+		if (gesto.current?.id === evento.pointerId) gesto.current = undefined;
 	};
 
 	const escolher = (acao: "abrir" | "esconder") => {

@@ -18,10 +18,8 @@ export interface PonteFlutuante {
 	expandir(): Promise<void>;
 	recolher(): Promise<void>;
 	/** A posição da janela em pixels da tela (arrastar a bolinha). */
-	moverPara(x: number, y: number): void;
-	/** O arrasto conduzido pelo Electron (opcional; sem ele, a tela move com moverPara). */
-	arrastoInicio?(): Promise<void>;
-	arrastoFim?(): Promise<{ arrastou: boolean } | undefined>;
+	/** Leva a bolinha até (x, y) da tela; resolve quando a janela já andou. */
+	moverPara(x: number, y: number): Promise<void> | void;
 	capturarTela(): Promise<CapturaDaTela | null>;
 	abrirApp(): Promise<void>;
 	/** "Esconder a bolinha" (grava ligado: false). */

@@ -21,10 +21,8 @@ const flutuante = {
 	modo: () => ipcRenderer.invoke("estudos:flutuante:modo"),
 	expandir: () => ipcRenderer.invoke("estudos:flutuante:expandir"),
 	recolher: () => ipcRenderer.invoke("estudos:flutuante:recolher"),
-	moverPara: (x, y) => ipcRenderer.send("estudos:flutuante:mover", x, y),
-	/** O arrasto conduzido pelo Electron (pelo cursor da tela): começa no pointerdown; o fim diz se arrastou. */
-	arrastoInicio: () => ipcRenderer.invoke("estudos:flutuante:arrasto-inicio"),
-	arrastoFim: () => ipcRenderer.invoke("estudos:flutuante:arrasto-fim"),
+	/** Leva a bolinha até (x, y) da tela; a promessa resolve quando a janela já andou (o arrasto espera por ela). */
+	moverPara: (x, y) => ipcRenderer.invoke("estudos:flutuante:mover", x, y),
 	capturarTela: () => ipcRenderer.invoke("estudos:flutuante:capturar"),
 	abrirApp: () => ipcRenderer.invoke("estudos:flutuante:abrir-app"),
 	esconder: () => ipcRenderer.invoke("estudos:flutuante:esconder"),

@@ -226,6 +226,9 @@ describe("a bolinha", () => {
 	});
 
 	it("depois de 4 px é arrasto: a janela anda com o ponteiro e soltar não expande", async () => {
+		// A janela está em (1000, 500) na tela; o alvo sai de window.screenX/Y mais o ponto dentro dela.
+		vi.spyOn(window, "screenX", "get").mockReturnValue(1000);
+		vi.spyOn(window, "screenY", "get").mockReturnValue(500);
 		desenhar();
 		await ate(() => bolinha() !== null);
 		ponteiro("pointerdown", 1100, 600); // o ponteiro está a (100, 100) do canto da janela
@@ -235,9 +238,11 @@ describe("a bolinha", () => {
 		expect(ponte.expandir).not.toHaveBeenCalled();
 		expect(ponte.moverPara).toHaveBeenCalled();
 		// O canto da janela é o ponteiro menos o deslocamento do clique: (1140 - 100, 650 - 100) no fim.
-		expect(vi.mocked(ponte.moverPara).mock.calls.at(-1)).toEqual([1040, 550]);
-		// Um pedido por quadro: dois movimentos seguidos não viram dois pedidos antes de soltar.
-		expect(vi.mocked(ponte.moverPara).mock.calls.length).toBeLessThanOrEqual(2);
+		await ate(() => JSON.stringify(vi.mocked(ponte.moverPara).mock.calls.at(-1)) === JSON.stringify([1040, 550]));
+		// Um pedido por vez: o do meio, que chegou com outro a caminho, foi trocado pelo mais novo.
+		await ate(() => vi.mocked(ponte.moverPara).mock.calls.length >= 2);
+		expect(vi.mocked(ponte.moverPara).mock.calls.length).toBeLessThanOrEqual(3);
+		vi.restoreAllMocks();
 	});
 
 	it("o botão direito não expande e abre o menu com 'Abrir o app' e 'Esconder a bolinha'", async () => {

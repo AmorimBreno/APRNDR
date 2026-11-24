@@ -2,6 +2,8 @@
 // importa daqui, e notas.ts reexporta. Cada nota é o arquivo
 // materias/<id>/notas/<Título>.md; o título é o nome do arquivo.
 
+import type { ProgressoPlano } from "./plano-tipos.ts";
+
 /** Uma nota na lista do caderno. */
 export interface ResumoNota {
 	titulo: string;
@@ -13,6 +15,8 @@ export interface ResumoNota {
 	previa: string;
 	/** A primeira linha é a marca de uma nota criada pelo professor (ehNotaDoProfessor). */
 	doProfessor: boolean;
+	/** Só nas notas com a tag de plano de estudos (ehPlanoDeEstudos): o progresso da checklist. */
+	plano?: ProgressoPlano;
 }
 
 export interface ListaNotas {

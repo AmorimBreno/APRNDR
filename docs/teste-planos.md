@@ -22,8 +22,8 @@ Seguir numa conversa nova
 13. Com o professor respondendo, o seletor fica desligado.
 
 Desfazer e renomear
-14. Crie um plano de teste e clique em Desfazer no cartão: confirme; o cartão vira "Plano desfeito", a nota some da lista e o seletor volta para "Nenhum".
-15. Renomeie um plano que a conversa segue: o seletor mostra o nome novo, e o professor continua seguindo.
+14. Crie um plano de teste, deixe o professor marcar o primeiro item e clique em Desfazer no cartão: confirme; o cartão vira "Plano desfeito", a nota some da lista e o seletor volta para "Nenhum". Crie outro, escreva uma linha nele pelo editor e clique em Desfazer: ele recusa ("Você mudou o plano…") e nada é apagado.
+15. Renomeie um plano que a conversa segue: o seletor mostra o nome novo, e o professor continua seguindo. Num plano criado pelo professor e só renomeado, o Desfazer do cartão ainda apaga (o arquivo com o nome novo).
 
 Copiar imagem
 16. Peça um diagrama ao professor. Passe o mouse na imagem: "Copiar imagem" no canto. Clique e cole no Samsung Notes: a imagem entra, com fundo (não transparente). O botão mostra "Copiada" por um instante, sem mudar de tamanho.

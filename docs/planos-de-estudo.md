@@ -53,7 +53,7 @@ Leitura (pura, lib/plano-tipos.ts, sem Node, usada também pela tela): os itens 
 
 - O professor só grava em notas com a tag, e só pelas operações abaixo, nunca reescrevendo a nota inteira. Nas outras notas do Breno ele só lê (as ferramentas dele já não têm write nem edit, decisão de 2026-11-24).
 - Operações (puras, lib/plano-tipos.ts): marcar e desmarcar um item (pelo número, conferindo o texto se vier), acrescentar um item (no fim da lista ou depois de um item) e acrescentar uma conversa. Cada operação mexe só na linha do item, numa linha nova da lista ou na seção Conversas; o resto do arquivo fica byte a byte igual (inclusive o fim de linha que o arquivo usa).
-- Gravação (lib/planos.ts): lê, aplica, grava com a versão lida (`salvarNota` com `versao`, que já recusa se o arquivo mudou). Se mudou no meio, relê e aplica de novo, até 3 vezes. Um item que não existe mais (ou cujo texto não bate) é recusado com a frase para o professor.
+- Gravação (lib/planos.ts): lê, aplica, grava com a versão lida (`salvarNota` com `versao`, que já recusa se o arquivo mudou; a conferência e a gravação ficam numa trava por arquivo, `comTravaDaNota`, a mesma do editor, porque as duas extensões gravam a mesma nota). Se mudou no meio, relê e aplica de novo, até 3 vezes. Um item que não existe mais (ou cujo texto não bate) é recusado com a frase para o professor.
 - Depois de gravar, a extensão avisa a tela no painel "notas" com a ação nova `mudou_fora` {materia, titulo, versao, conteudo}: o editor com a nota aberta e sem mudança pendente recarrega o conteúdo (fora do desfazer); com mudança pendente, ignora, e o salvamento dele cai no conflito que já existe ("Recarregar a do arquivo" ou "Manter a minha").
 - O Breno edita o plano no editor como qualquer nota (marca, desmarca, reordena, escreve).
 
@@ -78,14 +78,14 @@ As quatro entram no `tools` de agents/professor.md.
 
 ## 6. Eventos (eventos.jsonl da matéria, com o id da sessão)
 
-`criou_plano` {materia, titulo, itens, hash}, `seguiu_plano` {materia, titulo | null} (seletor, criar ou renomear), `ligou_plano` {materia, titulo, conversa} (o link no histórico), `atualizou_plano` {materia, titulo, operacoes} e `desfez_plano` {materia, titulo}. A edição do Breno continua no `editou_nota`. A linha do tempo do caderno ganha os rótulos.
+`criou_plano` {materia, titulo, itens, hash}, `seguiu_plano` {materia, titulo | null} (seletor, criar ou renomear), `ligou_plano` {materia, titulo, conversa, antes, hash} (o link no histórico), `atualizou_plano` {materia, titulo, operacoes, antes, hash} (antes e hash: o hash do arquivo antes e depois da gravação do professor) e `desfez_plano` {materia, titulo}. A edição do Breno continua no `editou_nota`. A linha do tempo do caderno ganha os rótulos.
 
 
 ## 7. A ponte "planos" e a tela
 
 Ponte (painel "planos", passageira, `gravar: false`):
 - a tela manda `listar` {materia} e `seguir` {materia, titulo | null, sessao, pedido}; a extensão responde `lista` {materia, sessao, planos: [{titulo, feitos, total, concluido}], seguindo: titulo | null}, e manda a `lista` de novo depois de criar, atualizar, desfazer ou seguir;
-- `desfazer_plano` {materia, titulo, sessao, pedido}: apaga o plano só se o arquivo ainda tem o hash do `criou_plano` (como o `desfazer_nota`), grava `desfez_plano` e a conversa deixa de seguir; responde `desfeito` ou `erro`.
+- `desfazer_plano` {materia, titulo, sessao, pedido}: `titulo` é o da criação (o do cartão). A partir do último `criou_plano` com ele, a extensão segue os `renomeou_nota` (o título de agora) e a cadeia das gravações do professor (`atualizou_plano` e `ligou_plano`, cada uma partindo do hash que a anterior deixou). Apaga só se a cadeia não tem buraco (nenhuma edição do Breno no meio) e o arquivo é o que a última gravação deixou; grava `desfez_plano` e a conversa deixa de seguir; responde `desfeito` (com o título de agora) ou `erro`. O cartão não usa a lista para dizer que o plano sumiu (ele pode ter sido renomeado): quem diz é a resposta ao Desfazer.
 
 Tela (profiles/estudos/paineis):
 - No topo do painel do professor (CabecalhoProfessor), uma segunda linha com o seletor "Plano: <título> · 2 de 5" (MenuSuspenso): os planos da matéria com o progresso ("concluído" quando for o caso), "Nenhum" e "Criar plano nesta conversa". Escolher um plano manda `seguir` e, com a resposta, a mensagem "Vamos seguir o plano "<título>"." (a aula começa sozinha). "Criar plano nesta conversa" manda "Quero montar um plano de estudos nesta conversa.". "Nenhum" só solta, sem mensagem. Ocupado (respondendo ou com pedido), o seletor fica desligado, como o das conversas.

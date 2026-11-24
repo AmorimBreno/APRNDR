@@ -166,6 +166,21 @@ function trechoEstaNoTexto(trecho: string, alvo: AlvoConferido): boolean {
 	return alvo.tipo === "nota" && normalizar(previaDaNota(alvo.texto, Number.POSITIVE_INFINITY)).includes(procurado);
 }
 
+/** Os parâmetros do abrir_na_mesa com os cursos na interface: nota ou lição. */
+const PARAMETROS_ABRIR = Type.Object({
+	tipo: Type.Union([Type.Literal("nota"), Type.Literal("licao")], { description: '"nota" to open a note, "licao" to open a lesson.' }),
+	titulo: Type.Optional(Type.String({ description: 'Note title (tipo "nota").' })),
+	modulo: Type.Optional(Type.String({ description: 'Module id, m1, m2… (tipo "licao").' })),
+	licao: Type.Optional(Type.String({ description: 'Lesson id (l1, l2…) or title (tipo "licao"). Without it, opens the module at its first lesson.' })),
+	curso: Type.Optional(Type.String({ description: 'Course id (from ler_curso), only if the subject has more than one course with that module (tipo "licao").' })),
+});
+
+/** Os parâmetros do abrir_na_mesa com os cursos pausados (ESPECIFICACAO 13.21): só nota. */
+const PARAMETROS_ABRIR_SO_NOTA = Type.Object({
+	tipo: Type.Literal("nota", { description: 'Always "nota".' }),
+	titulo: Type.String({ description: "Note title, as listar_notas shows it." }),
+});
+
 export default function mesa(pi: ExtensionAPI) {
 	const emitir = (comando: ComandoAbrirMesa | ComandoDestacarMesa): ComandoMesa => {
 		const dados: ComandoMesa = { ...comando, id: randomUUID() };
@@ -179,13 +194,8 @@ export default function mesa(pi: ExtensionAPI) {
 		description: !CURSOS_NA_INTERFACE
 			? "Open one of the user's notes as a tab on the study table, in the screen on the left of this conversation. Only in a subject's conversation. Use it only when what you are talking about is in a note that is not open yet; never to open things 'just in case'. Give tipo \"nota\" and the note title (as listar_notas shows it). The request is checked against the disk first and sent to the screen; the screen may show it as a preview tab, and you get no confirmation of what happened there."
 			: "Open one of the user's notes or one lesson as a tab on the study table, in the screen on the left of this conversation. Only in a subject's conversation. Use it only when what you are talking about is in a note or lesson that is not open yet; never to open things 'just in case'. For a note, give its title (as listar_notas shows it). For a lesson, give the module id (m1, m2…) and the lesson id (l1, l2…), and the course id when the subject has more than one course with that module. The request is checked against the disk first and sent to the screen; the screen may show it as a preview tab, and you get no confirmation of what happened there.",
-		parameters: Type.Object({
-			tipo: Type.Union([Type.Literal("nota"), Type.Literal("licao")], { description: '"nota" to open a note, "licao" to open a lesson.' }),
-			titulo: Type.Optional(Type.String({ description: 'Note title (tipo "nota").' })),
-			modulo: Type.Optional(Type.String({ description: 'Module id, m1, m2… (tipo "licao").' })),
-			licao: Type.Optional(Type.String({ description: 'Lesson id (l1, l2…) or title (tipo "licao"). Without it, opens the module at its first lesson.' })),
-			curso: Type.Optional(Type.String({ description: 'Course id (from ler_curso), only if the subject has more than one course with that module (tipo "licao").' })),
-		}),
+		// Com os cursos pausados, o modelo só vê os campos da nota (o execute continua o mesmo e recusa lição).
+		parameters: (CURSOS_NA_INTERFACE ? PARAMETROS_ABRIR : PARAMETROS_ABRIR_SO_NOTA) as unknown as typeof PARAMETROS_ABRIR,
 		async execute(_id, params, _signal, _onUpdate, ctx) {
 			const materia = materiaDaConversa(ctx.sessionManager.getBranch());
 			if (!materia) return respostaErro("Esta ferramenta só vale na conversa de uma matéria (de um caderno). Nesta conversa não há mesa de estudo.");
@@ -215,8 +225,18 @@ export default function mesa(pi: ExtensionAPI) {
 			? `Highlight a passage of a note on the study table, in the screen on the left of this conversation, so the user sees what you are pointing at. Only in a subject's conversation. Use it only when the user asked to see something, or when pointing at a specific passage really helps; never in every answer. The passage must be text that is really in the note (copy it exactly, at most ${LIMITE_TRECHO_DESTAQUE} characters; it is checked on the disk, ignoring extra spaces and letter case). \`aba\` is the note title; without it, the tab the user has in focus. With so_rolar the screen only scrolls to the passage, without highlighting (good for section titles). You get no confirmation of what the screen did.`
 			: `Highlight a passage of a note or lesson on the study table, in the screen on the left of this conversation, so the user sees what you are pointing at. Only in a subject's conversation. Use it only when the user asked to see something, or when pointing at a specific passage really helps; never in every answer. The passage must be text that is really in the note or lesson (copy it exactly, at most ${LIMITE_TRECHO_DESTAQUE} characters; it is checked on the disk, ignoring extra spaces and letter case). \`aba\` is the note title, or module/lesson (m1/l2); without it, the tab the user has in focus. With so_rolar the screen only scrolls to the passage, without highlighting (good for section titles). You get no confirmation of what the screen did.`,
 		parameters: Type.Object({
-			trecho: Type.String({ description: `The exact text to point at, copied from the note or lesson (up to ${LIMITE_TRECHO_DESTAQUE} characters).` }),
-			aba: Type.Optional(Type.String({ description: "Note title, or module/lesson such as m1/l2 (or course/module/lesson). Without it, the tab in focus on the user's screen." })),
+			trecho: Type.String({
+				description: CURSOS_NA_INTERFACE
+					? `The exact text to point at, copied from the note or lesson (up to ${LIMITE_TRECHO_DESTAQUE} characters).`
+					: `The exact text to point at, copied from the note (up to ${LIMITE_TRECHO_DESTAQUE} characters).`,
+			}),
+			aba: Type.Optional(
+				Type.String({
+					description: CURSOS_NA_INTERFACE
+						? "Note title, or module/lesson such as m1/l2 (or course/module/lesson). Without it, the tab in focus on the user's screen."
+						: "Note title. Without it, the tab in focus on the user's screen.",
+				}),
+			),
 			so_rolar: Type.Optional(Type.Boolean({ description: "Only scroll to the passage, without highlighting. Default false." })),
 		}),
 		async execute(_id, params, _signal, _onUpdate, ctx) {

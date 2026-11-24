@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type AcaoJanela, type EstadoJanela, estadoInicial, LIMITE_ACOES_POR_PAINEL, reduzirJanela } from "./estado-janela.ts";
+import { type AcaoJanela, type EstadoJanela, conversaDoHistorico, estadoInicial, LIMITE_ACOES_POR_PAINEL, reduzirJanela } from "./estado-janela.ts";
 import type { EstadoSessao, EventoNucleo } from "./tipos.ts";
 
 const PERFIL = "p1";
@@ -299,6 +299,17 @@ describe("reduzirJanela", () => {
 		expect(estado.executando).toBe(false);
 		expect(estado.fila).toEqual([]);
 		expect(estado.conversa[0]).toMatchObject({ emAndamento: false });
+	});
+});
+
+describe("imagens da mensagem (professor flutuante, 2.1)", () => {
+	it("o evento mensagem_usuario traz só a quantidade de imagens e o histórico também", () => {
+		const estado = aplicar(estadoInicial(PERFIL), ev({ tipo: "mensagem_usuario", texto: "olha", imagens: 2 }), ev({ tipo: "mensagem_usuario", texto: "sem" }));
+		expect(estado.conversa[0]).toMatchObject({ tipo: "usuario", texto: "olha", imagens: 2 });
+		expect(estado.conversa[1]).not.toHaveProperty("imagens");
+		const { conversa } = conversaDoHistorico([{ papel: "usuario", texto: "olha", imagens: 1 }, { papel: "usuario", texto: "sem" }]);
+		expect(conversa[0]).toMatchObject({ imagens: 1 });
+		expect(conversa[1]).not.toHaveProperty("imagens");
 	});
 });
 

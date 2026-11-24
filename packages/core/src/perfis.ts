@@ -76,6 +76,9 @@ export const esquemaImagens = z.strictObject({
 	pastas: z.array(pastaDeDados).min(1),
 });
 
+/** Modelo de transcrição de voz quando o profile.json não escolhe outro. */
+export const MODELO_TRANSCRICAO_PADRAO = "openai/whisper-large-v3";
+
 export const esquemaPerfil = z.strictObject({
 	id: z.string().regex(/^[a-z0-9][a-z0-9-]*$/, "use só letras minúsculas, números e hífen"),
 	nome: z.string().min(1),
@@ -100,6 +103,8 @@ export const esquemaPerfil = z.strictObject({
 	materiais: esquemaMateriais.optional(),
 	/** Imagens da pasta de dados que a interface mostra (imagens.ts). */
 	imagens: esquemaImagens.optional(),
+	/** Transcrição de voz (POST /api/transcrever do servidor): o modelo do OpenRouter. */
+	transcricao: z.strictObject({ modelo: z.string().min(1).default(MODELO_TRANSCRICAO_PADRAO) }).optional(),
 });
 
 export type ProfileJson = z.infer<typeof esquemaPerfil>;
@@ -139,6 +144,8 @@ export interface Perfil {
 	materiais?: ConfigMateriais;
 	/** Pastas da pasta de dados onde a interface procura uma imagem citada só pelo nome; vazio se o profile.json não declarar. */
 	pastasImagens: string[];
+	/** Transcrição de voz; sem ela, vale o modelo padrão (MODELO_TRANSCRICAO_PADRAO). */
+	transcricao?: { modelo: string };
 }
 
 export interface Aparencia {
@@ -277,6 +284,7 @@ export async function lerPerfil(pasta: string): Promise<Perfil> {
 		aparencia,
 		...(json.materiais ? { materiais: json.materiais } : {}),
 		pastasImagens: json.imagens?.pastas ?? [],
+		...(json.transcricao ? { transcricao: json.transcricao } : {}),
 	};
 }
 

@@ -270,6 +270,17 @@ conteúdo inteiro da nota`,
 		expect(historico).toEqual([{ papel: "usuario", texto: "oi", momento: new Date(1).toISOString(), contextosTela: [{ tipo: "nota", rotulo: "Nota A", olho: true }] }]);
 	});
 
+	it("a mensagem do usuário conta os blocos de imagem, no evento e no histórico", () => {
+		const bloco = { type: "image", data: "AAAA", mimeType: "image/png" };
+		const mensagem = { role: "user", content: [{ type: "text", text: "olha" }, bloco, bloco], timestamp: 1 };
+		const traduzir = criarTradutorEventos();
+		expect(traduzir(evento({ type: "message_end", message: mensagem }))).toEqual([
+			{ tipo: "mensagem_usuario", texto: "olha", momento: new Date(1).toISOString(), imagens: 2 },
+		]);
+		expect(converterHistorico(mensagens([mensagem]))).toEqual([{ papel: "usuario", texto: "olha", momento: new Date(1).toISOString(), imagens: 2 }]);
+		expect(JSON.stringify(converterHistorico(mensagens([mensagem])))).not.toContain("AAAA");
+	});
+
 	it("o tradutor emite contexto_tela (só o resumo) quando a mensagem custom do contexto termina", () => {
 		const traduzir = criarTradutorEventos();
 		const saida = [

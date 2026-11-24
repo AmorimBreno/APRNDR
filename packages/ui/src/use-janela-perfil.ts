@@ -8,12 +8,13 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { type ClienteConexao, type EstadoConexao, ErroPedido, obterCliente, type PedidoCliente } from "./cliente.ts";
 import { type EstadoJanela, estadoInicial, reduzirJanela } from "./estado-janela.ts";
-import type { ContextoSessao, ContextoTela, DadosResposta, EstadoSessao, InfoModelo, ResumoSessao, SituacaoMaterial } from "./tipos.ts";
+import type { ContextoSessao, ContextoTela, DadosResposta, EstadoSessao, ImagemMensagem, InfoModelo, ResumoSessao, SituacaoMaterial } from "./tipos.ts";
 
 export interface AcoesJanela {
 	/** "iniciada" ou "enfileirada" (a sessão estava respondendo). */
 	/** contextosTela: o que cada aba da tela mostra agora; o núcleo os junta à mensagem (com o olho fechado, o conteúdo não vai). */
-	enviar(texto: string, contextosTela?: ContextoTela[]): Promise<"iniciada" | "enfileirada">;
+	/** imagens: até 3, em base64 (a captura da tela); o modelo as vê junto da mensagem. */
+	enviar(texto: string, contextosTela?: ContextoTela[], imagens?: ImagemMensagem[]): Promise<"iniciada" | "enfileirada">;
 	/** Devolve as mensagens que estavam na fila, para voltarem ao campo de texto. */
 	abortar(): Promise<string[]>;
 	/** modelo no formato provedor/id. */
@@ -157,7 +158,14 @@ export function useJanelaPerfil(perfilId: string, cliente: ClienteConexao = obte
 	const acoes = useMemo<AcoesJanela>(() => {
 		const perfil = perfilId;
 		return {
-			enviar: (texto, contextosTela) => pedir({ tipo: "enviar", perfil, texto, ...(contextosTela && contextosTela.length > 0 ? { contextosTela } : {}) }),
+			enviar: (texto, contextosTela, imagens) =>
+				pedir({
+					tipo: "enviar",
+					perfil,
+					texto,
+					...(contextosTela && contextosTela.length > 0 ? { contextosTela } : {}),
+					...(imagens && imagens.length > 0 ? { imagens } : {}),
+				}),
 			abortar: () => pedir({ tipo: "abortar", perfil }),
 			trocarModelo: (modelo) => pedir({ tipo: "trocar_modelo", perfil, modelo }),
 			trocarAgente: (agente) => pedir({ tipo: "trocar_agente", perfil, agente }),

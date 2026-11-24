@@ -96,7 +96,7 @@ import { criarExtensaoMateriais } from "./materiais/extensao.ts";
 import { ServicoMateriais } from "./materiais/servico.ts";
 import type { SituacaoMaterial } from "./materiais/tipos.ts";
 import { criarExtensaoPergunta } from "./pergunta.ts";
-import type { HistoricoPonte } from "./protocolo.ts";
+import type { HistoricoPonte, ImagemMensagem } from "./protocolo.ts";
 import { criarExtensaoSubagente } from "./subagentes.ts";
 
 export interface OpcoesJanelaPerfil {
@@ -139,6 +139,13 @@ interface PedidoMontagem {
 /** Motivo da troca de sessão, no vocabulário dos eventos session_start/session_shutdown do pi. */
 type MotivoTroca = Extract<SessionStartEvent["reason"], "startup" | "reload" | "new" | "resume">;
 
+/** Uma mensagem do usuário esperando na fila própria. */
+interface ItemFila {
+	texto: string;
+	contextosTela?: ContextoTela[];
+	imagens?: ImagemMensagem[];
+}
+
 function mensagemDe(erro: unknown): string {
 	return erro instanceof Error ? erro.message : String(erro);
 }
@@ -178,7 +185,7 @@ export class JanelaPerfil {
 	 * before_agent_start e só aceita texto, então o contexto da tela de cada
 	 * mensagem se perderia. Cada item sai com prompt() quando a execução termina.
 	 */
-	private filaPropria: Array<{ texto: string; contextosTela?: ContextoTela[] }> = [];
+	private filaPropria: ItemFila[] = [];
 	/** O que está na fila do pi (steer e followUp de extensões), para o evento "fila" juntar as duas. */
 	private filaPi: string[] = [];
 	/** O contexto da tela do prompt() que está começando; o before_agent_start o consome. */
@@ -258,11 +265,15 @@ export class JanelaPerfil {
 	 * espera a resposta: ela chega pelos eventos. Erros também viram eventos
 	 * ("erro"), nunca uma promessa rejeitada solta.
 	 */
-	enviar(texto: string, contextosTela?: ContextoTela[]): Promise<"iniciada" | "enfileirada"> {
+	enviar(texto: string, contextosTela?: ContextoTela[], imagens?: ImagemMensagem[]): Promise<"iniciada" | "enfileirada"> {
 		return this.emOrdem(async () => {
 			const sessao = this.exigirSessao();
 			// Lista vazia = sem contexto (a mensagem custom não é gravada).
-			const item = { texto, ...(contextosTela && contextosTela.length > 0 ? { contextosTela } : {}) };
+			const item: ItemFila = {
+				texto,
+				...(contextosTela && contextosTela.length > 0 ? { contextosTela } : {}),
+				...(imagens && imagens.length > 0 ? { imagens } : {}),
+			};
 			// this.execucao cobre o intervalo entre o fim da execução no pi e o
 			// finally do prompt(), que manda o próximo da fila.
 			if (this.execucao || this.iniciando || sessao.isStreaming) {
@@ -562,12 +573,15 @@ export class JanelaPerfil {
 	 * (o pi resolve depois do agent_settled), manda o próximo da fila, a menos que
 	 * a execução tenha sido abortada ou a sessão trocada.
 	 */
-	private comecar(sessao: AgentSession, item: { texto: string; contextosTela?: ContextoTela[] }): void {
+	private comecar(sessao: AgentSession, item: ItemFila): void {
 		this.iniciando = true;
 		this.ultimaAbortada = false;
 		this.proximoContexto = item.contextosTela;
 		const execucao: Promise<void> = sessao
-			.prompt(item.texto)
+			.prompt(
+				item.texto,
+				item.imagens ? { images: item.imagens.map((imagem) => ({ type: "image" as const, data: imagem.dados, mimeType: imagem.tipo })) } : undefined,
+			)
 			.catch((erro: unknown) => {
 				// O contexto não pode sobrar para a mensagem seguinte.
 				this.proximoContexto = undefined;

@@ -5,9 +5,9 @@ import { mkdir, mkdtemp, readFile, rm, utimes, writeFile } from "node:fs/promise
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ContextoTela, EstadoSessao, EventoNucleo, Perfil, UsoModelo } from "@estudos/core";
-import type { MensagemServidor } from "@estudos/core/protocolo";
+import type { ImagemMensagem, MensagemServidor } from "@estudos/core/protocolo";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { criarApp } from "./app.ts";
+import { criarApp, type OpcoesApp } from "./app.ts";
 import { interpretarSaidaReg } from "./chaves.ts";
 import { resumirMensagem, tratarMensagem } from "./conexao.ts";
 import { type Conexao, type JanelaDoServidor, Janelas } from "./janelas.ts";
@@ -47,6 +47,8 @@ class JanelaFalsa implements JanelaDoServidor {
 	readonly chamadas: string[] = [];
 	/** Os contextosTela de cada enviar, na ordem. */
 	readonly contextos: Array<ContextoTela[] | undefined> = [];
+	/** As imagens de cada enviar, na ordem. */
+	readonly imagens: Array<ImagemMensagem[] | undefined> = [];
 	/** O que usoDoRamo devolve. */
 	uso: UsoModelo | undefined;
 	private readonly ouvintes = new Set<(evento: EventoNucleo) => void>();
@@ -72,9 +74,10 @@ class JanelaFalsa implements JanelaDoServidor {
 		if (opcoes.sessaoId === "nao-existe") throw new Error("Sessão nao-existe não encontrada");
 		return this.novoEstado(opcoes.sessaoId ?? `s${++this.sessao}`, opcoes.agente ?? this.perfil.agentePadrao);
 	}
-	async enviar(texto: string, contextosTela?: ContextoTela[]) {
+	async enviar(texto: string, contextosTela?: ContextoTela[], imagens?: ImagemMensagem[]) {
 		this.chamadas.push(`enviar ${texto}`);
 		this.contextos.push(contextosTela);
+		this.imagens.push(imagens);
 		this.conversa.push(texto);
 		this.emitir({ tipo: "execucao_inicio" });
 		return "iniciada" as const;
@@ -295,6 +298,64 @@ describe("rotas HTTP", () => {
 	});
 });
 
+describe("POST /api/transcrever", () => {
+	const audio = Buffer.from("RIFF....WAVEfmt ").toString("base64");
+	const chamar = (opcoes: OpcoesApp, corpo: unknown) =>
+		criarApp(janelas, logMudo, "1", opcoes).request("/api/transcrever", {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: typeof corpo === "string" ? corpo : JSON.stringify(corpo),
+		});
+	const pedido = { perfil: "teste", audio, formato: "wav" };
+
+	it("recusa corpo que não é JSON (um formulário de outro site não gasta créditos)", async () => {
+		let chamou = false;
+		const resposta = await criarApp(janelas, logMudo, "1", { buscar: (async () => { chamou = true; return new Response("{}"); }) as typeof fetch, chaveOpenRouter: () => "chave" }).request("/api/transcrever", {
+			method: "POST",
+			headers: { "content-type": "text/plain" },
+			body: JSON.stringify(pedido),
+		});
+		expect(resposta.status).toBe(415);
+		expect(chamou).toBe(false);
+	});
+
+	it("devolve o texto, os segundos e o custo, com o modelo padrão e a chave do ambiente", async () => {
+		const vistos: Array<{ url: string; auth: string | null; corpo: { model: string; language: string } }> = [];
+		const buscar = (async (url: string, init: RequestInit) => {
+			vistos.push({ url, auth: new Headers(init.headers).get("authorization"), corpo: JSON.parse(String(init.body)) });
+			return new Response(JSON.stringify({ text: " oi, professor ", usage: { seconds: 2.5, cost: 0.0003 } }), { status: 200 });
+		}) as unknown as typeof fetch;
+		const resposta = await chamar({ buscar, chaveOpenRouter: () => "chave-de-teste" }, pedido);
+		expect(resposta.status).toBe(200);
+		expect(await resposta.json()).toEqual({ texto: "oi, professor", segundos: 2.5, custo: 0.0003 });
+		expect(vistos).toHaveLength(1);
+		expect(vistos[0]).toMatchObject({ url: "https://openrouter.ai/api/v1/audio/transcriptions", auth: "Bearer chave-de-teste", corpo: { model: "openai/whisper-large-v3", language: "pt" } });
+	});
+
+	it("sem chave, sem perfil, com corpo inválido ou grande demais, responde { erro } sem chamar o OpenRouter", async () => {
+		const buscar = (async () => {
+			throw new Error("não devia chamar");
+		}) as unknown as typeof fetch;
+		const semChave = await chamar({ buscar, chaveOpenRouter: () => undefined }, pedido);
+		expect(semChave.status).toBe(400);
+		expect(await semChave.json()).toEqual({ erro: "Configure OPENROUTER_API_KEY nas variáveis de ambiente do Windows." });
+		const opcoes = { buscar, chaveOpenRouter: () => "k" };
+		expect((await chamar(opcoes, { ...pedido, perfil: "nada" })).status).toBe(404);
+		expect((await chamar(opcoes, { ...pedido, formato: "mp3" })).status).toBe(400);
+		expect((await chamar(opcoes, "{ não é json")).status).toBe(400);
+		const grande = await chamar(opcoes, { ...pedido, audio: "A".repeat(10 * 1024 * 1024 + 1) });
+		expect(grande.status).toBe(413);
+		expect(await grande.json()).toEqual({ erro: "O áudio é grande demais (o limite é 10 MB)." });
+	});
+
+	it("o erro do OpenRouter vira uma frase em português com o status", async () => {
+		const buscar = (async () => new Response(JSON.stringify({ error: { message: "Insufficient credits" } }), { status: 402 })) as unknown as typeof fetch;
+		const resposta = await chamar({ buscar, chaveOpenRouter: () => "k" }, pedido);
+		expect(resposta.status).toBe(502);
+		expect(await resposta.json()).toEqual({ erro: "A transcrição falhou (402): Insufficient credits" });
+	});
+});
+
 describe("mensagens do WebSocket", () => {
 	const enviar = (conexao: ConexaoFalsa, mensagem: unknown) => tratarMensagem(janelas, conexao, JSON.stringify(mensagem), logMudo);
 
@@ -412,6 +473,23 @@ describe("mensagens do WebSocket", () => {
 	it("o resumo do log não leva o texto do usuário", () => {
 		const resumo = resumirMensagem({ tipo: "enviar", perfil: "teste", texto: "segredo do Breno" });
 		expect(resumo).toBe("enviar perfil=teste texto=16 car.");
+	});
+
+	it("o resumo do log conta as imagens e nunca leva os dados", () => {
+		const dados = "A".repeat(2048);
+		const resumo = resumirMensagem({ tipo: "enviar", perfil: "teste", texto: "oi", imagens: [{ tipo: "image/jpeg", dados }] });
+		expect(resumo).toBe("enviar perfil=teste texto=2 car. imagens=1 tamanho=2 KB");
+		expect(resumo).not.toContain("AAAA");
+	});
+
+	it("enviar passa as imagens à janela", async () => {
+		const conexao = new ConexaoFalsa(1);
+		await enviar(conexao, { tipo: "abrir_perfil", pedidoId: "1", perfil: "teste" });
+		const imagens = [{ tipo: "image/png", dados: "iVBORw0KGgo=" }];
+		await enviar(conexao, { tipo: "enviar", pedidoId: "2", perfil: "teste", texto: "olha", imagens });
+		expect(falsas[0]?.imagens.at(-1)).toEqual(imagens);
+		await enviar(conexao, { tipo: "enviar", pedidoId: "3", perfil: "teste", texto: "sem" });
+		expect(falsas[0]?.imagens.at(-1)).toBeUndefined();
 	});
 });
 

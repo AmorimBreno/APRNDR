@@ -90,6 +90,22 @@ describe("rodapeDaResposta", () => {
 	});
 });
 
+describe("chip de imagens na nota do usuário", () => {
+	const comImagens = (imagens: number, contextos = false): ItemConversa => ({ tipo: "usuario", chave: "u1", texto: "olha", imagens, ...(contextos ? { contextosTela: [{ tipo: "nota", rotulo: "A", olho: true }] } : {}) });
+
+	it("mostra '1 imagem' e 'N imagens' no estilo dos chips de contexto, mesmo sem contexto da tela", async () => {
+		await desenhar(createElement(DocumentoConversa, { conversa: [comImagens(1)] }));
+		expect([...container.querySelectorAll(".chip-contexto")].map((chip) => chip.textContent)).toEqual(["1 imagem"]);
+		await desenhar(createElement(DocumentoConversa, { conversa: [comImagens(3, true)] }));
+		expect([...container.querySelectorAll(".chip-contexto")].map((chip) => chip.textContent)).toEqual(["A", "3 imagens"]);
+	});
+
+	it("sem imagens não há chip de imagem", async () => {
+		await desenhar(createElement(DocumentoConversa, { conversa: [usuario("u1")] }));
+		expect(container.textContent).not.toMatch(/imagem|imagens/);
+	});
+});
+
 describe("acoesDoBloco", () => {
 	const texto = "Primeiro parágrafo com ação.\n\n- a\n- b\n\n$$\nx^2\n$$";
 

@@ -36,6 +36,11 @@ export function resumirMensagem(mensagem: MensagemCliente): string {
 				partes.push(`contextos=${itens.length}`);
 				if (itens.length > 0) partes.push(`(${itens.join("; ")})`);
 			}
+			// As imagens: só quantas e o tamanho somado (os dados em base64 nunca vão para o log).
+			if (mensagem.imagens && mensagem.imagens.length > 0) {
+				const bytes = mensagem.imagens.reduce((soma, imagem) => soma + imagem.dados.length, 0);
+				partes.push(`imagens=${mensagem.imagens.length} tamanho=${Math.round(bytes / 1024)} KB`);
+			}
 			break;
 		case "abrir_perfil":
 			if (mensagem.sessaoId) partes.push(`sessao=${mensagem.sessaoId}`);
@@ -76,7 +81,7 @@ async function executar(janelas: Janelas, conexao: Conexao, mensagem: MensagemCl
 		case "abrir_perfil":
 			return janelas.abrirPerfil(conexao, mensagem);
 		case "enviar":
-			return janelas.janela(mensagem.perfil).enviar(mensagem.texto, mensagem.contextosTela);
+			return janelas.janela(mensagem.perfil).enviar(mensagem.texto, mensagem.contextosTela, mensagem.imagens);
 		case "abortar":
 			return janelas.janela(mensagem.perfil).abortar();
 		case "trocar_modelo":

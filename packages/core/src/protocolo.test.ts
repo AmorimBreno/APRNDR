@@ -88,6 +88,25 @@ describe("isolamento do pi", () => {
 	});
 });
 
+describe("imagens no enviar", () => {
+	const enviar = (imagens: unknown) => validarMensagemCliente({ tipo: "enviar", perfil: "estudos", texto: "Olha", imagens });
+	const imagem = { tipo: "image/jpeg", dados: "/9j/AAAA" };
+
+	it("aceita de uma a três imagens e a mensagem sem imagens", () => {
+		expect(enviar([imagem]).ok).toBe(true);
+		expect(enviar([imagem, imagem, { tipo: "image/png", dados: "AAAA" }]).ok).toBe(true);
+		expect(validarMensagemCliente({ tipo: "enviar", perfil: "estudos", texto: "Olha" }).ok).toBe(true);
+	});
+
+	it("recusa mais de três, tipo errado, dados vazios ou grandes demais e campos extras", () => {
+		expect(enviar([imagem, imagem, imagem, imagem]).ok).toBe(false);
+		expect(enviar([{ tipo: "application/pdf", dados: "AAAA" }]).ok).toBe(false);
+		expect(enviar([{ tipo: "image/png", dados: "" }]).ok).toBe(false);
+		expect(enviar([{ tipo: "image/png", dados: "A".repeat(8_000_001) }]).ok).toBe(false);
+		expect(enviar([{ ...imagem, extra: 1 }]).ok).toBe(false);
+	});
+});
+
 describe("contexto da tela no enviar (13.19)", () => {
 	const enviarLista = (contextosTela: unknown) => validarMensagemCliente({ tipo: "enviar", perfil: "estudos", texto: "Por quê?", contextosTela });
 	// Um contexto só, dentro da lista: as regras de cada item são as de antes.

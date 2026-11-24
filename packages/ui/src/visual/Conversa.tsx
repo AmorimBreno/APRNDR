@@ -462,7 +462,7 @@ function IconeTrecho() {
  * conteúdo foi cortado e o sinal do trecho citado (o trecho no title).
  * Genérico: quem decide o que é o rótulo é o perfil.
  */
-function ChipsContexto({ contextos }: { contextos: ResumoContextoTela[] }) {
+function ChipsContexto({ contextos, imagens = 0 }: { contextos: ResumoContextoTela[]; imagens?: number }) {
 	// Foco primeiro; o resto na ordem recebida (sort é estável).
 	const ordenados = [...contextos].sort((a, b) => Number(b.foco === true) - Number(a.foco === true));
 	return (
@@ -488,6 +488,11 @@ function ChipsContexto({ contextos }: { contextos: ResumoContextoTela[] }) {
 					</span>
 				);
 			})}
+			{imagens > 0 ? (
+				<span className="chip-contexto" title={imagens === 1 ? "Uma imagem foi junto" : `${imagens} imagens foram junto`}>
+					<span className="chip-contexto__rotulo">{imagens === 1 ? "1 imagem" : `${imagens} imagens`}</span>
+				</span>
+			) : null}
 		</div>
 	);
 }
@@ -605,7 +610,7 @@ export function DocumentoConversa({
 			// A nota não entra subindo: quem traz ela é o voo (ou ela já estava lá).
 			return (
 				<div key={item.chave} className="documento__item documento__item--usuario">
-					{item.contextosTela && item.contextosTela.length > 0 ? <ChipsContexto contextos={item.contextosTela} /> : null}
+					{(item.contextosTela && item.contextosTela.length > 0) || item.imagens ? <ChipsContexto contextos={item.contextosTela ?? []} imagens={item.imagens} /> : null}
 					<NotaUsuario
 						texto={item.texto}
 						{...(voo && aoVivo(item.chave) ? { voo } : {})}

@@ -12,6 +12,7 @@ export type {
 	DadosResposta,
 	EstadoMaterial,
 	HistoricoPonte,
+	ImagemMensagem,
 	MensagemCliente,
 	MensagemServidor,
 	ModoPergunta,

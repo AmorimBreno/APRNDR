@@ -341,9 +341,13 @@ describe("JanelaPerfil sem rede", () => {
 // "openai-completions"), que guarda os pedidos e pode segurar as respostas para
 // simular "durante a resposta". Nada sai da máquina.
 
+const PNG_1X1 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+
 /** Um pedido que chegou ao modelo falso: as mensagens, com o conteúdo em texto. */
 interface PedidoFalso {
 	mensagens: Array<{ role: string; texto: string }>;
+	/** Quantas partes de imagem vieram nas mensagens. */
+	imagens: number;
 }
 
 /** Texto de um conteúdo (string ou lista de partes com text, como na OpenAI e no pi). */
@@ -414,6 +418,10 @@ class ModeloFalso {
 			const dados = JSON.parse(corpo) as { messages?: Array<{ role?: unknown; content?: unknown }> };
 			this.pedidos.push({
 				mensagens: (dados.messages ?? []).map((mensagem) => ({ role: String(mensagem.role), texto: textoDoConteudo(mensagem.content) })),
+				imagens: (dados.messages ?? []).reduce(
+					(soma, mensagem) => soma + (Array.isArray(mensagem.content) ? mensagem.content.filter((parte: { type?: unknown }) => parte?.type === "image_url").length : 0),
+					0,
+				),
 			});
 			const numero = this.pedidos.length;
 			const prontas = this.esperas.filter((espera) => numero >= espera.quantos);
@@ -485,7 +493,7 @@ describe("contexto da tela e fila própria (WP1)", () => {
 						baseUrl: `http://127.0.0.1:${porta}/v1`,
 						api: "openai-completions",
 						apiKey: "chave-de-teste",
-						models: [{ id: "modelo", cost: { input: 1000, output: 2000, cacheRead: 0, cacheWrite: 0 } }],
+						models: [{ id: "modelo", input: ["text", "image"], cost: { input: 1000, output: 2000, cacheRead: 0, cacheWrite: 0 } }],
 					},
 					semchave: {
 						baseUrl: `http://127.0.0.1:${porta}/v1`,
@@ -567,6 +575,33 @@ describe("contexto da tela e fila própria (WP1)", () => {
 			{ tipo: "execucao_fim", abortada: false },
 			{ tipo: "execucao_fim", abortada: false },
 		]);
+	});
+
+	it("as imagens vão ao modelo junto da mensagem, a fila própria as guarda e o evento e o histórico só contam", async () => {
+		const aberta = await abrirJanela();
+		// Um PNG de 1x1 de verdade: o pi decodifica a imagem antes de mandar.
+		const imagem = { tipo: "image/png" as const, dados: PNG_1X1 };
+		modelo.segurar();
+		expect(await aberta.enviar("olha isto", undefined, [imagem])).toBe("iniciada");
+		await modelo.esperarPedidos(1);
+		expect(await aberta.enviar("e isto", undefined, [imagem, imagem])).toBe("enfileirada");
+		modelo.soltar();
+		await aberta.aguardarOcioso();
+		expect(modelo.pedidos.map((pedido) => pedido.imagens)).toEqual([1, 3]);
+		expect(eventos.filter((evento) => evento.tipo === "mensagem_usuario")).toMatchObject([
+			{ texto: "olha isto", imagens: 1 },
+			{ texto: "e isto", imagens: 2 },
+		]);
+		expect(JSON.stringify(eventos)).not.toContain(PNG_1X1);
+		expect(aberta.historico().flatMap((item) => (item.papel === "usuario" ? [[item.texto, item.imagens]] : []))).toEqual([
+			["olha isto", 1],
+			["e isto", 2],
+		]);
+		// Sem imagem, o campo nem aparece.
+		await aberta.enviar("sem imagem");
+		await aberta.aguardarOcioso();
+		expect(modelo.pedidos.at(-1)?.imagens).toBe(3); // as mesmas três, já na conversa
+		expect(aberta.historico().filter((item) => item.papel === "usuario").at(-1)).not.toHaveProperty("imagens");
 	});
 
 	it("dois envios seguidos, um durante a resposta, deixam dois contextos na sessão, cada um com o seu texto", async () => {

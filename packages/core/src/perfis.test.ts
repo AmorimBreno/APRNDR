@@ -44,6 +44,7 @@ describe("perfil estudos real", () => {
 		});
 		expect(perfil.materiais).toEqual({ pastas: ["materias/*/materiais"], modeloVisao: "openrouter/anthropic/claude-sonnet-5.5" });
 		expect(perfil.pastasImagens).toEqual(["viz"]);
+		expect(perfil.transcricao).toEqual({ modelo: "openai/whisper-large-v3" });
 	});
 
 	it("os quatro agentes têm nome, papel e modelo certos", async () => {
@@ -92,6 +93,12 @@ describe("profile.json inválido", () => {
 		expect(validarProfileJson({ ...valido, aparencia: { cor: "moss", lema: "Oi" } }, "x").aparencia).toEqual({ cor: "moss", lema: "Oi" });
 		expect(() => validarProfileJson({ ...valido, aparencia: { capa: "capa.txt" } }, "x")).toThrow(/use uma imagem/);
 		expect(() => validarProfileJson({ ...valido, aparencia: { cor: "roxo" } }, "x")).toThrow(/aparencia/);
+	});
+
+	it("transcricao é opcional e o modelo tem padrão", () => {
+		expect(validarProfileJson(valido, "x").transcricao).toBeUndefined();
+		expect(validarProfileJson({ ...valido, transcricao: {} }, "x").transcricao).toEqual({ modelo: "openai/whisper-large-v3" });
+		expect(validarProfileJson({ ...valido, transcricao: { modelo: "outro/modelo" } }, "x").transcricao).toEqual({ modelo: "outro/modelo" });
 	});
 
 	it("materiais é opcional; as pastas são relativas à pasta de dados, com barras normais e sem ..", () => {

@@ -89,7 +89,7 @@ export type EventoNucleo =
 	| { tipo: "execucao_inicio" }
 	/** A sessão terminou de verdade (agent_settled): não vai continuar sozinha. */
 	| { tipo: "execucao_fim"; abortada: boolean }
-	| { tipo: "mensagem_usuario"; texto: string; momento?: string }
+	| { tipo: "mensagem_usuario"; texto: string; momento?: string; /** Quantas imagens vieram na mensagem (os dados nunca voltam). */ imagens?: number }
 	/**
 	 * O contexto da tela que foi junto da última mensagem do usuário (13.19).
 	 * Chega depois do mensagem_usuario: a interface o prende ao último item do
@@ -139,7 +139,7 @@ export type EventoNucleo =
 
 /** Item do histórico de uma sessão, para mostrar a conversa ao reabrir. */
 export type ItemHistorico =
-	| { papel: "usuario"; texto: string; momento?: string; contextosTela?: ResumoContextoTela[] }
+	| { papel: "usuario"; texto: string; momento?: string; contextosTela?: ResumoContextoTela[]; imagens?: number }
 	| {
 			papel: "assistente";
 			texto: string;
@@ -199,6 +199,12 @@ export function resumirResultado(resultado: unknown, limite = LIMITE_RESUMO): st
 		}
 	}
 	return encurtar(partes.join(" "), limite);
+}
+
+/** Quantos blocos de imagem tem o conteúdo de uma mensagem do pi. */
+function contarImagens(conteudo: unknown): number {
+	if (!Array.isArray(conteudo)) return 0;
+	return conteudo.filter((bloco) => bloco && typeof bloco === "object" && (bloco as { type?: unknown }).type === "image").length;
 }
 
 function lerUso(uso: unknown): UsoModelo | undefined {
@@ -265,7 +271,8 @@ export function criarTradutorEventos(): (evento: AgentSessionEvent) => EventoNuc
 				if (contextos) return [{ tipo: "contexto_tela", contextos }];
 				if (mensagem.role === "user") {
 					const momento = momentoDe((mensagem as { timestamp?: unknown }).timestamp);
-					return [{ tipo: "mensagem_usuario", texto: juntarBlocos(mensagem.content, "text"), ...(momento ? { momento } : {}) }];
+					const imagens = contarImagens(mensagem.content);
+						return [{ tipo: "mensagem_usuario", texto: juntarBlocos(mensagem.content, "text"), ...(momento ? { momento } : {}), ...(imagens > 0 ? { imagens } : {}) }];
 				}
 				if (mensagem.role !== "assistant") return [];
 				const modelo = nomeModeloDaMensagem(mensagem);
@@ -380,7 +387,8 @@ export function converterHistorico(mensagens: readonly MensagemPi[], agentes?: R
 			if (anterior?.papel === "usuario") anterior.contextosTela = contextos;
 		} else if (mensagem.role === "user") {
 			const momento = momentoDe((mensagem as { timestamp?: unknown }).timestamp);
-			historico.push({ papel: "usuario", texto: juntarBlocos(mensagem.content, "text"), ...(momento ? { momento } : {}) });
+			const imagens = contarImagens(mensagem.content);
+				historico.push({ papel: "usuario", texto: juntarBlocos(mensagem.content, "text"), ...(momento ? { momento } : {}), ...(imagens > 0 ? { imagens } : {}) });
 		} else if (mensagem.role === "assistant") {
 			const ferramentas: Array<{ id: string; nome: string; argumentos: unknown }> = [];
 			for (const bloco of mensagem.content) {

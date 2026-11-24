@@ -52,7 +52,7 @@ export interface UsoResposta {
 }
 
 export type ItemConversa =
-	| { tipo: "usuario"; chave: string; texto: string; momento?: string; contextosTela?: ResumoContextoTela[] }
+	| { tipo: "usuario"; chave: string; texto: string; momento?: string; contextosTela?: ResumoContextoTela[]; imagens?: number }
 	| {
 			tipo: "assistente";
 			chave: string;
@@ -377,6 +377,7 @@ export function conversaDoHistorico(itens: ItemHistorico[], contadorInicial = 0)
 			conversa.push({ tipo: "usuario", chave: `h${++contador}`, texto: item.texto,
 				...(item.momento ? { momento: item.momento } : {}),
 				...(item.contextosTela ? { contextosTela: item.contextosTela } : {}),
+				...(item.imagens ? { imagens: item.imagens } : {}),
 			});
 		} else if (item.papel === "assistente") {
 			if (item.texto || item.raciocinio || item.erro) {
@@ -438,7 +439,13 @@ function aplicarEvento(estado: EstadoJanela, evento: EventoNucleo): EstadoJanela
 
 		case "mensagem_usuario": {
 			const [nova, contador] = chave(estado, "u");
-			const item: ItemConversa = { tipo: "usuario", chave: nova, texto: evento.texto, ...(evento.momento ? { momento: evento.momento } : {}) };
+			const item: ItemConversa = {
+				tipo: "usuario",
+				chave: nova,
+				texto: evento.texto,
+				...(evento.momento ? { momento: evento.momento } : {}),
+				...(evento.imagens ? { imagens: evento.imagens } : {}),
+			};
 			return { ...estado, conversa: [...estado.conversa, item], contador };
 		}
 

@@ -3,15 +3,22 @@
 
 import { readFile } from "node:fs/promises";
 import { extname } from "node:path";
-import { acharImagem, ErroCaminhoImagem, TIPOS_IMAGEM } from "@estudos/core";
+import { acharImagem, ErroCaminhoImagem, MODELO_TRANSCRICAO_PADRAO, TIPOS_IMAGEM } from "@estudos/core";
 import { Hono } from "hono";
 import type { Janelas } from "./janelas.ts";
 import type { Log } from "./log.ts";
+import { LIMITE_CORPO_TRANSCRICAO, transcrever } from "./transcricao.ts";
 
 // Um SVG aberto direto no navegador não roda script nem busca nada (dentro de <img> o navegador já não roda).
 const POLITICA_SVG = "default-src 'none'; style-src 'unsafe-inline'; img-src data:";
 
-export function criarApp(janelas: Janelas, log: Log, versao: string): Hono {
+/** Para os testes trocarem o fetch e a chave; em produção, o fetch global e a variável de ambiente. */
+export interface OpcoesApp {
+	buscar?: typeof fetch;
+	chaveOpenRouter?: () => string | undefined;
+}
+
+export function criarApp(janelas: Janelas, log: Log, versao: string, opcoes: OpcoesApp = {}): Hono {
 	const app = new Hono();
 
 	// Responde na hora, sem esperar perfis nem sessões: o lançador usa para saber se o servidor subiu.
@@ -132,6 +139,46 @@ export function criarApp(janelas: Janelas, log: Log, versao: string): Hono {
 		} catch (erro) {
 			return c.json({ ok: false, erro: (erro as Error).message }, 400);
 		}
+	});
+
+	// Transcrição de voz (professor flutuante, R8): { perfil, audio (WAV em base64), formato: "wav" }.
+	// O áudio não é gravado em disco; o log diz só o perfil, os segundos e o custo.
+	app.post("/api/transcrever", async (c) => {
+		// Só JSON: um formulário ou um fetch "simples" de outro site (sem a checagem prévia do navegador) não chega aqui
+		// e não gasta créditos do OpenRouter.
+		if (!(c.req.header("content-type") ?? "").toLowerCase().startsWith("application/json")) {
+			return c.json({ erro: "O pedido de transcrição precisa ser JSON (Content-Type: application/json)." }, 415);
+		}
+		const grande = { erro: "O áudio é grande demais (o limite é 10 MB)." };
+		if (Number(c.req.header("content-length") ?? 0) > LIMITE_CORPO_TRANSCRICAO) return c.json(grande, 413);
+		const bruto = await c.req.text();
+		if (Buffer.byteLength(bruto) > LIMITE_CORPO_TRANSCRICAO) return c.json(grande, 413);
+		let json: unknown;
+		try {
+			json = JSON.parse(bruto);
+		} catch {
+			return c.json({ erro: "O pedido de transcrição não é um JSON válido." }, 400);
+		}
+		const corpo = (json && typeof json === "object" ? json : {}) as { perfil?: unknown; audio?: unknown; formato?: unknown };
+		if (typeof corpo.perfil !== "string" || !corpo.perfil || typeof corpo.audio !== "string" || !corpo.audio || corpo.formato !== "wav") {
+			return c.json({ erro: 'O pedido de transcrição precisa de "perfil", "audio" (WAV em base64) e formato "wav".' }, 400);
+		}
+		const { perfis } = await janelas.perfis();
+		const perfil = perfis.find((item) => item.id === corpo.perfil);
+		if (!perfil) return c.json({ erro: `O perfil "${corpo.perfil}" não existe ou é inválido.` }, 404);
+		const resposta = await transcrever({
+			modelo: perfil.transcricao?.modelo ?? MODELO_TRANSCRICAO_PADRAO,
+			audio: corpo.audio,
+			chave: (opcoes.chaveOpenRouter ?? (() => process.env.OPENROUTER_API_KEY))(),
+			buscar: opcoes.buscar,
+		});
+		if (!resposta.ok) {
+			log.aviso(`[${perfil.id}] transcrição falhou (${resposta.status})`);
+			return c.json({ erro: resposta.erro }, resposta.status as 400 | 502);
+		}
+		const { texto, segundos, custo } = resposta.resultado;
+		log.info(`[${perfil.id}] transcrição: segundos=${segundos ?? "?"} custo=${custo ?? "?"}`);
+		return c.json({ texto, ...(segundos !== undefined ? { segundos } : {}), ...(custo !== undefined ? { custo } : {}) });
 	});
 
 	app.onError((erro, c) => {

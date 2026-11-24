@@ -94,12 +94,32 @@ const esquemaContextosTela = z
 		"a soma dos conteúdos passa do limite",
 	);
 
+/** Máximo de imagens por mensagem e tamanho máximo dos dados de cada uma (base64, em caracteres). */
+export const MAXIMO_IMAGENS = 3;
+export const LIMITE_DADOS_IMAGEM = 8_000_000;
+export const TIPOS_IMAGEM_MENSAGEM = ["image/jpeg", "image/png", "image/webp", "image/gif"] as const;
+
+/** Uma imagem que vai junto da mensagem (a captura da tela, por exemplo). */
+const esquemaImagem = z.strictObject({
+	tipo: z.enum(TIPOS_IMAGEM_MENSAGEM),
+	dados: z.string().min(1).max(LIMITE_DADOS_IMAGEM),
+});
+
+export type ImagemMensagem = z.infer<typeof esquemaImagem>;
+
 export const esquemaMensagemCliente = z.discriminatedUnion("tipo", [
 	z.strictObject({ tipo: z.literal("ping"), pedidoId }),
 	/** Abre a janela do perfil (ou entra na que já está aberta). Com sessaoId, continua essa sessão. */
 	z.strictObject({ tipo: z.literal("abrir_perfil"), ...comPerfil, sessaoId: texto.optional(), agente: texto.optional() }),
 	/** contextosTela: o que estava aberto na tela, uma por aba (13.19, 5b); o modelo o vê, a conversa mostra só o resumo. */
-	z.strictObject({ tipo: z.literal("enviar"), ...comPerfil, texto, contextosTela: esquemaContextosTela.optional() }),
+	z.strictObject({
+		tipo: z.literal("enviar"),
+		...comPerfil,
+		texto,
+		contextosTela: esquemaContextosTela.optional(),
+		/** imagens: até 3, em base64, que o modelo vê junto da mensagem (docs/professor-flutuante.md, 2.1). */
+		imagens: z.array(esquemaImagem).max(MAXIMO_IMAGENS).optional(),
+	}),
 	z.strictObject({ tipo: z.literal("abortar"), ...comPerfil }),
 	/** modelo no formato provedor/id. */
 	z.strictObject({ tipo: z.literal("trocar_modelo"), ...comPerfil, modelo: texto }),

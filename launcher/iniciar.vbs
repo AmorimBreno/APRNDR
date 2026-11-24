@@ -25,5 +25,12 @@ If shell.Run("cmd.exe /d /c where node >NUL 2>&1", 0, True) <> 0 Then
 	WScript.Quit 1
 End If
 
+' Os argumentos do .vbs (por exemplo --bandeja) vão para o iniciar.mjs.
+Dim argumentos, i
+argumentos = ""
+For i = 0 To WScript.Arguments.Count - 1
+	argumentos = argumentos & " " & WScript.Arguments(i)
+Next
+
 ' Estilo 0 = janela escondida; False = não espera (o iniciar.mjs avisa sozinho se falhar).
-shell.Run "node """ & pasta & "\iniciar.mjs""", 0, False
+shell.Run "node """ & pasta & "\iniciar.mjs""" & argumentos, 0, False

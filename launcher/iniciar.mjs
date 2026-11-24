@@ -4,7 +4,9 @@
 // do app (Electron, apps/desktop). Se o Electron não estiver instalado, abre o
 // Edge em modo app, como antes. Registra tudo em %LOCALAPPDATA%\estudos-app\logs\lancador-AAAA-MM-DD.log.
 //
-// Uso: node launcher\iniciar.mjs (ou wscript launcher\iniciar.vbs, sem janela).
+// Uso: node launcher\iniciar.mjs [--bandeja] (ou wscript launcher\iniciar.vbs [--bandeja], sem janela).
+// Com --bandeja (o atalho "APRNDR (bandeja)" da pasta Inicializar), o Electron abre sem a janela
+// principal: só o ícone da bandeja e a bolinha do professor; e não há Edge de reserva.
 // Variáveis de ambiente opcionais:
 //   ESTUDOS_SEM_NAVEGADOR=1  não abre o navegador (para testes);
 //   ESTUDOS_ESPERA_S=N       tempo limite para o app subir (padrão 90 s).
@@ -26,6 +28,7 @@
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
 	ARQUIVO_PID,
 	CAMINHO_ELECTRON,
@@ -45,6 +48,12 @@ import {
 
 const ESPERA_MS = (Number(process.env.ESTUDOS_ESPERA_S) || 90) * 1000;
 const INTERVALO_MS = 1000;
+
+/** As opções da linha de comando: por enquanto só --bandeja. */
+export function lerArgumentos(argv) {
+	return { bandeja: argv.includes("--bandeja") };
+}
+const { bandeja } = lerArgumentos(process.argv.slice(2));
 
 /** GET com tempo limite curto; true se respondeu 2xx (e, se pedido, com { ok: true }). */
 async function responde(url, conferirOk = false) {
@@ -125,7 +134,12 @@ function abrirNavegador() {
 		// ELECTRON_RUN_AS_NODE (herdado de um terminal de outro app Electron) faria o
 		// electron.exe rodar como Node puro, sem janela.
 		const { ELECTRON_RUN_AS_NODE: _, ...ambiente } = process.env;
-		spawn(CAMINHO_ELECTRON, [PASTA_DESKTOP], { detached: true, stdio: "ignore", env: ambiente }).unref();
+		// Já no ar, o segundo Electron só avisa o primeiro e sai (com --bandeja, o primeiro ignora o aviso).
+		spawn(CAMINHO_ELECTRON, [PASTA_DESKTOP, ...(bandeja ? ["--bandeja"] : [])], { detached: true, stdio: "ignore", env: ambiente }).unref();
+		return;
+	}
+	if (bandeja) {
+		registrar("Electron não encontrado e o modo --bandeja não tem o Edge de reserva; nada aberto.");
 		return;
 	}
 	registrar("Electron não encontrado (rode pnpm install e, se faltar o binário, node apps/desktop/node_modules/electron/install.js); usando o Edge em modo app.");
@@ -140,7 +154,7 @@ function abrirNavegador() {
 }
 
 async function principal() {
-	registrar(`lançador iniciado (Node ${process.version}, raiz ${RAIZ})`);
+	registrar(`lançador iniciado (Node ${process.version}, raiz ${RAIZ}${bandeja ? ", --bandeja" : ""})`);
 
 	const estado = await appNoAr();
 	if (estado.ambos) {
@@ -188,8 +202,11 @@ async function principal() {
 	process.exitCode = 1;
 }
 
-principal().catch((erro) => {
-	registrar(`erro inesperado: ${erro?.stack ?? erro}`);
-	avisar(`O lançador do app falhou: ${erro?.message ?? erro}\n\nVeja o log em ${PASTA_LOGS}`);
-	process.exitCode = 1;
-});
+// Só roda quando é o programa principal (o teste importa lerArgumentos sem subir nada).
+if (process.argv[1] && fileURLToPath(import.meta.url).toLowerCase() === join(process.argv[1]).toLowerCase()) {
+	principal().catch((erro) => {
+		registrar(`erro inesperado: ${erro?.stack ?? erro}`);
+		avisar(`O lançador do app falhou: ${erro?.message ?? erro}\n\nVeja o log em ${PASTA_LOGS}`);
+		process.exitCode = 1;
+	});
+}

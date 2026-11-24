@@ -7,10 +7,38 @@ const prefixo = "--estudos-altura-barra=";
 const argumento = process.argv.find((a) => a.startsWith(prefixo));
 const alturaBarra = Number(argumento?.slice(prefixo.length)) || 32;
 
+const ehFlutuante = process.argv.includes("--estudos-janela=flutuante");
+
+/** Ouve um evento do processo principal e devolve a função que cancela. */
+function ouvir(canal, cb) {
+	const ouvinte = (_evento, ...args) => cb(...args);
+	ipcRenderer.on(canal, ouvinte);
+	return () => ipcRenderer.removeListener(canal, ouvinte);
+}
+
+/** Só na janela da bolinha (o contrato é o docs/professor-flutuante.md, 2.3). */
+const flutuante = {
+	modo: () => ipcRenderer.invoke("estudos:flutuante:modo"),
+	expandir: () => ipcRenderer.invoke("estudos:flutuante:expandir"),
+	recolher: () => ipcRenderer.invoke("estudos:flutuante:recolher"),
+	moverPara: (x, y) => ipcRenderer.send("estudos:flutuante:mover", x, y),
+	capturarTela: () => ipcRenderer.invoke("estudos:flutuante:capturar"),
+	abrirApp: () => ipcRenderer.invoke("estudos:flutuante:abrir-app"),
+	esconder: () => ipcRenderer.invoke("estudos:flutuante:esconder"),
+	aoMudarModo: (cb) => ouvir("estudos:flutuante:modo-mudou", cb),
+	aoAlternarVoz: (cb) => ouvir("estudos:flutuante:alternar-voz", () => cb()),
+};
+
 contextBridge.exposeInMainWorld("estudosDesktop", {
 	plataforma: process.platform,
 	/** Altura, em pixels da janela, da barra de título que o Windows reserva para os botões. */
 	alturaBarra,
 	/** Sai do app de verdade: fecha a janela e encerra o servidor (o que o parar.mjs faz). */
 	sair: () => ipcRenderer.invoke("estudos:sair"),
+	...(ehFlutuante ? { flutuante } : {}),
+	/** A bolinha do professor, em qualquer janela do app. */
+	bolinha: {
+		ligada: () => ipcRenderer.invoke("estudos:bolinha:ligada"),
+		ligar: (ligada) => ipcRenderer.invoke("estudos:bolinha:ligar", ligada === true),
+	},
 });

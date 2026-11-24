@@ -34,3 +34,13 @@ No fim, anote o resultado de cada passo e mande para o Claude Code.
 - Os últimos blocos usados do menu "/" recomeçaram do zero: o Electron guarda o localStorage num perfil próprio (%LOCALAPPDATA%\estudos-app\electron), diferente do Edge.
 - Se o app abrir no Edge em vez da janela própria, o Electron não está instalado: rode `pnpm install` e, se faltar o binário, `node apps/desktop/node_modules/electron/install.js`.
 - Tamanho e posição da janela ficam em %LOCALAPPDATA%\estudos-app\janela.json; apagar o arquivo volta ao padrão.
+
+
+## O professor flutuante, a bandeja e o início com o Windows
+
+- A bolinha (76 px, sem moldura, transparente, sempre por cima, fora da barra de tarefas) é uma segunda janela do Electron (apps/desktop/src/flutuante.mjs). No modo bolinha ela não aceita foco e aparece sem roubá-lo, para não atrapalhar a escrita com a S Pen no Samsung Notes; só o chat compacto (420 x 620) aceita foco. Posição e "ligada" ficam em \%LOCALAPPDATA\%\estudos-app\flutuante.json.
+- Atalhos globais: Ctrl+Alt+P alterna chat e bolinha (liga a bolinha se estava desligada); Ctrl+Alt+Espaço manda "alternar voz" à bolinha, abrindo o chat antes se preciso.
+- Bandeja do Windows: o ícone do app fica ao lado do relógio sempre que o Electron está no ar. Clique esquerdo mostra ou esconde a bolinha; o menu tem "Mostrar/Esconder o professor", "Abrir o app", "Iniciar com o Windows" e "Sair do app".
+- Fechar a janela principal não encerra o app: o Electron fica na bandeja. Quem encerra é o "Sair do app". Abrir o atalho "Estudos" de novo mostra a janela principal.
+- Iniciar com o Windows: na primeira vez o app cria o atalho "APRNDR (bandeja)" na pasta Inicializar do usuário (wscript launcher\iniciar.vbs --bandeja); com --bandeja só a bandeja e a bolinha sobem, sem a janela principal. A caixa do menu liga e desliga; se você desligar, ele não recria.
+- O microfone ("media", só áudio) é liberado só para o front do app.

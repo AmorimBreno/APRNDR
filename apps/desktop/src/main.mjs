@@ -2,8 +2,9 @@
 // que carrega o front (http://localhost:7430, servido pelo `pnpm dev`); o
 // servidor e o Vite continuam sendo subidos pelo lançador (launcher/iniciar.mjs).
 //
-// Fechar a janela encerra só o Electron: o servidor segue no ar, como já era com
-// o Edge em modo app. Quem encerra tudo é o "Parar Estudos".
+// Fechar a janela principal não encerra o Electron: ele fica na bandeja do Windows, com a bolinha
+// do professor (flutuante.mjs). Quem encerra tudo é o "Sair do app" (bandeja ou tela de perfis) ou
+// o "Parar Estudos". Com --bandeja (iniciar com o Windows), não abre a janela principal.
 //
 // Variáveis de ambiente opcionais (para testes):
 //   ESTUDOS_URL=...        outro endereço do front (padrão http://localhost:7430);
@@ -15,6 +16,8 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { iniciarFlutuante } from "./flutuante.mjs";
+import { ARGUMENTO_BANDEJA } from "./estado-flutuante.mjs";
 import { ajustarAsTelas, ALTURA_MINIMA, LARGURA_MINIMA, lerEstado } from "./estado-janela.mjs";
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
@@ -45,12 +48,10 @@ if (!app.requestSingleInstanceLock()) {
 	// Já tem uma janela aberta: ela recebe o "second-instance" e vem para a frente, sem recarregar.
 	app.quit();
 } else {
-	app.on("second-instance", () => {
-		const janela = BrowserWindow.getAllWindows()[0];
-		if (!janela) return;
-		if (janela.isMinimized()) janela.restore();
-		janela.show();
-		janela.focus();
+	app.on("second-instance", (_evento, argv) => {
+		// Um --bandeja com o app já no ar não faz nada; o resto mostra a janela principal (sem mexer na bolinha).
+		if (argv.includes(ARGUMENTO_BANDEJA)) return;
+		mostrarPrincipal();
 	});
 	ipcMain.handle("estudos:sair", (evento) => {
 		// Só a página do próprio app pode pedir (não uma página aberta por engano na janela).
@@ -64,9 +65,27 @@ if (!app.requestSingleInstanceLock()) {
 	});
 	app.whenReady().then(() => {
 		garantirAtalhoDoMenuIniciar();
-		abrirJanela();
+		Menu.setApplicationMenu(null);
+		protegerSessao();
+		// Na captura de teste (ESTUDOS_CAPTURA) nada de bolinha, bandeja, atalhos globais nem atalho de inicialização.
+		if (!process.env.ESTUDOS_CAPTURA) {
+			iniciarFlutuante({
+				urlApp: URL_APP,
+				origemApp: ORIGEM_APP,
+				pastaApp: PASTA_APP,
+				raiz: RAIZ,
+				preload: join(AQUI, "preload.cjs"),
+				icone: ARQUIVO_ICONE,
+				prenderNavegacao,
+				atalhosDeTeclado: atalhos,
+				mostrarPrincipal,
+				sairDoApp,
+			});
+		}
+		if (!process.argv.includes(ARGUMENTO_BANDEJA) || process.env.ESTUDOS_CAPTURA) abrirJanela();
 	});
-	app.on("window-all-closed", () => app.quit());
+	// Sem janela aberta o Electron continua vivo na bandeja; só o "Sair do app" encerra.
+	app.on("window-all-closed", () => {});
 }
 
 function lerEstadoSalvo() {
@@ -152,10 +171,22 @@ async function frenteNoAr() {
 	}
 }
 
-function abrirJanela() {
-	Menu.setApplicationMenu(null);
-	protegerSessao();
+/** A janela principal, se estiver aberta. */
+/** @type {import("electron").BrowserWindow | null} */
+let janelaPrincipal = null;
 
+/** Mostra a janela principal (recriando se foi fechada) e a põe na frente. */
+function mostrarPrincipal() {
+	if (!janelaPrincipal || janelaPrincipal.isDestroyed()) {
+		abrirJanela();
+		return;
+	}
+	if (janelaPrincipal.isMinimized()) janelaPrincipal.restore();
+	janelaPrincipal.show();
+	janelaPrincipal.focus();
+}
+
+function abrirJanela() {
 	const estado = lerEstadoSalvo();
 	const janela = new BrowserWindow({
 		...(estado.x !== undefined && estado.y !== undefined ? { x: estado.x, y: estado.y } : {}),
@@ -182,6 +213,10 @@ function abrirJanela() {
 		},
 	});
 
+	janelaPrincipal = janela;
+	janela.on("closed", () => {
+		if (janelaPrincipal === janela) janelaPrincipal = null;
+	});
 	janela.once("ready-to-show", () => {
 		if (estado.maximizada) janela.maximize();
 		janela.show();
@@ -249,11 +284,17 @@ function prenderNavegacao(janela) {
 }
 
 /**
- * Sem permissões extras (câmera, microfone, localização...). A única liberada é escrever na área de
- * transferência ("Copiar imagem" dos diagramas da conversa, para colar no Samsung Notes), e só para o
- * front do app (ORIGEM_APP). Ler a área de transferência continua negado.
+ * Sem permissões extras (câmera, localização...). Liberadas, só para o front do app (ORIGEM_APP):
+ * escrever na área de transferência ("Copiar imagem" dos diagramas da conversa, para colar no
+ * Samsung Notes) e o microfone, só áudio (a voz do professor flutuante). Ler a área de
+ * transferência continua negado.
  */
 const PERMISSOES_DO_APP = new Set(["clipboard-sanitized-write"]);
+
+/** O microfone ("media") só para o front do app e só áudio (a voz do professor flutuante); câmera continua negada. */
+function soAudio(permissao, tipos) {
+	return permissao === "media" && Array.isArray(tipos) && tipos.length > 0 && tipos.every((tipo) => tipo === "audio");
+}
 
 function origemDe(url) {
 	try {
@@ -265,9 +306,15 @@ function origemDe(url) {
 
 function protegerSessao() {
 	session.defaultSession.setPermissionRequestHandler((contents, permissao, resposta, detalhes) =>
-		resposta(PERMISSOES_DO_APP.has(permissao) && origemDe(detalhes?.requestingUrl ?? contents?.getURL() ?? "") === ORIGEM_APP),
+		resposta(
+			(PERMISSOES_DO_APP.has(permissao) || soAudio(permissao, /** @type {any} */ (detalhes)?.mediaTypes)) &&
+				origemDe(detalhes?.requestingUrl ?? contents?.getURL() ?? "") === ORIGEM_APP,
+		),
 	);
-	session.defaultSession.setPermissionCheckHandler((_contents, permissao, origem) => PERMISSOES_DO_APP.has(permissao) && origemDe(origem) === ORIGEM_APP);
+	session.defaultSession.setPermissionCheckHandler(
+		(_contents, permissao, origem, detalhes) =>
+			(PERMISSOES_DO_APP.has(permissao) || soAudio(permissao, detalhes?.mediaType ? [detalhes.mediaType] : undefined)) && origemDe(origem) === ORIGEM_APP,
+	);
 }
 
 /** Sem o menu padrão, os atalhos de navegador que o Breno usa precisam ser ligados à mão. */

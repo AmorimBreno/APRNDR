@@ -149,8 +149,8 @@ apps/server/src/acesso-local.ts — só este computador fala com o servidor: end
 apps/server/src/transcricao.test.ts — testes da transcrição com fetch falso
 apps/server/src/log.ts — log no console e em %LOCALAPPDATA%\estudos-app\logs\servidor-AAAA-MM-DD.log
 apps/server/src/servidor.test.ts — testes do servidor sem rede (rotas, mensagens com janela falsa, watcher, chaves)
-apps/desktop/src/flutuante.mjs — o professor flutuante no Electron (docs/professor-flutuante.md): a janela da bolinha (sem foco no modo bolinha; o chat 420 x 620 como balão ao lado da bolinha, na mesma janela, recortada com setShape), o IPC, a captura da tela, Ctrl+Alt+P e Ctrl+Alt+Espaço, o ícone da bandeja e o atalho de inicialização
-apps/desktop/src/estado-flutuante.mjs — as partes puras da bolinha: o flutuante.json, a posição da bolinha e a disposição do balão do chat ao lado dela (disposicaoDoChat, formaDoChat), os argumentos (--bandeja) e o atalho de inicialização (testes em estado-flutuante.test.ts e iniciar-argumentos.test.ts)
+apps/desktop/src/flutuante.mjs — o professor flutuante no Electron (docs/professor-flutuante.md): duas janelas, a da bolinha (76 x 76, nunca muda de tamanho, nunca aceita foco) e a do balão do chat (420 x 620 mais o vão da pontinha, criada uma vez e só mostrada e escondida, ao lado da bolinha; uma anda junto da outra), o IPC, a captura da tela, Ctrl+Alt+P e Ctrl+Alt+Espaço, o ícone da bandeja e o atalho de inicialização
+apps/desktop/src/estado-flutuante.mjs — as partes puras da bolinha: o flutuante.json, a posição da bolinha e a disposição da janela do balão ao lado dela (disposicaoDoBalao, que usa disposicaoDoChat, e o deslocamento balão-bolinha), os argumentos (--bandeja) e o atalho de inicialização (testes em estado-flutuante.test.ts e iniciar-argumentos.test.ts)
 apps/desktop/ — @estudos/desktop: a janela própria do app (Electron). Sem script dev de propósito (o pnpm dev da raiz roda o dev de todo apps/*); o script é iniciar
 apps/desktop/package.json — electron com versão exata; main src/main.mjs
 apps/desktop/tsconfig.json — checkJs nos .mjs (noImplicitAny desligado)
@@ -178,7 +178,7 @@ apps/web/src/desktop.ts — lê window.estudosDesktop (do preload do Electron) e
 apps/web/src/desktop.test.ts — teste da leitura do ambiente da janela própria
 apps/web/src/App.test.ts — teste da leitura do hash
 apps/web/src/telas-iniciais.ts — registro das telas iniciais dos perfis (estudos = cadernos)
-apps/web/src/telas/TelaFlutuante.tsx — a janela da bolinha do professor (rota #/flutuante/<perfil>): modo bolinha (foto de 64 px, anel de estado, arrastar contra clicar, menu do botão direito, nunca pede foco) e modo chat (bolinha mais um balão de 420 x 620 ao lado dela, na posição da disposição que o Electron manda, com pontinha; clicar na bolinha abre e fecha; topo do perfil, Abrir o app, chips da captura e da voz, câmera "Olha minha página" e microfone); testes em TelaFlutuante.dom.test.ts
+apps/web/src/telas/TelaFlutuante.tsx — as duas páginas do professor flutuante: a da bolinha (rota #/flutuante/<perfil>: foto de 64 px, anel de estado, ouvindo pelo aviso do Electron, arrastar contra clicar, clique alterna o balão, menu do botão direito, nunca pede foco) e a do balão (rota #/flutuante/<perfil>/balao: o chat de 420 x 620 com pontinha no lado da disposição, topo do perfil, Abrir o app, chips da captura e da voz, câmera "Olha minha página", microfone, a voz avisando a bolinha); testes em TelaFlutuante.dom.test.ts
 apps/web/src/useVoz.ts — a voz do flutuante: grava (ScriptProcessor), converte, POST /api/transcrever, texto no campo e envio automático em 2 s com Cancelar; limite de 60 s
 apps/web/src/voz-wav.ts — funções puras: reamostrar para 16 kHz, PCM de 16 bits, cabeçalho do WAV e base64 (voz-wav.test.ts)
 apps/web/src/telas/BotaoProfessorFlutuante.dom.test.ts — o botão "Mostrar/Esconder o professor flutuante" da tela de perfis (BotaoProfessorFlutuante, em TelaPerfis.tsx)

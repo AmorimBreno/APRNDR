@@ -15,8 +15,8 @@ A bolinha e a escrita
    O esperado: "OK: a bolinha não roubou o foco." e "OK: o foco voltou para a janela de escrita ao recolher." Feche o Bloco de Notas que ele abriu.
 
 O chat compacto
-7. Clique na bolinha (sem arrastar): abre o chat compacto, por cima, com a matéria e o seletor de plano no topo e a mesma conversa da mesa. Pergunte algo: a resposta chega ali, e a mesma conversa aparece na mesa.
-8. Ctrl+Alt+P em qualquer app recolhe e abre o chat. Ao recolher, o foco volta para o app em que você estava.
+7. Clique na bolinha (sem arrastar): o balão do chat surge ao lado dela (com a pontinha para ela), com a matéria e o seletor de plano no topo e a mesma conversa da mesa; a bolinha não se mexe nem pisca. Clique de novo na bolinha: o balão fecha. Pergunte algo: a resposta chega ali, e a mesma conversa aparece na mesa. Arraste o balão pelo topo ou a bolinha: os dois andam juntos.
+8. Ctrl+Alt+P em qualquer app abre e fecha o balão. Ao fechar, o foco volta para o app em que você estava; feche e abra de novo: a conversa e o rascunho continuam onde estavam.
 9. Clique direito na bolinha: o menu do Windows com Abrir o chat, Abrir o app e Esconder o professor.
 
 Olha minha página

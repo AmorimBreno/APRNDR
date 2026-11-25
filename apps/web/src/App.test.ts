@@ -23,6 +23,12 @@ describe("rotaDoHash", () => {
 		expect(rotaDoHash("#/flutuante/")).toEqual({ conversa: false });
 		expect(rotaDoHash("#/flutuante/estudos/outra")).toEqual({ conversa: false });
 	});
+
+	it("a janela do balão do chat: #/flutuante/<perfil>/balao", () => {
+		expect(rotaDoHash("#/flutuante/estudos/balao")).toEqual({ perfil: "estudos", conversa: false, flutuante: true, balao: true });
+		expect(rotaDoHash("#/flutuante/meu%20perfil/balao/")).toEqual({ perfil: "meu perfil", conversa: false, flutuante: true, balao: true });
+		expect(rotaDoHash("#/flutuante/estudos/balao/outra")).toEqual({ conversa: false });
+	});
 });
 
 // Contrato do WP3 (docs/mesa-de-estudo.md, 2.9).

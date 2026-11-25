@@ -1,17 +1,18 @@
-// A tela do professor flutuante (docs/professor-flutuante.md, 2.4). É a página da janela da bolinha
-// (apps/desktop), rota "#/flutuante/<perfil>", e tem dois modos que o Electron troca:
+// A tela do professor flutuante (docs/professor-flutuante.md, 2.4). São DUAS janelas do Electron (apps/desktop), cada
+// uma com a sua rota e a sua conexão com o servidor (useJanelaPerfil sem sessaoId entra na conversa aberta):
 //
-// - bolinha: a foto do agente num círculo de 64 px (a janela tem 76), com um anel de estado (parado,
-//   pensando, escrevendo, ouvindo). Arrasta a janela pela ponte; soltar sem ter arrastado abre o chat; o
-//   clique direito abre um menu. Nunca pede foco: a bolinha fica por cima do Samsung Notes sem tirar
-//   a caneta do lugar;
-// - chat: um balão de 420 x 620 AO LADO da bolinha (que não sai do lugar; a janela cresce para conter as
-//   duas, e a disposição vem do Electron), com a pontinha voltada para ela. É a MESMA conversa que está
-//   aberta no app (useJanelaPerfil sem sessaoId entra na sessão aberta no servidor), com o topo do perfil,
-//   os chips (captura da tela, voz) e os botões de "Olha minha página" e de microfone. Clicar na bolinha
-//   de novo fecha o balão; não há botão de recolher.
+// - "#/flutuante/<perfil>", a janela da BOLINHA (76 x 76, nunca muda de tamanho): a foto do agente num círculo de 64 px,
+//   com um anel de estado (parado, pensando, escrevendo, ouvindo). Arrasta a janela pela ponte; soltar sem ter arrastado
+//   abre ou fecha o balão (alternarBalao); o clique direito abre um menu. Nunca pede foco: a bolinha fica por cima do
+//   Samsung Notes sem tirar a caneta do lugar. "Ouvindo" e os segundos vêm do Electron (aoOuvindo), porque a voz vive no balão;
+// - "#/flutuante/<perfil>/balao", a janela do BALÃO (420 x 620 mais o vão de 14 px da pontinha): o chat compacto, com a
+//   pontinha voltada para a bolinha, no lado e na altura que o Electron manda (disposição). A janela só é mostrada e
+//   escondida, nunca destruída: a conversa, a rolagem, o rascunho, a captura pendente e a voz continuam no lugar. É a MESMA
+//   conversa que está aberta no app, com o topo do perfil, os chips (captura da tela, voz) e os botões de "Olha minha
+//   página" e de microfone. Não há botão de recolher: a bolinha o abre e o fecha.
 //
-// A página é sempre transparente na janela do Electron; o que recebe clique é recortado por ele (setShape).
+// As páginas são sempre transparentes na janela do Electron; o balão desenha o próprio fundo. Sem a ponte (navegador
+// comum), a rota do balão mostra o chat na página inteira, com o fundo e o zoom de sempre.
 //
 // Nada daqui conhece matéria, nota ou plano: o topo vem de EntradaTelaInicial.cabecalhoFlutuante.
 // Padrões de interface (docs/padroes-de-interface.md): o estado da gravação aparece na hora (foi o
@@ -21,7 +22,7 @@
 import { Icon } from "@estudos/design-system";
 import { AvatarAgente, atividadeDoAgente, type JanelaPerfilHook, useJanelaPerfil, usePerfis, useValorEstavel } from "@estudos/ui";
 import { type ComponentType, type PointerEvent as EventoPonteiro, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type CapturaDaTela, type Disposicao, type ModoFlutuante, type PonteFlutuante, lerDisposicao, lerPonteFlutuante } from "../desktop.ts";
+import { type CapturaDaTela, type Disposicao, type PonteBalao, type PonteFlutuante, lerDisposicao, lerPonteBalao, lerPonteFlutuante } from "../desktop.ts";
 import { type AmbienteVoz, type FaseVoz, usarVoz } from "../useVoz.ts";
 import { PainelConversa } from "./PainelConversa.tsx";
 
@@ -39,8 +40,12 @@ export interface PropsTelaFlutuante {
 	perfilId: string;
 	/** O topo do perfil (EntradaTelaInicial.cabecalhoFlutuante). */
 	cabecalho?: ComponentType<{ janela: JanelaPerfilHook }>;
-	/** A ponte do Electron; sem ela (navegador comum) a tela lê window.estudosDesktop e, não achando, vira só um chat. */
+	/** true na rota do balão ("#/flutuante/<perfil>/balao"); senão é a janela da bolinha. */
+	balao?: boolean;
+	/** A ponte da bolinha; sem ela a tela lê window.estudosDesktop. */
 	ponte?: PonteFlutuante;
+	/** A ponte do balão; sem ela (navegador comum) a tela lê window.estudosDesktop e, não achando, vira só um chat. */
+	ponteBalao?: PonteBalao;
 	/** Para os testes: o microfone e o fetch falsos. */
 	ambienteVoz?: AmbienteVoz;
 }
@@ -88,13 +93,11 @@ interface PropsBolinha {
 	/** Segundos gravados, quando ouvindo. */
 	segundos: number;
 	ponte?: PonteFlutuante;
-	/** Onde o quadro de 76 x 76 está na janela (no modo bolinha, 0, 0). */
-	origem?: { x: number; y: number };
-	/** Clique sem arrasto: abre ou fecha o chat. */
+	/** Clique sem arrasto: abre ou fecha o balão. */
 	aoClicar(): void;
 }
 
-function Bolinha({ nome, avatar, estado, segundos, ponte, origem, aoClicar }: PropsBolinha) {
+function Bolinha({ nome, avatar, estado, segundos, ponte, aoClicar }: PropsBolinha) {
 	const [menu, setMenu] = useState(false);
 	/**
 	 * O gesto em andamento. O arrasto não usa o screenX do evento nem o cursor do sistema: no Electron, com a janela
@@ -122,10 +125,9 @@ function Bolinha({ nome, avatar, estado, segundos, ponte, origem, aoClicar }: Pr
 	};
 
 	const alvoDo = (evento: EventoPonteiro<HTMLDivElement>, atual: { gx: number; gy: number }) => ({
-		// A posição da BOLINHA na tela: a da janela + o ponto do ponteiro, menos o ponto em que pegou medido a partir do
-		// canto do quadro da bolinha (que está em `origem` na janela; no modo bolinha, em 0, 0).
-		x: Math.round(window.screenX + evento.clientX - (atual.gx - (origem?.x ?? 0))),
-		y: Math.round(window.screenY + evento.clientY - (atual.gy - (origem?.y ?? 0))),
+		// A posição da BOLINHA na tela: a da janela + o ponto do ponteiro, menos o ponto em que pegou (a janela é a bolinha).
+		x: Math.round(window.screenX + evento.clientX - atual.gx),
+		y: Math.round(window.screenY + evento.clientY - atual.gy),
 	});
 
 	const descer = (evento: EventoPonteiro<HTMLDivElement>) => {
@@ -139,7 +141,7 @@ function Bolinha({ nome, avatar, estado, segundos, ponte, origem, aoClicar }: Pr
 		const atual = gesto.current;
 		if (!atual || atual.id !== evento.pointerId) return;
 		if (!atual.arrastou) {
-			// A janela ainda não andou: a distância dentro dela é a distância do dedo.
+			// Enquanto a janela não anda, a distância dentro dela é a distância do dedo.
 			if (Math.hypot(evento.clientX - atual.gx, evento.clientY - atual.gy) < LIMITE_ARRASTO) return;
 			atual.arrastou = true;
 		}
@@ -186,7 +188,7 @@ function Bolinha({ nome, avatar, estado, segundos, ponte, origem, aoClicar }: Pr
 	}, [menu]);
 
 	return (
-		<div className="bolinha" data-estado={estado} {...(origem ? { style: { position: "absolute" as const, left: origem.x, top: origem.y } } : {})}>
+		<div className="bolinha" data-estado={estado}>
 			<div
 				className="bolinha__corpo"
 				role="button"
@@ -217,7 +219,7 @@ function Bolinha({ nome, avatar, estado, segundos, ponte, origem, aoClicar }: Pr
 						Abrir o app
 					</button>
 					<button type="button" role="menuitem" className="bolinha__item" onClick={() => escolher("esconder")}>
-						Esconder a bolinha
+						Esconder o professor
 					</button>
 				</div>
 			) : null}
@@ -225,7 +227,7 @@ function Bolinha({ nome, avatar, estado, segundos, ponte, origem, aoClicar }: Pr
 	);
 }
 
-/* ── O chat compacto ───────────────────────────────────────────────────────────────────────── */
+/* ── O chat compacto (o conteúdo do balão) ───────────────────────────────────────────────────────────────────────── */
 
 interface PropsChat {
 	perfilId: string;
@@ -234,7 +236,7 @@ interface PropsChat {
 	/** A janela de verdade, para o topo do perfil: o que ele manda não leva a captura. */
 	janelaPura: JanelaPerfilHook;
 	cabecalho?: ComponentType<{ janela: JanelaPerfilHook }>;
-	ponte?: PonteFlutuante;
+	ponte?: PonteBalao;
 	rascunho: [string, (valor: string | ((anterior: string) => string)) => void];
 	captura: CapturaDaTela | undefined;
 	removerCaptura(): void;
@@ -245,61 +247,13 @@ interface PropsChat {
 	limparAviso(): void;
 }
 
-/** Abaixo desta altura a janela ainda é (ou já é) a bolinha: a rolagem não é guardada nem devolvida. */
-const ALTURA_MINIMA_DO_CHAT = 300;
-
-/** A rolagem do chat entre um abrir e outro (o chat é desmontado na bolinha), pela classe do elemento que rola. */
-const rolagensDoChat = new Map<string, { topo: number; noFim: boolean }>();
-
 function Chat({ perfilId, janela, janelaPura, cabecalho: Cabecalho, ponte, rascunho, captura, removerCaptura, capturar, capturando, voz, aviso, limparAviso }: PropsChat) {
 	const perfis = usePerfis();
 	const perfil = perfis.lista?.perfis.find((item) => item.id === perfilId);
-	const raiz = useRef<HTMLDivElement>(null);
 
 	// Sem foco automático no campo: no notebook com tela de toque, o foco abre o teclado virtual mesmo sem o Breno querer
-	// digitar (pedido dele). Ele toca no campo quando for escrever.
-
-	// A rolagem da conversa volta para onde estava: o chat é desmontado quando vira bolinha, e a conversa remontada
-	// começaria no fim. Guarda a rolagem de cada elemento que rola (pela classe) a cada scroll, e devolve ao abrir.
-	useEffect(() => {
-		const caixa = raiz.current;
-		if (!caixa) return;
-		// A posição de antes, copiada já: ao montar, a conversa rola sozinha até o fim, e esse scroll (que não é do Breno)
-		// seria gravado por cima antes de a posição ser devolvida (relato do Breno: continuava indo ao fim).
-		const salvo = new Map(rolagensDoChat);
-		let devolvendo = true;
-		const guardar = (evento: Event) => {
-			if (devolvendo) return;
-			const alvo = evento.target;
-			if (!(alvo instanceof HTMLElement) || !alvo.className) return;
-			// Ao recolher, o Electron encolhe a janela ao tamanho da bolinha antes de a tela trocar: a conversa fica com
-			// poucos pixels, o navegador rola para caber e esse scroll falso apagaria a posição guardada (relato do Breno).
-			if (window.innerHeight < ALTURA_MINIMA_DO_CHAT || alvo.clientHeight < 80) return;
-			rolagensDoChat.set(alvo.className, { topo: alvo.scrollTop, noFim: alvo.scrollHeight - alvo.scrollTop - alvo.clientHeight < 40 });
-		};
-		caixa.addEventListener("scroll", guardar, true);
-		// Depois que a conversa se desenha (ela vai ao fim por conta própria, no primeiro quadro e quando a janela cresce):
-		// devolve o que estava, algumas vezes nos primeiros quadros, até a janela ter o tamanho do chat.
-		const devolver = () => {
-			if (window.innerHeight < ALTURA_MINIMA_DO_CHAT) return;
-			for (const [classe, rolagem] of salvo) {
-				if (rolagem.noFim) continue;
-				const elemento = [...caixa.querySelectorAll<HTMLElement>("*")].find((item) => item.className === classe);
-				if (elemento && Math.abs(elemento.scrollTop - rolagem.topo) > 1) elemento.scrollTop = rolagem.topo;
-			}
-		};
-		const quadro = requestAnimationFrame(devolver);
-		const tempos = [60, 150, 300].map((ms) => setTimeout(devolver, ms));
-		// Depois disso, a rolagem volta a ser do Breno e é guardada de novo.
-		tempos.push(setTimeout(() => {
-			devolvendo = false;
-		}, 350));
-		return () => {
-			cancelAnimationFrame(quadro);
-			for (const tempo of tempos) clearTimeout(tempo);
-			caixa.removeEventListener("scroll", guardar, true);
-		};
-	}, []);
+	// digitar (pedido dele). Ele toca no campo quando for escrever. A rolagem da conversa não precisa ser guardada: a
+	// janela do balão não é destruída ao fechar, então a conversa fica onde estava.
 
 	const transcrevendoVisivel = useValorEstavel(voz.fase === "transcrevendo", voz.fase === "transcrevendo", false);
 	let chipVoz: ReactNode = null;
@@ -373,7 +327,7 @@ function Chat({ perfilId, janela, janelaPura, cabecalho: Cabecalho, ponte, rascu
 	);
 
 	return (
-		<div className="flutuante" ref={raiz}>
+		<div className="flutuante">
 			<header className="flutuante__topo">
 				<div className="flutuante__cabecalho">{Cabecalho ? <Cabecalho janela={janelaPura} /> : null}</div>
 				<div className="flutuante__acoes">
@@ -399,66 +353,117 @@ function Chat({ perfilId, janela, janelaPura, cabecalho: Cabecalho, ponte, rascu
 	);
 }
 
-/* ── A tela ────────────────────────────────────────────────────────────────────────────────── */
+/* ── A janela da bolinha ───────────────────────────────────────────────────────────────────── */
 
-export function TelaFlutuante({ perfilId, cabecalho, ponte: ponteProp, ambienteVoz }: PropsTelaFlutuante) {
+interface PropsTelaBolinha {
+	perfilId: string;
+	ponte?: PonteFlutuante | undefined;
+}
+
+function TelaBolinha({ perfilId, ponte: ponteProp }: PropsTelaBolinha) {
 	const ponte = useMemo(() => ponteProp ?? lerPonteFlutuante(window), [ponteProp]);
-	const janela = useJanelaPerfil(perfilId);
-	const { estado, acoes } = janela;
+	const { estado } = useJanelaPerfil(perfilId);
 	const perfis = usePerfis();
 	const perfil = perfis.lista?.perfis.find((item) => item.id === perfilId);
 
-	// Sem ponte (navegador comum): só o chat. Com ela, o modo vem do Electron.
-	// O modo e a disposição andam juntos (um estado só): o balão nunca aparece sem saber onde fica.
-	const [cena, setCena] = useState<{ modo: ModoFlutuante; disposicao?: Disposicao } | undefined>(ponte ? undefined : { modo: "chat" });
-	const modo = cena?.modo;
-	const disposicao = cena?.disposicao;
+	// Na janela do Electron a página é sempre transparente (estilo.css, .rota-flutuante); sem ponte (navegador comum) a
+	// classe "flutuante-solto" devolve o fundo e o zoom de sempre.
+	useEffect(() => {
+		const raiz = document.documentElement;
+		raiz.classList.add("rota-flutuante");
+		raiz.classList.toggle("flutuante-solto", !ponte);
+		return () => raiz.classList.remove("rota-flutuante", "flutuante-solto");
+	}, [ponte]);
+
+	// A voz vive na janela do balão; o Electron avisa a bolinha de que está gravando e há quantos segundos.
+	const [ouvindo, setOuvindo] = useState({ ativo: false, segundos: 0 });
+	useEffect(() => ponte?.aoOuvindo((ativo, segundos) => setOuvindo({ ativo, segundos })), [ponte]);
+
+	const agentes = perfil?.agentes ?? [];
+	const agente = agentes.find((item) => item.nome === perfil?.agentePadrao) ?? agentes[0];
+	return (
+		<Bolinha
+			nome={agente?.nome ?? perfil?.nome ?? perfilId}
+			{...(agente?.avatar ? { avatar: agente.avatar } : {})}
+			estado={estadoDaBolinha(atividadeDoAgente(estado), ouvindo.ativo ? "gravando" : "ocioso")}
+			segundos={ouvindo.segundos}
+			{...(ponte ? { ponte } : {})}
+			aoClicar={() => void ponte?.alternarBalao()}
+		/>
+	);
+}
+
+/* ── A janela do balão ─────────────────────────────────────────────────────────────────────── */
+
+interface PropsTelaBalao {
+	perfilId: string;
+	cabecalho?: ComponentType<{ janela: JanelaPerfilHook }> | undefined;
+	ponte?: PonteBalao | undefined;
+	ambienteVoz?: AmbienteVoz | undefined;
+}
+
+/** Enquanto o Electron não manda a disposição (a janela fica escondida até lá), vale a do lado direito. */
+const PONTA_PADRAO = 38;
+
+function TelaBalao({ perfilId, cabecalho, ponte: ponteProp, ambienteVoz }: PropsTelaBalao) {
+	const ponte = useMemo(() => ponteProp ?? lerPonteBalao(window), [ponteProp]);
+	const janela = useJanelaPerfil(perfilId);
+	const { acoes } = janela;
+
+	// Na janela do Electron a página é transparente e sem o zoom do app (o balão desenha o próprio fundo e usa o zoom só
+	// no conteúdo); "flutuante-chat" liga o arrasto nativo pelo topo. Sem ponte, o fundo e o zoom de sempre.
+	useEffect(() => {
+		const raiz = document.documentElement;
+		raiz.classList.add("rota-flutuante");
+		raiz.classList.toggle("flutuante-solto", !ponte);
+		raiz.classList.toggle("flutuante-chat", !!ponte);
+		return () => raiz.classList.remove("rota-flutuante", "flutuante-chat", "flutuante-solto");
+	}, [ponte]);
+
+	// A disposição: de que lado da bolinha o balão está e onde fica a pontinha. Vem ao carregar e a cada abertura.
+	const [disposicao, setDisposicao] = useState<Disposicao | undefined>(undefined);
 	useEffect(() => {
 		if (!ponte) return;
 		let vivo = true;
-		const parar = ponte.aoMudarModo((novo, nova) => {
+		const parar = ponte.aoMudarDisposicao((nova) => {
 			const conferida = lerDisposicao(nova);
-			if (vivo) setCena({ modo: novo, ...(conferida ? { disposicao: conferida } : {}) });
+			if (vivo && conferida) setDisposicao(conferida);
 		});
-		void Promise.all([ponte.modo(), Promise.resolve(ponte.disposicao()).catch(() => null)]).then(
-			([inicial, inicialDisposicao]) => {
-				const conferida = lerDisposicao(inicialDisposicao);
-				if (vivo) setCena((atual) => atual ?? { modo: inicial, ...(conferida ? { disposicao: conferida } : {}) });
+		void Promise.resolve(ponte.disposicao()).then(
+			(inicial) => {
+				const conferida = lerDisposicao(inicial);
+				if (vivo && conferida) setDisposicao((atual) => atual ?? conferida);
 			},
-			() => vivo && setCena((atual) => atual ?? { modo: "bolinha" }),
+			() => {},
 		);
 		return () => {
 			vivo = false;
 			parar();
 		};
 	}, [ponte]);
-	// Depois que a cena nova foi desenhada (dois quadros: o React aplicou e o navegador pintou), avisa o Electron, que
-	// deixou a janela invisível durante a troca: sem isso, a bolinha aparecia um instante no canto do balão (relato do Breno).
+
+	// A animação de surgir (160 ms a partir da pontinha) roda a cada vez que o balão é mostrado: a janela não é remontada,
+	// então ela é reiniciada quando a disposição chega e quando a janela fica visível de novo.
+	const balaoRef = useRef<HTMLDivElement>(null);
+	const surgir = useCallback(() => {
+		const elemento = balaoRef.current;
+		if (!elemento) return;
+		elemento.style.animation = "none";
+		void elemento.offsetWidth; // força o recálculo, para a animação da classe recomeçar
+		elemento.style.animation = "";
+	}, []);
 	useEffect(() => {
-		if (!ponte?.pintado || !cena) return;
-		let segundo = 0;
-		const primeiro = requestAnimationFrame(() => {
-			segundo = requestAnimationFrame(() => ponte.pintado?.());
-		});
-		return () => {
-			cancelAnimationFrame(primeiro);
-			cancelAnimationFrame(segundo);
+		if (disposicao) surgir();
+	}, [disposicao, surgir]);
+	useEffect(() => {
+		const mudou = () => {
+			if (document.visibilityState === "visible") surgir();
 		};
-	}, [ponte, cena]);
+		document.addEventListener("visibilitychange", mudou);
+		return () => document.removeEventListener("visibilitychange", mudou);
+	}, [surgir]);
 
-	// Na janela do Electron a página é sempre transparente, nos dois modos (estilo.css, .rota-flutuante); sem ponte
-	// (navegador comum) a classe "flutuante-solto" devolve o fundo e o zoom de sempre.
-	useEffect(() => {
-		const raiz = document.documentElement;
-		raiz.classList.add("rota-flutuante");
-		raiz.classList.toggle("flutuante-solto", !ponte);
-		return () => raiz.classList.remove("rota-flutuante", "flutuante-chat", "flutuante-solto");
-	}, [ponte]);
-	useEffect(() => {
-		document.documentElement.classList.toggle("flutuante-chat", modo === "chat");
-	}, [modo]);
-
-	// O rascunho, a captura e a voz ficam aqui: recolher e expandir não podem perdê-los.
+	// O rascunho, a captura e a voz ficam aqui, na janela que não é destruída.
 	const rascunho = useState("");
 	const [texto, setTexto] = rascunho;
 	const [captura, setCaptura] = useState<CapturaDaTela | undefined>(undefined);
@@ -466,8 +471,6 @@ export function TelaFlutuante({ perfilId, cabecalho, ponte: ponteProp, ambienteV
 	const [avisoCaptura, setAvisoCaptura] = useState<string | undefined>(undefined);
 	const capturaRef = useRef(captura);
 	capturaRef.current = captura;
-	const textoRef = useRef(texto);
-	textoRef.current = texto;
 	const vivo = useRef(true);
 	useEffect(() => {
 		vivo.current = true;
@@ -504,17 +507,19 @@ export function TelaFlutuante({ perfilId, cabecalho, ponte: ponteProp, ambienteV
 	});
 	const vozRef = useRef(voz);
 	vozRef.current = voz;
-	const modoRef = useRef(modo);
-	modoRef.current = modo;
 
-	// O atalho Ctrl+Alt+Espaço (global): começa ou para a gravação; com a bolinha recolhida, o chat abre.
+	// O atalho Ctrl+Alt+Espaço (global): começa ou para a gravação (o Electron já abriu o balão).
 	useEffect(() => {
 		if (!ponte) return;
-		return ponte.aoAlternarVoz(() => {
-			if (modoRef.current === "bolinha" && vozRef.current.fase === "ocioso") void ponte.expandir();
-			vozRef.current.alternar();
-		});
+		return ponte.aoAlternarVoz(() => vozRef.current.alternar());
 	}, [ponte]);
+
+	// A bolinha pulsa e mostra o tempo enquanto grava: o Electron repassa este aviso a ela.
+	const gravando = voz.fase === "gravando";
+	const segundosGravados = gravando ? voz.segundos : 0;
+	useEffect(() => {
+		ponte?.avisarVoz(gravando, segundosGravados);
+	}, [ponte, gravando, segundosGravados]);
 
 	const capturar = () => {
 		if (!ponte || capturando) return;
@@ -563,10 +568,6 @@ export function TelaFlutuante({ perfilId, cabecalho, ponte: ponteProp, ambienteV
 		[janela, acoes],
 	);
 
-	const agentes = perfil?.agentes ?? [];
-	const agente = agentes.find((item) => item.nome === perfil?.agentePadrao) ?? agentes[0];
-	const atividade = atividadeDoAgente(estado);
-
 	const chat = (
 		<Chat
 			perfilId={perfilId}
@@ -587,37 +588,24 @@ export function TelaFlutuante({ perfilId, cabecalho, ponte: ponteProp, ambienteV
 			}}
 		/>
 	);
-	const nomeBolinha = agente?.nome ?? perfil?.nome ?? perfilId;
-	const bolinhaDe = (origem?: { x: number; y: number }) => (
-		<Bolinha
-			nome={nomeBolinha}
-			{...(agente?.avatar ? { avatar: agente.avatar } : {})}
-			estado={estadoDaBolinha(atividade, voz.fase)}
-			segundos={voz.segundos}
-			{...(ponte ? { ponte } : {})}
-			{...(origem ? { origem } : {})}
-			aoClicar={() => void (modo === "chat" ? ponte?.recolher() : ponte?.expandir())}
-		/>
-	);
 
-	if (modo === undefined) return <div className="flutuante-aguarda" aria-hidden="true" />;
-	if (modo === "bolinha") return bolinhaDe();
 	// Sem ponte (navegador comum): só o chat, na página inteira.
 	if (!ponte) return chat;
-	// Com a ponte, o balão só aparece quando a disposição chegou (a janela já tem o tamanho dela).
-	if (!disposicao) return <div className="flutuante-aguarda" aria-hidden="true" />;
-	const { balao, ponta, lado } = disposicao;
+	const lado = disposicao?.lado ?? "direita";
+	const ponta = disposicao?.ponta.y ?? PONTA_PADRAO;
 	return (
 		<div className="flutuante-cena">
-			{bolinhaDe(disposicao.bolinha)}
-			<div
-				className="flutuante-balao"
-				data-lado={lado}
-				style={{ left: balao.x, top: balao.y, width: balao.width, height: balao.height, transformOrigin: `${lado === "direita" ? "0" : "100%"} ${ponta.y}px` }}
-			>
+			<div ref={balaoRef} className="flutuante-balao" data-lado={lado} style={{ transformOrigin: `${lado === "direita" ? "0" : "100%"} ${ponta}px` }}>
 				<div className="flutuante-balao__corpo">{chat}</div>
-				<span className="flutuante-balao__ponta" style={{ top: ponta.y - 6 }} aria-hidden="true" />
+				<span className="flutuante-balao__ponta" style={{ top: ponta - 6 }} aria-hidden="true" />
 			</div>
 		</div>
 	);
+}
+
+/* ── A tela ────────────────────────────────────────────────────────────────────────────────── */
+
+export function TelaFlutuante({ perfilId, cabecalho, balao = false, ponte, ponteBalao, ambienteVoz }: PropsTelaFlutuante) {
+	if (balao) return <TelaBalao perfilId={perfilId} cabecalho={cabecalho} ponte={ponteBalao} ambienteVoz={ambienteVoz} />;
+	return <TelaBolinha perfilId={perfilId} ponte={ponte} />;
 }

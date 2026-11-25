@@ -4,21 +4,23 @@ Decisão de origem: ESPECIFICACAO.md, 13.21 ("O professor ao lado"). Fases 3, 4 
 
 Versão 2 (2026-11-24, pedido do Breno): o protótipo de tinta (R11, Fase 6a) sai por enquanto; entram o ícone nos ícones ocultos da barra de tarefas (R12) e o app subindo com o Windows só com esse ícone (R13), para ele ligar o professor flutuante sem abrir o app. Ele também pediu para conferir que a bolinha e o chat não atrapalham a escrita (o foco da caneta no Samsung Notes).
 
+Versão 2.1 (2026-11-25, pedido do Breno): o professor passa a ser DUAS janelas, a da bolinha e a do balão do chat. Antes, uma janela só crescia para conter a bolinha e o balão, e a bolinha piscava a cada troca de modo. Agora a bolinha nunca muda de tamanho nem de lugar, e o balão abre e fecha ao lado dela (R1, R3 e a seção 2.3).
+
 Regras de sempre: o núcleo não sabe o que é matéria, nota ou plano (o cabeçalho do chat compacto vem do perfil); docs/padroes-de-interface.md vale em toda tela; nada de áudio guardado; a chave do OpenRouter só do ambiente; nada de teste na pasta de dados do Breno.
 
 
 ## 1. Requisitos
 
 Fase 3, o professor flutuante:
-- R1 Bolinha: uma janela própria do Electron, sem moldura, transparente, sempre por cima (inclusive do Samsung Notes), fora da barra de tarefas, com a foto do professor (64 px). Arrastável; a posição fica lembrada (%LOCALAPPDATA%\estudos-app\flutuante.json) e sempre dentro de uma tela visível. Aparece sem roubar o foco (showInactive).
+- R1 Bolinha: uma janela própria do Electron de 76 x 76 (nunca muda de tamanho), sem moldura, transparente, sempre por cima (inclusive do Samsung Notes), fora da barra de tarefas, com a foto do professor (64 px). Nunca aceita foco (focusable: false) e aparece sem roubar o foco (showInactive). Arrastável; a posição fica lembrada (%LOCALAPPDATA%\estudos-app\flutuante.json) e sempre dentro de uma tela visível.
 - R2 A bolinha mostra o estado: parada, pensando, escrevendo e ouvindo (um anel que pulsa; com movimento reduzido, só a cor muda).
-- R3 Chat compacto: o clique na bolinha (sem arrastar) abre o chat compacto (420 × 620), sempre por cima. O chat é um balão de conversa AO LADO da bolinha (que não sai do lugar), com bordas arredondadas e uma pontinha voltada para ela; a bolinha o abre e o fecha (clicar de novo), e não há botão "Recolher". É a MESMA conversa que está aberta no app (a mesma sessão do servidor, sem trocar nada): o que se pergunta nele aparece na mesa e vice-versa. O topo vem do perfil (no de estudos: a matéria da conversa e o seletor de plano), e é por ele que se arrasta o balão (a bolinha vai junto).
-- R4 Atalho global Ctrl+Alt+P: abre e recolhe o chat compacto de qualquer lugar do Windows. Fechar a janela principal não fecha a bolinha (o app continua no ar com ela); a bolinha tem "Abrir o app" e "Esconder a bolinha". Sem janela nenhuma, o Electron sai. O "Sair do app" fecha as duas.
-- R5 "Olha minha página": um botão no chat compacto captura a tela onde a bolinha está, escondendo a bolinha e o chat durante a captura (lado maior até 2000 px, JPEG 85), e a imagem vai junto da próxima mensagem (aparece como um chip "Captura da tela" com X antes de mandar). O professor (GPT-6.1 Sol, que aceita imagem: conferido no catálogo do pi) lê a anotação. No núcleo, a mensagem aceita imagens (genérico).
+- R3 Chat compacto: o clique na bolinha (sem arrastar) abre o chat compacto (420 × 620), sempre por cima, e outro clique o fecha. O chat é um balão de conversa numa SEGUNDA janela, AO LADO da bolinha (que não sai do lugar e não pisca), com bordas arredondadas e uma pontinha voltada para ela; não há botão "Recolher". A janela do balão é criada uma vez (escondida) e depois só é mostrada e escondida, nunca destruída: a rolagem, o rascunho, a captura pendente e a gravação de voz continuam onde estavam. Ao abrir, o balão aceita foco (é preciso digitar; o campo só ganha foco quando o Breno toca nele); ao fechar, ele é escondido e o Windows devolve a ativação à janela de antes. É a MESMA conversa que está aberta no app (a mesma sessão do servidor, sem trocar nada): o que se pergunta nele aparece na mesa e vice-versa. O topo vem do perfil (no de estudos: a matéria da conversa e o seletor de plano), e é por ele que se arrasta o balão (a bolinha vai junto).
+- R4 Atalho global Ctrl+Alt+P: abre e fecha o balão do chat de qualquer lugar do Windows (liga a bolinha se estiver desligada). Fechar a janela principal não fecha a bolinha (o app continua no ar com ela); a bolinha tem "Abrir o app" e "Esconder a bolinha". Sem janela nenhuma, o Electron sai. O "Sair do app" fecha as duas.
+- R5 "Olha minha página": um botão no chat compacto captura a tela onde a bolinha está, escondendo a bolinha e o balão durante a captura (e mostrando de novo como estavam) (lado maior até 2000 px, JPEG 85), e a imagem vai junto da próxima mensagem (aparece como um chip "Captura da tela" com X antes de mandar). O professor (GPT-6.1 Sol, que aceita imagem: conferido no catálogo do pi) lê a anotação. No núcleo, a mensagem aceita imagens (genérico).
 - R6 A bolinha se liga e desliga (lembrado em flutuante.json): pelo menu da bolinha ("Esconder a bolinha") e por um botão na tela de perfis ("Mostrar o professor flutuante"), só na janela própria.
 
 Fase 4, a voz pelo atalho:
-- R7 Ctrl+Alt+Espaço (global) ou o botão de microfone do chat compacto começa a gravar; de novo, para. Gravando, a bolinha (ou o botão) pulsa e mostra o tempo; para sozinha em 60 s. Se o chat estava recolhido, ele abre.
+- R7 Ctrl+Alt+Espaço (global) ou o botão de microfone do chat compacto começa a gravar; de novo, para. Gravando, a bolinha (ou o botão) pulsa e mostra o tempo; para sozinha em 60 s. Se o balão estava fechado, o atalho o abre. A voz vive na página do balão, que avisa o Electron, e o Electron avisa a bolinha.
 - R8 O áudio (WAV 16 kHz mono, convertido no front) vai ao servidor, que transcreve pela API do OpenRouter (POST https://openrouter.ai/api/v1/audio/transcriptions, JSON com input_audio {data, format: "wav"}, language "pt"), com a OPENROUTER_API_KEY do ambiente. O modelo vem do profile.json (transcricao.modelo; padrão openai/whisper-large-v3). O áudio não é gravado em disco nem nos logs; o log diz só a duração e o custo.
 - R9 O texto aparece no campo do chat compacto e é enviado sozinho depois de 2 s, com "Cancelar" e com a edição parando a contagem. A resposta vem em texto.
 - R10 O Electron libera o microfone (permissão "media", só áudio) só para o front do app; as outras continuam negadas. Microfone negado ou sem dispositivo: aviso claro no chat ("Não consegui usar o microfone").
@@ -50,35 +52,44 @@ A bandeja do Windows (versão 2):
     4xx/5xx { erro: string }   // frase para a tela, em português
     O modelo: perfil.transcricao?.modelo (profile.json "transcricao": { "modelo": "openai/whisper-large-v3" }), validado no esquema do perfil.
 
-2.3 A ponte do Electron (WP-B implementa no preload; WP-C usa):
+2.3 A ponte do Electron (as duas janelas)
+
+    São duas janelas do Electron, ambas transparentes, sem moldura, sempre por cima no mesmo nível ("floating"), fora da barra de tarefas, com o mesmo preload e a mesma proteção de navegação e de permissões. O preload sabe qual é a janela pelo argumento --estudos-janela=flutuante (a bolinha) ou --estudos-janela=balao (o balão), e expõe a ponte só dela.
 
     window.estudosDesktop (já existe: plataforma, alturaBarra, sair) ganha:
-      flutuante?: {
-        // só na janela da bolinha
-        modo(): Promise<"bolinha" | "chat">;
-        disposicao(): Promise<Disposicao | null>;  // a atual; null no modo bolinha
-        expandir(): Promise<void>;            // abre o balão ao lado da bolinha
-        recolher(): Promise<void>;            // fecha o balão: volta a bolinha
-        moverPara(x: number, y: number): void; // posição da BOLINHA em pixels da tela (nos dois modos; no chat a janela anda junto)
+
+      flutuante?: {                // só na janela da bolinha
+        alternarBalao(): Promise<void>;           // abre o balão ao lado da bolinha, ou o fecha
+        moverPara(x: number, y: number): Promise<void>;   // posição da BOLINHA em pixels da tela; o balão aberto anda junto; resolve quando a janela já andou
+        abrirApp(): Promise<void>;
+        esconder(): Promise<void>;                // "Esconder o professor": esconde as duas janelas (grava ligado: false)
+        menu(): Promise<void>;                    // o menu nativo do clique direito (Abrir/Fechar o chat, Abrir o app, Esconder o professor)
+        aoOuvindo(cb: (ouvindo: boolean, segundos: number) => void): () => void;   // a voz do balão, repassada pelo Electron
+      };
+      balao?: {                    // só na janela do balão
+        disposicao(): Promise<Disposicao | null>;   // a última; null se o balão ainda não abriu
+        aoMudarDisposicao(cb: (d: Disposicao) => void): () => void;   // "estudos:flutuante:disposicao-mudou": ao abrir e quando a tela muda
+        fecharBalao(): Promise<void>;             // esconde o balão (hide), sem destruir
         capturarTela(): Promise<{ tipo: "image/jpeg"; dados: string; largura: number; altura: number } | null>;
         abrirApp(): Promise<void>;
-        esconder(): Promise<void>;            // "Esconder a bolinha" (grava ligado: false)
-        aoMudarModo(cb: (modo: "bolinha" | "chat", disposicao?: Disposicao) => void): () => void;
         aoAlternarVoz(cb: () => void): () => void;   // o atalho Ctrl+Alt+Espaço
+        avisarVoz(ouvindo: boolean, segundos: number): void;   // o Electron repassa à bolinha (aoOuvindo)
       };
       // em qualquer janela do app
       bolinha?: { ligada(): Promise<boolean>; ligar(ligada: boolean): Promise<void> };
 
-    Disposicao (pixels; calculada pelo Electron em estado-flutuante.mjs, disposicaoDoChat, e conferida na tela por lerDisposicao):
-      { janela: {x, y, width, height},      // o retângulo da janela na tela (contém a bolinha e o balão)
-        bolinha: {x, y},                    // o quadro de 76 × 76 da bolinha, dentro da janela
-        balao: {x, y, width, height},       // o balão (420 × 620), dentro da janela
-        lado: "esquerda" | "direita",       // de que lado da bolinha o balão fica
-        ponta: {y} }                        // o centro vertical da bolinha dentro do balão, a pelo menos 24 px das bordas dele
+    Disposicao (pixels; calculada pelo Electron em estado-flutuante.mjs, disposicaoDoBalao, que usa disposicaoDoChat; conferida na tela por lerDisposicao):
+      { balao: {x, y, width, height},      // a JANELA do balão na tela: 420 + 14 de largura (o vão da pontinha) por 620
+        lado: "esquerda" | "direita",      // de que lado da bolinha o balão fica
+        ponta: {y} }                       // o centro vertical da bolinha dentro do balão, a pelo menos 24 px das bordas dele
 
-    O balão vai para a esquerda da bolinha se o centro dela está na metade direita da área útil da tela, senão para a direita; se o centro está na metade de baixo, o fundo do balão alinha com o da bolinha (cresce para cima), senão o topo alinha com o topo. Entre os dois há um vão de 14 px, onde fica a pontinha. Se não couber na vertical, o balão desliza para dentro da área (a bolinha não se mexe); se não couber do lado escolhido, usa o outro. Expandir faz setBounds(disposicao.janela) na MESMA janela; recolher volta ao quadro da bolinha. No modo chat, arrastar o balão pelo topo (arrasto nativo) leva a janela e a bolinha juntas, com a disposição guardada, e a posição da bolinha (janela + disposicao.bolinha) é a que fica gravada. O Electron recorta a janela (BrowserWindow.setShape) na bolinha, no balão e na pontinha, para o vazio em volta deixar o clique passar ao app de trás; sem setShape, segue sem recorte.
+    O balão vai para a esquerda da bolinha se o centro dela está na metade direita da área útil da tela, senão para a direita; se o centro está na metade de baixo, o fundo do balão alinha com o da bolinha (cresce para cima), senão o topo alinha com o topo. Entre os dois há um vão de 14 px, que faz parte da janela do balão (do lado da bolinha) e onde a página desenha a pontinha. Se não couber na vertical, o balão desliza para dentro da área (a bolinha não se mexe); se não couber do lado escolhido, usa o outro.
 
-    A janela da bolinha carrega URL_APP + "/#/flutuante/estudos" (o perfil vem da rota), com o mesmo preload (o argumento --estudos-janela=flutuante diz ao preload que é ela). Fundo transparente: a página da rota flutuante nunca pinta o fundo (html, body e raiz), nos dois modos, com zoom 1; só o conteúdo do balão usa o zoom do app (0,9).
+    Abrir: o Electron calcula a disposição, guarda o deslocamento (balão = bolinha + deslocamento), faz setBounds na janela do balão, manda a disposição à página ("estudos:flutuante:disposicao-mudou"), e chama show() e focus(). Fechar: hide(). A janela da bolinha só muda de posição (moverPara), nunca de tamanho; não há setShape nem esconder a janela durante a troca. Arrastar a bolinha com o balão aberto leva o balão junto (o Electron o reposiciona pelo deslocamento). Arrastar o balão pelo topo (região de arrasto nativo): no evento "move" da janela do balão (contínuo no Windows) a bolinha vai junto, mantendo o deslocamento, e a posição da bolinha é gravada no fim ("moved"), corrigida para uma tela visível. "Esconder o professor" (bandeja, menu, bolinha.ligar(false)) esconde as duas janelas; ligar mostra só a bolinha.
+
+    Atalhos: Ctrl+Alt+P alterna o balão (liga a bolinha se estiver desligada); Ctrl+Alt+Espaço abre o balão se estiver fechado e manda "alternar-voz" à página dele. A captura da tela esconde as duas janelas e as mostra de novo como estavam (o balão com showInactive se não tinha foco; com focus se tinha).
+
+    A janela da bolinha carrega URL_APP + "/#/flutuante/estudos" e a do balão URL_APP + "/#/flutuante/estudos/balao" (o perfil vem da rota). Fundo transparente: as páginas das rotas flutuantes nunca pintam o fundo (html, body e raiz), com zoom 1; só o conteúdo do balão usa o zoom do app (0,9) e desenha o próprio fundo, com a pontinha no lado da bolinha.
 
 2.4 A tela flutuante (WP-C):
 

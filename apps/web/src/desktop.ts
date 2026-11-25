@@ -10,8 +10,6 @@ export interface CapturaDaTela {
 	altura: number;
 }
 
-export type ModoFlutuante = "bolinha" | "chat";
-
 /** Um retângulo em pixels, relativo à janela. */
 export interface RetanguloJanela {
 	x: number;
@@ -21,12 +19,11 @@ export interface RetanguloJanela {
 }
 
 /**
- * Como o chat fica ao lado da bolinha (docs/professor-flutuante.md, 2.3). Tudo relativo à janela, exceto
- * `janela`, que está na tela. `ponta.y` é o centro da bolinha dentro do balão (relativo ao topo dele).
+ * Como o balão fica ao lado da bolinha (docs/professor-flutuante.md, 2.3). `balao` é a janela do balão na tela (com o vão
+ * de 14 px do lado da bolinha, onde a pontinha é desenhada); `ponta.y` é o centro da bolinha dentro do balão (relativo ao
+ * topo dele).
  */
 export interface Disposicao {
-	janela: RetanguloJanela;
-	bolinha: { x: number; y: number };
 	balao: RetanguloJanela;
 	lado: "esquerda" | "direita";
 	ponta: { y: number };
@@ -42,9 +39,8 @@ const ehRetangulo = (valor: unknown): valor is RetanguloJanela => {
 /** Confere o que a ponte mandou: uma disposição inteira, ou undefined. */
 export function lerDisposicao(bruto: unknown): Disposicao | undefined {
 	if (!bruto || typeof bruto !== "object") return undefined;
-	const { janela, bolinha, balao, lado, ponta } = bruto as Record<string, unknown>;
-	if (!ehRetangulo(janela) || !ehRetangulo(balao)) return undefined;
-	if (!bolinha || typeof bolinha !== "object" || !ehNumero((bolinha as { x?: unknown }).x) || !ehNumero((bolinha as { y?: unknown }).y)) return undefined;
+	const { balao, lado, ponta } = bruto as Record<string, unknown>;
+	if (!ehRetangulo(balao)) return undefined;
 	if (lado !== "esquerda" && lado !== "direita") return undefined;
 	if (!ponta || typeof ponta !== "object" || !ehNumero((ponta as { y?: unknown }).y)) return undefined;
 	return bruto as Disposicao;
@@ -52,24 +48,32 @@ export function lerDisposicao(bruto: unknown): Disposicao | undefined {
 
 /** A ponte da janela da bolinha (docs/professor-flutuante.md, 2.3). Só existe nela. */
 export interface PonteFlutuante {
-	modo(): Promise<ModoFlutuante>;
-	/** A disposição atual do balão ao lado da bolinha, ou null no modo bolinha. */
-	disposicao(): Promise<Disposicao | null>;
-	/** Avisa o Electron que a página já desenhou a cena do modo novo (ele mostra a janela de novo). Opcional. */
-	pintado?(): void;
-	expandir(): Promise<void>;
-	recolher(): Promise<void>;
-	/** Leva a BOLINHA até (x, y) da tela (no modo chat a janela anda junto); resolve quando a janela já andou. */
+	/** Abre o balão ao lado da bolinha, ou o fecha se está aberto. */
+	alternarBalao(): Promise<void>;
+	/** Leva a BOLINHA até (x, y) da tela (o balão aberto anda junto); resolve quando a janela já andou. */
 	moverPara(x: number, y: number): Promise<void> | void;
-	capturarTela(): Promise<CapturaDaTela | null>;
 	abrirApp(): Promise<void>;
-	/** "Esconder a bolinha" (grava ligado: false). */
+	/** "Esconder o professor": esconde a bolinha e o balão (grava ligado: false). */
 	esconder(): Promise<void>;
 	/** O menu nativo do clique direito (opcional: sem ele, a tela desenha o próprio menu). */
 	menu?(): Promise<void>;
-	aoMudarModo(cb: (modo: ModoFlutuante, disposicao?: Disposicao) => void): () => void;
+	/** A voz do balão: ouvindo ou não e os segundos gravados. */
+	aoOuvindo(cb: (ouvindo: boolean, segundos: number) => void): () => void;
+}
+
+/** A ponte da janela do balão do chat. Só existe nela. */
+export interface PonteBalao {
+	/** A disposição atual do balão (o lado da bolinha e a ponta), ou null se ele ainda não abriu. */
+	disposicao(): Promise<Disposicao | null>;
+	/** O Electron mandou uma disposição nova (o balão abriu ou a tela mudou). */
+	aoMudarDisposicao(cb: (disposicao: Disposicao) => void): () => void;
+	fecharBalao(): Promise<void>;
+	capturarTela(): Promise<CapturaDaTela | null>;
+	abrirApp(): Promise<void>;
 	/** O atalho Ctrl+Alt+Espaço. */
 	aoAlternarVoz(cb: () => void): () => void;
+	/** Diz à bolinha (pelo Electron) que a gravação começou, parou ou avançou. */
+	avisarVoz(ouvindo: boolean, segundos: number): void;
 }
 
 /** Liga e desliga a bolinha; existe em qualquer janela do app. */
@@ -86,6 +90,8 @@ export interface AmbienteDesktop {
 	sair(): Promise<void>;
 	/** Só na janela da bolinha. */
 	flutuante?: PonteFlutuante;
+	/** Só na janela do balão. */
+	balao?: PonteBalao;
 	/** Em qualquer janela do app. */
 	bolinha?: PonteBolinha;
 }
@@ -104,22 +110,35 @@ export function lerAmbienteDesktop(janela: { estudosDesktop?: unknown }): Ambien
 	if (typeof plataforma !== "string" || typeof alturaBarra !== "number" || !Number.isFinite(alturaBarra) || alturaBarra <= 0) return undefined;
 	if (typeof sair !== "function") return undefined;
 	const flutuante = lerPonteFlutuante(janela);
+	const balao = lerPonteBalao(janela);
 	const bolinha = lerPonteBolinha(janela);
-	return { plataforma, alturaBarra, sair: () => sair() as Promise<void>, ...(flutuante ? { flutuante } : {}), ...(bolinha ? { bolinha } : {}) };
+	return { plataforma, alturaBarra, sair: () => sair() as Promise<void>, ...(flutuante ? { flutuante } : {}), ...(balao ? { balao } : {}), ...(bolinha ? { bolinha } : {}) };
 }
 
 const temFuncoes = (objeto: object, nomes: string[]) => nomes.every((nome) => typeof (objeto as Record<string, unknown>)[nome] === "function");
 
-/** A ponte da janela da bolinha, se o preload expôs uma inteira (cada função conferida). Não depende do resto do ambiente. */
-export function lerPonteFlutuante(janela: { estudosDesktop?: unknown }): PonteFlutuante | undefined {
+/** O que a ponte da bolinha precisa ter (menu é opcional); o preload-ponte.test.ts confere o preload contra esta lista. */
+const nomesFlutuante = ["alternarBalao", "moverPara", "abrirApp", "esconder", "aoOuvindo"];
+/** O que a ponte do balão precisa ter; o preload-ponte.test.ts confere o preload contra esta lista. */
+const nomesBalao = ["disposicao", "aoMudarDisposicao", "fecharBalao", "capturarTela", "abrirApp", "aoAlternarVoz", "avisarVoz"];
+
+function lerPonte(janela: { estudosDesktop?: unknown }, chave: "flutuante" | "balao", nomes: string[]): object | undefined {
 	const bruto = janela.estudosDesktop;
 	if (!bruto || typeof bruto !== "object") return undefined;
-	const ponte = (bruto as { flutuante?: unknown }).flutuante;
+	const ponte = (bruto as Record<string, unknown>)[chave];
 	if (!ponte || typeof ponte !== "object") return undefined;
-	const nomes = ["modo", "disposicao", "expandir", "recolher", "moverPara", "capturarTela", "abrirApp", "esconder", "aoMudarModo", "aoAlternarVoz"];
-	if (!temFuncoes(ponte, nomes)) return undefined;
+	return temFuncoes(ponte, nomes) ? ponte : undefined;
+}
+
+/** A ponte da janela da bolinha, se o preload expôs uma inteira (cada função conferida). Não depende do resto do ambiente. */
+export function lerPonteFlutuante(janela: { estudosDesktop?: unknown }): PonteFlutuante | undefined {
+	return lerPonte(janela, "flutuante", nomesFlutuante) as PonteFlutuante | undefined;
+}
+
+/** A ponte da janela do balão, se o preload expôs uma inteira. */
+export function lerPonteBalao(janela: { estudosDesktop?: unknown }): PonteBalao | undefined {
 	// A disposição que a ponte entrega é conferida pela tela com lerDisposicao (a ponte fica a mesma, sem embrulho).
-	return ponte as PonteFlutuante;
+	return lerPonte(janela, "balao", nomesBalao) as PonteBalao | undefined;
 }
 
 /** A ponte que liga e desliga a bolinha, se o preload expôs uma inteira. */
@@ -132,8 +151,8 @@ export function lerPonteBolinha(janela: { estudosDesktop?: unknown }): PonteBoli
 }
 
 /**
- * A janela da bolinha é sempre transparente (a página não pinta o fundo, nos dois
- * modos; estilo.css). Chamado antes do primeiro desenho, para a janela não
+ * As janelas da bolinha e do balão são sempre transparentes (a página não pinta o
+ * fundo; estilo.css). Chamado antes do primeiro desenho, para a janela não
  * nascer com um quadrado de fundo.
  */
 export function marcarRotaFlutuante(janela: Window = window): void {

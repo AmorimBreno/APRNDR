@@ -1,7 +1,7 @@
 // Leitura do ambiente da janela própria (sem DOM: só o objeto que o preload expõe).
 
 import { describe, expect, it } from "vitest";
-import { lerAmbienteDesktop, lerDisposicao, lerPonteBolinha, lerPonteFlutuante, marcarRotaFlutuante } from "./desktop.ts";
+import { lerAmbienteDesktop, lerDisposicao, lerPonteBalao, lerPonteBolinha, lerPonteFlutuante, marcarRotaFlutuante } from "./desktop.ts";
 
 describe("lerAmbienteDesktop", () => {
 	it("no navegador comum não há ambiente", () => {
@@ -34,18 +34,22 @@ describe("lerAmbienteDesktop", () => {
 });
 
 const funcoes = (nomes: string[]) => Object.fromEntries(nomes.map((nome) => [nome, () => {}]));
-const NOMES_FLUTUANTE = ["modo", "disposicao", "expandir", "recolher", "moverPara", "capturarTela", "abrirApp", "esconder", "aoMudarModo", "aoAlternarVoz"];
+const NOMES_FLUTUANTE = ["alternarBalao", "moverPara", "abrirApp", "esconder", "aoOuvindo"];
+const NOMES_BALAO = ["disposicao", "aoMudarDisposicao", "fecharBalao", "capturarTela", "abrirApp", "aoAlternarVoz", "avisarVoz"];
 
 describe("a ponte do professor flutuante", () => {
 	const base = { plataforma: "win32", alturaBarra: 32, sair() {} };
 
 	it("o ambiente leva a ponte da bolinha e a que liga e desliga, quando o preload as expõe inteiras", () => {
 		const flutuante = funcoes(NOMES_FLUTUANTE);
+		const balao = funcoes(NOMES_BALAO);
 		const bolinha = funcoes(["ligada", "ligar"]);
-		const ambiente = lerAmbienteDesktop({ estudosDesktop: { ...base, flutuante, bolinha } });
+		const ambiente = lerAmbienteDesktop({ estudosDesktop: { ...base, flutuante, balao, bolinha } });
 		expect(ambiente?.flutuante).toBe(flutuante);
+		expect(ambiente?.balao).toBe(balao);
 		expect(ambiente?.bolinha).toBe(bolinha);
 		expect(lerAmbienteDesktop({ estudosDesktop: base })).not.toHaveProperty("flutuante");
+		expect(lerAmbienteDesktop({ estudosDesktop: base })).not.toHaveProperty("balao");
 		expect(lerAmbienteDesktop({ estudosDesktop: base })).not.toHaveProperty("bolinha");
 	});
 
@@ -53,7 +57,12 @@ describe("a ponte do professor flutuante", () => {
 		const incompleta = funcoes(NOMES_FLUTUANTE.slice(1));
 		expect(lerPonteFlutuante({ estudosDesktop: { ...base, flutuante: incompleta } })).toBeUndefined();
 		expect(lerPonteFlutuante({ estudosDesktop: { ...base, flutuante: "sim" } })).toBeUndefined();
-		expect(lerPonteFlutuante({ estudosDesktop: { ...base, flutuante: { ...funcoes(NOMES_FLUTUANTE), modo: 1 } } })).toBeUndefined();
+		expect(lerPonteFlutuante({ estudosDesktop: { ...base, flutuante: { ...funcoes(NOMES_FLUTUANTE), alternarBalao: 1 } } })).toBeUndefined();
+		expect(lerPonteBalao({ estudosDesktop: { ...base, balao: funcoes(NOMES_BALAO.slice(1)) } })).toBeUndefined();
+		expect(lerPonteBalao({ estudosDesktop: { ...base, balao: "sim" } })).toBeUndefined();
+		// A ponte de uma janela não vale para a outra.
+		expect(lerPonteFlutuante({ estudosDesktop: { ...base, flutuante: funcoes(NOMES_BALAO) } })).toBeUndefined();
+		expect(lerPonteBalao({ estudosDesktop: { ...base, balao: funcoes(NOMES_FLUTUANTE) } })).toBeUndefined();
 		expect(lerPonteBolinha({ estudosDesktop: { ...base, bolinha: funcoes(["ligada"]) } })).toBeUndefined();
 		expect(lerPonteBolinha({ estudosDesktop: { ...base, bolinha: null } })).toBeUndefined();
 		expect(lerPonteBolinha({})).toBeUndefined();
@@ -63,20 +72,25 @@ describe("a ponte do professor flutuante", () => {
 		const flutuante = funcoes(NOMES_FLUTUANTE);
 		expect(lerPonteFlutuante({ estudosDesktop: { flutuante } })).toBe(flutuante);
 		expect(lerPonteFlutuante({})).toBeUndefined();
+		const balao = funcoes(NOMES_BALAO);
+		expect(lerPonteBalao({ estudosDesktop: { balao } })).toBe(balao);
+		expect(lerPonteBalao({})).toBeUndefined();
 	});
 
-	it("marca só a rota da bolinha como transparente", () => {
+	it("marca as rotas da bolinha e do balão como transparentes", () => {
 		const janela = (hash: string) => ({ location: { hash }, document: { documentElement: { classList: { add: (nome: string) => (marcadas.push(nome), undefined) } } } }) as unknown as Window;
 		const marcadas: string[] = [];
 		marcarRotaFlutuante(janela("#/perfil/estudos"));
 		expect(marcadas).toEqual([]);
 		marcarRotaFlutuante(janela("#/flutuante/estudos"));
 		expect(marcadas).toEqual(["rota-flutuante"]);
+		marcarRotaFlutuante(janela("#/flutuante/estudos/balao"));
+		expect(marcadas).toEqual(["rota-flutuante", "rota-flutuante"]);
 	});
 });
 
 describe("lerDisposicao", () => {
-	const boa = { janela: { x: 1, y: 2, width: 510, height: 620 }, bolinha: { x: 0, y: 0 }, balao: { x: 90, y: 0, width: 420, height: 620 }, lado: "direita", ponta: { y: 38 } };
+	const boa = { balao: { x: 90, y: 0, width: 434, height: 620 }, lado: "direita", ponta: { y: 38 } };
 
 	it("aceita uma disposição inteira", () => {
 		expect(lerDisposicao(boa)).toEqual(boa);
@@ -88,6 +102,6 @@ describe("lerDisposicao", () => {
 		expect(lerDisposicao({ ...boa, lado: "cima" })).toBeUndefined();
 		expect(lerDisposicao({ ...boa, ponta: {} })).toBeUndefined();
 		expect(lerDisposicao({ ...boa, balao: { x: 0, y: 0, width: "420", height: 620 } })).toBeUndefined();
-		expect(lerDisposicao({ ...boa, bolinha: { x: Number.NaN, y: 0 } })).toBeUndefined();
+		expect(lerDisposicao({ ...boa, balao: { x: Number.NaN, y: 0, width: 434, height: 620 } })).toBeUndefined();
 	});
 });

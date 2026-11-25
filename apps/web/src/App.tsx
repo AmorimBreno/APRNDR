@@ -27,11 +27,13 @@ interface Rota {
 	caminho?: string;
 	/** "#/flutuante/<perfil>": a janela da bolinha do professor (docs/professor-flutuante.md). */
 	flutuante?: boolean;
+	/** "#/flutuante/<perfil>/balao": a janela do balão do chat. */
+	balao?: boolean;
 }
 
 export function rotaDoHash(hash: string): Rota {
-	const flutuante = /^#\/flutuante\/([^/]+)\/?$/.exec(hash);
-	if (flutuante) return { perfil: decodeURIComponent(flutuante[1]!), conversa: false, flutuante: true };
+	const flutuante = /^#\/flutuante\/([^/]+?)(\/balao)?\/?$/.exec(hash);
+	if (flutuante) return { perfil: decodeURIComponent(flutuante[1]!), conversa: false, flutuante: true, ...(flutuante[2] ? { balao: true } : {}) };
 	const achado = /^#\/perfil\/([^/]+)(?:\/(.+?))?\/?$/.exec(hash);
 	if (!achado) return { conversa: false };
 	const perfil = decodeURIComponent(achado[1]!);
@@ -168,13 +170,13 @@ function Rotas() {
 		return () => window.removeEventListener("hashchange", mudou);
 	}, []);
 
-	const { perfil, conversa, caminho = "", flutuante } = rotaDoHash(hash);
+	const { perfil, conversa, caminho = "", flutuante, balao } = rotaDoHash(hash);
 	if (!perfil) return <TelaPerfis />;
 	if (flutuante) {
 		const cabecalho = Object.hasOwn(telasIniciais, perfil) ? telasIniciais[perfil]?.cabecalhoFlutuante : undefined;
 		return (
 			<ProvedorImagens perfilId={perfil}>
-				<TelaFlutuante key={perfil} perfilId={perfil} {...(cabecalho ? { cabecalho } : {})} />
+				<TelaFlutuante key={perfil} perfilId={perfil} {...(balao ? { balao } : {})} {...(cabecalho ? { cabecalho } : {})} />
 			</ProvedorImagens>
 		);
 	}

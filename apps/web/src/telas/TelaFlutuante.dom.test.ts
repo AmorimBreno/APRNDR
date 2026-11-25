@@ -1,14 +1,15 @@
 // @vitest-environment happy-dom
-// A tela do professor flutuante (TelaFlutuante.tsx) no DOM, com a ponte do Electron falsa e a janela do perfil
-// falsa (o useJanelaPerfil e o usePerfis são trocados; o resto do @estudos/ui é o de verdade): a bolinha e o chat,
-// arrastar contra clicar, a bolinha que nunca pede foco, a captura indo junto do enviar, a voz com a contagem de
-// 2 s (Cancelar e a edição param) e os erros do microfone e do servidor. Nada aqui toca a rede nem a pasta de dados.
+// A tela do professor flutuante (TelaFlutuante.tsx) no DOM, com as pontes do Electron falsas e a janela do perfil
+// falsa (o useJanelaPerfil e o usePerfis são trocados; o resto do @estudos/ui é o de verdade). São duas páginas:
+// a da bolinha (arrastar contra clicar, nunca pede foco, o anel pelo estado e pelo aviso de "ouvindo") e a do balão
+// (o chat com a pontinha no lado da disposição, a captura indo junto do enviar, a voz com a contagem de 2 s e avisando
+// o Electron, os erros do microfone e do servidor). Nada aqui toca a rede nem a pasta de dados.
 
 import type { JanelaPerfilHook } from "@estudos/ui";
 import { createElement, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Disposicao, PonteFlutuante } from "../desktop.ts";
+import type { Disposicao, PonteBalao, PonteFlutuante } from "../desktop.ts";
 import type { AmbienteVoz } from "../useVoz.ts";
 
 interface Controle {
@@ -61,61 +62,71 @@ async function ate(condicao: () => boolean, prazo = 3000): Promise<void> {
 let container: HTMLDivElement;
 let root: Root;
 
-interface Ponte extends PonteFlutuante {
-	mudarModo(modo: "bolinha" | "chat", disposicao?: Disposicao): void;
-	alternarVoz(): void;
+/** A ponte da bolinha, mais o que o teste usa para fingir o Electron. */
+interface PonteDaBolinha extends PonteFlutuante {
+	alternarBalao: ReturnType<typeof vi.fn<() => Promise<void>>>;
+	moverPara: ReturnType<typeof vi.fn<(x: number, y: number) => void>>;
+	ouvir(ouvindo: boolean, segundos: number): void;
 }
-let modoInicial: "bolinha" | "chat";
+/** A ponte do balão, mais o que o teste usa para fingir o Electron. */
+interface PonteDoBalao extends PonteBalao {
+	mudarDisposicao(disposicao: Disposicao): void;
+	alternarVoz(): void;
+	avisarVoz: ReturnType<typeof vi.fn<(ouvindo: boolean, segundos: number) => void>>;
+}
 
-/** O balão à direita da bolinha, que está no canto de cima à esquerda da janela. */
-const DISPOSICAO_DIREITA: Disposicao = {
-	janela: { x: 1000, y: 500, width: 510, height: 620 },
-	bolinha: { x: 0, y: 0 },
-	balao: { x: 90, y: 0, width: 420, height: 620 },
-	lado: "direita",
-	ponta: { y: 38 },
-};
-/** O balão à esquerda; a bolinha embaixo, à direita da janela. */
-const DISPOSICAO_ESQUERDA: Disposicao = {
-	janela: { x: 1000, y: 500, width: 510, height: 620 },
-	bolinha: { x: 434, y: 544 },
-	balao: { x: 0, y: 0, width: 420, height: 620 },
-	lado: "esquerda",
-	ponta: { y: 582 },
-};
-let disposicaoAtual: Disposicao = DISPOSICAO_DIREITA;
+/** O balão à direita da bolinha: a janela dele tem 434 px (14 de vão e 420 de balão). */
+const DISPOSICAO_DIREITA: Disposicao = { balao: { x: 1090, y: 500, width: 434, height: 620 }, lado: "direita", ponta: { y: 38 } };
+/** O balão à esquerda; a bolinha embaixo. */
+const DISPOSICAO_ESQUERDA: Disposicao = { balao: { x: 1000, y: 500, width: 434, height: 620 }, lado: "esquerda", ponta: { y: 582 } };
+let disposicaoInicial: Disposicao | null = DISPOSICAO_DIREITA;
 let captura: { tipo: "image/jpeg"; dados: string; largura: number; altura: number } | null;
 
-function criarPonte(): Ponte {
-	let aoModo: ((modo: "bolinha" | "chat", disposicao?: Disposicao) => void) | undefined;
-	let aoVoz: (() => void) | undefined;
+function criarPonteDaBolinha(): PonteDaBolinha {
+	let aoOuvir: ((ouvindo: boolean, segundos: number) => void) | undefined;
 	return {
-		modo: vi.fn(async () => modoInicial),
-		disposicao: vi.fn(async () => (modoInicial === "chat" ? disposicaoAtual : null)),
-		expandir: vi.fn(async () => {}),
-		recolher: vi.fn(async () => {}),
+		alternarBalao: vi.fn(async () => {}),
 		moverPara: vi.fn(),
-		capturarTela: vi.fn(async () => captura),
 		abrirApp: vi.fn(async () => {}),
 		esconder: vi.fn(async () => {}),
-		aoMudarModo: vi.fn((cb) => {
-			aoModo = cb;
+		aoOuvindo: vi.fn((cb) => {
+			aoOuvir = cb;
 			return () => {
-				aoModo = undefined;
+				aoOuvir = undefined;
 			};
 		}),
+		ouvir: (ouvindo, segundos) => aoOuvir?.(ouvindo, segundos),
+	};
+}
+
+function criarPonteDoBalao(): PonteDoBalao {
+	let aoDisposicao: ((disposicao: Disposicao) => void) | undefined;
+	let aoVoz: (() => void) | undefined;
+	return {
+		disposicao: vi.fn(async () => disposicaoInicial),
+		aoMudarDisposicao: vi.fn((cb) => {
+			aoDisposicao = cb;
+			return () => {
+				aoDisposicao = undefined;
+			};
+		}),
+		fecharBalao: vi.fn(async () => {}),
+		capturarTela: vi.fn(async () => captura),
+		abrirApp: vi.fn(async () => {}),
 		aoAlternarVoz: vi.fn((cb) => {
 			aoVoz = cb;
 			return () => {
 				aoVoz = undefined;
 			};
 		}),
-		mudarModo: (modo, disposicao) => aoModo?.(modo, modo === "chat" ? (disposicao ?? disposicaoAtual) : undefined),
+		avisarVoz: vi.fn(),
+		mudarDisposicao: (disposicao) => aoDisposicao?.(disposicao),
 		alternarVoz: () => aoVoz?.(),
 	};
 }
 
-let ponte: Ponte;
+let ponteBolinha: PonteDaBolinha;
+let ponte: PonteDoBalao;
 
 interface Voz {
 	ambiente: AmbienteVoz;
@@ -147,10 +158,15 @@ function criarVoz(): Voz {
 
 const Cabecalho = ({ janela }: { janela: JanelaPerfilHook }) => createElement("span", { className: "cab-teste" }, `cabecalho:${janela.estado.perfil}`);
 
+/** A página do balão (rota "#/flutuante/<perfil>/balao"). */
 function desenhar(extra: { cabecalho?: typeof Cabecalho } = {}): void {
-	root.render(createElement(TelaFlutuante, { perfilId: "estudos", ponte, ambienteVoz: voz.ambiente, ...extra }) as ReactNode as never);
+	root.render(createElement(TelaFlutuante, { perfilId: "estudos", balao: true, ponteBalao: ponte, ambienteVoz: voz.ambiente, ...extra }) as ReactNode as never);
 }
-const redesenhar = () => desenhar();
+/** A página da bolinha (rota "#/flutuante/<perfil>"). */
+function desenharBolinha(): void {
+	root.render(createElement(TelaFlutuante, { perfilId: "estudos", ponte: ponteBolinha }) as ReactNode as never);
+}
+const redesenharBolinha = desenharBolinha;
 
 const bolinha = () => container.querySelector<HTMLElement>(".bolinha");
 const corpo = () => container.querySelector<HTMLElement>(".bolinha__corpo")!;
@@ -172,10 +188,10 @@ beforeEach(() => {
 	controle.executando = false;
 	controle.sessao = true;
 	controle.enviar = vi.fn<(...args: unknown[]) => Promise<unknown>>(async () => "iniciada");
-	modoInicial = "chat";
-	disposicaoAtual = DISPOSICAO_DIREITA;
+	disposicaoInicial = DISPOSICAO_DIREITA;
 	captura = { tipo: "image/jpeg", dados: "AAAA", largura: 800, altura: 600 };
-	ponte = criarPonte();
+	ponteBolinha = criarPonteDaBolinha();
+	ponte = criarPonteDoBalao();
 	voz = criarVoz();
 	vi.stubGlobal("matchMedia", (query: string) => ({ matches: query.includes("prefers-reduced-motion"), media: query, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, onchange: null, dispatchEvent: () => false }));
 	container = document.createElement("div");
@@ -192,41 +208,47 @@ afterEach(async () => {
 	vi.unstubAllGlobals();
 });
 
-describe("a bolinha", () => {
-	beforeEach(() => {
-		modoInicial = "bolinha";
-	});
-
-	it("mostra a foto do agente padrão (aqui a inicial, sem avatar) e nenhum campo de texto", async () => {
-		desenhar();
+describe("a página da bolinha", () => {
+	it("mostra só a foto do agente padrão (aqui a inicial, sem avatar), sem campo de texto nem balão, e a página fica transparente", async () => {
+		desenharBolinha();
 		await ate(() => bolinha() !== null);
 		expect(bolinha()!.dataset.estado).toBe("parado");
 		expect(container.querySelector(".bolinha__foto")?.textContent).toBe("P");
 		expect(campo()).toBeNull();
-		// A página fica transparente: a rota marca o html.
-		expect(document.documentElement.classList.contains("rota-flutuante")).toBe(true);
+		expect(container.querySelector(".flutuante-balao")).toBeNull();
+		await ate(() => document.documentElement.classList.contains("rota-flutuante"));
+		expect(document.documentElement.classList.contains("flutuante-solto")).toBe(false);
 		expect(document.documentElement.classList.contains("flutuante-chat")).toBe(false);
 	});
 
-	it("o anel acompanha o estado: pensando com o professor respondendo, ouvindo ao gravar", async () => {
+	it("o anel acompanha o estado: pensando com o professor respondendo", async () => {
 		controle.executando = true;
-		desenhar();
+		desenharBolinha();
 		await ate(() => bolinha() !== null);
 		expect(bolinha()!.dataset.estado).not.toBe("parado");
 		controle.executando = false;
-		redesenhar();
+		redesenharBolinha();
 		await ate(() => bolinha()!.dataset.estado === "parado");
-		ponte.alternarVoz();
+	});
+
+	it("ouvindo e os segundos vêm do Electron (a voz vive no balão), e o tempo ocupa sempre o mesmo lugar", async () => {
+		desenharBolinha();
+		await ate(() => bolinha() !== null);
+		const tempo = container.querySelector<HTMLElement>(".bolinha__tempo")!;
+		expect(tempo.style.visibility).toBe("hidden");
+		ponteBolinha.ouvir(true, 7);
 		await ate(() => bolinha()!.dataset.estado === "ouvindo");
-		// A bolinha pede o chat para a voz ter onde mostrar o texto, e o tempo aparece nela.
-		expect(ponte.expandir).toHaveBeenCalled();
-		expect(container.querySelector<HTMLElement>(".bolinha__tempo")!.style.visibility).toBe("visible");
-		expect(container.querySelector(".bolinha__tempo")?.textContent).toBe("0:00");
+		expect(container.querySelector<HTMLElement>(".bolinha__tempo")).toBe(tempo);
+		expect(tempo.style.visibility).toBe("visible");
+		expect(tempo.textContent).toBe("0:07");
+		ponteBolinha.ouvir(false, 0);
+		await ate(() => bolinha()!.dataset.estado === "parado");
+		expect(tempo.style.visibility).toBe("hidden");
 	});
 
 	it("nunca pede foco", async () => {
 		const foco = vi.spyOn(HTMLElement.prototype, "focus");
-		desenhar();
+		desenharBolinha();
 		await ate(() => bolinha() !== null);
 		ponteiro("pointerdown", 1100, 600);
 		ponteiro("pointerup", 1100, 600);
@@ -235,64 +257,66 @@ describe("a bolinha", () => {
 		expect(document.activeElement === document.body || document.activeElement === null).toBe(true);
 	});
 
-	it("soltar sem ter arrastado expande; um movimento de até 3 px ainda é um clique", async () => {
-		desenhar();
+	it("soltar sem ter arrastado alterna o balão; um movimento de até 3 px ainda é um clique", async () => {
+		desenharBolinha();
 		await ate(() => bolinha() !== null);
 		ponteiro("pointerdown", 1100, 600);
 		ponteiro("pointermove", 1102, 601);
 		ponteiro("pointerup", 1102, 601);
-		expect(ponte.expandir).toHaveBeenCalledTimes(1);
-		expect(ponte.moverPara).not.toHaveBeenCalled();
+		expect(ponteBolinha.alternarBalao).toHaveBeenCalledTimes(1);
+		expect(ponteBolinha.moverPara).not.toHaveBeenCalled();
+		// De novo: a página não guarda o estado do balão, quem decide abrir ou fechar é o Electron.
+		ponteiro("pointerdown", 1100, 600);
+		ponteiro("pointerup", 1100, 600);
+		expect(ponteBolinha.alternarBalao).toHaveBeenCalledTimes(2);
 	});
 
-	it("depois de 4 px é arrasto: a janela anda com o ponteiro e soltar não expande", async () => {
+	it("depois de 4 px é arrasto: a janela anda com o ponteiro e soltar não alterna o balão", async () => {
 		// A janela está em (1000, 500) na tela; o alvo sai de window.screenX/Y mais o ponto dentro dela.
 		vi.spyOn(window, "screenX", "get").mockReturnValue(1000);
 		vi.spyOn(window, "screenY", "get").mockReturnValue(500);
-		desenhar();
+		desenharBolinha();
 		await ate(() => bolinha() !== null);
 		ponteiro("pointerdown", 1100, 600); // o ponteiro está a (100, 100) do canto da janela
 		ponteiro("pointermove", 1110, 600);
 		ponteiro("pointermove", 1140, 650);
 		ponteiro("pointerup", 1140, 650);
-		expect(ponte.expandir).not.toHaveBeenCalled();
-		expect(ponte.moverPara).toHaveBeenCalled();
+		expect(ponteBolinha.alternarBalao).not.toHaveBeenCalled();
+		expect(ponteBolinha.moverPara).toHaveBeenCalled();
 		// O canto da janela é o ponteiro menos o deslocamento do clique: (1140 - 100, 650 - 100) no fim.
-		await ate(() => JSON.stringify(vi.mocked(ponte.moverPara).mock.calls.at(-1)) === JSON.stringify([1040, 550]));
+		await ate(() => JSON.stringify(vi.mocked(ponteBolinha.moverPara).mock.calls.at(-1)) === JSON.stringify([1040, 550]));
 		// Um pedido por vez: o do meio, que chegou com outro a caminho, foi trocado pelo mais novo.
-		await ate(() => vi.mocked(ponte.moverPara).mock.calls.length >= 2);
-		expect(vi.mocked(ponte.moverPara).mock.calls.length).toBeLessThanOrEqual(3);
+		await ate(() => vi.mocked(ponteBolinha.moverPara).mock.calls.length >= 2);
+		expect(vi.mocked(ponteBolinha.moverPara).mock.calls.length).toBeLessThanOrEqual(3);
 		vi.restoreAllMocks();
 	});
 
-	it("o botão direito não expande e abre o menu com 'Abrir o app' e 'Esconder a bolinha'", async () => {
-		desenhar();
+	it("o botão direito não alterna o balão e abre o menu com 'Abrir o app' e 'Esconder o professor'", async () => {
+		desenharBolinha();
 		await ate(() => bolinha() !== null);
 		corpo().dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, button: 2 }));
 		await ate(() => botaoTexto("Abrir o app") !== undefined);
-		expect(ponte.expandir).not.toHaveBeenCalled();
-		botaoTexto("Esconder a bolinha")!.click();
-		expect(ponte.esconder).toHaveBeenCalledTimes(1);
+		expect(ponteBolinha.alternarBalao).not.toHaveBeenCalled();
+		botaoTexto("Esconder o professor")!.click();
+		expect(ponteBolinha.esconder).toHaveBeenCalledTimes(1);
 		await ate(() => botaoTexto("Abrir o app") === undefined);
 		corpo().dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, button: 2 }));
 		await ate(() => botaoTexto("Abrir o app") !== undefined);
 		botaoTexto("Abrir o app")!.click();
-		expect(ponte.abrirApp).toHaveBeenCalledTimes(1);
+		expect(ponteBolinha.abrirApp).toHaveBeenCalledTimes(1);
 	});
 
-	it("a ponte manda o modo chat e a tela vira bolinha mais balão, transparente nos dois modos", async () => {
-		desenhar();
+	it("com o menu nativo na ponte, o botão direito o pede e não desenha o da tela", async () => {
+		ponteBolinha.menu = vi.fn(async () => {});
+		desenharBolinha();
 		await ate(() => bolinha() !== null);
-		ponte.mudarModo("chat");
-		await ate(() => campo() !== null);
-		expect(bolinha()).not.toBeNull();
-		await ate(() => document.documentElement.classList.contains("flutuante-chat"));
-		// Sem a classe "flutuante-solto" a página fica transparente e com zoom 1 (estilo.css).
-		expect(document.documentElement.classList.contains("flutuante-solto")).toBe(false);
+		corpo().dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, button: 2 }));
+		expect(ponteBolinha.menu).toHaveBeenCalledTimes(1);
+		expect(botaoTexto("Abrir o app")).toBeUndefined();
 	});
 });
 
-describe("o chat compacto", () => {
+describe("a página do balão", () => {
 	const balao = () => container.querySelector<HTMLElement>(".flutuante-balao");
 
 	it("mostra o topo do perfil e Abrir o app (sem Recolher), sem pôr o foco no campo (o teclado virtual não abre sozinho)", async () => {
@@ -306,95 +330,78 @@ describe("o chat compacto", () => {
 		expect(ponte.abrirApp).toHaveBeenCalledTimes(1);
 	});
 
-	it("a bolinha e o balão ficam nas posições da disposição, com a pontinha do lado da bolinha", async () => {
+	it("a página é transparente e liga o arrasto pelo topo; a bolinha não é desenhada aqui", async () => {
 		desenhar();
 		await ate(() => balao() !== null);
-		expect(bolinha()!.style.left).toBe("0px");
-		expect(bolinha()!.style.top).toBe("0px");
-		expect(balao()!.style.left).toBe("90px");
-		expect(balao()!.style.top).toBe("0px");
-		expect(balao()!.style.width).toBe("420px");
-		expect(balao()!.style.height).toBe("620px");
+		await ate(() => document.documentElement.classList.contains("flutuante-chat"));
+		expect(document.documentElement.classList.contains("rota-flutuante")).toBe(true);
+		expect(document.documentElement.classList.contains("flutuante-solto")).toBe(false);
+		expect(bolinha()).toBeNull();
+	});
+
+	it("com o balão à direita da bolinha, a pontinha fica do lado esquerdo, na altura da disposição", async () => {
+		desenhar();
+		await ate(() => balao() !== null);
 		expect(balao()!.dataset.lado).toBe("direita");
+		expect(balao()!.style.transformOrigin).toMatch(/^0(px)? 38px$/);
 		expect(container.querySelector<HTMLElement>(".flutuante-balao__ponta")!.style.top).toBe("32px");
 	});
 
-	it("com o balão à esquerda a bolinha fica onde a disposição diz", async () => {
-		disposicaoAtual = DISPOSICAO_ESQUERDA;
+	it("com o balão à esquerda, a pontinha vai para o outro lado", async () => {
+		disposicaoInicial = DISPOSICAO_ESQUERDA;
 		desenhar();
-		await ate(() => balao() !== null);
-		expect(bolinha()!.style.left).toBe("434px");
-		expect(bolinha()!.style.top).toBe("544px");
-		expect(balao()!.dataset.lado).toBe("esquerda");
-		expect(balao()!.style.left).toBe("0px");
+		await ate(() => balao()?.dataset.lado === "esquerda");
+		expect(balao()!.style.transformOrigin).toBe("100% 582px");
+		expect(container.querySelector<HTMLElement>(".flutuante-balao__ponta")!.style.top).toBe("576px");
 	});
 
-	it("clicar na bolinha com o chat aberto recolhe (e não expande)", async () => {
+	it("uma disposição nova (o balão abriu de novo, noutro canto) troca o lado sem remontar o chat nem perder o rascunho", async () => {
 		desenhar();
-		await ate(() => balao() !== null);
-		ponteiro("pointerdown", 1100, 600);
-		ponteiro("pointerup", 1100, 600);
-		expect(ponte.recolher).toHaveBeenCalledTimes(1);
-		expect(ponte.expandir).not.toHaveBeenCalled();
+		await ate(() => campo() !== null);
+		escrever("uma dúvida");
+		const antes = campo();
+		ponte.mudarDisposicao(DISPOSICAO_ESQUERDA);
+		await ate(() => balao()?.dataset.lado === "esquerda");
+		expect(campo()).toBe(antes);
+		expect(campo()!.value).toBe("uma dúvida");
+		ponte.mudarDisposicao(DISPOSICAO_DIREITA);
+		await ate(() => balao()?.dataset.lado === "direita");
+		expect(campo()!.value).toBe("uma dúvida");
 	});
 
-	it("arrastar a bolinha no modo chat manda a posição da BOLINHA (a janela anda junto)", async () => {
-		disposicaoAtual = DISPOSICAO_ESQUERDA;
-		vi.spyOn(window, "screenX", "get").mockReturnValue(1000);
-		vi.spyOn(window, "screenY", "get").mockReturnValue(500);
+	it("uma disposição estragada é ignorada", async () => {
 		desenhar();
 		await ate(() => balao() !== null);
-		// A bolinha está em (434, 544) da janela, ou (1434, 1044) na tela; o ponteiro pega a (500, 600) da janela.
-		ponteiro("pointerdown", 1500, 1100);
-		ponteiro("pointermove", 1510, 1100);
-		ponteiro("pointermove", 1540, 1150);
-		ponteiro("pointerup", 1540, 1150);
-		expect(ponte.recolher).not.toHaveBeenCalled();
-		// A bolinha andou (+40, +50): de (1434, 1044) para (1474, 1094).
-		await ate(() => JSON.stringify(vi.mocked(ponte.moverPara).mock.calls.at(-1)) === JSON.stringify([1474, 1094]));
-		vi.restoreAllMocks();
+		ponte.mudarDisposicao({ lado: "cima" } as unknown as Disposicao);
+		await esperar(30);
+		expect(balao()!.dataset.lado).toBe("direita");
 	});
 
-	it("sem ponte (navegador comum) é só o chat, sem câmera nem Recolher", async () => {
-		root.render(createElement(TelaFlutuante, { perfilId: "estudos", ambienteVoz: voz.ambiente }));
+	it("a animação de surgir recomeça quando a disposição chega e quando a janela fica visível", async () => {
+		desenhar();
+		await ate(() => balao() !== null);
+		await ate(() => vi.mocked(ponte.aoMudarDisposicao).mock.calls.length > 0);
+		await esperar(30);
+		// Reiniciar a animação força o recálculo do layout (offsetWidth); conta quantas vezes isso acontece.
+		const leituras = vi.spyOn(HTMLElement.prototype, "offsetWidth", "get");
+		ponte.mudarDisposicao(DISPOSICAO_ESQUERDA);
+		await ate(() => leituras.mock.calls.length >= 1);
+		const depoisDaDisposicao = leituras.mock.calls.length;
+		document.dispatchEvent(new Event("visibilitychange"));
+		await ate(() => leituras.mock.calls.length > depoisDaDisposicao);
+		// A animação inline volta a "" (vale a da classe, que o movimento reduzido desliga no CSS).
+		expect(balao()!.style.animation).toBe("");
+	});
+
+	it("sem ponte (navegador comum) é só o chat, sem câmera nem Recolher, e a página mantém o fundo e o zoom de sempre", async () => {
+		root.render(createElement(TelaFlutuante, { perfilId: "estudos", balao: true, ambienteVoz: voz.ambiente }));
 		await ate(() => campo() !== null);
 		expect(botao("Olha minha página")).toBeNull();
 		expect(botaoTexto("Recolher")).toBeUndefined();
 		expect(botao("Gravar a voz")).not.toBeNull();
-	});
-
-	it("recolher e abrir de novo volta à rolagem em que o Breno estava, mesmo com a conversa rolando sozinha ao fim", async () => {
-		const rolagem = () => container.querySelector<HTMLElement>(".painel-conversa__rolagem");
-		const alturas = (elemento: HTMLElement) => {
-			Object.defineProperty(elemento, "clientHeight", { configurable: true, get: () => 321 });
-			Object.defineProperty(elemento, "scrollHeight", { configurable: true, get: () => 5000 });
-		};
-		desenhar();
-		await ate(() => rolagem() !== null);
-		await new Promise((pronto) => setTimeout(pronto, 400));
-		alturas(rolagem()!);
-		rolagem()!.scrollTop = 1000;
-		rolagem()!.dispatchEvent(new Event("scroll"));
-		ponte.mudarModo("bolinha");
-		await ate(() => campo() === null);
-		ponte.mudarModo("chat");
-		await ate(() => rolagem() !== null);
-		// A conversa remontada vai ao fim sozinha (e esse scroll não pode ser gravado como do Breno).
-		alturas(rolagem()!);
-		rolagem()!.scrollTop = 4679;
-		rolagem()!.dispatchEvent(new Event("scroll"));
-		await ate(() => rolagem()!.scrollTop === 1000);
-	});
-
-	it("recolher e expandir não perdem o rascunho", async () => {
-		desenhar();
-		await ate(() => campo() !== null);
-		escrever("uma dúvida");
-		ponte.mudarModo("bolinha");
-		await ate(() => campo() === null);
-		ponte.mudarModo("chat");
-		await ate(() => campo() !== null);
-		expect(campo()!.value).toBe("uma dúvida");
+		expect(balao()).toBeNull();
+		await ate(() => document.documentElement.classList.contains("flutuante-solto"));
+		expect(document.documentElement.classList.contains("flutuante-chat")).toBe(false);
 	});
 });
 
@@ -486,6 +493,7 @@ describe("a voz", () => {
 	it("o atalho alterna: com o chat aberto, o mesmo atalho começa e para", async () => {
 		desenhar();
 		await ate(() => botao("Gravar a voz") !== null);
+		await ate(() => vi.mocked(ponte.aoAlternarVoz).mock.calls.length > 0);
 		ponte.alternarVoz();
 		await ate(() => botao("Parar de gravar") !== null);
 		ponte.alternarVoz();
@@ -566,5 +574,31 @@ describe("a voz", () => {
 		parar();
 		await ate(() => campo()!.value === "explica derivada");
 		expect(container.querySelector(".flutuante__faixa")).toBe(faixa);
+	});
+});
+
+describe("a voz avisa a bolinha pelo Electron", () => {
+	it("começa a gravar: avisarVoz(true, segundos); para: avisarVoz(false, 0)", async () => {
+		desenhar();
+		await ate(() => botao("Gravar a voz") !== null);
+		// Ao montar, o balão diz que não está gravando (a bolinha começa parada).
+		await ate(() => ponte.avisarVoz.mock.calls.length > 0);
+		expect(ponte.avisarVoz).toHaveBeenLastCalledWith(false, 0);
+		botao("Gravar a voz")!.click();
+		await ate(() => botao("Parar de gravar") !== null);
+		await ate(() => ponte.avisarVoz.mock.calls.some(([ouvindo]) => ouvindo === true));
+		expect(ponte.avisarVoz.mock.calls.at(-1)![0]).toBe(true);
+		botao("Parar de gravar")!.click();
+		await ate(() => ponte.avisarVoz.mock.calls.at(-1)![0] === false);
+		expect(ponte.avisarVoz).toHaveBeenLastCalledWith(false, 0);
+	});
+
+	it("o atalho global (Ctrl+Alt+Espaço) no balão já aberto começa a gravar e avisa a bolinha", async () => {
+		desenhar();
+		await ate(() => botao("Gravar a voz") !== null);
+		await ate(() => vi.mocked(ponte.aoAlternarVoz).mock.calls.length > 0);
+		ponte.alternarVoz();
+		await ate(() => botao("Parar de gravar") !== null);
+		await ate(() => ponte.avisarVoz.mock.calls.some(([ouvindo]) => ouvindo === true));
 	});
 });

@@ -6,10 +6,11 @@ import {
 	lerFlutuante,
 	MARGEM_PRIMEIRA_VEZ,
 	pastaInicializar,
-	bolinhaPelaJanela,
+	balaoPelaBolinha,
+	bolinhaPeloBalao,
+	deslocamentoDoBalao,
+	disposicaoDoBalao,
 	disposicaoDoChat,
-	formaDoChat,
-	janelaPelaBolinha,
 	VAO_BALAO,
 	posicaoInicial,
 	tamanhoDaCaptura,
@@ -85,7 +86,8 @@ describe("disposição do chat (balão ao lado da bolinha)", () => {
 		expect(d.lado).toBe("esquerda");
 		expect(d.balao.x).toBe(0);
 		expect(d.bolinha.x).toBe(LB + VAO_BALAO);
-		expect(bolinhaPelaJanela(d, d.janela)).toEqual({ x: 1800, y: 10 });
+		expect(d.janela.x + d.bolinha.x).toBe(1800);
+		expect(d.janela.y + d.bolinha.y).toBe(10);
 	});
 
 	it("no canto inferior esquerdo: o fundo do balão alinha com o fundo da bolinha", () => {
@@ -104,16 +106,16 @@ describe("disposição do chat (balão ao lado da bolinha)", () => {
 		expect(d.janela.y).toBeGreaterThanOrEqual(0);
 		expect(d.janela.x + d.janela.width).toBeLessThanOrEqual(1920);
 		expect(d.janela.y + d.janela.height).toBeLessThanOrEqual(1040);
-		expect(bolinhaPelaJanela(d, d.janela)).toEqual(p);
+		expect({ x: d.janela.x + d.bolinha.x, y: d.janela.y + d.bolinha.y }).toEqual(p);
 	});
 
 	it("o balão que não cabe na vertical desliza para dentro da área, sem mexer na bolinha", () => {
 		const d = disposicaoDoChat({ x: 100, y: 300 }, { x: 0, y: 0, width: 1920, height: 700 });
 		expect(d.janela.y + d.balao.y).toBe(700 - AB);
-		expect(bolinhaPelaJanela(d, d.janela)).toEqual({ x: 100, y: 300 });
+		expect(d.janela.y + d.bolinha.y).toBe(300);
 		const d2 = disposicaoDoChat({ x: 100, y: 400 }, { x: 0, y: 100, width: 1920, height: 600 });
 		expect(d2.janela.y + d2.balao.y).toBe(100);
-		expect(bolinhaPelaJanela(d2, d2.janela)).toEqual({ x: 100, y: 400 });
+		expect(d2.janela.y + d2.bolinha.y).toBe(400);
 	});
 
 	it("o que não cabe do lado escolhido usa o outro", () => {
@@ -161,22 +163,75 @@ describe("disposição do chat (balão ao lado da bolinha)", () => {
 			}
 		}
 	});
+});
 
-	it("arrastar: a janela e a bolinha andam juntas com a disposição guardada (moved e moverPara)", () => {
-		const d = disposicaoDoChat({ x: 1800, y: 900 }, tela);
-		expect(janelaPelaBolinha(d, { x: 500, y: 400 })).toEqual({ x: 500 - d.bolinha.x, y: 400 - d.bolinha.y });
-		expect(bolinhaPelaJanela(d, janelaPelaBolinha(d, { x: 500, y: 400 }))).toEqual({ x: 500, y: 400 });
+describe("disposição da janela do balão (duas janelas)", () => {
+	const B = TAMANHO_BOLINHA.width;
+	const { width: LB, height: AB } = TAMANHO_CHAT;
+	const JB = LB + VAO_BALAO;
+
+	it("canto superior esquerdo: o balão à direita, com o vão do lado da bolinha e topo com topo", () => {
+		const d = disposicaoDoBalao({ x: 10, y: 10 }, tela);
+		expect(d.lado).toBe("direita");
+		expect(d.balao).toEqual({ x: 10 + B, y: 10, width: JB, height: AB });
+		expect(d.ponta.y).toBe(38);
 	});
 
-	it("a forma do recorte: bolinha, balão e a pontinha no vão", () => {
-		const d = disposicaoDoChat({ x: 10, y: 10 }, tela);
-		const [quadro, balao, ponta] = formaDoChat(d);
-		expect(quadro).toEqual({ x: 0, y: 0, width: B, height: B });
-		expect(balao).toEqual(d.balao);
-		expect(ponta!.x).toBe(B);
-		expect(ponta!.width).toBe(VAO_BALAO);
-		const e = disposicaoDoChat({ x: 1800, y: 10 }, tela);
-		expect(formaDoChat(e)[2]!.x).toBe(e.balao.width);
+	it("canto superior direito: o balão à esquerda; o vão fica à direita dele, junto da bolinha", () => {
+		const d = disposicaoDoBalao({ x: 1800, y: 10 }, tela);
+		expect(d.lado).toBe("esquerda");
+		expect(d.balao.x + d.balao.width).toBe(1800);
+		expect(d.balao).toMatchObject({ width: JB, height: AB, y: 10 });
+	});
+
+	it("canto inferior esquerdo: o fundo do balão alinha com o fundo da bolinha", () => {
+		const d = disposicaoDoBalao({ x: 10, y: 950 }, tela);
+		expect(d.lado).toBe("direita");
+		expect(d.balao.y + AB).toBe(950 + B);
+		expect(d.ponta.y).toBe(AB - B / 2);
+	});
+
+	it("canto inferior direito: esquerda e para cima, dentro da área", () => {
+		const d = disposicaoDoBalao({ x: 1840, y: 950 }, tela);
+		expect(d.lado).toBe("esquerda");
+		expect(d.balao.x).toBeGreaterThanOrEqual(0);
+		expect(d.balao.y).toBeGreaterThanOrEqual(0);
+		expect(d.balao.x + d.balao.width).toBeLessThanOrEqual(1920);
+		expect(d.balao.y + d.balao.height).toBeLessThanOrEqual(1040);
+	});
+
+	it("desliza na vertical quando não cabe, e a ponta continua na bolinha", () => {
+		const area = { x: 0, y: 0, width: 1920, height: 700 };
+		const d = disposicaoDoBalao({ x: 100, y: 300 }, area);
+		expect(d.balao.y + AB).toBe(700);
+		expect(d.ponta.y).toBe(300 + B / 2 - d.balao.y);
+	});
+
+	it("troca de lado quando o preferido não cabe", () => {
+		const estreita = { x: 0, y: 0, width: 1000, height: 1040 };
+		// Centro na metade esquerda (queria a direita), mas 100 + 76 + 14 + 420 cabe; já em x=450 o centro passa de 500 - mas a esquerda cabe.
+		expect(disposicaoDoBalao({ x: 100, y: 100 }, estreita).lado).toBe("direita");
+		expect(disposicaoDoBalao({ x: 480, y: 100 }, estreita).lado).toBe("esquerda");
+		// 460: centro 498 < 500 (direita), 460 + 76 + 14 + 420 = 970 cabe.
+		expect(disposicaoDoBalao({ x: 460, y: 100 }, estreita).lado).toBe("direita");
+		// 500: centro 538 > 500 (esquerda): 500 - 14 - 420 = 66 cabe.
+		expect(disposicaoDoBalao({ x: 500, y: 100 }, estreita).lado).toBe("esquerda");
+		// Na borda esquerda o balão queria a esquerda (centro > metade em tela estreita) e não cabe: vai para a direita.
+		const minuscula = { x: 0, y: 0, width: 600, height: 1040 };
+		expect(disposicaoDoBalao({ x: 300, y: 100 }, minuscula).lado).toBe("esquerda");
+		expect(disposicaoDoBalao({ x: 120, y: 100 }, minuscula).lado).toBe("direita");
+	});
+
+	it("arrastar qualquer uma das duas janelas leva a outra, mantendo o deslocamento", () => {
+		const bolinha = { x: 1800, y: 900 };
+		const d = disposicaoDoBalao(bolinha, tela);
+		const desl = deslocamentoDoBalao(d, bolinha);
+		// O balão na tela = bolinha + deslocamento (o balão à esquerda tem x menor).
+		expect(balaoPelaBolinha(desl, bolinha)).toEqual({ x: d.balao.x, y: d.balao.y });
+		expect(balaoPelaBolinha(desl, { x: 500, y: 400 })).toEqual({ x: 500 + desl.x, y: 400 + desl.y });
+		expect(bolinhaPeloBalao(desl, balaoPelaBolinha(desl, { x: 500, y: 400 }))).toEqual({ x: 500, y: 400 });
+		// Arrastando o balão para (300, 200): a bolinha vai para (300 - desl.x, 200 - desl.y).
+		expect(bolinhaPeloBalao(desl, { x: 300, y: 200 })).toEqual({ x: 300 - desl.x, y: 200 - desl.y });
 	});
 });
 

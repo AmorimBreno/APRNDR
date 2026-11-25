@@ -219,6 +219,26 @@ function avisarModo() {
 }
 
 /**
+ * A troca de modo muda o tamanho da janela antes de a página se redesenhar: por um instante a bolinha aparecia no canto
+ * do balão e voltava (relato do Breno). Durante a troca a janela fica invisível (opacidade 0) e volta quando a página
+ * avisa que pintou a cena nova ("pintado"), ou depois de 250 ms, o que vier antes.
+ */
+/** @type {(() => void) | null} */
+let aoPintar = null;
+/** @param {import("electron").BrowserWindow} atual */
+function esconderDuranteATroca(atual) {
+	aoPintar?.();
+	atual.setOpacity(0);
+	const mostrar = () => {
+		clearTimeout(prazo);
+		if (aoPintar === mostrar) aoPintar = null;
+		if (!atual.isDestroyed()) atual.setOpacity(1);
+	};
+	const prazo = setTimeout(mostrar, 250);
+	aoPintar = mostrar;
+}
+
+/**
  * O recorte da janela: no modo bolinha, ela inteira; no chat, só a bolinha, o balão e a pontinha, e o vazio em
  * volta deixa o clique passar ao app de trás. Sem setShape (ou se ele falhar), segue sem recorte.
  */
@@ -241,6 +261,7 @@ function expandir() {
 	// O balão abre ao lado da bolinha, que não sai do lugar: a janela cresce para conter as duas.
 	disposicao = disposicaoDoChat(posicao, areaDaBolinha());
 	modo = "chat";
+	esconderDuranteATroca(atual);
 	atual.setHasShadow(false);
 	atual.setFocusable(true);
 	atual.setBounds(disposicao.janela);
@@ -255,6 +276,7 @@ function recolher() {
 	if (!atual || modo === "bolinha") return;
 	modo = "bolinha";
 	disposicao = null;
+	esconderDuranteATroca(atual);
 	atual.setBounds(boundsBolinha());
 	aplicarForma(atual);
 	atual.setFocusable(false);
@@ -369,6 +391,9 @@ function registrarIpc() {
 	});
 	ipcMain.handle("estudos:flutuante:recolher", (evento) => {
 		if (daBolinha(evento)) recolher();
+	});
+	ipcMain.on("estudos:flutuante:pintado", (evento) => {
+		if (daBolinha(evento)) aoPintar?.();
 	});
 	ipcMain.handle("estudos:flutuante:disposicao", (evento) => (daBolinha(evento) ? disposicao : null));
 	// Arrastar a bolinha: nunca foca. (x, y) é a posição desejada da BOLINHA na tela. No modo chat a janela anda junto,

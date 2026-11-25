@@ -432,6 +432,19 @@ export function TelaFlutuante({ perfilId, cabecalho, ponte: ponteProp, ambienteV
 			parar();
 		};
 	}, [ponte]);
+	// Depois que a cena nova foi desenhada (dois quadros: o React aplicou e o navegador pintou), avisa o Electron, que
+	// deixou a janela invisível durante a troca: sem isso, a bolinha aparecia um instante no canto do balão (relato do Breno).
+	useEffect(() => {
+		if (!ponte?.pintado || !cena) return;
+		let segundo = 0;
+		const primeiro = requestAnimationFrame(() => {
+			segundo = requestAnimationFrame(() => ponte.pintado?.());
+		});
+		return () => {
+			cancelAnimationFrame(primeiro);
+			cancelAnimationFrame(segundo);
+		};
+	}, [ponte, cena]);
 
 	// Na janela do Electron a página é sempre transparente, nos dois modos (estilo.css, .rota-flutuante); sem ponte
 	// (navegador comum) a classe "flutuante-solto" devolve o fundo e o zoom de sempre.

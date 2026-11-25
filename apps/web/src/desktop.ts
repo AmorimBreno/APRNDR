@@ -55,6 +55,8 @@ export interface PonteFlutuante {
 	modo(): Promise<ModoFlutuante>;
 	/** A disposição atual do balão ao lado da bolinha, ou null no modo bolinha. */
 	disposicao(): Promise<Disposicao | null>;
+	/** Avisa o Electron que a página já desenhou a cena do modo novo (ele mostra a janela de novo). Opcional. */
+	pintado?(): void;
 	expandir(): Promise<void>;
 	recolher(): Promise<void>;
 	/** Leva a BOLINHA até (x, y) da tela (no modo chat a janela anda junto); resolve quando a janela já andou. */

@@ -21,6 +21,8 @@ const flutuante = {
 	modo: () => ipcRenderer.invoke("estudos:flutuante:modo"),
 	/** A disposição do balão ao lado da bolinha (no modo chat), ou null na bolinha. */
 	disposicao: () => ipcRenderer.invoke("estudos:flutuante:disposicao"),
+	/** A página desenhou a cena do modo novo: o Electron mostra a janela de novo (ela fica invisível durante a troca). */
+	pintado: () => ipcRenderer.send("estudos:flutuante:pintado"),
 	expandir: () => ipcRenderer.invoke("estudos:flutuante:expandir"),
 	recolher: () => ipcRenderer.invoke("estudos:flutuante:recolher"),
 	/** Leva a BOLINHA até (x, y) da tela (no modo chat, a janela anda junto); a promessa resolve quando a janela já andou (o arrasto espera por ela). */

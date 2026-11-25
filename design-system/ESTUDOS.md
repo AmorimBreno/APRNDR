@@ -1,4 +1,4 @@
-# Mudanças do estudos-ia no design system
+# Mudanças do APRNDR (este repositório) no design system
 
 A pasta design-system/ é o design system APRNDR como foi exportado do Claude Design (2026-10-16). Para o app usá-la como pacote do workspace (@estudos/design-system), estas foram as mudanças. Ao trocar a pasta por uma exportação nova, refaça cada uma.
 
@@ -14,7 +14,7 @@ Mudanças no código (o TypeScript do projeto é estrito e usa verbatimModuleSyn
 
 - components/src/quiz.tsx e components/index.d.ts: `QuizQuestion` ganhou `interactiveLabels` (padrão false). Com ele, o radio é um botão ao lado do rótulo, em vez de envolver o texto: links e botões no rótulo não ficam aninhados em outro botão. As teclas de controles internos não escolhem uma alternativa; selecionar o texto também não escolhe. As classes `ap-opt__radio-control` e `ap-opt--interactive` ficam em components/bundle.css. Linhas marcadas com [estudos-ia]; bundle.js não foi refeito (o app usa src).
 
-Fora do pacote, também do estudos-ia: pnpm-workspace.yaml lista design-system.
+Fora do pacote, também deste repositório: pnpm-workspace.yaml lista design-system.
 
 ## Regras do app que mudam o manual
 

@@ -5,7 +5,7 @@ Skills, agentes e extensões do pi usados pelo perfil de estudos. A base é uma 
 Origem: github.com/amosblomqvist/learn, commit 7cfd894 ("updated thumbnail").
 Copiado sem o histórico git e sem a pasta assets/. O README original está em README-learn.md.
 
-Antes de vir para cá, a cópia morava em vault/.pi no estudos-ia (branch main, commit c03bc25, checkpoint 1), onde rodava no WSL com o pi-interactive-subagents (tmux) e o Obsidian. Lá o primeiro commit tinha os arquivos exatamente como no learn, e cada mudança tinha o seu commit. Agora tudo roda no Windows nativo, sem WSL e sem tmux.
+Antes de vir para cá, a cópia morava em vault/.pi no estudos-ia, hoje AmorimBreno/APRNDR (branch main, commit c03bc25, checkpoint 1), onde rodava no WSL com o pi-interactive-subagents (tmux) e o Obsidian. Lá o primeiro commit tinha os arquivos exatamente como no learn, e cada mudança tinha o seu commit. Agora tudo roda no Windows nativo, sem WSL e sem tmux.
 
 As linhas alteradas nos arquivos do learn são marcadas com o comentário [estudos-ia]. Nos .json, que não aceitam comentário, a explicação está aqui.
 

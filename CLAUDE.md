@@ -1,4 +1,4 @@
-# estudos-ia, branch app-perfis
+# APRNDR (repositório AmorimBreno/APRNDR, antes estudos-ia), branch app-perfis
 
 @AGENTS.md
 

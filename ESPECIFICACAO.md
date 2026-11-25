@@ -352,9 +352,9 @@ Tomadas ao montar o projeto num computador novo. Quando divergirem das seções 
 
 13.2 Pacote do pi. O nome atual é @earendil-works/pi-coding-agent, versão 1.2.0, fixada no packages/core.
 
-13.3 Repositório. O código fica no repositório privado AmorimBreno/estudos-ia, na branch app-perfis. A main guarda o checkpoint 1 (pi no terminal com WSL, tmux e Obsidian) até a fusão ser aprovada. Os documentos daquela fase estão em docs/historico/.
+13.3 Repositório. O código fica no repositório privado AmorimBreno/APRNDR (chamado estudos-ia até 2026-11-25, quando foi renomeado no GitHub), na branch app-perfis. A main guarda o checkpoint 1 (pi no terminal com WSL, tmux e Obsidian) até a fusão ser aprovada. Os documentos daquela fase estão em docs/historico/.
 
-13.4 Configuração do pi reaproveitada (seção 6). Ela vem do estudos-ia:
+13.4 Configuração do pi reaproveitada (seção 6). Ela vem do checkpoint 1 deste repositório (quando ele ainda se chamava estudos-ia):
 - global, em ~/.pi/agent, com fonte versionada em pi-global/ e instalada por scripts/instalar-pi-global.mjs: settings.json (provedor openrouter, modelo padrão openai/gpt-6.1-sol, raciocínio medium) e as extensões web_search e web_fetch, que usam o Tavily;
 - no perfil de estudos, em profiles/estudos/: os agentes professor (agente geral, openai/gpt-6.1-sol), researcher (pesquisa, z-ai/glm-5.3), mermaid-maker e svg-maker (desenho, anthropic/claude-sonnet-5.5, que aceita imagem); as skills teach e visualize; as extensões quiz, ask-user-question e visual-tools. A origem é o repositório learn (commit 7cfd894), registrada em profiles/estudos/ORIGEM.md.
 O modelo de cada papel é configurável no profile.json. Provedor único: OpenRouter. Busca: Tavily.

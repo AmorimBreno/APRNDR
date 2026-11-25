@@ -511,7 +511,7 @@ profiles/estudos/extensions/visual-tools/tools/_common.ts — acha o navegador (
 referencias/plano-cd.html — artefato de plano de estudo usado antes; referência visual para o design
 
 design-system/ — design system APRNDR (feito no Claude Design), pacote @estudos/design-system do workspace: manual, tokens, componentes React, fontes e ícones
-design-system/ESTUDOS.md — mudanças do estudos-ia sobre a exportação do Claude Design (refazer ao trocar a pasta), inclusive a exceção do trilho de seis etapas do guia de curso
+design-system/ESTUDOS.md — mudanças deste repositório sobre a exportação do Claude Design (refazer ao trocar a pasta), inclusive a exceção do trilho de seis etapas do guia de curso
 design-system/package.json, tsconfig.json — o pacote: exports dos componentes (components/src), do tokens.css e do componentes.css (= components/bundle.css)
 design-system/README.md — manual da marca: princípios, voz, cor, tipografia, forma, telas e fluxo, estados, ícones e ornamento
 design-system/tokens.json — os tokens (cores, estilos de texto, espaços, raios, bordas, tamanhos, sombras); a fonte da verdade

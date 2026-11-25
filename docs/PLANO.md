@@ -48,7 +48,7 @@ Pendências observadas:
 
 ## Etapa 0: preparar o repositório (feita)
 
-0.1 Branch app-perfis criada a partir de origin/main do estudos-ia. Arquivos do learn e da busca web movidos com git mv para profiles/estudos/ e pi-global/. Documentos do checkpoint 1 em docs/historico/. Dados do usuário (vault/aulas, comparacao, viz) copiados para G:\Meu Drive\estudos-dados\legado\ e removidos da branch.
+0.1 Branch app-perfis criada a partir de origin/main do estudos-ia (hoje AmorimBreno/APRNDR). Arquivos do learn e da busca web movidos com git mv para profiles/estudos/ e pi-global/. Documentos do checkpoint 1 em docs/historico/. Dados do usuário (vault/aulas, comparacao, viz) copiados para G:\Meu Drive\estudos-dados\legado\ e removidos da branch.
 
 0.2 CLAUDE.md, filemap.md, este plano e a seção 13 da especificação.
 

@@ -35,6 +35,7 @@ const COR_SIMBOLOS = "#e9e4db";
 const ALTURA_BARRA = 32;
 
 /** A identidade do app no Windows: a janela e o atalho do Menu Iniciar usam a mesma. */
+// O id fica com o nome antigo do repositório de propósito: trocar desfaria o atalho fixado e o agrupamento na barra de tarefas.
 const ID_DO_APP = "br.estudos-ia.aprndr";
 const ARQUIVO_ICONE = join(AQUI, "..", "assets", "icone.ico");
 

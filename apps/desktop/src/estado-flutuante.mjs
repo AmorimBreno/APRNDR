@@ -1,5 +1,5 @@
 // A bolinha do professor (janela flutuante): a parte pura. Ler e gravar o
-// flutuante.json, a posição do chat a partir da bolinha, a posição corrigida
+// flutuante.json, a disposição do chat (balão ao lado da bolinha), a posição corrigida
 // para uma tela visível, o tamanho da captura e o atalho de inicialização.
 // Quem toca no disco e nas janelas é o flutuante.mjs.
 
@@ -94,15 +94,81 @@ export function corrigirPosicao(posicao, areas, tamanho = TAMANHO_BOLINHA) {
 	return limitarNaArea(x, y, tamanho, melhor);
 }
 
+/** O vão entre a bolinha e o balão, onde fica a pontinha do balão. */
+export const VAO_BALAO = 14;
+/** A pontinha nunca chega mais perto que isso das quinas do balão. */
+export const MARGEM_PONTA = 24;
+
 /**
- * Onde fica o canto do chat compacto quando a bolinha em `bolinha` expande, dentro da área útil
- * da tela dela: cresce para a direita e para baixo; no canto direito abre para a esquerda
- * (a borda direita do chat acompanha a da bolinha) e embaixo, para cima.
+ * @typedef {{
+ *   janela: Retangulo,
+ *   bolinha: { x: number, y: number },
+ *   balao: Retangulo,
+ *   lado: "esquerda" | "direita",
+ *   ponta: { y: number },
+ * }} Disposicao
  */
-export function posicaoDoChat(bolinha, area, chat = TAMANHO_CHAT, tamanhoBolinha = TAMANHO_BOLINHA) {
-	const x = bolinha.x + chat.width > area.x + area.width ? bolinha.x + tamanhoBolinha.width - chat.width : bolinha.x;
-	const y = bolinha.y + chat.height > area.y + area.height ? bolinha.y + tamanhoBolinha.height - chat.height : bolinha.y;
-	return limitarNaArea(x, y, chat, area);
+
+/**
+ * A disposição do chat como balão ao lado da bolinha. `bolinha` é o canto de cima à esquerda do
+ * quadro da bolinha na tela; `area` é a área útil da tela dela. O balão vai para a esquerda se o
+ * centro da bolinha está na metade direita da área (senão, para a direita) e, na vertical, cresce
+ * para cima se o centro está na metade de baixo (fundo do balão no fundo da bolinha), senão para
+ * baixo (topo com topo). Se não couber na vertical, desliza para dentro da área (a bolinha não
+ * se mexe); se não couber do lado escolhido, usa o outro (se nenhum cabe, o de mais folga). A
+ * janela contém a bolinha e o balão; `bolinha` e `balao` são relativos a ela. `ponta.y` é o
+ * centro da bolinha dentro do balão (relativo ao topo dele), a 24 px das bordas no mínimo.
+ * @returns {Disposicao}
+ */
+export function disposicaoDoChat(bolinha, area, balao = TAMANHO_CHAT, tamanhoBolinha = TAMANHO_BOLINHA, vao = VAO_BALAO) {
+	const centroX = bolinha.x + tamanhoBolinha.width / 2;
+	const centroY = bolinha.y + tamanhoBolinha.height / 2;
+	const preferida = centroX > area.x + area.width / 2 ? "esquerda" : "direita";
+	const outra = preferida === "esquerda" ? "direita" : "esquerda";
+
+	const xDe = (lado) => (lado === "esquerda" ? bolinha.x - vao - balao.width : bolinha.x + tamanhoBolinha.width + vao);
+	const cabe = (lado) => xDe(lado) >= area.x && xDe(lado) + balao.width <= area.x + area.width;
+	const folga = (lado) => (lado === "esquerda" ? bolinha.x - area.x : area.x + area.width - (bolinha.x + tamanhoBolinha.width));
+	const lado = cabe(preferida) ? preferida : cabe(outra) || folga(outra) > folga(preferida) ? outra : preferida;
+	const balaoX = xDe(lado);
+
+	const embaixo = centroY > area.y + area.height / 2;
+	const desejado = embaixo ? bolinha.y + tamanhoBolinha.height - balao.height : bolinha.y;
+	const maxY = Math.max(area.y, area.y + area.height - balao.height);
+	const balaoY = Math.min(Math.max(desejado, area.y), maxY);
+
+	const esquerda = Math.min(balaoX, bolinha.x);
+	const topo = Math.min(balaoY, bolinha.y);
+	const direita = Math.max(balaoX + balao.width, bolinha.x + tamanhoBolinha.width);
+	const fundo = Math.max(balaoY + balao.height, bolinha.y + tamanhoBolinha.height);
+	const ponta = Math.min(Math.max(centroY - balaoY, MARGEM_PONTA), balao.height - MARGEM_PONTA);
+	return {
+		janela: { x: esquerda, y: topo, width: direita - esquerda, height: fundo - topo },
+		bolinha: { x: bolinha.x - esquerda, y: bolinha.y - topo },
+		balao: { x: balaoX - esquerda, y: balaoY - topo, width: balao.width, height: balao.height },
+		lado,
+		ponta: { y: ponta },
+	};
+}
+
+/** A posição da bolinha na tela quando a janela está em (x, y) com essa disposição (o balão arrastado pelo topo). */
+export function bolinhaPelaJanela(disposicao, janela) {
+	return { x: janela.x + disposicao.bolinha.x, y: janela.y + disposicao.bolinha.y };
+}
+
+/** O canto da janela na tela para a bolinha estar em (x, y), mantendo a disposição (a bolinha arrastada no modo chat). */
+export function janelaPelaBolinha(disposicao, bolinha) {
+	return { x: bolinha.x - disposicao.bolinha.x, y: bolinha.y - disposicao.bolinha.y };
+}
+
+/**
+ * Os retângulos (relativos à janela) que recebem o clique no modo chat: a bolinha, o balão e a
+ * pontinha no vão entre eles. O resto da janela, transparente, deixa o clique passar ao app de trás.
+ */
+export function formaDoChat(disposicao, tamanhoBolinha = TAMANHO_BOLINHA, vao = VAO_BALAO, meiaPonta = 12) {
+	const { bolinha, balao, lado, ponta } = disposicao;
+	const xPonta = lado === "esquerda" ? balao.x + balao.width : bolinha.x + tamanhoBolinha.width;
+	return [{ x: bolinha.x, y: bolinha.y, ...tamanhoBolinha }, { ...balao }, { x: xPonta, y: balao.y + ponta.y - meiaPonta, width: vao, height: meiaPonta * 2 }];
 }
 
 /** O tamanho da miniatura da captura: a tela em pixels físicos, com o lado maior até o limite. */

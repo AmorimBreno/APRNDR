@@ -1,7 +1,7 @@
 // Leitura do ambiente da janela própria (sem DOM: só o objeto que o preload expõe).
 
 import { describe, expect, it } from "vitest";
-import { lerAmbienteDesktop, lerPonteBolinha, lerPonteFlutuante, marcarRotaFlutuante } from "./desktop.ts";
+import { lerAmbienteDesktop, lerDisposicao, lerPonteBolinha, lerPonteFlutuante, marcarRotaFlutuante } from "./desktop.ts";
 
 describe("lerAmbienteDesktop", () => {
 	it("no navegador comum não há ambiente", () => {
@@ -34,7 +34,7 @@ describe("lerAmbienteDesktop", () => {
 });
 
 const funcoes = (nomes: string[]) => Object.fromEntries(nomes.map((nome) => [nome, () => {}]));
-const NOMES_FLUTUANTE = ["modo", "expandir", "recolher", "moverPara", "capturarTela", "abrirApp", "esconder", "aoMudarModo", "aoAlternarVoz"];
+const NOMES_FLUTUANTE = ["modo", "disposicao", "expandir", "recolher", "moverPara", "capturarTela", "abrirApp", "esconder", "aoMudarModo", "aoAlternarVoz"];
 
 describe("a ponte do professor flutuante", () => {
 	const base = { plataforma: "win32", alturaBarra: 32, sair() {} };
@@ -72,5 +72,22 @@ describe("a ponte do professor flutuante", () => {
 		expect(marcadas).toEqual([]);
 		marcarRotaFlutuante(janela("#/flutuante/estudos"));
 		expect(marcadas).toEqual(["rota-flutuante"]);
+	});
+});
+
+describe("lerDisposicao", () => {
+	const boa = { janela: { x: 1, y: 2, width: 510, height: 620 }, bolinha: { x: 0, y: 0 }, balao: { x: 90, y: 0, width: 420, height: 620 }, lado: "direita", ponta: { y: 38 } };
+
+	it("aceita uma disposição inteira", () => {
+		expect(lerDisposicao(boa)).toEqual(boa);
+	});
+
+	it("recusa null, lixo, lado errado e números faltando", () => {
+		expect(lerDisposicao(null)).toBeUndefined();
+		expect(lerDisposicao("chat")).toBeUndefined();
+		expect(lerDisposicao({ ...boa, lado: "cima" })).toBeUndefined();
+		expect(lerDisposicao({ ...boa, ponta: {} })).toBeUndefined();
+		expect(lerDisposicao({ ...boa, balao: { x: 0, y: 0, width: "420", height: 620 } })).toBeUndefined();
+		expect(lerDisposicao({ ...boa, bolinha: { x: Number.NaN, y: 0 } })).toBeUndefined();
 	});
 });

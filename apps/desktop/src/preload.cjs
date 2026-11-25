@@ -21,7 +21,7 @@ const flutuante = {
 	modo: () => ipcRenderer.invoke("estudos:flutuante:modo"),
 	expandir: () => ipcRenderer.invoke("estudos:flutuante:expandir"),
 	recolher: () => ipcRenderer.invoke("estudos:flutuante:recolher"),
-	/** Leva a bolinha até (x, y) da tela; a promessa resolve quando a janela já andou (o arrasto espera por ela). */
+	/** Leva a BOLINHA até (x, y) da tela (no modo chat, a janela anda junto); a promessa resolve quando a janela já andou (o arrasto espera por ela). */
 	moverPara: (x, y) => ipcRenderer.invoke("estudos:flutuante:mover", x, y),
 	capturarTela: () => ipcRenderer.invoke("estudos:flutuante:capturar"),
 	abrirApp: () => ipcRenderer.invoke("estudos:flutuante:abrir-app"),

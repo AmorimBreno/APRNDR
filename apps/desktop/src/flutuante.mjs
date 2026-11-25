@@ -20,16 +20,18 @@ import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "
 import { dirname, join } from "node:path";
 import {
 	atalhoDeInicializacao,
+	bolinhaPelaJanela,
 	corrigirPosicao,
+	disposicaoDoChat,
+	formaDoChat,
 	gravarFlutuante,
 	lerFlutuante,
+	janelaPelaBolinha,
 	limitarNaArea,
 	NOME_ATALHO_INICIALIZACAO,
 	pastaInicializar,
-	posicaoDoChat,
 	tamanhoDaCaptura,
 	TAMANHO_BOLINHA,
-	TAMANHO_CHAT,
 } from "./estado-flutuante.mjs";
 
 const NIVEL_POR_CIMA = "floating";
@@ -45,8 +47,11 @@ let janela = null;
 let modo = "bolinha";
 /** @type {import("./estado-flutuante.mjs").EstadoFlutuante} */
 let estado = { ligada: true, inicioComWindowsEscolhido: false };
-/** Posição da bolinha (canto de cima à esquerda, pixels da tela); o chat é calculado a partir dela. */
+/** Posição da bolinha (canto de cima à esquerda, pixels da tela); o balão do chat é calculado a partir dela. */
 let posicao = { x: 0, y: 0 };
+/** A disposição do chat (janela, bolinha e balão) enquanto o modo é "chat"; null na bolinha. */
+/** @type {import("./estado-flutuante.mjs").Disposicao | null} */
+let disposicao = null;
 let adiarGravar;
 
 /**
@@ -117,18 +122,6 @@ function gravarDepois() {
 
 // --- a janela da bolinha --------------------------------------------------
 
-/** Onde o chat ficou depois de arrastado pelo topo (só nesta execução do app). */
-/** @type {{ x: number, y: number } | null} */
-let posicaoChat = null;
-
-/** A distância da bolinha ao canto do chat quando ele abriu: arrastar o chat leva a bolinha junto, com essa distância. */
-let deslocamentoBolinha = { x: 0, y: 0 };
-
-/** O chat inteiro cabe na área útil de alguma tela? */
-function cabeEmAlgumaTela(canto) {
-	return screen.getAllDisplays().some(({ workArea: a }) => canto.x >= a.x && canto.y >= a.y && canto.x + TAMANHO_CHAT.width <= a.x + a.width && canto.y + TAMANHO_CHAT.height <= a.y + a.height);
-}
-
 function boundsBolinha() {
 	return { ...posicao, ...TAMANHO_BOLINHA };
 }
@@ -179,15 +172,13 @@ function criarJanela() {
 	nova.once("ready-to-show", () => {
 		if (!nova.isDestroyed() && estado.ligada && modo === "bolinha") nova.showInactive();
 	});
-	// O chat arrastado pelo topo (arrasto nativo): lembra onde ficou, para abrir ali da próxima vez.
+	// O balão arrastado pelo topo (arrasto nativo): só a janela anda, a disposição guardada continua valendo; a
+	// bolinha vai junto (janela + a posição dela dentro da janela) e essa posição é a que fica gravada.
 	nova.on("moved", () => {
-		if (modo !== "chat" || nova.isDestroyed()) return;
+		if (modo !== "chat" || !disposicao || nova.isDestroyed()) return;
 		const { x, y } = nova.getBounds();
-		posicaoChat = { x, y };
-		// A bolinha vai junto (pedido do Breno): ao recolher, ela aparece perto de onde o chat ficou.
-		const alvo = { x: x + deslocamentoBolinha.x, y: y + deslocamentoBolinha.y };
-		const area = screen.getDisplayNearestPoint({ x: alvo.x + TAMANHO_BOLINHA.width / 2, y: alvo.y + TAMANHO_BOLINHA.height / 2 }).workArea;
-		posicao = limitarNaArea(alvo.x, alvo.y, TAMANHO_BOLINHA, area);
+		disposicao = { ...disposicao, janela: { ...disposicao.janela, x, y } };
+		posicao = bolinhaPelaJanela(disposicao, { x, y });
 		gravarDepois();
 	});
 	nova.on("closed", () => {
@@ -224,7 +215,20 @@ function ligar(ligada) {
 
 function avisarModo() {
 	const atual = vivaOuNula();
-	if (atual && !atual.webContents.isDestroyed()) atual.webContents.send("estudos:flutuante:modo-mudou", modo);
+	if (atual && !atual.webContents.isDestroyed()) atual.webContents.send("estudos:flutuante:modo-mudou", modo, disposicao);
+}
+
+/**
+ * O recorte da janela: no modo bolinha, ela inteira; no chat, só a bolinha, o balão e a pontinha, e o vazio em
+ * volta deixa o clique passar ao app de trás. Sem setShape (ou se ele falhar), segue sem recorte.
+ */
+function aplicarForma(atual) {
+	try {
+		if (typeof atual.setShape !== "function") return;
+		atual.setShape(modo === "chat" && disposicao ? formaDoChat(disposicao) : [{ x: 0, y: 0, ...TAMANHO_BOLINHA }]);
+	} catch (erro) {
+		console.warn("não consegui recortar a janela (setShape):", erro);
+	}
 }
 
 function areaDaBolinha() {
@@ -234,13 +238,13 @@ function areaDaBolinha() {
 function expandir() {
 	const atual = vivaOuNula();
 	if (!atual || modo === "chat") return;
-	// Onde o Breno deixou o chat da última vez (arrastado pelo topo), se ainda cabe numa tela; senão, junto da bolinha.
-	const canto = posicaoChat && cabeEmAlgumaTela(posicaoChat) ? posicaoChat : posicaoDoChat(posicao, areaDaBolinha());
-	deslocamentoBolinha = { x: posicao.x - canto.x, y: posicao.y - canto.y };
+	// O balão abre ao lado da bolinha, que não sai do lugar: a janela cresce para conter as duas.
+	disposicao = disposicaoDoChat(posicao, areaDaBolinha());
 	modo = "chat";
-	atual.setHasShadow(true);
+	atual.setHasShadow(false);
 	atual.setFocusable(true);
-	atual.setBounds({ ...canto, ...TAMANHO_CHAT });
+	atual.setBounds(disposicao.janela);
+	aplicarForma(atual);
 	if (!atual.isVisible()) atual.showInactive();
 	atual.focus();
 	avisarModo();
@@ -250,8 +254,9 @@ function recolher() {
 	const atual = vivaOuNula();
 	if (!atual || modo === "bolinha") return;
 	modo = "bolinha";
+	disposicao = null;
 	atual.setBounds(boundsBolinha());
-	atual.setHasShadow(false);
+	aplicarForma(atual);
 	atual.setFocusable(false);
 	// Devolve o foco ao app em que o Breno estava (o Samsung Notes): esconder a janela ativa faz o Windows ativar a
 	// janela anterior; depois ela volta como bolinha, sem foco. (O blur() ativava a próxima na ordem Z, que podia ser
@@ -264,7 +269,15 @@ function recolher() {
 function reposicionar() {
 	posicao = corrigirPosicao(posicao, areas());
 	const atual = vivaOuNula();
-	if (atual && modo === "bolinha") atual.setBounds(boundsBolinha());
+	if (!atual) return;
+	if (modo === "bolinha") atual.setBounds(boundsBolinha());
+	else if (modo === "chat") {
+		// A tela mudou com o balão aberto: nova disposição para a bolinha corrigida.
+		disposicao = disposicaoDoChat(posicao, areaDaBolinha());
+		atual.setBounds(disposicao.janela);
+		aplicarForma(atual);
+		avisarModo();
+	}
 }
 
 function alternarChat() {
@@ -357,15 +370,23 @@ function registrarIpc() {
 	ipcMain.handle("estudos:flutuante:recolher", (evento) => {
 		if (daBolinha(evento)) recolher();
 	});
-	// Arrastar a bolinha: nunca foca. No chat não há o que arrastar.
+	ipcMain.handle("estudos:flutuante:disposicao", (evento) => (daBolinha(evento) ? disposicao : null));
+	// Arrastar a bolinha: nunca foca. (x, y) é a posição desejada da BOLINHA na tela. No modo chat a janela anda junto,
+	// com o mesmo tamanho e a mesma disposição (sem recalcular durante o arrasto).
 	ipcMain.handle("estudos:flutuante:mover", (evento, x, y) => {
-		if (!daBolinha(evento) || modo !== "bolinha" || typeof x !== "number" || typeof y !== "number" || !Number.isFinite(x) || !Number.isFinite(y)) return;
+		if (!daBolinha(evento) || typeof x !== "number" || typeof y !== "number" || !Number.isFinite(x) || !Number.isFinite(y)) return;
 		const atual = vivaOuNula();
 		if (!atual) return;
 		const centro = { x: Math.round(x) + TAMANHO_BOLINHA.width / 2, y: Math.round(y) + TAMANHO_BOLINHA.height / 2 };
 		const area = screen.getDisplayNearestPoint(centro).workArea;
 		posicao = limitarNaArea(x, y, TAMANHO_BOLINHA, area);
-		atual.setBounds(boundsBolinha());
+		if (modo === "chat" && disposicao) {
+			const canto = janelaPelaBolinha(disposicao, posicao);
+			disposicao = { ...disposicao, janela: { ...disposicao.janela, ...canto } };
+			atual.setBounds(disposicao.janela);
+		} else if (modo === "bolinha") {
+			atual.setBounds(boundsBolinha());
+		}
 		gravarDepois();
 	});
 	ipcMain.handle("estudos:flutuante:capturar", (evento) => (daBolinha(evento) ? capturarTela() : null));

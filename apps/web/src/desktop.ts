@@ -12,13 +12,52 @@ export interface CapturaDaTela {
 
 export type ModoFlutuante = "bolinha" | "chat";
 
+/** Um retângulo em pixels, relativo à janela. */
+export interface RetanguloJanela {
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+}
+
+/**
+ * Como o chat fica ao lado da bolinha (docs/professor-flutuante.md, 2.3). Tudo relativo à janela, exceto
+ * `janela`, que está na tela. `ponta.y` é o centro da bolinha dentro do balão (relativo ao topo dele).
+ */
+export interface Disposicao {
+	janela: RetanguloJanela;
+	bolinha: { x: number; y: number };
+	balao: RetanguloJanela;
+	lado: "esquerda" | "direita";
+	ponta: { y: number };
+}
+
+const ehNumero = (valor: unknown): valor is number => typeof valor === "number" && Number.isFinite(valor);
+const ehRetangulo = (valor: unknown): valor is RetanguloJanela => {
+	if (!valor || typeof valor !== "object") return false;
+	const r = valor as Record<string, unknown>;
+	return ehNumero(r.x) && ehNumero(r.y) && ehNumero(r.width) && ehNumero(r.height);
+};
+
+/** Confere o que a ponte mandou: uma disposição inteira, ou undefined. */
+export function lerDisposicao(bruto: unknown): Disposicao | undefined {
+	if (!bruto || typeof bruto !== "object") return undefined;
+	const { janela, bolinha, balao, lado, ponta } = bruto as Record<string, unknown>;
+	if (!ehRetangulo(janela) || !ehRetangulo(balao)) return undefined;
+	if (!bolinha || typeof bolinha !== "object" || !ehNumero((bolinha as { x?: unknown }).x) || !ehNumero((bolinha as { y?: unknown }).y)) return undefined;
+	if (lado !== "esquerda" && lado !== "direita") return undefined;
+	if (!ponta || typeof ponta !== "object" || !ehNumero((ponta as { y?: unknown }).y)) return undefined;
+	return bruto as Disposicao;
+}
+
 /** A ponte da janela da bolinha (docs/professor-flutuante.md, 2.3). Só existe nela. */
 export interface PonteFlutuante {
 	modo(): Promise<ModoFlutuante>;
+	/** A disposição atual do balão ao lado da bolinha, ou null no modo bolinha. */
+	disposicao(): Promise<Disposicao | null>;
 	expandir(): Promise<void>;
 	recolher(): Promise<void>;
-	/** A posição da janela em pixels da tela (arrastar a bolinha). */
-	/** Leva a bolinha até (x, y) da tela; resolve quando a janela já andou. */
+	/** Leva a BOLINHA até (x, y) da tela (no modo chat a janela anda junto); resolve quando a janela já andou. */
 	moverPara(x: number, y: number): Promise<void> | void;
 	capturarTela(): Promise<CapturaDaTela | null>;
 	abrirApp(): Promise<void>;
@@ -26,7 +65,7 @@ export interface PonteFlutuante {
 	esconder(): Promise<void>;
 	/** O menu nativo do clique direito (opcional: sem ele, a tela desenha o próprio menu). */
 	menu?(): Promise<void>;
-	aoMudarModo(cb: (modo: ModoFlutuante) => void): () => void;
+	aoMudarModo(cb: (modo: ModoFlutuante, disposicao?: Disposicao) => void): () => void;
 	/** O atalho Ctrl+Alt+Espaço. */
 	aoAlternarVoz(cb: () => void): () => void;
 }
@@ -75,8 +114,10 @@ export function lerPonteFlutuante(janela: { estudosDesktop?: unknown }): PonteFl
 	if (!bruto || typeof bruto !== "object") return undefined;
 	const ponte = (bruto as { flutuante?: unknown }).flutuante;
 	if (!ponte || typeof ponte !== "object") return undefined;
-	const nomes = ["modo", "expandir", "recolher", "moverPara", "capturarTela", "abrirApp", "esconder", "aoMudarModo", "aoAlternarVoz"];
-	return temFuncoes(ponte, nomes) ? (ponte as PonteFlutuante) : undefined;
+	const nomes = ["modo", "disposicao", "expandir", "recolher", "moverPara", "capturarTela", "abrirApp", "esconder", "aoMudarModo", "aoAlternarVoz"];
+	if (!temFuncoes(ponte, nomes)) return undefined;
+	// A disposição que a ponte entrega é conferida pela tela com lerDisposicao (a ponte fica a mesma, sem embrulho).
+	return ponte as PonteFlutuante;
 }
 
 /** A ponte que liga e desliga a bolinha, se o preload expôs uma inteira. */
@@ -89,8 +130,8 @@ export function lerPonteBolinha(janela: { estudosDesktop?: unknown }): PonteBoli
 }
 
 /**
- * A janela da bolinha começa transparente (a página não pinta o fundo no modo
- * bolinha; estilo.css). Chamado antes do primeiro desenho, para a janela não
+ * A janela da bolinha é sempre transparente (a página não pinta o fundo, nos dois
+ * modos; estilo.css). Chamado antes do primeiro desenho, para a janela não
  * nascer com um quadrado de fundo.
  */
 export function marcarRotaFlutuante(janela: Window = window): void {

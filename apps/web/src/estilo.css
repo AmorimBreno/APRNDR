@@ -248,10 +248,25 @@ a.cartao:hover .cartao__carregar .overline, a.cartao:focus-visible .cartao__carr
 .perfis__flutuante-rotulos { display: inline-grid; }
 .perfis__flutuante-rotulos > span { grid-area: 1 / 1; white-space: nowrap; }
 
-/* A janela da bolinha nasce transparente; no modo chat (classe flutuante-chat) volta o fundo de sempre.
- * Na bolinha o zoom do app não vale: a janela tem 76 px e a foto 64, em pixels de verdade. */
-html.rota-flutuante:not(.flutuante-chat), html.rota-flutuante:not(.flutuante-chat) body, html.rota-flutuante:not(.flutuante-chat) #raiz { background: transparent; }
-html.rota-flutuante:not(.flutuante-chat) body { zoom: 1; }
+/* Na janela do Electron (rota-flutuante sem flutuante-solto) a página é sempre transparente e sem o zoom do app: as
+ * posições da bolinha e do balão vêm do Electron em pixels de verdade, e o recorte da janela (setShape) é o mesmo.
+ * O zoom de 90% do app vale só dentro do balão. No navegador comum (flutuante-solto), o fundo e o zoom de sempre. */
+html.rota-flutuante:not(.flutuante-solto), html.rota-flutuante:not(.flutuante-solto) body, html.rota-flutuante:not(.flutuante-solto) #raiz { background: transparent; }
+html.rota-flutuante:not(.flutuante-solto) body { zoom: 1; overflow: hidden; }
+html.rota-flutuante:not(.flutuante-solto), html.rota-flutuante:not(.flutuante-solto) body, html.rota-flutuante:not(.flutuante-solto) #raiz { width: 100%; height: 100%; margin: 0; }
+
+/* A cena do modo chat: a bolinha e o balão, cada um na posição que o Electron mandou (disposicao). */
+.flutuante-cena { position: relative; width: 100%; height: 100%; }
+.flutuante-balao { position: absolute; box-sizing: border-box; border-radius: 18px; background: var(--surface-panel); box-shadow: inset 0 0 0 var(--border-hair) var(--line-strong); animation: balao-surge 160ms ease-out both; }
+.flutuante-balao__corpo { position: absolute; inset: 0; border-radius: 18px; overflow: hidden; }
+/* O conteúdo do chat na escala do resto do app (o Chromium já resolve os 100% no espaço com zoom: a caixa enche o balão). */
+.flutuante-balao__corpo > .flutuante { zoom: var(--zoom-app); width: 100%; height: 100%; background: transparent; }
+/* A pontinha: um quadrado girado da cor do balão, metade para fora, no lado da bolinha (no vão de 14 px). */
+.flutuante-balao__ponta { position: absolute; width: 12px; height: 12px; background: var(--surface-panel); transform: rotate(45deg); box-shadow: inset 0 0 0 var(--border-hair) var(--line-strong); clip-path: polygon(0 0, 100% 0, 100% 100%); }
+.flutuante-balao[data-lado="esquerda"] .flutuante-balao__ponta { right: -6px; }
+.flutuante-balao[data-lado="direita"] .flutuante-balao__ponta { left: -6px; transform: rotate(-135deg); }
+@keyframes balao-surge { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .flutuante-balao { animation: none; } }
 
 .flutuante-aguarda { width: 100%; height: 100%; }
 

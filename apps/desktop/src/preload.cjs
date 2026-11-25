@@ -19,6 +19,8 @@ function ouvir(canal, cb) {
 /** Só na janela da bolinha (o contrato é o docs/professor-flutuante.md, 2.3). */
 const flutuante = {
 	modo: () => ipcRenderer.invoke("estudos:flutuante:modo"),
+	/** A disposição do balão ao lado da bolinha (no modo chat), ou null na bolinha. */
+	disposicao: () => ipcRenderer.invoke("estudos:flutuante:disposicao"),
 	expandir: () => ipcRenderer.invoke("estudos:flutuante:expandir"),
 	recolher: () => ipcRenderer.invoke("estudos:flutuante:recolher"),
 	/** Leva a BOLINHA até (x, y) da tela (no modo chat, a janela anda junto); a promessa resolve quando a janela já andou (o arrasto espera por ela). */

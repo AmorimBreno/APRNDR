@@ -16,7 +16,7 @@
 // "screen-saver" só valeria para apps em tela cheia exclusiva; se algum dia a bolinha sumir atrás
 // de um, troque o NIVEL_POR_CIMA abaixo.
 
-import { desktopCapturer, globalShortcut, ipcMain, Menu, nativeImage, screen, shell, Tray, BrowserWindow, app } from "electron";
+import { desktopCapturer, globalShortcut, ipcMain, Menu, nativeImage, screen, shell, systemPreferences, Tray, BrowserWindow, app } from "electron";
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import {
@@ -299,8 +299,42 @@ function abrirBalao() {
 	deslocamento = deslocamentoDoBalao(disposicao, posicao);
 	colocarBalao(disposicao.balao);
 	avisarDisposicao();
-	b.show();
+	surgir(b);
 	b.focus();
+}
+
+/** O relógio do surgir do balão, para um abrir novo cancelar o anterior. */
+/** @type {ReturnType<typeof setInterval> | undefined} */
+let relogioSurgir;
+
+/**
+ * Mostra o balão já invisível e sobe a opacidade da janela em ~150 ms. Uma animação na página piscava: o Windows mostra
+ * primeiro o último quadro pintado (o balão inteiro) e a animação recomeçava do zero (relato do Breno). Com movimento
+ * reduzido no Windows, aparece direto.
+ * @param {import("electron").BrowserWindow} b
+ */
+function surgir(b) {
+	clearInterval(relogioSurgir);
+	const reduzido = (() => {
+		try {
+			return systemPreferences.getAnimationSettings().prefersReducedMotion;
+		} catch {
+			return false;
+		}
+	})();
+	if (reduzido) {
+		b.setOpacity(1);
+		b.show();
+		return;
+	}
+	b.setOpacity(0);
+	b.show();
+	let opacidade = 0;
+	relogioSurgir = setInterval(() => {
+		opacidade = Math.min(1, opacidade + 0.12);
+		if (!b.isDestroyed()) b.setOpacity(opacidade);
+		if (opacidade >= 1 || b.isDestroyed()) clearInterval(relogioSurgir);
+	}, 16);
 }
 
 /** Fecha o balão: só esconde (o Windows devolve a ativação à janela de antes). */

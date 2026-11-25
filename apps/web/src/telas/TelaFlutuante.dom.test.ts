@@ -377,22 +377,6 @@ describe("a página do balão", () => {
 		expect(balao()!.dataset.lado).toBe("direita");
 	});
 
-	it("a animação de surgir recomeça quando a disposição chega e quando a janela fica visível", async () => {
-		desenhar();
-		await ate(() => balao() !== null);
-		await ate(() => vi.mocked(ponte.aoMudarDisposicao).mock.calls.length > 0);
-		await esperar(30);
-		// Reiniciar a animação força o recálculo do layout (offsetWidth); conta quantas vezes isso acontece.
-		const leituras = vi.spyOn(HTMLElement.prototype, "offsetWidth", "get");
-		ponte.mudarDisposicao(DISPOSICAO_ESQUERDA);
-		await ate(() => leituras.mock.calls.length >= 1);
-		const depoisDaDisposicao = leituras.mock.calls.length;
-		document.dispatchEvent(new Event("visibilitychange"));
-		await ate(() => leituras.mock.calls.length > depoisDaDisposicao);
-		// A animação inline volta a "" (vale a da classe, que o movimento reduzido desliga no CSS).
-		expect(balao()!.style.animation).toBe("");
-	});
-
 	it("sem ponte (navegador comum) é só o chat, sem câmera nem Recolher, e a página mantém o fundo e o zoom de sempre", async () => {
 		root.render(createElement(TelaFlutuante, { perfilId: "estudos", balao: true, ambienteVoz: voz.ambiente }));
 		await ate(() => campo() !== null);

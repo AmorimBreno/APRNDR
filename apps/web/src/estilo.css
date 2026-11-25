@@ -257,7 +257,7 @@ html.rota-flutuante:not(.flutuante-solto), html.rota-flutuante:not(.flutuante-so
 
 /* A janela do balão: o balão ocupa a janela menos o vão de 14 px do lado da bolinha, onde a pontinha é desenhada. */
 .flutuante-cena { position: relative; width: 100%; height: 100%; }
-.flutuante-balao { position: absolute; top: 0; bottom: 0; box-sizing: border-box; border-radius: 18px; background: var(--surface-panel); box-shadow: inset 0 0 0 var(--border-hair) var(--line-strong); animation: balao-surge 160ms ease-out both; }
+.flutuante-balao { position: absolute; top: 0; bottom: 0; box-sizing: border-box; border-radius: 18px; background: var(--surface-panel); box-shadow: inset 0 0 0 var(--border-hair) var(--line-strong); }
 .flutuante-balao[data-lado="direita"] { left: 14px; right: 0; }
 .flutuante-balao[data-lado="esquerda"] { left: 0; right: 14px; }
 .flutuante-balao__corpo { position: absolute; inset: 0; border-radius: 18px; overflow: hidden; }
@@ -267,7 +267,6 @@ html.rota-flutuante:not(.flutuante-solto), html.rota-flutuante:not(.flutuante-so
 .flutuante-balao__ponta { position: absolute; width: 12px; height: 12px; background: var(--surface-panel); transform: rotate(45deg); box-shadow: inset 0 0 0 var(--border-hair) var(--line-strong); clip-path: polygon(0 0, 100% 0, 100% 100%); }
 .flutuante-balao[data-lado="esquerda"] .flutuante-balao__ponta { right: -6px; }
 .flutuante-balao[data-lado="direita"] .flutuante-balao__ponta { left: -6px; transform: rotate(-135deg); }
-@keyframes balao-surge { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { .flutuante-balao { animation: none; } }
 
 

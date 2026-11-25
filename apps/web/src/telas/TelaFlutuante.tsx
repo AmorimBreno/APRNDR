@@ -442,26 +442,10 @@ function TelaBalao({ perfilId, cabecalho, ponte: ponteProp, ambienteVoz }: Props
 		};
 	}, [ponte]);
 
-	// A animação de surgir (160 ms a partir da pontinha) roda a cada vez que o balão é mostrado: a janela não é remontada,
-	// então ela é reiniciada quando a disposição chega e quando a janela fica visível de novo.
+	// O balão surge pela opacidade da própria janela (o Electron, em flutuante.mjs): reiniciar uma animação da página a
+	// cada abertura fazia piscar (o Windows mostra primeiro o último quadro pintado, o balão inteiro; depois a animação
+	// recomeçava do zero e ele sumia e voltava; relato do Breno).
 	const balaoRef = useRef<HTMLDivElement>(null);
-	const surgir = useCallback(() => {
-		const elemento = balaoRef.current;
-		if (!elemento) return;
-		elemento.style.animation = "none";
-		void elemento.offsetWidth; // força o recálculo, para a animação da classe recomeçar
-		elemento.style.animation = "";
-	}, []);
-	useEffect(() => {
-		if (disposicao) surgir();
-	}, [disposicao, surgir]);
-	useEffect(() => {
-		const mudou = () => {
-			if (document.visibilityState === "visible") surgir();
-		};
-		document.addEventListener("visibilitychange", mudou);
-		return () => document.removeEventListener("visibilitychange", mudou);
-	}, [surgir]);
 
 	// O rascunho, a captura e a voz ficam aqui, na janela que não é destruída.
 	const rascunho = useState("");
